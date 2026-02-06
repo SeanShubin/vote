@@ -1,5 +1,7 @@
 package com.seanshubin.vote.backend.service
 
+import com.seanshubin.vote.backend.crypto.PasswordUtil
+import com.seanshubin.vote.backend.validation.Validation
 import com.seanshubin.vote.contract.*
 import com.seanshubin.vote.domain.*
 
@@ -37,28 +39,38 @@ class ServiceImpl(
     }
 
     override fun register(userName: String, email: String, password: String): Tokens {
-        // TODO: Validation, password hashing
+        val validUserName = Validation.validateUserName(userName)
+        val validEmail = Validation.validateEmail(email)
+        val validPassword = Validation.validatePassword(password)
+
+        require(queryModel.searchUserByName(validUserName) == null) { "User name already exists: $validUserName" }
+        require(queryModel.searchUserByEmail(validEmail) == null) { "Email already exists: $validEmail" }
+
         val role = if (queryModel.userCount() == 0) Role.OWNER else Role.USER
-        val salt = uniqueIdGenerator.generate()
-        val hash = uniqueIdGenerator.generate() // TODO: proper password hashing
+        val saltAndHash = PasswordUtil.createSaltAndHash(validPassword)
 
         eventLog.appendEvent(
             "system",
             clock.now(),
-            DomainEvent.UserRegistered(userName, email, salt, hash, role)
+            DomainEvent.UserRegistered(validUserName, validEmail, saltAndHash.salt, saltAndHash.hash, role)
         )
         synchronize()
 
-        val user = queryModel.findUserByName(userName)
+        val user = queryModel.findUserByName(validUserName)
         val accessToken = AccessToken(user.name, user.role)
         val refreshToken = RefreshToken(user.name)
         return Tokens(accessToken, refreshToken)
     }
 
     override fun authenticate(nameOrEmail: String, password: String): Tokens {
-        val user = queryModel.searchUserByName(nameOrEmail)
-            ?: queryModel.findUserByEmail(nameOrEmail)
-        // TODO: Password verification
+        val validNameOrEmail = Validation.validateNameOrEmail(nameOrEmail)
+        val user = queryModel.searchUserByName(validNameOrEmail)
+            ?: queryModel.findUserByEmail(validNameOrEmail)
+
+        require(PasswordUtil.passwordMatches(password, user.salt, user.hash)) {
+            "Invalid password for user: $validNameOrEmail"
+        }
+
         val accessToken = AccessToken(user.name, user.role)
         val refreshToken = RefreshToken(user.name)
         return Tokens(accessToken, refreshToken)
@@ -299,12 +311,12 @@ class ServiceImpl(
     }
 
     override fun changePassword(accessToken: AccessToken, userName: String, password: String) {
-        val salt = uniqueIdGenerator.generate()
-        val hash = uniqueIdGenerator.generate() // TODO: proper password hashing
+        val validPassword = Validation.validatePassword(password)
+        val saltAndHash = PasswordUtil.createSaltAndHash(validPassword)
         eventLog.appendEvent(
             accessToken.userName,
             clock.now(),
-            DomainEvent.UserPasswordChanged(userName, salt, hash)
+            DomainEvent.UserPasswordChanged(userName, saltAndHash.salt, saltAndHash.hash)
         )
         synchronize()
     }
