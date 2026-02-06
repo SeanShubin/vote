@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+set -e
+
+ENDPOINT="http://localhost:8000"
+REGION="us-east-1"
+export AWS_ACCESS_KEY_ID=dummy
+export AWS_SECRET_ACCESS_KEY=dummy
+
+# Optional election name filter
+ELECTION_NAME="${1:-}"
+
+echo "=== Ballots (Single-Table) ==="
+echo ""
+
+if [ -n "$ELECTION_NAME" ]; then
+    echo "Filtering by election: $ELECTION_NAME"
+    echo ""
+
+    # Query specific election's ballots
+    result=$(aws dynamodb query \
+        --table-name vote_data \
+        --key-condition-expression "PK = :pk AND begins_with(SK, :sk_prefix)" \
+        --expression-attribute-values "{\":pk\":{\"S\":\"ELECTION#${ELECTION_NAME}\"},\":sk_prefix\":{\"S\":\"BALLOT#\"}}" \
+        --endpoint-url "$ENDPOINT" \
+        --region "$REGION" \
+        2>/dev/null)
+else
+    # Scan for all ballots
+    result=$(aws dynamodb scan \
+        --table-name vote_data \
+        --filter-expression "begins_with(SK, :prefix)" \
+        --expression-attribute-values '{":prefix":{"S":"BALLOT#"}}' \
+        --endpoint-url "$ENDPOINT" \
+        --region "$REGION" \
+        2>/dev/null)
+fi
+
+count=$(echo "$result" | jq -r '.Count // 0')
+
+if [ "$count" -eq 0 ]; then
+    echo "No ballots found."
+else
+    echo "Found $count ballot(s):"
+    echo ""
+    echo "$result" | jq -r '.Items[] |
+        "Election:     " + .election_name.S + "\n" +
+        "Voter:        " + .voter_name.S + "\n" +
+        "Confirmation: " + .confirmation.S + "\n" +
+        "When Cast:    " + .when_cast.N + "\n" +
+        "Rankings:     " + .rankings.S + "\n"'
+fi

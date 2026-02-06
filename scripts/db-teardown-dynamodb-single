@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+set -e
+
+echo "=========================================="
+echo "Tearing down DynamoDB Local (Single-Table)"
+echo "=========================================="
+echo ""
+
+# Stop and remove container
+if docker ps -a --format '{{.Names}}' | grep -q '^vote-dynamodb-local$'; then
+    echo "Stopping and removing DynamoDB Local container..."
+    docker stop vote-dynamodb-local 2>/dev/null || true
+    docker rm vote-dynamodb-local 2>/dev/null || true
+    echo "✓ Container removed"
+else
+    echo "✓ No DynamoDB Local container found"
+fi
+
+echo ""
+echo "=========================================="
+echo "Teardown complete!"
+echo "=========================================="
