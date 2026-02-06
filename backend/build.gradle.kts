@@ -31,6 +31,10 @@ dependencies {
     // Email
     implementation("javax.mail:mail:1.4.7")
 
+    // Logging
+    implementation("ch.qos.logback:logback-classic:1.4.14")
+    implementation("org.slf4j:slf4j-api:2.0.9")
+
     // Testing
     testImplementation(kotlin("test"))
     testImplementation("org.junit.jupiter:junit-jupiter:${project.property("junit.version")}")

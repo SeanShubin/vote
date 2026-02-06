@@ -11,11 +11,13 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.eclipse.jetty.server.Request
 import org.eclipse.jetty.server.handler.AbstractHandler
+import org.slf4j.LoggerFactory
 
 class SimpleHttpHandler(
     private val service: Service,
     private val json: Json
 ) : AbstractHandler() {
+    private val log = LoggerFactory.getLogger(SimpleHttpHandler::class.java)
 
     override fun handle(
         target: String,
@@ -26,6 +28,8 @@ class SimpleHttpHandler(
         baseRequest.isHandled = true
         response.contentType = "application/json"
         response.characterEncoding = "UTF-8"
+
+        log.debug("${request.method} $target")
 
         try {
             when {
@@ -64,9 +68,11 @@ class SimpleHttpHandler(
                 }
             }
         } catch (e: IllegalArgumentException) {
+            log.warn("Bad request: ${request.method} $target - ${e.message}", e)
             response.status = HttpServletResponse.SC_BAD_REQUEST
             response.writer.write(json.encodeToString(ErrorResponse(e.message ?: "Bad request")))
         } catch (e: ServiceException) {
+            log.info("Service exception: ${request.method} $target - ${e.category}: ${e.message}")
             response.status = when (e.category) {
                 ServiceException.Category.UNAUTHORIZED -> HttpServletResponse.SC_UNAUTHORIZED
                 ServiceException.Category.NOT_FOUND -> HttpServletResponse.SC_NOT_FOUND
@@ -76,6 +82,7 @@ class SimpleHttpHandler(
             }
             response.writer.write(json.encodeToString(ErrorResponse(e.message ?: "Service error")))
         } catch (e: Exception) {
+            log.error("Unhandled exception: ${request.method} $target", e)
             response.status = HttpServletResponse.SC_INTERNAL_SERVER_ERROR
             response.writer.write(json.encodeToString(ErrorResponse(e.message ?: "Unknown error")))
         }
