@@ -7,5 +7,6 @@ include(
     ":frontend",
     ":deploy",
     ":local",
-    ":integration"
+    ":integration",
+    ":schema-diagram"
 )
