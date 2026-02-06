@@ -285,6 +285,7 @@ Created `schema-diagram` Gradle module with:
    - Color-coded PK/FK annotations
 
 4. **HtmlTableGenerator** - Generates browsable HTML
+   - Embeds SVG diagram at the top (like code-structure)
    - Tables with color-coded keys (PK red, FK blue)
    - Columns with types and constraints
    - Simple, no-dependencies format

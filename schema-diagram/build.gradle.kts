@@ -36,6 +36,7 @@ tasks.register("generateSchemaDiagram") {
 
         outputDir.mkdirs()
 
+        // First pass: generate .dot and .mmd files
         javaexec {
             classpath = sourceSets["main"].runtimeClasspath
             mainClass.set("com.seanshubin.vote.schema.MainKt")
@@ -57,6 +58,16 @@ tasks.register("generateSchemaDiagram") {
                 }
                 if (svgFile.exists()) {
                     println("✓ Generated SVG diagram: ${svgFile.absolutePath}")
+
+                    // Second pass: regenerate HTML with embedded SVG
+                    javaexec {
+                        classpath = sourceSets["main"].runtimeClasspath
+                        mainClass.set("com.seanshubin.vote.schema.MainKt")
+                        args = listOf(
+                            schemaFile.absolutePath,
+                            outputDir.absolutePath
+                        )
+                    }
                 } else {
                     println("⚠ GraphViz 'dot' command not found. Install GraphViz to generate SVG.")
                 }

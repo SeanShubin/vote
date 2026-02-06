@@ -1,7 +1,9 @@
 package com.seanshubin.vote.schema
 
+import java.io.File
+
 object HtmlTableGenerator {
-    fun generate(schema: Schema): String {
+    fun generate(schema: Schema, svgFile: File? = null): String {
         val sb = StringBuilder()
 
         sb.appendLine("<!DOCTYPE html>")
@@ -23,6 +25,14 @@ object HtmlTableGenerator {
         sb.appendLine("</head>")
         sb.appendLine("<body>")
         sb.appendLine("    <h1>Database Schema</h1>")
+
+        // Embed SVG diagram if available
+        if (svgFile != null && svgFile.exists()) {
+            sb.appendLine("    <div>")
+            val svgContent = svgFile.readText()
+            sb.appendLine(svgContent)
+            sb.appendLine("    </div>")
+        }
 
         for (table in schema.tables) {
             sb.appendLine("    <div class=\"table-name\">${table.name}</div>")

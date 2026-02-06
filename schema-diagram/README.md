@@ -25,7 +25,7 @@ Output files are written to `generated/schema-diagram/`:
 - `schema.dot` - GraphViz source
 - `schema.svg` - Rendered SVG diagram (requires GraphViz installed)
 - `schema.mmd` - Mermaid ER diagram
-- `schema.html` - HTML table view
+- `schema.html` - HTML table view with embedded SVG diagram at the top
 
 ### Automatic Generation
 

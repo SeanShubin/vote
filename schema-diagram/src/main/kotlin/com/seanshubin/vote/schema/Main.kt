@@ -45,9 +45,10 @@ fun main(args: Array<String>) {
     mermaidFile.writeText(mermaidContent)
     println("✓ Written: ${mermaidFile.absolutePath}")
 
-    // Generate HTML table
+    // Generate HTML table (with embedded SVG if available)
     println("Generating HTML table...")
-    val htmlContent = HtmlTableGenerator.generate(schema)
+    val svgFile = File(outputDir, "schema.svg")
+    val htmlContent = HtmlTableGenerator.generate(schema, if (svgFile.exists()) svgFile else null)
     val htmlFile = File(outputDir, "schema.html")
     htmlFile.writeText(htmlContent)
     println("✓ Written: ${htmlFile.absolutePath}")
