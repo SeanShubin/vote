@@ -7,14 +7,13 @@ import org.jetbrains.compose.web.dom.*
 
 @Composable
 fun RegisterPage(
-    onRegisterSuccess: () -> Unit,
+    onLoginSuccess: (String, String) -> Unit,
     onNavigateToLogin: () -> Unit
 ) {
     var userName by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf<String?>(null) }
-    var successMessage by remember { mutableStateOf<String?>(null) }
     var isLoading by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
@@ -24,12 +23,6 @@ fun RegisterPage(
         if (errorMessage != null) {
             Div({ classes("error") }) {
                 Text(errorMessage!!)
-            }
-        }
-
-        if (successMessage != null) {
-            Div({ classes("success") }) {
-                Text(successMessage!!)
             }
         }
 
@@ -57,15 +50,11 @@ fun RegisterPage(
                     if (!isLoading) {
                         isLoading = true
                         errorMessage = null
-                        successMessage = null
                         scope.launch {
                             try {
-                                ApiClient.register(userName, email, password)
-                                successMessage = "Registration successful! Please login."
-                                userName = ""
-                                email = ""
-                                password = ""
-                                onRegisterSuccess()
+                                val tokens = ApiClient.register(userName, email, password)
+                                val tokenJson = """{"userName":"$userName","role":"USER"}"""
+                                onLoginSuccess(tokenJson, userName)
                             } catch (e: Exception) {
                                 ApiClient.logErrorToServer(e)
                                 errorMessage = e.message ?: "Registration failed"

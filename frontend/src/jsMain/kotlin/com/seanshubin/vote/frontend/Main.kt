@@ -25,8 +25,10 @@ fun VoteApp() {
             onNavigateToRegister = { currentPage = Page.Register }
         )
         is Page.Register -> RegisterPage(
-            onRegisterSuccess = {
-                currentPage = Page.Login
+            onLoginSuccess = { token, user ->
+                authToken = token
+                userName = user
+                currentPage = Page.Home
             },
             onNavigateToLogin = { currentPage = Page.Login }
         )
