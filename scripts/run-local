@@ -1,19 +1,17 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -e
 
-# Start complete local development environment
-# TODO: Implement once backend and frontend are ready
-# Will start:
-# - DynamoDB Local (Docker/Testcontainers)
-# - H2 database (embedded)
-# - Backend server (:8080)
-# - Frontend dev server (:3000)
+# Convenience script - launches fresh development environment with DynamoDB
+# For all 4 combinations, see:
+#   ./scripts/launch-fresh-mysql      - Fresh start with MySQL
+#   ./scripts/launch-fresh-dynamodb   - Fresh start with DynamoDB (this script)
+#   ./scripts/launch-keep-mysql       - Keep existing MySQL data
+#   ./scripts/launch-keep-dynamodb    - Keep existing DynamoDB data
 
-echo "Starting local development environment..."
-echo "TODO: Implementation pending (Milestone 1)"
-echo ""
-echo "This will eventually run:"
-echo "  - DynamoDB Local (Docker)"
-echo "  - H2 database (embedded)"
-echo "  - Backend server on :8080"
-echo "  - Frontend dev server on :3000"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+echo "Launching fresh development environment (DynamoDB)..."
+echo "For other options, run: ls scripts/launch-*"
+echo
+
+"$SCRIPT_DIR/launch-fresh-dynamodb"

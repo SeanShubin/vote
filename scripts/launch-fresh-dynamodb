@@ -8,7 +8,7 @@ LOG_DIR="$PROJECT_DIR/logs"
 
 mkdir -p "$LOG_DIR"
 
-echo "=== Fresh Smoke Test (DynamoDB) ==="
+echo "=== Launch Fresh (DynamoDB) ==="
 echo
 
 # 1. Terminate existing processes
@@ -78,7 +78,7 @@ echo "8. Opening browser..."
 open http://localhost:3000
 
 echo
-echo "=== Smoke Test Environment Ready ==="
+echo "=== Development Environment Ready ==="
 echo "Backend:  http://localhost:8080 (DynamoDB)"
 echo "Frontend: http://localhost:3000"
 echo "Logs:     logs/backend.log, logs/frontend.log"
