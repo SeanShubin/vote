@@ -1,6 +1,7 @@
 package com.seanshubin.vote.backend.repository
 
 import com.seanshubin.vote.contract.CommandModel
+import com.seanshubin.vote.contract.QueryLoader
 import com.seanshubin.vote.domain.ElectionUpdates
 import com.seanshubin.vote.domain.Ranking
 import com.seanshubin.vote.domain.Role
@@ -12,10 +13,11 @@ import java.sql.Timestamp
 
 class MySqlCommandModel(
     private val connection: Connection,
+    private val queryLoader: QueryLoader,
     private val json: Json
 ) : CommandModel {
     override fun setLastSynced(lastSynced: Long) {
-        val sql = "UPDATE sync_state SET last_synced = ? WHERE id = 1"
+        val sql = queryLoader.load("sync-state-update")
         connection.prepareStatement(sql).use { stmt ->
             stmt.setLong(1, lastSynced)
             stmt.executeUpdate()
@@ -23,10 +25,7 @@ class MySqlCommandModel(
     }
 
     override fun initializeLastSynced(lastSynced: Long) {
-        val sql = """
-            INSERT INTO sync_state (id, last_synced) VALUES (1, ?)
-            ON DUPLICATE KEY UPDATE last_synced = VALUES(last_synced)
-        """.trimIndent()
+        val sql = queryLoader.load("sync-state-upsert")
         connection.prepareStatement(sql).use { stmt ->
             stmt.setLong(1, lastSynced)
             stmt.executeUpdate()
@@ -41,7 +40,7 @@ class MySqlCommandModel(
         hash: String,
         role: Role
     ) {
-        val sql = "INSERT INTO users (name, email, salt, hash, role) VALUES (?, ?, ?, ?, ?)"
+        val sql = queryLoader.load("user-insert")
         connection.prepareStatement(sql).use { stmt ->
             stmt.setString(1, userName)
             stmt.setString(2, email)
@@ -53,7 +52,7 @@ class MySqlCommandModel(
     }
 
     override fun setRole(authority: String, userName: String, role: Role) {
-        val sql = "UPDATE users SET role = ? WHERE name = ?"
+        val sql = queryLoader.load("user-update-role")
         connection.prepareStatement(sql).use { stmt ->
             stmt.setString(1, role.name)
             stmt.setString(2, userName)
@@ -62,8 +61,7 @@ class MySqlCommandModel(
     }
 
     override fun removeUser(authority: String, userName: String) {
-        // Cascading deletes handled by foreign key constraints
-        val sql = "DELETE FROM users WHERE name = ?"
+        val sql = queryLoader.load("user-delete")
         connection.prepareStatement(sql).use { stmt ->
             stmt.setString(1, userName)
             stmt.executeUpdate()
@@ -71,7 +69,7 @@ class MySqlCommandModel(
     }
 
     override fun addElection(authority: String, owner: String, electionName: String) {
-        val sql = "INSERT INTO elections (election_name, owner_name) VALUES (?, ?)"
+        val sql = queryLoader.load("election-insert")
         connection.prepareStatement(sql).use { stmt ->
             stmt.setString(1, electionName)
             stmt.setString(2, owner)
@@ -135,8 +133,7 @@ class MySqlCommandModel(
     }
 
     override fun deleteElection(authority: String, electionName: String) {
-        // Cascading deletes handled by foreign key constraints
-        val sql = "DELETE FROM elections WHERE election_name = ?"
+        val sql = queryLoader.load("election-delete")
         connection.prepareStatement(sql).use { stmt ->
             stmt.setString(1, electionName)
             stmt.executeUpdate()
@@ -145,7 +142,7 @@ class MySqlCommandModel(
 
     override fun addCandidates(authority: String, electionName: String, candidateNames: List<String>) {
         if (candidateNames.isEmpty()) return
-        val sql = "INSERT IGNORE INTO candidates (election_name, candidate_name) VALUES (?, ?)"
+        val sql = queryLoader.load("candidate-insert")
         connection.prepareStatement(sql).use { stmt ->
             for (candidateName in candidateNames) {
                 stmt.setString(1, electionName)
@@ -158,7 +155,7 @@ class MySqlCommandModel(
 
     override fun removeCandidates(authority: String, electionName: String, candidateNames: List<String>) {
         if (candidateNames.isEmpty()) return
-        val sql = "DELETE FROM candidates WHERE election_name = ? AND candidate_name = ?"
+        val sql = queryLoader.load("candidate-delete")
         connection.prepareStatement(sql).use { stmt ->
             for (candidateName in candidateNames) {
                 stmt.setString(1, electionName)
@@ -171,7 +168,7 @@ class MySqlCommandModel(
 
     override fun addVoters(authority: String, electionName: String, voterNames: List<String>) {
         if (voterNames.isEmpty()) return
-        val sql = "INSERT IGNORE INTO eligible_voters (election_name, voter_name) VALUES (?, ?)"
+        val sql = queryLoader.load("eligible-voter-insert")
         connection.prepareStatement(sql).use { stmt ->
             for (voterName in voterNames) {
                 stmt.setString(1, electionName)
@@ -184,7 +181,7 @@ class MySqlCommandModel(
 
     override fun removeVoters(authority: String, electionName: String, voterNames: List<String>) {
         if (voterNames.isEmpty()) return
-        val sql = "DELETE FROM eligible_voters WHERE election_name = ? AND voter_name = ?"
+        val sql = queryLoader.load("eligible-voter-delete")
         connection.prepareStatement(sql).use { stmt ->
             for (voterName in voterNames) {
                 stmt.setString(1, electionName)
@@ -204,14 +201,7 @@ class MySqlCommandModel(
         now: Instant
     ) {
         val rankingsJson = json.encodeToString(rankings)
-        val sql = """
-            INSERT INTO ballots (election_name, voter_name, rankings, confirmation, when_cast)
-            VALUES (?, ?, ?, ?, ?)
-            ON DUPLICATE KEY UPDATE
-            rankings = VALUES(rankings),
-            confirmation = VALUES(confirmation),
-            when_cast = VALUES(when_cast)
-        """.trimIndent()
+        val sql = queryLoader.load("ballot-upsert")
 
         connection.prepareStatement(sql).use { stmt ->
             stmt.setString(1, electionName)
@@ -225,7 +215,7 @@ class MySqlCommandModel(
 
     override fun setRankings(authority: String, confirmation: String, electionName: String, rankings: List<Ranking>) {
         val rankingsJson = json.encodeToString(rankings)
-        val sql = "UPDATE ballots SET rankings = ? WHERE confirmation = ? AND election_name = ?"
+        val sql = queryLoader.load("ballot-update-rankings")
         connection.prepareStatement(sql).use { stmt ->
             stmt.setString(1, rankingsJson)
             stmt.setString(2, confirmation)
@@ -235,7 +225,7 @@ class MySqlCommandModel(
     }
 
     override fun updateWhenCast(authority: String, confirmation: String, now: Instant) {
-        val sql = "UPDATE ballots SET when_cast = ? WHERE confirmation = ?"
+        val sql = queryLoader.load("ballot-update-when-cast")
         connection.prepareStatement(sql).use { stmt ->
             stmt.setTimestamp(1, Timestamp(now.toEpochMilliseconds()))
             stmt.setString(2, confirmation)
@@ -244,7 +234,7 @@ class MySqlCommandModel(
     }
 
     override fun setPassword(authority: String, userName: String, salt: String, hash: String) {
-        val sql = "UPDATE users SET salt = ?, hash = ? WHERE name = ?"
+        val sql = queryLoader.load("user-update-password")
         connection.prepareStatement(sql).use { stmt ->
             stmt.setString(1, salt)
             stmt.setString(2, hash)
@@ -254,34 +244,28 @@ class MySqlCommandModel(
     }
 
     override fun setUserName(authority: String, oldUserName: String, newUserName: String) {
-        // MySQL will cascade updates if we set up ON UPDATE CASCADE in foreign keys
-        // But our schema uses ON DELETE CASCADE only, so we need manual updates
-
-        val updateUser = "UPDATE users SET name = ? WHERE name = ?"
+        val updateUser = queryLoader.load("user-update-name")
         connection.prepareStatement(updateUser).use { stmt ->
             stmt.setString(1, newUserName)
             stmt.setString(2, oldUserName)
             stmt.executeUpdate()
         }
 
-        // Update references in elections
-        val updateElections = "UPDATE elections SET owner_name = ? WHERE owner_name = ?"
+        val updateElections = queryLoader.load("election-update-owner-name")
         connection.prepareStatement(updateElections).use { stmt ->
             stmt.setString(1, newUserName)
             stmt.setString(2, oldUserName)
             stmt.executeUpdate()
         }
 
-        // Update references in eligible_voters
-        val updateVoters = "UPDATE eligible_voters SET voter_name = ? WHERE voter_name = ?"
+        val updateVoters = queryLoader.load("eligible-voter-update-name")
         connection.prepareStatement(updateVoters).use { stmt ->
             stmt.setString(1, newUserName)
             stmt.setString(2, oldUserName)
             stmt.executeUpdate()
         }
 
-        // Update references in ballots
-        val updateBallots = "UPDATE ballots SET voter_name = ? WHERE voter_name = ?"
+        val updateBallots = queryLoader.load("ballot-update-voter-name")
         connection.prepareStatement(updateBallots).use { stmt ->
             stmt.setString(1, newUserName)
             stmt.setString(2, oldUserName)
@@ -290,7 +274,7 @@ class MySqlCommandModel(
     }
 
     override fun setEmail(authority: String, userName: String, email: String) {
-        val sql = "UPDATE users SET email = ? WHERE name = ?"
+        val sql = queryLoader.load("user-update-email")
         connection.prepareStatement(sql).use { stmt ->
             stmt.setString(1, email)
             stmt.setString(2, userName)

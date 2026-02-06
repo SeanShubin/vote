@@ -1,5 +1,6 @@
 package com.seanshubin.vote.backend.repository
 
+import com.seanshubin.vote.contract.QueryLoader
 import com.seanshubin.vote.contract.QueryModel
 import com.seanshubin.vote.domain.*
 import kotlinx.datetime.Instant
@@ -9,10 +10,11 @@ import java.sql.ResultSet
 
 class MySqlQueryModel(
     private val connection: Connection,
+    private val queryLoader: QueryLoader,
     private val json: Json
 ) : QueryModel {
     override fun findUserByName(name: String): User {
-        val sql = "SELECT name, email, salt, hash, role FROM users WHERE name = ?"
+        val sql = queryLoader.load("user-select-by-name")
         return connection.prepareStatement(sql).use { stmt ->
             stmt.setString(1, name)
             val rs = stmt.executeQuery()
@@ -25,7 +27,7 @@ class MySqlQueryModel(
     }
 
     override fun findUserByEmail(email: String): User {
-        val sql = "SELECT name, email, salt, hash, role FROM users WHERE email = ?"
+        val sql = queryLoader.load("user-select-by-email")
         return connection.prepareStatement(sql).use { stmt ->
             stmt.setString(1, email)
             val rs = stmt.executeQuery()
@@ -38,7 +40,7 @@ class MySqlQueryModel(
     }
 
     override fun searchUserByName(name: String): User? {
-        val sql = "SELECT name, email, salt, hash, role FROM users WHERE name = ?"
+        val sql = queryLoader.load("user-select-by-name")
         return connection.prepareStatement(sql).use { stmt ->
             stmt.setString(1, name)
             val rs = stmt.executeQuery()
@@ -51,7 +53,7 @@ class MySqlQueryModel(
     }
 
     override fun searchUserByEmail(email: String): User? {
-        val sql = "SELECT name, email, salt, hash, role FROM users WHERE email = ?"
+        val sql = queryLoader.load("user-select-by-email")
         return connection.prepareStatement(sql).use { stmt ->
             stmt.setString(1, email)
             val rs = stmt.executeQuery()
@@ -64,7 +66,7 @@ class MySqlQueryModel(
     }
 
     override fun userCount(): Int {
-        val sql = "SELECT COUNT(*) as count FROM users"
+        val sql = queryLoader.load("user-count")
         return connection.prepareStatement(sql).use { stmt ->
             val rs = stmt.executeQuery()
             if (rs.next()) {
@@ -76,7 +78,7 @@ class MySqlQueryModel(
     }
 
     override fun electionCount(): Int {
-        val sql = "SELECT COUNT(*) as count FROM elections"
+        val sql = queryLoader.load("election-count")
         return connection.prepareStatement(sql).use { stmt ->
             val rs = stmt.executeQuery()
             if (rs.next()) {
@@ -88,7 +90,7 @@ class MySqlQueryModel(
     }
 
     override fun candidateCount(electionName: String): Int {
-        val sql = "SELECT COUNT(*) as count FROM candidates WHERE election_name = ?"
+        val sql = queryLoader.load("candidate-count")
         return connection.prepareStatement(sql).use { stmt ->
             stmt.setString(1, electionName)
             val rs = stmt.executeQuery()
@@ -101,7 +103,7 @@ class MySqlQueryModel(
     }
 
     override fun voterCount(electionName: String): Int {
-        val sql = "SELECT COUNT(*) as count FROM eligible_voters WHERE election_name = ?"
+        val sql = queryLoader.load("voter-count")
         return connection.prepareStatement(sql).use { stmt ->
             stmt.setString(1, electionName)
             val rs = stmt.executeQuery()
@@ -119,7 +121,7 @@ class MySqlQueryModel(
     }
 
     override fun listUsers(): List<User> {
-        val sql = "SELECT name, email, salt, hash, role FROM users ORDER BY name"
+        val sql = queryLoader.load("user-select-all")
         return connection.prepareStatement(sql).use { stmt ->
             val rs = stmt.executeQuery()
             buildList {
@@ -131,12 +133,7 @@ class MySqlQueryModel(
     }
 
     override fun listElections(): List<ElectionSummary> {
-        val sql = """
-            SELECT election_name, owner_name, secret_ballot, no_voting_before,
-                   no_voting_after, allow_edit, allow_vote
-            FROM elections
-            ORDER BY election_name
-        """.trimIndent()
+        val sql = queryLoader.load("election-select-all")
         return connection.prepareStatement(sql).use { stmt ->
             val rs = stmt.executeQuery()
             buildList {
@@ -159,7 +156,7 @@ class MySqlQueryModel(
     }
 
     override fun lastSynced(): Long? {
-        val sql = "SELECT last_synced FROM sync_state WHERE id = 1"
+        val sql = queryLoader.load("sync-state-select")
         return connection.prepareStatement(sql).use { stmt ->
             val rs = stmt.executeQuery()
             if (rs.next()) {
@@ -171,12 +168,7 @@ class MySqlQueryModel(
     }
 
     override fun searchElectionByName(name: String): ElectionSummary? {
-        val sql = """
-            SELECT election_name, owner_name, secret_ballot, no_voting_before,
-                   no_voting_after, allow_edit, allow_vote
-            FROM elections
-            WHERE election_name = ?
-        """.trimIndent()
+        val sql = queryLoader.load("election-select-by-name")
         return connection.prepareStatement(sql).use { stmt ->
             stmt.setString(1, name)
             val rs = stmt.executeQuery()
@@ -189,7 +181,7 @@ class MySqlQueryModel(
     }
 
     override fun listCandidates(electionName: String): List<String> {
-        val sql = "SELECT candidate_name FROM candidates WHERE election_name = ? ORDER BY candidate_name"
+        val sql = queryLoader.load("candidate-select-by-election")
         return connection.prepareStatement(sql).use { stmt ->
             stmt.setString(1, electionName)
             val rs = stmt.executeQuery()
@@ -202,7 +194,7 @@ class MySqlQueryModel(
     }
 
     override fun listRankings(voterName: String, electionName: String): List<Ranking> {
-        val sql = "SELECT rankings FROM ballots WHERE election_name = ? AND voter_name = ?"
+        val sql = queryLoader.load("ballot-select-rankings")
         return connection.prepareStatement(sql).use { stmt ->
             stmt.setString(1, electionName)
             stmt.setString(2, voterName)
@@ -217,7 +209,7 @@ class MySqlQueryModel(
     }
 
     override fun listRankings(electionName: String): List<VoterElectionCandidateRank> {
-        val sql = "SELECT voter_name, rankings FROM ballots WHERE election_name = ?"
+        val sql = queryLoader.load("ballot-select-rankings-by-election")
         return connection.prepareStatement(sql).use { stmt ->
             stmt.setString(1, electionName)
             val rs = stmt.executeQuery()
@@ -244,7 +236,7 @@ class MySqlQueryModel(
     }
 
     override fun searchBallot(voterName: String, electionName: String): BallotSummary? {
-        val sql = "SELECT confirmation, when_cast FROM ballots WHERE election_name = ? AND voter_name = ?"
+        val sql = queryLoader.load("ballot-select-summary")
         return connection.prepareStatement(sql).use { stmt ->
             stmt.setString(1, electionName)
             stmt.setString(2, voterName)
@@ -263,7 +255,7 @@ class MySqlQueryModel(
     }
 
     override fun listBallots(electionName: String): List<RevealedBallot> {
-        val sql = "SELECT voter_name, rankings, confirmation, when_cast FROM ballots WHERE election_name = ?"
+        val sql = queryLoader.load("ballot-select-all-by-election")
         return connection.prepareStatement(sql).use { stmt ->
             stmt.setString(1, electionName)
             val rs = stmt.executeQuery()
@@ -276,7 +268,7 @@ class MySqlQueryModel(
     }
 
     override fun listVoterNames(): List<String> {
-        val sql = "SELECT DISTINCT voter_name FROM ballots ORDER BY voter_name"
+        val sql = queryLoader.load("ballot-select-distinct-voters")
         return connection.prepareStatement(sql).use { stmt ->
             val rs = stmt.executeQuery()
             buildList {
@@ -288,7 +280,7 @@ class MySqlQueryModel(
     }
 
     override fun listVotersForElection(electionName: String): List<String> {
-        val sql = "SELECT voter_name FROM eligible_voters WHERE election_name = ? ORDER BY voter_name"
+        val sql = queryLoader.load("eligible-voter-select-by-election")
         return connection.prepareStatement(sql).use { stmt ->
             stmt.setString(1, electionName)
             val rs = stmt.executeQuery()
@@ -301,7 +293,7 @@ class MySqlQueryModel(
     }
 
     override fun listUserNames(): List<String> {
-        val sql = "SELECT name FROM users ORDER BY name"
+        val sql = queryLoader.load("user-select-names")
         return connection.prepareStatement(sql).use { stmt ->
             val rs = stmt.executeQuery()
             buildList {

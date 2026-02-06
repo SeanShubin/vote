@@ -57,9 +57,10 @@ class ApplicationDependencies(
             RepositorySet(eventLog, commandModel, queryModel)
         }
         is DatabaseConfig.MySql -> {
-            val eventLog = MySqlEventLog(connection!!, json)
-            val commandModel = MySqlCommandModel(connection, json)
-            val queryModel = MySqlQueryModel(connection, json)
+            val queryLoader = QueryLoaderFromResource()
+            val eventLog = MySqlEventLog(connection!!, queryLoader, json)
+            val commandModel = MySqlCommandModel(connection, queryLoader, json)
+            val queryModel = MySqlQueryModel(connection, queryLoader, json)
             RepositorySet(eventLog, commandModel, queryModel)
         }
     }

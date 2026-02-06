@@ -1,6 +1,7 @@
 package com.seanshubin.vote.backend.repository
 
 import com.seanshubin.vote.contract.EventLog
+import com.seanshubin.vote.contract.QueryLoader
 import com.seanshubin.vote.domain.DomainEvent
 import com.seanshubin.vote.domain.EventEnvelope
 import kotlinx.datetime.Instant
@@ -12,16 +13,13 @@ import java.sql.Timestamp
 
 class MySqlEventLog(
     private val connection: Connection,
+    private val queryLoader: QueryLoader,
     private val json: Json
 ) : EventLog {
     override fun appendEvent(authority: String, whenHappened: Instant, event: DomainEvent) {
         val eventType = event::class.simpleName ?: "Unknown"
         val eventData = json.encodeToString(event)
-
-        val sql = """
-            INSERT INTO event_log (authority, event_type, event_data, created_at)
-            VALUES (?, ?, ?, ?)
-        """.trimIndent()
+        val sql = queryLoader.load("event-log-insert")
 
         connection.prepareStatement(sql).use { stmt ->
             stmt.setString(1, authority)
@@ -33,12 +31,7 @@ class MySqlEventLog(
     }
 
     override fun eventsToSync(lastEventSynced: Long): List<EventEnvelope> {
-        val sql = """
-            SELECT event_id, authority, event_type, event_data, created_at
-            FROM event_log
-            WHERE event_id > ?
-            ORDER BY event_id ASC
-        """.trimIndent()
+        val sql = queryLoader.load("event-log-select-to-sync")
 
         return connection.prepareStatement(sql).use { stmt ->
             stmt.setLong(1, lastEventSynced)
@@ -52,7 +45,7 @@ class MySqlEventLog(
     }
 
     override fun eventCount(): Int {
-        val sql = "SELECT COUNT(*) as count FROM event_log"
+        val sql = queryLoader.load("event-log-count")
         return connection.prepareStatement(sql).use { stmt ->
             val rs = stmt.executeQuery()
             if (rs.next()) {
