@@ -16,12 +16,12 @@ object ApiClient {
 
     suspend fun register(userName: String, email: String, password: String): Tokens {
         val request = RegisterRequest(userName, email, password)
-        return post("/register", request)
+        return post<RegisterRequest, Tokens>("/register", request)
     }
 
     suspend fun authenticate(userName: String, password: String): Tokens {
         val request = AuthenticateRequest(userName, password)
-        return post("/authenticate", request)
+        return post<AuthenticateRequest, Tokens>("/authenticate", request)
     }
 
     suspend fun listElections(authToken: String): List<ElectionSummary> {
@@ -71,7 +71,7 @@ object ApiClient {
         return getWithAuth("/election/${encodeURIComponent(electionName)}/tally", authToken)
     }
 
-    private suspend inline fun <reified T> post(path: String, body: Any): T {
+    private suspend inline fun <reified TReq, reified TRes> post(path: String, body: TReq): TRes {
         val response = fetch("$baseUrl$path", RequestInit(
             method = "POST",
             headers = json(
