@@ -1,0 +1,67 @@
+#!/usr/bin/env bash
+set -e
+
+ENDPOINT="http://localhost:8000"
+export AWS_ACCESS_KEY_ID=dummy
+export AWS_SECRET_ACCESS_KEY=dummy
+REGION="us-east-1"
+
+echo "=========================================="
+echo "DynamoDB Key Structure (PK/SK only)"
+echo "=========================================="
+echo ""
+echo "This shows ONLY the composite keys (PK/SK)."
+echo "Use this to understand the access patterns."
+echo ""
+
+result=$(aws dynamodb scan \
+    --table-name vote_data \
+    --endpoint-url "$ENDPOINT" \
+    --region "$REGION" \
+    2>/dev/null)
+
+count=$(echo "$result" | jq -r '.Count // 0')
+
+if [ "$count" -eq 0 ]; then
+    echo "No items found."
+else
+    echo "Found $count items:"
+    echo ""
+    printf "%-35s %-35s %s\n" "PK" "SK" "Entity Type"
+    printf "%-35s %-35s %s\n" "===================================" "===================================" "============"
+
+    echo "$result" | jq -r '.Items[] |
+        [.PK.S, .SK.S, (.entity_type.S // "unknown")] |
+        @tsv' | \
+        sort | \
+        while IFS=$'\t' read -r pk sk entity; do
+            printf "%-35s %-35s %s\n" "$pk" "$sk" "$entity"
+        done
+fi
+
+echo ""
+echo "=========================================="
+echo "ACCESS PATTERNS"
+echo "=========================================="
+echo ""
+echo "Get user by name:"
+echo "  Query: PK=USER#alice, SK=METADATA"
+echo ""
+echo "Get user by email (GSI):"
+echo "  Query email-index: GSI1PK=EMAIL#alice@example.com"
+echo ""
+echo "Get election metadata:"
+echo "  Query: PK=ELECTION#Best Language, SK=METADATA"
+echo ""
+echo "Get all candidates for election:"
+echo "  Query: PK=ELECTION#Best Language, SK begins_with CANDIDATE#"
+echo ""
+echo "Get all voters for election:"
+echo "  Query: PK=ELECTION#Best Language, SK begins_with VOTER#"
+echo ""
+echo "Get all ballots for election:"
+echo "  Query: PK=ELECTION#Best Language, SK begins_with BALLOT#"
+echo ""
+echo "Get specific ballot:"
+echo "  Query: PK=ELECTION#Best Language, SK=BALLOT#alice"
+echo ""

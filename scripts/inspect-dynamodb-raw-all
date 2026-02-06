@@ -1,0 +1,104 @@
+#!/usr/bin/env bash
+set -e
+
+ENDPOINT="http://localhost:8000"
+export AWS_ACCESS_KEY_ID=dummy
+export AWS_SECRET_ACCESS_KEY=dummy
+REGION="us-east-1"
+
+echo "=========================================="
+echo "Raw DynamoDB Storage (Mechanical View)"
+echo "=========================================="
+echo ""
+echo "This shows ACTUAL storage with PK/SK composite keys."
+echo "Compare with inspect-dynamodb-all for relational projection."
+echo ""
+
+echo "=========================================="
+echo "MAIN TABLE (vote_data)"
+echo "=========================================="
+echo ""
+
+result=$(aws dynamodb scan \
+    --table-name vote_data \
+    --endpoint-url "$ENDPOINT" \
+    --region "$REGION" \
+    2>/dev/null)
+
+count=$(echo "$result" | jq -r '.Count // 0')
+
+if [ "$count" -eq 0 ]; then
+    echo "No items found."
+else
+    echo "Found $count items in vote_data:"
+    echo ""
+
+    # Show items grouped by entity type (based on PK prefix)
+    echo "--- USERS (PK=USER#*, SK=METADATA) ---"
+    echo "$result" | jq -r '.Items[] | select(.PK.S | startswith("USER#")) | select(.SK.S == "METADATA")'
+    echo ""
+
+    echo "--- ELECTIONS (PK=ELECTION#*, SK=METADATA) ---"
+    echo "$result" | jq -r '.Items[] | select(.PK.S | startswith("ELECTION#")) | select(.SK.S == "METADATA")'
+    echo ""
+
+    echo "--- CANDIDATES (PK=ELECTION#*, SK=CANDIDATE#*) ---"
+    echo "$result" | jq -r '.Items[] | select(.SK.S | startswith("CANDIDATE#"))'
+    echo ""
+
+    echo "--- ELIGIBLE VOTERS (PK=ELECTION#*, SK=VOTER#*) ---"
+    echo "$result" | jq -r '.Items[] | select(.SK.S | startswith("VOTER#"))'
+    echo ""
+
+    echo "--- BALLOTS (PK=ELECTION#*, SK=BALLOT#*) ---"
+    echo "$result" | jq -r '.Items[] | select(.SK.S | startswith("BALLOT#"))'
+    echo ""
+
+    echo "--- SYNC STATE (PK=METADATA, SK=SYNC) ---"
+    echo "$result" | jq -r '.Items[] | select(.PK.S == "METADATA") | select(.SK.S == "SYNC")'
+    echo ""
+fi
+
+echo ""
+echo "=========================================="
+echo "EVENT LOG TABLE (vote_event_log)"
+echo "=========================================="
+echo ""
+
+event_result=$(aws dynamodb scan \
+    --table-name vote_event_log \
+    --endpoint-url "$ENDPOINT" \
+    --region "$REGION" \
+    2>/dev/null)
+
+event_count=$(echo "$event_result" | jq -r '.Count // 0')
+
+if [ "$event_count" -eq 0 ]; then
+    echo "No events found."
+else
+    echo "Found $event_count events (showing first 5):"
+    echo ""
+    echo "$event_result" | jq -r '.Items | sort_by(.event_id.N | tonumber) | .[0:5]'
+fi
+
+echo ""
+echo "=========================================="
+echo "DEBUGGING NOTES"
+echo "=========================================="
+echo ""
+echo "Key Structure:"
+echo "  Users:     PK=USER#<name>          SK=METADATA"
+echo "  Elections: PK=ELECTION#<name>      SK=METADATA"
+echo "  Candidates:PK=ELECTION#<name>      SK=CANDIDATE#<name>"
+echo "  Voters:    PK=ELECTION#<name>      SK=VOTER#<name>"
+echo "  Ballots:   PK=ELECTION#<name>      SK=BALLOT#<voter>"
+echo "  Sync:      PK=METADATA             SK=SYNC"
+echo ""
+echo "GSI (email-index):"
+echo "  Users:     GSI1PK=EMAIL#<email>    GSI1SK=USER#<name>"
+echo ""
+echo "Attribute names (camelCase in DynamoDB):"
+echo "  userName, email, salt, hash, role"
+echo "  electionName, ownerName, secretBallot, allowVote, allowEdit"
+echo "  candidateName, voterName, rankings, confirmation, whenCast"
+echo ""

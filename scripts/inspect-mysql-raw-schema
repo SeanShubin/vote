@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+set -e
+
+echo "=========================================="
+echo "MySQL Raw Schema (Mechanical View)"
+echo "=========================================="
+echo ""
+echo "This shows ACTUAL table structure (DDL, indexes, constraints)."
+echo "Compare with inspect-mysql-all for data content."
+echo ""
+
+# Database connection details
+CONTAINER_NAME="vote-mysql"
+MYSQL_USER="vote"
+MYSQL_PASS="vote"
+MYSQL_DB="vote"
+
+# Get list of all tables
+TABLES=$(docker exec "$CONTAINER_NAME" mysql -u"$MYSQL_USER" -p"$MYSQL_PASS" "$MYSQL_DB" -N -e "SHOW TABLES" 2>/dev/null)
+
+for table in $TABLES; do
+    echo "=========================================="
+    echo "Table: $table"
+    echo "=========================================="
+    echo ""
+
+    echo "--- DESCRIBE $table ---"
+    docker exec "$CONTAINER_NAME" mysql -u"$MYSQL_USER" -p"$MYSQL_PASS" "$MYSQL_DB" -e "DESCRIBE $table" 2>/dev/null
+    echo ""
+
+    echo "--- INDEXES on $table ---"
+    docker exec "$CONTAINER_NAME" mysql -u"$MYSQL_USER" -p"$MYSQL_PASS" "$MYSQL_DB" -e "SHOW INDEXES FROM $table" 2>/dev/null
+    echo ""
+
+    echo "--- CREATE TABLE $table ---"
+    docker exec "$CONTAINER_NAME" mysql -u"$MYSQL_USER" -p"$MYSQL_PASS" "$MYSQL_DB" -e "SHOW CREATE TABLE $table\G" 2>/dev/null
+    echo ""
+done
+
+echo "=========================================="
+echo "DEBUGGING NOTES"
+echo "=========================================="
+echo ""
+echo "MySQL uses natural keys (name, email) as primary keys."
+echo "Foreign keys reference natural keys, not surrogate IDs."
+echo ""
+echo "Key Structure:"
+echo "  user:            PK (name)"
+echo "  election:        PK (name), FK owner -> user(name)"
+echo "  candidate:       PK (election, name), FK election -> election(name)"
+echo "  eligible_voter:  PK (election, voter), FK election -> election(name), FK voter -> user(name)"
+echo "  ballot:          PK (election, voter), FK election -> election(name), FK voter -> user(name)"
+echo "  event_log:       PK (event_id), no foreign keys"
+echo "  sync_state:      PK (id)"
+echo ""
+echo "Compare with DynamoDB single-table design:"
+echo "  MySQL: Multiple tables with natural keys and foreign key constraints"
+echo "  DynamoDB: Single table with composite PK/SK using prefixed keys"
+echo ""

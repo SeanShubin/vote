@@ -9,23 +9,23 @@ REGION="us-east-1"
 if [ -z "$1" ]; then
     echo "Usage: $0 <table-name>"
     echo ""
-    echo "Available tables:"
-    echo "  vote_users"
-    echo "  vote_elections"
-    echo "  vote_candidates"
-    echo "  vote_eligible_voters"
-    echo "  vote_ballots"
-    echo "  vote_event_log"
-    echo "  vote_sync_state"
+    echo "Available tables (single-table design):"
+    echo "  vote_data         - Main single table (all entities)"
+    echo "  vote_event_log    - Event sourcing log"
     echo ""
     echo "Example:"
-    echo "  $0 vote_users"
+    echo "  $0 vote_data"
+    echo ""
+    echo "Tip: Use inspect-dynamodb-raw-all to see all data with PK/SK structure"
     exit 1
 fi
 
 TABLE_NAME="$1"
 
-echo "=== Raw Scan of $TABLE_NAME ==="
+echo "=== Raw DynamoDB Scan of $TABLE_NAME ==="
+echo ""
+echo "This shows the ACTUAL storage structure (PK/SK, raw attributes)."
+echo "Compare with inspect-dynamodb-* scripts that show relational projections."
 echo ""
 
 aws dynamodb scan \
