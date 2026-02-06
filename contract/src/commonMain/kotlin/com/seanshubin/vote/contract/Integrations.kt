@@ -4,4 +4,5 @@ interface Integrations {
     val clock: Clock
     val uniqueIdGenerator: UniqueIdGenerator
     val notifications: Notifications
+    val passwordUtil: PasswordUtil
 }

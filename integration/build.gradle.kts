@@ -7,6 +7,9 @@ dependencies {
     testImplementation(project(":domain"))
     testImplementation(project(":contract"))
 
+    // Kotlinx
+    testImplementation("org.jetbrains.kotlinx:kotlinx-datetime:${project.property("kotlinx.datetime.version")}")
+
     // Testing
     testImplementation(kotlin("test"))
     testImplementation("org.junit.jupiter:junit-jupiter:${project.property("junit.version")}")

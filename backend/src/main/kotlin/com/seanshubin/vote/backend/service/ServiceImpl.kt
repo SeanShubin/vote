@@ -1,6 +1,5 @@
 package com.seanshubin.vote.backend.service
 
-import com.seanshubin.vote.backend.crypto.PasswordUtil
 import com.seanshubin.vote.backend.validation.Validation
 import com.seanshubin.vote.contract.*
 import com.seanshubin.vote.domain.*
@@ -14,6 +13,7 @@ class ServiceImpl(
     private val clock = integrations.clock
     private val uniqueIdGenerator = integrations.uniqueIdGenerator
     private val notifications = integrations.notifications
+    private val passwordUtil = integrations.passwordUtil
 
     override fun synchronize() {
         // Synchronize events from EventLog to CommandModel
@@ -125,7 +125,7 @@ class ServiceImpl(
         require(queryModel.searchUserByEmail(validEmail) == null) { "Email already exists: $validEmail" }
 
         val role = if (queryModel.userCount() == 0) Role.OWNER else Role.USER
-        val saltAndHash = PasswordUtil.createSaltAndHash(validPassword)
+        val saltAndHash = passwordUtil.createSaltAndHash(validPassword)
 
         eventLog.appendEvent(
             "system",
@@ -145,7 +145,7 @@ class ServiceImpl(
         val user = queryModel.searchUserByName(validNameOrEmail)
             ?: queryModel.findUserByEmail(validNameOrEmail)
 
-        require(PasswordUtil.passwordMatches(password, user.salt, user.hash)) {
+        require(passwordUtil.passwordMatches(password, user.salt, user.hash)) {
             "Invalid password for user: $validNameOrEmail"
         }
 
@@ -409,7 +409,7 @@ class ServiceImpl(
 
     override fun changePassword(accessToken: AccessToken, userName: String, password: String) {
         val validPassword = Validation.validatePassword(password)
-        val saltAndHash = PasswordUtil.createSaltAndHash(validPassword)
+        val saltAndHash = passwordUtil.createSaltAndHash(validPassword)
         eventLog.appendEvent(
             accessToken.userName,
             clock.now(),
