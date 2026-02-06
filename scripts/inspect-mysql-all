@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+set -e
+
+echo "=========================================="
+echo "MySQL Database Complete Dump"
+echo "=========================================="
+echo ""
+
+# Database connection details
+CONTAINER_NAME="vote-mysql"
+MYSQL_USER="vote"
+MYSQL_PASS="vote"
+MYSQL_DB="vote"
+
+# Get list of all tables
+TABLES=$(docker exec "$CONTAINER_NAME" mysql -u"$MYSQL_USER" -p"$MYSQL_PASS" "$MYSQL_DB" -N -e "SHOW TABLES" 2>/dev/null)
+
+for table in $TABLES; do
+    echo "=========================================="
+    echo "Table: $table"
+    echo "=========================================="
+
+    # Get row count
+    COUNT=$(docker exec "$CONTAINER_NAME" mysql -u"$MYSQL_USER" -p"$MYSQL_PASS" "$MYSQL_DB" -N -e "SELECT COUNT(*) FROM $table" 2>/dev/null)
+    echo "Row count: $COUNT"
+    echo ""
+
+    if [ "$COUNT" -gt 0 ]; then
+        # Display all rows in vertical format for readability
+        docker exec "$CONTAINER_NAME" mysql -u"$MYSQL_USER" -p"$MYSQL_PASS" "$MYSQL_DB" -e "SELECT * FROM $table\G" 2>/dev/null
+    else
+        echo "(empty)"
+    fi
+    echo ""
+done
+
+echo "=========================================="
+echo "Summary"
+echo "=========================================="
+echo ""
+
+for table in $TABLES; do
+    COUNT=$(docker exec "$CONTAINER_NAME" mysql -u"$MYSQL_USER" -p"$MYSQL_PASS" "$MYSQL_DB" -N -e "SELECT COUNT(*) FROM $table" 2>/dev/null)
+    printf "%-25s %3d rows\n" "$table:" "$COUNT"
+done

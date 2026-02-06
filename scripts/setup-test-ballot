@@ -1,0 +1,180 @@
+#!/usr/bin/env bash
+set -e
+
+if [ -z "$1" ]; then
+    echo "Usage: $0 <mysql|dynamodb>"
+    echo ""
+    echo "This script sets up test data and casts a ballot for manual inspection."
+    echo ""
+    echo "Example workflow for MySQL:"
+    echo "  ./scripts/db-reset-mysql"
+    echo "  ./scripts/run-backend-mysql &"
+    echo "  sleep 5"
+    echo "  ./scripts/setup-test-ballot mysql"
+    echo "  mysql -h localhost -u vote -p vote  # password: vote"
+    echo "  mysql> SELECT * FROM ballots;"
+    echo ""
+    echo "Example workflow for DynamoDB:"
+    echo "  ./scripts/db-reset-dynamodb"
+    echo "  ./scripts/run-backend-dynamodb &"
+    echo "  sleep 10"
+    echo "  ./scripts/setup-test-ballot dynamodb"
+    echo "  ./scripts/inspect-dynamodb-ballots"
+    exit 1
+fi
+
+DB_TYPE="$1"
+BASE_URL="http://localhost:8080"
+
+echo "=========================================="
+echo "Setting up test ballot for $DB_TYPE"
+echo "=========================================="
+echo ""
+
+# Step 1: Register Alice (becomes OWNER)
+echo "1. Registering alice (OWNER)..."
+ALICE_RESPONSE=$(curl -s -X POST "$BASE_URL/register" \
+    -H "Content-Type: application/json" \
+    -d '{"userName":"alice","email":"alice@example.com","password":"alicepass"}')
+
+ALICE_TOKEN=$(echo "$ALICE_RESPONSE" | jq -r '.accessToken | @json')
+echo "   ✓ Alice registered"
+echo ""
+
+# Step 2: Register Bob (becomes USER)
+echo "2. Registering bob (USER)..."
+BOB_RESPONSE=$(curl -s -X POST "$BASE_URL/register" \
+    -H "Content-Type: application/json" \
+    -d '{"userName":"bob","email":"bob@example.com","password":"bobpass"}')
+
+BOB_TOKEN=$(echo "$BOB_RESPONSE" | jq -r '.accessToken | @json')
+echo "   ✓ Bob registered"
+echo ""
+
+# Step 3: Create election (as alice)
+echo "3. Creating election 'Favorite Language'..."
+curl -s -X POST "$BASE_URL/election" \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer $ALICE_TOKEN" \
+    -d '{"userName":"alice","electionName":"Favorite Language"}' > /dev/null
+echo "   ✓ Election created"
+echo ""
+
+# Step 4: Set candidates (as alice)
+echo "4. Setting candidates..."
+curl -s -X PUT "$BASE_URL/election/Favorite%20Language/candidates" \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer $ALICE_TOKEN" \
+    -d '{"candidateNames":["Kotlin","Java","Python","Rust"]}' > /dev/null
+echo "   ✓ Candidates set (4 candidates)"
+echo ""
+
+# Step 5: Add eligible voters (as alice)
+echo "5. Adding eligible voters (alice and bob)..."
+curl -s -X PUT "$BASE_URL/election/Favorite%20Language/eligibility" \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer $ALICE_TOKEN" \
+    -d '{"voterNames":["alice","bob"]}' > /dev/null
+echo "   ✓ Eligible voters added"
+echo ""
+
+# Step 6: Launch election (as alice)
+echo "6. Launching election..."
+curl -s -X POST "$BASE_URL/election/Favorite%20Language/launch" \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer $ALICE_TOKEN" \
+    -d '{}' > /dev/null
+echo "   ✓ Election launched"
+echo ""
+
+# Step 7: Alice casts ballot
+echo "7. Alice casting ballot (Kotlin > Python > Rust > Java)..."
+ALICE_BALLOT_RESPONSE=$(curl -s -X POST "$BASE_URL/election/Favorite%20Language/ballot" \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer $ALICE_TOKEN" \
+    -d '{
+        "voterName": "alice",
+        "rankings": [
+            {"candidateName": "Kotlin", "rank": 1},
+            {"candidateName": "Python", "rank": 2},
+            {"candidateName": "Rust", "rank": 3},
+            {"candidateName": "Java", "rank": 4}
+        ]
+    }')
+
+ALICE_CONFIRMATION=$(echo "$ALICE_BALLOT_RESPONSE" | jq -r '.confirmation')
+echo "   ✓ Alice's ballot cast"
+echo "   Confirmation: $ALICE_CONFIRMATION"
+echo ""
+
+# Step 8: Bob casts ballot
+echo "8. Bob casting ballot (Python > Rust > Kotlin > Java)..."
+BOB_BALLOT_RESPONSE=$(curl -s -X POST "$BASE_URL/election/Favorite%20Language/ballot" \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer $BOB_TOKEN" \
+    -d '{
+        "voterName": "bob",
+        "rankings": [
+            {"candidateName": "Python", "rank": 1},
+            {"candidateName": "Rust", "rank": 2},
+            {"candidateName": "Kotlin", "rank": 3},
+            {"candidateName": "Java", "rank": 4}
+        ]
+    }')
+
+BOB_CONFIRMATION=$(echo "$BOB_BALLOT_RESPONSE" | jq -r '.confirmation')
+echo "   ✓ Bob's ballot cast"
+echo "   Confirmation: $BOB_CONFIRMATION"
+echo ""
+
+echo "=========================================="
+echo "Setup complete!"
+echo "=========================================="
+echo ""
+echo "Test data created:"
+echo "  • 2 users: alice (OWNER), bob (USER)"
+echo "  • 1 election: 'Favorite Language'"
+echo "  • 4 candidates: Kotlin, Java, Python, Rust"
+echo "  • 2 eligible voters: alice, bob"
+echo "  • 2 ballots cast"
+echo ""
+echo "To inspect the ballots:"
+echo ""
+
+if [ "$DB_TYPE" = "mysql" ]; then
+    echo "MySQL:"
+    echo "  mysql -h localhost -u vote -p vote  # password: vote"
+    echo ""
+    echo "  Then run these queries:"
+    echo "    SELECT * FROM ballots;"
+    echo "    SELECT * FROM ballots WHERE voter_name = 'alice'\\G"
+    echo "    SELECT * FROM ballots WHERE voter_name = 'bob'\\G"
+    echo ""
+    echo "  To see the raw rankings JSON:"
+    echo "    SELECT voter_name, rankings FROM ballots;"
+elif [ "$DB_TYPE" = "dynamodb" ]; then
+    echo "DynamoDB:"
+    echo "  ./scripts/inspect-dynamodb-ballots"
+    echo "  ./scripts/inspect-dynamodb-ballots 'Favorite Language'"
+    echo ""
+    echo "  Or for specific voter:"
+    echo "    ./scripts/inspect-dynamodb-raw vote_ballots | jq '.Items[] | select(.voter_name.S == \"alice\")'"
+fi
+
+echo ""
+echo "To inspect other data:"
+
+if [ "$DB_TYPE" = "mysql" ]; then
+    echo "  SELECT * FROM users;"
+    echo "  SELECT * FROM elections;"
+    echo "  SELECT * FROM candidates;"
+    echo "  SELECT * FROM eligible_voters;"
+    echo "  SELECT * FROM event_log ORDER BY event_id;"
+elif [ "$DB_TYPE" = "dynamodb" ]; then
+    echo "  ./scripts/inspect-dynamodb-tables      # Overview"
+    echo "  ./scripts/inspect-dynamodb-users       # All users"
+    echo "  ./scripts/inspect-dynamodb-elections   # All elections"
+    echo "  ./scripts/inspect-dynamodb-candidates  # All candidates"
+    echo "  ./scripts/inspect-dynamodb-voters      # Eligible voters"
+    echo "  ./scripts/inspect-dynamodb-event-log   # Event sourcing log"
+fi

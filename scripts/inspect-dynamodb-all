@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+set -e
+
+echo "=========================================="
+echo "DynamoDB Database Complete Dump"
+echo "=========================================="
+echo ""
+
+# First show overview
+./scripts/inspect-dynamodb-tables
+echo ""
+echo ""
+
+# Then show detailed contents of each table
+echo "=========================================="
+echo "USERS"
+echo "=========================================="
+./scripts/inspect-dynamodb-users
+echo ""
+echo ""
+
+echo "=========================================="
+echo "ELECTIONS"
+echo "=========================================="
+./scripts/inspect-dynamodb-elections
+echo ""
+echo ""
+
+echo "=========================================="
+echo "CANDIDATES"
+echo "=========================================="
+./scripts/inspect-dynamodb-candidates
+echo ""
+echo ""
+
+echo "=========================================="
+echo "ELIGIBLE VOTERS"
+echo "=========================================="
+./scripts/inspect-dynamodb-voters
+echo ""
+echo ""
+
+echo "=========================================="
+echo "BALLOTS"
+echo "=========================================="
+./scripts/inspect-dynamodb-ballots
+echo ""
+echo ""
+
+echo "=========================================="
+echo "EVENT LOG"
+echo "=========================================="
+./scripts/inspect-dynamodb-event-log
+echo ""
+echo ""
+
+echo "=========================================="
+echo "SYNC STATE"
+echo "=========================================="
+./scripts/inspect-dynamodb-sync-state
+echo ""
