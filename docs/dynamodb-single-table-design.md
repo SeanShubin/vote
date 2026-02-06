@@ -292,12 +292,16 @@ val candidates = candidatesResult.items.map { it["candidate_name"]?.asS()!! }
 3. **GSI costs** - Every user write updates GSI. Mitigation: Only one GSI (email), acceptable cost.
 4. **Item size limits** - Ballots with many rankings could approach 400KB limit. Mitigation: Unlikely with ranked-choice voting (typically <20 candidates).
 
-## Migration Path
+## Implementation Status
 
-1. **Phase 1**: Implement new DynamoDbQueryModel and DynamoDbCommandModel using single-table design
-2. **Phase 2**: Run existing tests (unchanged) against new implementation
-3. **Phase 3**: Verify all QueryModel operations return identical results
-4. **Phase 4**: Deploy to production (or keep multi-table for comparison)
+Single-table design is now the production DynamoDB implementation:
+
+1. ✅ **Implemented**: DynamoDbSingleTableQueryModel and DynamoDbSingleTableCommandModel
+2. ✅ **Tested**: Existing tests run against single-table implementation
+3. ✅ **Consolidated**: Three-backend architecture (InMemory, MySQL, DynamoDB single-table)
+4. ✅ **Deployed**: Main branch uses single-table design
+
+The system now demonstrates both relational (MySQL) and NoSQL (DynamoDB) approaches, unified behind the QueryModel interface.
 
 ## Relational Projection Layer (QueryModel Interface)
 

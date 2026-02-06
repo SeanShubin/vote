@@ -2,9 +2,10 @@
 
 ## Status: ✅ Implementation Complete
 
-The single-table DynamoDB design has been fully implemented. The system now supports both:
-1. **Multi-table design** (7 tables) - Educational comparison to MySQL
-2. **Single-table design** (2 tables) - Production-ready idiomatic DynamoDB
+The single-table DynamoDB design is the production implementation. The system demonstrates three data modeling approaches:
+1. **InMemory** (Map-based) - Fast testing, no dependencies
+2. **MySQL** (Relational) - Traditional RDBMS with foreign keys, educational comparison
+3. **DynamoDB Single-Table** (NoSQL) - Production-ready idiomatic DynamoDB (2 tables: `vote_data` + `vote_event_log`)
 
 ## What Was Implemented
 

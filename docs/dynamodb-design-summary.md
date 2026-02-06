@@ -87,25 +87,29 @@ SK (Sort Key): Sub-entity type + identifier or METADATA
    - Admin sees "election name", "voter name", "candidate name"
    - No knowledge of internal PK/SK structure required
 
-## Comparison: Multi-Table vs Single-Table
+## Three-Backend Architecture
 
-### Current Multi-Table Design (7 tables)
-- `vote_users` - One table per entity type
-- `vote_elections` - Mirrors relational model
-- `vote_candidates` - Educational comparison to MySQL
-- `vote_eligible_voters` - Easy to understand
-- `vote_ballots` - But not idiomatic DynamoDB
-- `vote_event_log`
-- `vote_sync_state`
+The system supports three database backends, each demonstrating different data modeling approaches:
 
-### Proposed Single-Table Design (3 tables)
+### 1. InMemory (Testing)
+- Map-based storage in memory
+- No dependencies, fast setup
+- Used for unit tests and quick development
+
+### 2. MySQL (Relational Model)
+- Traditional relational tables with foreign keys
+- Natural key primary keys (`user(name)`, `election(name)`)
+- Normalized design with explicit relationships
+- Educational comparison to NoSQL approach
+
+### 3. DynamoDB Single-Table (Production NoSQL)
 - `vote_data` - Main table (users, elections, candidates, voters, ballots)
 - `vote_event_log` - Separate (append-only, different access pattern)
-- (sync state embedded in `vote_data` as metadata)
+- Sync state embedded in `vote_data` as metadata (PK=METADATA, SK=SYNC)
 
-**Why Single-Table?**
+**Why Single-Table DynamoDB?**
 - Idiomatic DynamoDB (follows AWS best practices)
-- More efficient (fewer round-trips, better use of partition keys)
+- Efficient query patterns (fewer round-trips, better use of partition keys)
 - Enables transactions across entities (election + candidates in one partition)
 - Production-ready design
 
@@ -113,6 +117,11 @@ SK (Sort Key): Sub-entity type + identifier or METADATA
 - Different access pattern (append-only, sequential reads)
 - Prevents hot partition issues
 - Event sourcing is architectural concern, not just data storage
+
+**All Three Share Same QueryModel Interface**
+- Tests and admin tools use relational projections
+- Swapping backends requires zero code changes outside repository layer
+- This proves the abstraction layer works!
 
 ## Admin/Debug Relational Projections
 
