@@ -20,14 +20,10 @@ sleep 1
 echo "2. Rolling logs..."
 "$SCRIPT_DIR/roll-logs"
 
-# 3. Build frontend if needed
-if [ ! -d "$PROJECT_DIR/frontend/build/dist/js/productionExecutable" ]; then
-  echo "3. Building frontend..."
-  cd "$PROJECT_DIR"
-  ./gradlew :frontend:build --no-daemon
-else
-  echo "3. Frontend already built"
-fi
+# 3. Build frontend (incremental)
+echo "3. Building frontend (incremental)..."
+cd "$PROJECT_DIR"
+./gradlew :frontend:build --no-daemon
 
 # 4. Start backend
 echo "4. Starting backend (DynamoDB)..."

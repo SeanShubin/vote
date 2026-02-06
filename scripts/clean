@@ -1,7 +1,27 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Clean all build artifacts
-echo "Cleaning build artifacts..."
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+
+echo "=== Clean Build Artifacts ==="
+echo
+echo "This removes all build artifacts and resets Gradle's incremental state."
+echo
+echo "Use this when:"
+echo "  - You deleted source files but the build still includes them"
+echo "  - Gradle's incremental compilation is confused (changes not taking effect)"
+echo "  - You want a guaranteed clean slate"
+echo
+echo "Normal incremental builds (./scripts/launch-*) handle most cases correctly."
+echo
+
+cd "$PROJECT_DIR"
+
+echo "Cleaning all modules..."
 ./gradlew clean --no-daemon
+
+echo
 echo "✓ Clean complete"
+echo
+echo "Next: Run any launch script to rebuild and start the application"
