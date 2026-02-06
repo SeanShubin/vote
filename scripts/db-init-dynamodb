@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+set -e
+
+echo "Creating DynamoDB tables..."
+
+# Note: This requires the AWS CLI to be installed
+# For DynamoDB Local, we'll create tables programmatically in the application
+
+echo "✓ DynamoDB tables will be created on first application startup"
+echo ""
+echo "To manually list tables:"
+echo "  aws dynamodb list-tables --endpoint-url http://localhost:8000 --region us-east-1"

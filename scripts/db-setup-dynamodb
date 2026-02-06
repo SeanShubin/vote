@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+set -e
+
+echo "Starting DynamoDB Local..."
+docker run -d \
+  --name vote-dynamodb \
+  -p 8000:8000 \
+  amazon/dynamodb-local
+
+echo "Waiting for DynamoDB Local to be ready..."
+sleep 3
+
+echo "✓ DynamoDB Local is running on http://localhost:8000"
+echo ""
+echo "To verify it's running:"
+echo "  aws dynamodb list-tables --endpoint-url http://localhost:8000 --region us-east-1"

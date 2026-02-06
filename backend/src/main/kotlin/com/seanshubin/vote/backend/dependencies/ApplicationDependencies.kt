@@ -1,5 +1,9 @@
 package com.seanshubin.vote.backend.dependencies
 
+import aws.sdk.kotlin.runtime.auth.credentials.StaticCredentialsProvider
+import aws.sdk.kotlin.services.dynamodb.DynamoDbClient
+import aws.smithy.kotlin.runtime.auth.awscredentials.Credentials
+import aws.smithy.kotlin.runtime.net.url.Url
 import com.seanshubin.vote.backend.http.SimpleHttpHandler
 import com.seanshubin.vote.backend.integration.ProductionIntegrations
 import com.seanshubin.vote.backend.repository.*
@@ -9,6 +13,7 @@ import com.seanshubin.vote.contract.EventLog
 import com.seanshubin.vote.contract.Integrations
 import com.seanshubin.vote.contract.QueryModel
 import com.seanshubin.vote.contract.Service
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import org.eclipse.jetty.server.Server
 import java.sql.Connection
@@ -20,6 +25,10 @@ sealed class DatabaseConfig {
         val url: String = "jdbc:mysql://localhost:3306/vote",
         val user: String = "vote",
         val password: String = "vote"
+    ) : DatabaseConfig()
+    data class DynamoDB(
+        val endpoint: String = "http://localhost:8000",
+        val region: String = "us-east-1"
     ) : DatabaseConfig()
 }
 
@@ -40,6 +49,7 @@ class ApplicationDependencies(
                 databaseConfig.password
             )
         }
+        is DatabaseConfig.DynamoDB -> null
     }
 
     private data class RepositorySet(
@@ -47,6 +57,22 @@ class ApplicationDependencies(
         val commandModel: CommandModel,
         val queryModel: QueryModel
     )
+
+    private val dynamoDbClient: DynamoDbClient? = when (databaseConfig) {
+        is DatabaseConfig.DynamoDB -> {
+            DynamoDbClient {
+                region = databaseConfig.region
+                endpointUrl = Url.parse(databaseConfig.endpoint)
+                credentialsProvider = StaticCredentialsProvider(
+                    Credentials(
+                        accessKeyId = "dummy",
+                        secretAccessKey = "dummy"
+                    )
+                )
+            }
+        }
+        else -> null
+    }
 
     private val repositories: RepositorySet = when (databaseConfig) {
         is DatabaseConfig.InMemory -> {
@@ -61,6 +87,22 @@ class ApplicationDependencies(
             val eventLog = MySqlEventLog(connection!!, queryLoader, json)
             val commandModel = MySqlCommandModel(connection, queryLoader, json)
             val queryModel = MySqlQueryModel(connection, queryLoader, json)
+            RepositorySet(eventLog, commandModel, queryModel)
+        }
+        is DatabaseConfig.DynamoDB -> {
+            // Initialize DynamoDB tables if needed
+            runBlocking {
+                try {
+                    DynamoDbSchema.createTables(dynamoDbClient!!)
+                    println("DynamoDB tables created/verified")
+                } catch (e: Exception) {
+                    println("DynamoDB tables may already exist: ${e.message}")
+                }
+            }
+
+            val eventLog = DynamoDbEventLog(dynamoDbClient!!, json)
+            val commandModel = DynamoDbCommandModel(dynamoDbClient, json)
+            val queryModel = DynamoDbQueryModel(dynamoDbClient, json)
             RepositorySet(eventLog, commandModel, queryModel)
         }
     }
@@ -93,5 +135,6 @@ class ApplicationDependencies(
     fun stop() {
         server.stop()
         connection?.close()
+        dynamoDbClient?.close()
     }
 }

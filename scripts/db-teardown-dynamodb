@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+set -e
+
+echo "Stopping DynamoDB Local..."
+docker stop vote-dynamodb || true
+docker rm vote-dynamodb || true
+
+echo "✓ DynamoDB Local stopped and removed"

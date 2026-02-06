@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+set -e
+
+echo "Starting backend with DynamoDB..."
+./gradlew :backend:run --args="8080 dynamodb" --console=plain
