@@ -16,31 +16,35 @@ echo "1. Terminating existing processes..."
 "$SCRIPT_DIR/terminate-all"
 sleep 1
 
-# 2. Build frontend if needed
+# 2. Roll logs
+echo "2. Rolling logs..."
+"$SCRIPT_DIR/roll-logs"
+
+# 3. Build frontend if needed
 if [ ! -d "$PROJECT_DIR/frontend/build/dist/js/productionExecutable" ]; then
-  echo "2. Building frontend..."
+  echo "3. Building frontend..."
   cd "$PROJECT_DIR"
   ./gradlew :frontend:build --no-daemon
 else
-  echo "2. Frontend already built"
+  echo "3. Frontend already built"
 fi
 
-# 3. Start backend
-echo "3. Starting backend (DynamoDB)..."
+# 4. Start backend
+echo "4. Starting backend (DynamoDB)..."
 cd "$PROJECT_DIR"
 ./gradlew :backend:run --args="8080 dynamodb" --console=plain > "$LOG_DIR/backend.log" 2>&1 &
 BACKEND_PID=$!
 echo "   Backend started (PID: $BACKEND_PID, log: logs/backend.log)"
 
-# 4. Start frontend
-echo "4. Starting frontend server..."
+# 5. Start frontend
+echo "5. Starting frontend server..."
 cd "$PROJECT_DIR/frontend/build/dist/js/productionExecutable"
 python3 -m http.server 3000 > "$LOG_DIR/frontend.log" 2>&1 &
 FRONTEND_PID=$!
 echo "   Frontend started (PID: $FRONTEND_PID, log: logs/frontend.log)"
 
-# 5. Wait for backend
-echo "5. Waiting for backend to be ready..."
+# 6. Wait for backend
+echo "6. Waiting for backend to be ready..."
 for i in {1..30}; do
   if curl -s http://localhost:8080/health > /dev/null 2>&1; then
     echo "   Backend ready!"
@@ -54,8 +58,8 @@ for i in {1..30}; do
   sleep 1
 done
 
-# 6. Wait for frontend
-echo "6. Waiting for frontend to be ready..."
+# 7. Wait for frontend
+echo "7. Waiting for frontend to be ready..."
 for i in {1..10}; do
   if curl -s http://localhost:3000 > /dev/null 2>&1; then
     echo "   Frontend ready!"
@@ -69,8 +73,8 @@ for i in {1..10}; do
   sleep 1
 done
 
-# 7. Open browser
-echo "7. Opening browser..."
+# 8. Open browser
+echo "8. Opening browser..."
 open http://localhost:3000
 
 echo

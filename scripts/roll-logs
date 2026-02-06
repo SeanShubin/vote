@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+LOG_DIR="$PROJECT_DIR/logs"
+ARCHIVE_DIR="$LOG_DIR/archive"
+
+# Create directories if needed
+mkdir -p "$LOG_DIR"
+mkdir -p "$ARCHIVE_DIR"
+
+# Generate timestamp
+TIMESTAMP=$(date +"%Y-%m-%d-%H-%M-%S")
+
+# Roll backend log if it exists
+if [ -f "$LOG_DIR/backend.log" ]; then
+  mv "$LOG_DIR/backend.log" "$ARCHIVE_DIR/backend-$TIMESTAMP.log"
+  echo "Rolled backend.log → archive/backend-$TIMESTAMP.log"
+fi
+
+# Roll frontend log if it exists
+if [ -f "$LOG_DIR/frontend.log" ]; then
+  mv "$LOG_DIR/frontend.log" "$ARCHIVE_DIR/frontend-$TIMESTAMP.log"
+  echo "Rolled frontend.log → archive/frontend-$TIMESTAMP.log"
+fi
+
+# If no logs were rolled
+if [ ! -f "$ARCHIVE_DIR/backend-$TIMESTAMP.log" ] && [ ! -f "$ARCHIVE_DIR/frontend-$TIMESTAMP.log" ]; then
+  echo "No logs to roll (first run)"
+fi
