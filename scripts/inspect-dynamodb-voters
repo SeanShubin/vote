@@ -6,15 +6,15 @@ export AWS_ACCESS_KEY_ID=dummy
 export AWS_SECRET_ACCESS_KEY=dummy
 REGION="us-east-1"
 
-echo "=== Eligible Voters Table ==="
+echo "=== Eligible Voters (Single-Table) ==="
 echo ""
 
 if [ -n "$1" ]; then
-    # Query specific election
+    # Query specific election (PK = ELECTION#name, SK begins with VOTER#)
     result=$(aws dynamodb query \
-        --table-name vote_eligible_voters \
-        --key-condition-expression "election_name = :en" \
-        --expression-attribute-values "{\":en\":{\"S\":\"$1\"}}" \
+        --table-name vote_data \
+        --key-condition-expression "PK = :pk AND begins_with(SK, :sk)" \
+        --expression-attribute-values "{\":pk\":{\"S\":\"ELECTION#$1\"},\":sk\":{\"S\":\"VOTER#\"}}" \
         --endpoint-url "$ENDPOINT" \
         --region "$REGION" \
         2>/dev/null)
@@ -26,12 +26,14 @@ if [ -n "$1" ]; then
     else
         echo "Found $count eligible voter(s) for election: $1"
         echo ""
-        echo "$result" | jq -r '.Items[] | "  - " + .voter_name.S'
+        echo "$result" | jq -r '.Items[] | "  - " + .voterName.S'
     fi
 else
-    # Scan all voters
+    # Scan all voters (SK begins with VOTER#)
     result=$(aws dynamodb scan \
-        --table-name vote_eligible_voters \
+        --table-name vote_data \
+        --filter-expression "begins_with(SK, :sk)" \
+        --expression-attribute-values '{":sk":{"S":"VOTER#"}}' \
         --endpoint-url "$ENDPOINT" \
         --region "$REGION" \
         2>/dev/null)
@@ -44,8 +46,8 @@ else
         echo "Found $count eligible voter(s):"
         echo ""
         echo "$result" | jq -r '.Items[] |
-            "Election: " + .election_name.S + "\n" +
-            "Voter:    " + .voter_name.S + "\n"'
+            "Election: " + .electionName.S + "\n" +
+            "Voter:    " + .voterName.S + "\n"'
     fi
 
     echo ""

@@ -9,7 +9,6 @@ fun main(args: Array<String>) {
     //   Main 8080 memory
     //   Main 8080 mysql
     //   Main 8080 dynamodb
-    //   Main 8080 dynamodb-single
     val port = args.getOrNull(0)?.toIntOrNull() ?: 8080
     val dbType = args.getOrNull(1) ?: "memory"
 
@@ -17,7 +16,6 @@ fun main(args: Array<String>) {
         "memory" -> DatabaseConfig.InMemory
         "mysql" -> DatabaseConfig.MySql()
         "dynamodb" -> DatabaseConfig.DynamoDB()
-        "dynamodb-single" -> DatabaseConfig.DynamoDBSingle()
         else -> {
             println("Unknown database type: $dbType. Using in-memory.")
             DatabaseConfig.InMemory

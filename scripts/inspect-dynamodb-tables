@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -e
 
-echo "=== DynamoDB Tables Overview ==="
+echo "=== DynamoDB Tables Overview (Single-Table Design) ==="
 echo ""
 
 ENDPOINT="http://localhost:8000"
@@ -9,32 +9,34 @@ REGION="us-east-1"
 export AWS_ACCESS_KEY_ID=dummy
 export AWS_SECRET_ACCESS_KEY=dummy
 
-tables=(
-    "vote_users"
-    "vote_elections"
-    "vote_candidates"
-    "vote_eligible_voters"
-    "vote_ballots"
-    "vote_event_log"
-    "vote_sync_state"
-)
+# Count main table total
+main_count=$(aws dynamodb scan \
+    --table-name vote_data \
+    --select COUNT \
+    --endpoint-url "$ENDPOINT" \
+    --region "$REGION" \
+    2>/dev/null | jq -r '.Count // 0')
 
-for table in "${tables[@]}"; do
-    count=$(aws dynamodb scan \
-        --table-name "$table" \
-        --select COUNT \
-        --endpoint-url "$ENDPOINT" \
-        --region "$REGION" \
-        2>/dev/null | jq -r '.Count // 0')
+echo "vote_data (main table):   $main_count records"
 
-    printf "%-25s %3d records\n" "$table:" "$count"
-done
+# Count event log
+event_count=$(aws dynamodb scan \
+    --table-name vote_event_log \
+    --select COUNT \
+    --endpoint-url "$ENDPOINT" \
+    --region "$REGION" \
+    2>/dev/null | jq -r '.Count // 0')
+
+echo "vote_event_log:           $event_count events"
 
 echo ""
-echo "Use specific inspect scripts to see details:"
+echo "Use ./scripts/inspect-dynamodb-all to see complete data breakdown."
+echo ""
+echo "Or use specific inspect scripts:"
 echo "  ./scripts/inspect-dynamodb-users"
 echo "  ./scripts/inspect-dynamodb-elections"
 echo "  ./scripts/inspect-dynamodb-candidates"
 echo "  ./scripts/inspect-dynamodb-voters"
 echo "  ./scripts/inspect-dynamodb-ballots"
 echo "  ./scripts/inspect-dynamodb-event-log"
+echo "  ./scripts/inspect-dynamodb-sync-state"

@@ -6,25 +6,24 @@ export AWS_ACCESS_KEY_ID=dummy
 export AWS_SECRET_ACCESS_KEY=dummy
 REGION="us-east-1"
 
-echo "=== Sync State Table ==="
+echo "=== Sync State (Single-Table) ==="
 echo ""
 
-result=$(aws dynamodb scan \
-    --table-name vote_sync_state \
+# Query for sync state (PK = METADATA, SK = SYNC)
+result=$(aws dynamodb get-item \
+    --table-name vote_data \
+    --key '{"PK":{"S":"METADATA"},"SK":{"S":"SYNC"}}' \
     --endpoint-url "$ENDPOINT" \
     --region "$REGION" \
     2>/dev/null)
 
-count=$(echo "$result" | jq -r '.Count // 0')
+item=$(echo "$result" | jq -r '.Item')
 
-if [ "$count" -eq 0 ]; then
+if [ "$item" == "null" ] || [ -z "$item" ]; then
     echo "No sync state found."
 else
-    echo "Found $count sync state record(s):"
+    echo "Sync state:"
     echo ""
-    echo "$result" | jq -r '.Items[] |
-        "ID:                " + .id.S + "\n" +
-        (if .last_synced then "Last Synced:       " + .last_synced.N + "\n" else "" end) +
-        (if .next_event_id then "Next Event ID:     " + .next_event_id.N + "\n" else "" end) +
-        ""'
+    echo "$result" | jq -r '.Item |
+        (if .last_synced then "Last Synced: " + .last_synced.N + " (epoch ms)\n" else "Last Synced: Not set\n" end)'
 fi

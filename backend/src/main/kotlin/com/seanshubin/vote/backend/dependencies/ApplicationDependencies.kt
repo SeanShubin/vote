@@ -30,10 +30,6 @@ sealed class DatabaseConfig {
         val endpoint: String = "http://localhost:8000",
         val region: String = "us-east-1"
     ) : DatabaseConfig()
-    data class DynamoDBSingle(
-        val endpoint: String = "http://localhost:8000",
-        val region: String = "us-east-1"
-    ) : DatabaseConfig()
 }
 
 class ApplicationDependencies(
@@ -54,7 +50,6 @@ class ApplicationDependencies(
             )
         }
         is DatabaseConfig.DynamoDB -> null
-        is DatabaseConfig.DynamoDBSingle -> null
     }
 
     private data class RepositorySet(
@@ -65,18 +60,6 @@ class ApplicationDependencies(
 
     private val dynamoDbClient: DynamoDbClient? = when (databaseConfig) {
         is DatabaseConfig.DynamoDB -> {
-            DynamoDbClient {
-                region = databaseConfig.region
-                endpointUrl = Url.parse(databaseConfig.endpoint)
-                credentialsProvider = StaticCredentialsProvider(
-                    Credentials(
-                        accessKeyId = "dummy",
-                        secretAccessKey = "dummy"
-                    )
-                )
-            }
-        }
-        is DatabaseConfig.DynamoDBSingle -> {
             DynamoDbClient {
                 region = databaseConfig.region
                 endpointUrl = Url.parse(databaseConfig.endpoint)
@@ -107,29 +90,13 @@ class ApplicationDependencies(
             RepositorySet(eventLog, commandModel, queryModel)
         }
         is DatabaseConfig.DynamoDB -> {
-            // Initialize DynamoDB tables if needed
-            runBlocking {
-                try {
-                    DynamoDbSchema.createTables(dynamoDbClient!!)
-                    println("DynamoDB tables created/verified")
-                } catch (e: Exception) {
-                    println("DynamoDB tables may already exist: ${e.message}")
-                }
-            }
-
-            val eventLog = DynamoDbEventLog(dynamoDbClient!!, json)
-            val commandModel = DynamoDbCommandModel(dynamoDbClient, json)
-            val queryModel = DynamoDbQueryModel(dynamoDbClient, json)
-            RepositorySet(eventLog, commandModel, queryModel)
-        }
-        is DatabaseConfig.DynamoDBSingle -> {
-            // Initialize DynamoDB single-table schema if needed
+            // Initialize DynamoDB single-table schema
             runBlocking {
                 try {
                     DynamoDbSingleTableSchema.createTables(dynamoDbClient!!)
                     println("DynamoDB single-table schema created/verified")
                 } catch (e: Exception) {
-                    println("DynamoDB single-table may already exist: ${e.message}")
+                    println("DynamoDB tables may already exist: ${e.message}")
                 }
             }
 
