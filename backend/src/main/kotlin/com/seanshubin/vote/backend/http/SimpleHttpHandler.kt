@@ -29,7 +29,19 @@ class SimpleHttpHandler(
         response.contentType = "application/json"
         response.characterEncoding = "UTF-8"
 
+        // CORS headers - allow frontend on different port to access backend
+        response.setHeader("Access-Control-Allow-Origin", "http://localhost:3000")
+        response.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+        response.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization")
+        response.setHeader("Access-Control-Max-Age", "3600")
+
         log.debug("${request.method} $target")
+
+        // Handle OPTIONS preflight requests
+        if (request.method == "OPTIONS") {
+            response.status = HttpServletResponse.SC_OK
+            return
+        }
 
         try {
             when {
