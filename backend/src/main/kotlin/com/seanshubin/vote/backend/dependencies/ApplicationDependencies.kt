@@ -3,6 +3,7 @@ package com.seanshubin.vote.backend.dependencies
 import com.seanshubin.vote.backend.http.SimpleHttpHandler
 import com.seanshubin.vote.backend.integration.ProductionIntegrations
 import com.seanshubin.vote.backend.repository.InMemoryCommandModel
+import com.seanshubin.vote.backend.repository.InMemoryData
 import com.seanshubin.vote.backend.repository.InMemoryEventLog
 import com.seanshubin.vote.backend.repository.InMemoryQueryModel
 import com.seanshubin.vote.backend.service.ServiceImpl
@@ -17,8 +18,9 @@ class ApplicationDependencies(
 ) {
     private val json = Json { prettyPrint = true }
     private val eventLog = InMemoryEventLog()
-    private val commandModel = InMemoryCommandModel()
-    private val queryModel = InMemoryQueryModel()
+    private val sharedData = InMemoryData()
+    private val commandModel = InMemoryCommandModel(sharedData)
+    private val queryModel = InMemoryQueryModel(sharedData)
 
     private val service: Service = ServiceImpl(
         integrations = integrations,

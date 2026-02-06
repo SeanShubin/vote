@@ -19,8 +19,86 @@ class ServiceImpl(
         // Synchronize events from EventLog to CommandModel
         val lastSynced = queryModel.lastSynced() ?: 0
         val newEvents = eventLog.eventsToSync(lastSynced)
-        // Apply events to command model (event sourcing)
-        // For now, stub
+
+        // Apply each event to the command model
+        newEvents.forEach { envelope ->
+            applyEvent(envelope.authority, envelope.event)
+            commandModel.setLastSynced(envelope.eventId)
+        }
+    }
+
+    private fun applyEvent(authority: String, event: DomainEvent) {
+        when (event) {
+            is DomainEvent.UserRegistered -> {
+                commandModel.createUser(
+                    authority = authority,
+                    userName = event.name,
+                    email = event.email,
+                    salt = event.salt,
+                    hash = event.hash,
+                    role = event.role
+                )
+            }
+            is DomainEvent.UserRoleChanged -> {
+                commandModel.setRole(authority, event.userName, event.newRole)
+            }
+            is DomainEvent.UserRemoved -> {
+                commandModel.removeUser(authority, event.userName)
+            }
+            is DomainEvent.UserPasswordChanged -> {
+                commandModel.setPassword(authority, event.userName, event.newSalt, event.newHash)
+            }
+            is DomainEvent.UserNameChanged -> {
+                commandModel.setUserName(authority, event.oldUserName, event.newUserName)
+            }
+            is DomainEvent.UserEmailChanged -> {
+                commandModel.setEmail(authority, event.userName, event.newEmail)
+            }
+            is DomainEvent.ElectionCreated -> {
+                commandModel.addElection(authority, event.ownerName, event.electionName)
+            }
+            is DomainEvent.ElectionUpdated -> {
+                val updates = ElectionUpdates(
+                    secretBallot = event.secretBallot,
+                    noVotingBefore = event.noVotingBefore,
+                    noVotingAfter = event.noVotingAfter,
+                    allowEdit = event.allowEdit,
+                    allowVote = event.allowVote
+                )
+                commandModel.updateElection(authority, event.electionName, updates)
+            }
+            is DomainEvent.ElectionDeleted -> {
+                commandModel.deleteElection(authority, event.electionName)
+            }
+            is DomainEvent.CandidatesAdded -> {
+                commandModel.addCandidates(authority, event.electionName, event.candidateNames)
+            }
+            is DomainEvent.CandidatesRemoved -> {
+                commandModel.removeCandidates(authority, event.electionName, event.candidateNames)
+            }
+            is DomainEvent.VotersAdded -> {
+                commandModel.addVoters(authority, event.electionName, event.voterNames)
+            }
+            is DomainEvent.VotersRemoved -> {
+                commandModel.removeVoters(authority, event.electionName, event.voterNames)
+            }
+            is DomainEvent.BallotCast -> {
+                commandModel.castBallot(
+                    authority = authority,
+                    voterName = event.voterName,
+                    electionName = event.electionName,
+                    rankings = event.rankings,
+                    confirmation = event.confirmation,
+                    now = event.whenCast
+                )
+            }
+            is DomainEvent.BallotTimestampUpdated -> {
+                commandModel.updateWhenCast(authority, event.confirmation, event.newWhenCast)
+            }
+            is DomainEvent.BallotRankingsChanged -> {
+                commandModel.setRankings(authority, event.confirmation, event.electionName, event.newRankings)
+            }
+        }
     }
 
     override fun health(): String {
