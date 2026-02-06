@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+set -e
+
+ENDPOINT="http://localhost:8000"
+export AWS_ACCESS_KEY_ID=dummy
+export AWS_SECRET_ACCESS_KEY=dummy
+REGION="us-east-1"
+
+echo "=== Ballots Table ==="
+echo ""
+
+if [ -n "$1" ]; then
+    # Query specific election
+    result=$(aws dynamodb query \
+        --table-name vote_ballots \
+        --key-condition-expression "election_name = :en" \
+        --expression-attribute-values "{\":en\":{\"S\":\"$1\"}}" \
+        --endpoint-url "$ENDPOINT" \
+        --region "$REGION" \
+        2>/dev/null)
+
+    count=$(echo "$result" | jq -r '.Count // 0')
+
+    if [ "$count" -eq 0 ]; then
+        echo "No ballots found for election: $1"
+    else
+        echo "Found $count ballot(s) for election: $1"
+        echo ""
+        echo "$result" | jq -r '.Items[] |
+            "Voter:        " + .voter_name.S + "\n" +
+            "Rankings:     " + .rankings.S + "\n" +
+            "Confirmation: " + .confirmation.S + "\n" +
+            "When Cast:    " + .when_cast.N + " (epoch ms)\n"'
+    fi
+else
+    # Scan all ballots
+    result=$(aws dynamodb scan \
+        --table-name vote_ballots \
+        --endpoint-url "$ENDPOINT" \
+        --region "$REGION" \
+        2>/dev/null)
+
+    count=$(echo "$result" | jq -r '.Count // 0')
+
+    if [ "$count" -eq 0 ]; then
+        echo "No ballots found."
+    else
+        echo "Found $count ballot(s):"
+        echo ""
+        echo "$result" | jq -r '.Items[] |
+            "Election:     " + .election_name.S + "\n" +
+            "Voter:        " + .voter_name.S + "\n" +
+            "Rankings:     " + .rankings.S + "\n" +
+            "Confirmation: " + .confirmation.S + "\n" +
+            "When Cast:    " + .when_cast.N + " (epoch ms)\n"'
+    fi
+
+    echo ""
+    echo "Tip: Run with election name to see ballots for specific election:"
+    echo "  ./scripts/inspect-dynamodb-ballots \"Best Programming Language\""
+fi

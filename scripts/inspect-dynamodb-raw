@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+set -e
+
+ENDPOINT="http://localhost:8000"
+export AWS_ACCESS_KEY_ID=dummy
+export AWS_SECRET_ACCESS_KEY=dummy
+REGION="us-east-1"
+
+if [ -z "$1" ]; then
+    echo "Usage: $0 <table-name>"
+    echo ""
+    echo "Available tables:"
+    echo "  vote_users"
+    echo "  vote_elections"
+    echo "  vote_candidates"
+    echo "  vote_eligible_voters"
+    echo "  vote_ballots"
+    echo "  vote_event_log"
+    echo "  vote_sync_state"
+    echo ""
+    echo "Example:"
+    echo "  $0 vote_users"
+    exit 1
+fi
+
+TABLE_NAME="$1"
+
+echo "=== Raw Scan of $TABLE_NAME ==="
+echo ""
+
+aws dynamodb scan \
+    --table-name "$TABLE_NAME" \
+    --endpoint-url "$ENDPOINT" \
+    --region "$REGION" \
+    2>/dev/null | jq '.'

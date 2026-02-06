@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+set -e
+
+ENDPOINT="http://localhost:8000"
+export AWS_ACCESS_KEY_ID=dummy
+export AWS_SECRET_ACCESS_KEY=dummy
+REGION="us-east-1"
+
+echo "=== Candidates Table ==="
+echo ""
+
+if [ -n "$1" ]; then
+    # Query specific election
+    result=$(aws dynamodb query \
+        --table-name vote_candidates \
+        --key-condition-expression "election_name = :en" \
+        --expression-attribute-values "{\":en\":{\"S\":\"$1\"}}" \
+        --endpoint-url "$ENDPOINT" \
+        --region "$REGION" \
+        2>/dev/null)
+
+    count=$(echo "$result" | jq -r '.Count // 0')
+
+    if [ "$count" -eq 0 ]; then
+        echo "No candidates found for election: $1"
+    else
+        echo "Found $count candidate(s) for election: $1"
+        echo ""
+        echo "$result" | jq -r '.Items[] | "  - " + .candidate_name.S'
+    fi
+else
+    # Scan all candidates
+    result=$(aws dynamodb scan \
+        --table-name vote_candidates \
+        --endpoint-url "$ENDPOINT" \
+        --region "$REGION" \
+        2>/dev/null)
+
+    count=$(echo "$result" | jq -r '.Count // 0')
+
+    if [ "$count" -eq 0 ]; then
+        echo "No candidates found."
+    else
+        echo "Found $count candidate(s):"
+        echo ""
+        echo "$result" | jq -r '.Items[] |
+            "Election:  " + .election_name.S + "\n" +
+            "Candidate: " + .candidate_name.S + "\n"'
+    fi
+
+    echo ""
+    echo "Tip: Run with election name to see candidates for specific election:"
+    echo "  ./scripts/inspect-dynamodb-candidates \"Best Programming Language\""
+fi

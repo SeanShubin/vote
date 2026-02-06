@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+set -e
+
+ENDPOINT="http://localhost:8000"
+export AWS_ACCESS_KEY_ID=dummy
+export AWS_SECRET_ACCESS_KEY=dummy
+REGION="us-east-1"
+
+echo "=== Event Log Table ==="
+echo ""
+
+result=$(aws dynamodb scan \
+    --table-name vote_event_log \
+    --endpoint-url "$ENDPOINT" \
+    --region "$REGION" \
+    2>/dev/null)
+
+count=$(echo "$result" | jq -r '.Count // 0')
+
+if [ "$count" -eq 0 ]; then
+    echo "No events found."
+else
+    echo "Found $count event(s):"
+    echo ""
+    # Sort by event_id and display
+    echo "$result" | jq -r '.Items | sort_by(.event_id.N | tonumber) | .[] |
+        "Event ID:   " + .event_id.N + "\n" +
+        "Authority:  " + .authority.S + "\n" +
+        "Type:       " + .event_type.S + "\n" +
+        "Data:       " + .event_data.S + "\n" +
+        "Created At: " + .created_at.N + " (epoch ms)\n"'
+fi
+
+echo ""
+echo "Tip: Pipe through 'head' or 'tail' to see specific events:"
+echo "  ./scripts/inspect-dynamodb-event-log | head -30  # First 5 events"
+echo "  ./scripts/inspect-dynamodb-event-log | tail -30  # Last 5 events"

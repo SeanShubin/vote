@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+set -e
+
+ENDPOINT="http://localhost:8000"
+export AWS_ACCESS_KEY_ID=dummy
+export AWS_SECRET_ACCESS_KEY=dummy
+REGION="us-east-1"
+
+echo "=== Elections Table ==="
+echo ""
+
+result=$(aws dynamodb scan \
+    --table-name vote_elections \
+    --endpoint-url "$ENDPOINT" \
+    --region "$REGION" \
+    2>/dev/null)
+
+count=$(echo "$result" | jq -r '.Count // 0')
+
+if [ "$count" -eq 0 ]; then
+    echo "No elections found."
+else
+    echo "Found $count election(s):"
+    echo ""
+    echo "$result" | jq -r '.Items[] |
+        "Election:         " + .election_name.S + "\n" +
+        "Owner:            " + .owner_name.S + "\n" +
+        "Secret Ballot:    " + (.secret_ballot.BOOL | tostring) + "\n" +
+        "Allow Vote:       " + (.allow_vote.BOOL | tostring) + "\n" +
+        "Allow Edit:       " + (.allow_edit.BOOL | tostring) + "\n" +
+        (if .no_voting_before then "No Voting Before: " + .no_voting_before.N + "\n" else "" end) +
+        (if .no_voting_after then "No Voting After:  " + .no_voting_after.N + "\n" else "" end) +
+        ""'
+fi
