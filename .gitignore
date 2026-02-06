@@ -21,6 +21,9 @@ package-lock.json
 yarn.lock
 yarn-error.log
 
+# Kotlin compiler
+.kotlin/
+
 # Test
 test-results/
 *.log
