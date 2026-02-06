@@ -20,6 +20,7 @@ fun ElectionsPage(
         try {
             elections = ApiClient.listElections(authToken)
         } catch (e: Exception) {
+            ApiClient.logErrorToServer(e)
             errorMessage = e.message ?: "Failed to load elections"
         } finally {
             isLoading = false

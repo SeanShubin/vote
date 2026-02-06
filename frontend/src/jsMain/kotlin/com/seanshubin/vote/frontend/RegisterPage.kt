@@ -67,6 +67,7 @@ fun RegisterPage(
                                 password = ""
                                 onRegisterSuccess()
                             } catch (e: Exception) {
+                                ApiClient.logErrorToServer(e)
                                 errorMessage = e.message ?: "Registration failed"
                             } finally {
                                 isLoading = false

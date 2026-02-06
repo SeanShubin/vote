@@ -156,6 +156,31 @@ object ApiClient {
         return tokenData["userName"]?.toString()?.removeSurrounding("\"")
             ?: throw IllegalArgumentException("Invalid auth token")
     }
+
+    fun logErrorToServer(error: Throwable) {
+        try {
+            val errorRequest = ClientErrorRequest(
+                message = error.message ?: error.toString(),
+                stackTrace = error.stackTraceToString(),
+                url = window.location.href,
+                userAgent = window.navigator.userAgent,
+                timestamp = js("new Date().toISOString()") as String
+            )
+
+            // Use basic fetch without awaiting - fire and forget
+            window.fetch("$baseUrl/log-client-error", RequestInit(
+                method = "POST",
+                headers = json(
+                    "Content-Type" to "application/json"
+                ),
+                body = json.encodeToString(errorRequest)
+            ))
+        } catch (loggingError: Throwable) {
+            // If logging fails, at least show it in console
+            console.error("Failed to log error to server:", loggingError)
+            console.error("Original error:", error)
+        }
+    }
 }
 
 class ApiException(message: String) : Exception(message)

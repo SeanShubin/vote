@@ -25,6 +25,7 @@ fun ElectionDetailPage(
             election = ApiClient.getElection(authToken, electionName)
             candidates = ApiClient.listCandidates(authToken, electionName)
         } catch (e: Exception) {
+            ApiClient.logErrorToServer(e)
             errorMessage = e.message ?: "Failed to load election"
         } finally {
             isLoading = false
@@ -156,6 +157,7 @@ fun ElectionSetupView(
                             ApiClient.setCandidates(authToken, electionName, candidates)
                             onSuccess("Candidates updated successfully")
                         } catch (e: Exception) {
+                            ApiClient.logErrorToServer(e)
                             onError(e.message ?: "Failed to update candidates")
                         } finally {
                             isLoading = false
@@ -188,6 +190,7 @@ fun ElectionSetupView(
                             ApiClient.setEligibleVoters(authToken, electionName, voters)
                             onSuccess("Eligible voters updated successfully")
                         } catch (e: Exception) {
+                            ApiClient.logErrorToServer(e)
                             onError(e.message ?: "Failed to update eligible voters")
                         } finally {
                             isLoading = false
@@ -210,6 +213,7 @@ fun ElectionSetupView(
                             ApiClient.launchElection(authToken, electionName)
                             onSuccess("Election launched successfully")
                         } catch (e: Exception) {
+                            ApiClient.logErrorToServer(e)
                             onError(e.message ?: "Failed to launch election")
                         } finally {
                             isLoading = false
@@ -274,6 +278,7 @@ fun VotingView(
                                 val confirmation = ApiClient.castBallot(authToken, electionName, ballotRankings)
                                 onSuccess("Ballot cast successfully! Confirmation: $confirmation")
                             } catch (e: Exception) {
+                                ApiClient.logErrorToServer(e)
                                 onError(e.message ?: "Failed to cast ballot")
                             } finally {
                                 isLoading = false
@@ -302,6 +307,7 @@ fun TallyView(
         try {
             tally = ApiClient.getTally(authToken, electionName)
         } catch (e: Exception) {
+            ApiClient.logErrorToServer(e)
             onError(e.message ?: "Failed to load tally")
         } finally {
             isLoading = false

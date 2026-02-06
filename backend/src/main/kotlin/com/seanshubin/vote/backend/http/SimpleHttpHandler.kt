@@ -34,6 +34,7 @@ class SimpleHttpHandler(
         try {
             when {
                 target == "/health" && request.method == "GET" -> handleHealth(response)
+                target == "/log-client-error" && request.method == "POST" -> handleLogClientError(request, response)
                 target == "/register" && request.method == "POST" -> handleRegister(request, response)
                 target == "/authenticate" && request.method == "POST" -> handleAuthenticate(request, response)
                 target == "/refresh" && request.method == "POST" -> handleRefresh(request, response)
@@ -119,6 +120,20 @@ class SimpleHttpHandler(
         val result = service.health()
         response.status = HttpServletResponse.SC_OK
         response.writer.write(json.encodeToString(mapOf("status" to result)))
+    }
+
+    private fun handleLogClientError(request: HttpServletRequest, response: HttpServletResponse) {
+        val body = request.reader.readText()
+        val clientError = json.decodeFromString<ClientErrorRequest>(body)
+        log.error(
+            "CLIENT ERROR: ${clientError.message}\n" +
+            "  URL: ${clientError.url}\n" +
+            "  User-Agent: ${clientError.userAgent}\n" +
+            "  Timestamp: ${clientError.timestamp}\n" +
+            "  Stack trace: ${clientError.stackTrace ?: "none"}"
+        )
+        response.status = HttpServletResponse.SC_OK
+        response.writer.write("{}")
     }
 
     private fun handleRegister(request: HttpServletRequest, response: HttpServletResponse) {

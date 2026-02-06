@@ -49,6 +49,7 @@ fun LoginPage(
                                 val tokenJson = """{"userName":"$userName","role":"USER"}"""
                                 onLoginSuccess(tokenJson, userName)
                             } catch (e: Exception) {
+                                ApiClient.logErrorToServer(e)
                                 errorMessage = e.message ?: "Login failed"
                             } finally {
                                 isLoading = false

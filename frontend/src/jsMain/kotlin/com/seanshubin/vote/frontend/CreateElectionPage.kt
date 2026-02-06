@@ -42,6 +42,7 @@ fun CreateElectionPage(
                                 ApiClient.createElection(authToken, electionName)
                                 onElectionCreated(electionName)
                             } catch (e: Exception) {
+                                ApiClient.logErrorToServer(e)
                                 errorMessage = e.message ?: "Failed to create election"
                             } finally {
                                 isLoading = false
