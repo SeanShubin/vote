@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+echo "Purging MySQL database..."
+"$SCRIPT_DIR/db-reset-mysql"
+echo "MySQL database purged and recreated"

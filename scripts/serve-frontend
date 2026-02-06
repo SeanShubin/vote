@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+FRONTEND_DIR="$PROJECT_DIR/frontend/build/dist/js/productionExecutable"
+
+if [ ! -d "$FRONTEND_DIR" ]; then
+  echo "Frontend not built. Building now..."
+  cd "$PROJECT_DIR"
+  ./gradlew :frontend:build --no-daemon
+fi
+
+echo "Serving frontend from $FRONTEND_DIR on http://localhost:3000"
+cd "$FRONTEND_DIR"
+python3 -m http.server 3000

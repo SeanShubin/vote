@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+
+set -e
+
+echo "Terminating all backend and frontend processes..."
+
+# Kill backend on port 8080
+BACKEND_PID=$(lsof -ti:8080 || true)
+if [ -n "$BACKEND_PID" ]; then
+  echo "Killing backend process on port 8080 (PID: $BACKEND_PID)"
+  kill -9 $BACKEND_PID
+fi
+
+# Kill frontend on port 3000
+FRONTEND_PID=$(lsof -ti:3000 || true)
+if [ -n "$FRONTEND_PID" ]; then
+  echo "Killing frontend process on port 3000 (PID: $FRONTEND_PID)"
+  kill -9 $FRONTEND_PID
+fi
+
+echo "All processes terminated"

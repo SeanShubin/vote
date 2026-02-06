@@ -1,0 +1,82 @@
+#!/usr/bin/env bash
+
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+LOG_DIR="$PROJECT_DIR/logs"
+
+mkdir -p "$LOG_DIR"
+
+echo "=== Smoke Test (MySQL, keeping existing data) ==="
+echo
+
+# 1. Terminate existing processes
+echo "1. Terminating existing processes..."
+"$SCRIPT_DIR/terminate-all"
+sleep 1
+
+# 2. Build frontend if needed
+if [ ! -d "$PROJECT_DIR/frontend/build/dist/js/productionExecutable" ]; then
+  echo "2. Building frontend..."
+  cd "$PROJECT_DIR"
+  ./gradlew :frontend:build --no-daemon
+else
+  echo "2. Frontend already built"
+fi
+
+# 3. Start backend
+echo "3. Starting backend (MySQL)..."
+cd "$PROJECT_DIR"
+./gradlew :backend:run --args="8080 mysql" --console=plain > "$LOG_DIR/backend.log" 2>&1 &
+BACKEND_PID=$!
+echo "   Backend started (PID: $BACKEND_PID, log: logs/backend.log)"
+
+# 4. Start frontend
+echo "4. Starting frontend server..."
+cd "$PROJECT_DIR/frontend/build/dist/js/productionExecutable"
+python3 -m http.server 3000 > "$LOG_DIR/frontend.log" 2>&1 &
+FRONTEND_PID=$!
+echo "   Frontend started (PID: $FRONTEND_PID, log: logs/frontend.log)"
+
+# 5. Wait for backend
+echo "5. Waiting for backend to be ready..."
+for i in {1..30}; do
+  if curl -s http://localhost:8080/health > /dev/null 2>&1; then
+    echo "   Backend ready!"
+    break
+  fi
+  if [ $i -eq 30 ]; then
+    echo "   ERROR: Backend did not start within 30 seconds"
+    echo "   Check logs/backend.log for details"
+    exit 1
+  fi
+  sleep 1
+done
+
+# 6. Wait for frontend
+echo "6. Waiting for frontend to be ready..."
+for i in {1..10}; do
+  if curl -s http://localhost:3000 > /dev/null 2>&1; then
+    echo "   Frontend ready!"
+    break
+  fi
+  if [ $i -eq 10 ]; then
+    echo "   ERROR: Frontend did not start within 10 seconds"
+    echo "   Check logs/frontend.log for details"
+    exit 1
+  fi
+  sleep 1
+done
+
+# 7. Open browser
+echo "7. Opening browser..."
+open http://localhost:3000
+
+echo
+echo "=== Smoke Test Environment Ready ==="
+echo "Backend:  http://localhost:8080 (MySQL)"
+echo "Frontend: http://localhost:3000"
+echo "Logs:     logs/backend.log, logs/frontend.log"
+echo
+echo "To stop: ./scripts/terminate-all"

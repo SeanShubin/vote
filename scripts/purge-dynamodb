@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+echo "Purging DynamoDB tables..."
+"$SCRIPT_DIR/db-reset-dynamodb"
+echo "DynamoDB tables purged and recreated"
