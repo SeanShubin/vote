@@ -399,7 +399,97 @@ All 20 constraint questions answered. See `00-constraint-summary.md` for complet
 
 ## Implementation Log
 
-_This section will track major implementation milestones..._
+### Session 2: Implementation Begins (2026-02-06)
+
+#### Batch 1: Project Setup ✅
+
+**Created Gradle multiplatform structure:**
+- Root configuration: Gradle 8.10, Kotlin 2.0.21, Compose 1.7.1
+- 7 modules: domain, contract, backend, frontend, deploy, local, integration
+- Multiplatform targets: JVM + JS (via Kotlin/JS with IR)
+- Java 21 via asdf (`.tool-versions` file)
+- All modules compile successfully
+
+**Created scripts/ directory:**
+- Self-documenting: Browse filenames to discover capabilities
+- Working scripts: `build`, `test`, `verify`, `clean`, `check-java`
+- Placeholder scripts for future: `run-local`, `run-backend`, `run-frontend`, `db-*`
+- All executable with proper error handling (`set -euo pipefail`)
+
+**Git commit:** "Initial project setup: Gradle 8.10 multiplatform with 7 modules, Kotlin 2.0.21, Compose 1.7.1, Java 21, and discoverable scripts directory"
+
+---
+
+#### Batch 2: Domain Model Migration ✅
+
+**Migrated 10 core domain models** from condorcet-backend to multiplatform:
+
+**User & Security:**
+- `Role.kt` - User role hierarchy (NO_ACCESS → OWNER)
+- `Permission.kt` - Permission enum
+- `User.kt` - User entity with credentials
+
+**Elections:**
+- `ElectionDetail.kt` - Election configuration with voting windows
+
+**Voting:**
+- `Ranking.kt` - Candidate ranking with utility functions (normalization, comparisons, effective rankings)
+- `Ballot.kt` - Ballot interface with comparator
+- `SecretBallot.kt` - Anonymous ballot
+- `RevealedBallot.kt` - Ballot with voter identity and timestamp
+
+**Tally Calculation:**
+- `Preference.kt` - Pairwise preference with strength calculations
+- `Place.kt` - Final placement with tie adjustment
+- `Tally.kt` - Complete Condorcet algorithm with BallotCounter
+
+**Key transformations:**
+1. **Jackson → kotlinx.serialization** (all `@JsonPropertyOrder` → `@Serializable`)
+2. **java.time.Instant → kotlinx.datetime.Instant** (multiplatform compatibility)
+3. Fixed JVM-only APIs (`.toSortedMap()` → `.sortedBy()`)
+
+**Added dependency:** `kotlinx-datetime:0.6.1`
+
+**Build verification:** `./gradlew build` ✅ succeeds for all modules (JVM + JS targets)
+
+---
+
+#### Technical Note: Why @Serializable?
+
+The `@Serializable` annotation (kotlinx.serialization) is **critical** for the testing architecture:
+
+**Purpose:** Compile-time code generation for serialization/deserialization
+
+**Why not Jackson?** Jackson is JVM-only. kotlinx.serialization works on:
+- ✅ JVM (backend, tests)
+- ✅ JS (frontend, ViewModel tests)
+- ✅ Native (future if needed)
+
+**Essential for testing strategy:**
+```kotlin
+// Events ARE the behavioral specification
+val event = UserRegistered(name = "alice", email = "alice@example.com")
+
+// Same event serializes identically on both projections
+mysqlProjection.applyEvent(event)  // JVM
+dynamoProjection.applyEvent(event) // JVM
+
+// Can also serialize for frontend tests
+frontendViewModel.handleEvent(event) // JS
+
+// Tests verify projections match
+assertEquals(mysqlRepo.findUser("alice"), dynamoRepo.findUser("alice"))
+```
+
+**Benefits:**
+- Multiplatform: Same models work on JVM + JS
+- Type-safe: Errors caught at compile time
+- Zero-reflection on JS: Better performance
+- Event sourcing: Events serialize uniformly as JSON
+- Dual projections: Same event format for MySQL + DynamoDB
+- Testing: ViewModel tests can use same event objects as backend
+
+This enables the entire research goal: shared behavioral specifications (events) that work seamlessly across backend (JVM), frontend (JS), and tests (both).
 
 ---
 
