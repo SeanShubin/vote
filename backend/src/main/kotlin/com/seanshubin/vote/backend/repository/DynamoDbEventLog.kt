@@ -24,7 +24,7 @@ class DynamoDbEventLog(
         // Store the event
         runBlocking {
             dynamoDb.putItem(PutItemRequest {
-                tableName = DynamoDbSchema.EVENT_LOG_TABLE
+                tableName = DynamoDbSingleTableSchema.EVENT_LOG_TABLE
                 item = mapOf(
                     "event_id" to AttributeValue.N(eventId.toString()),
                     "authority" to AttributeValue.S(authority),
@@ -39,7 +39,7 @@ class DynamoDbEventLog(
     override fun eventsToSync(lastEventSynced: Long): List<EventEnvelope> {
         return runBlocking {
             val response = dynamoDb.scan(ScanRequest {
-                tableName = DynamoDbSchema.EVENT_LOG_TABLE
+                tableName = DynamoDbSingleTableSchema.EVENT_LOG_TABLE
                 filterExpression = "event_id > :lastSynced"
                 expressionAttributeValues = mapOf(
                     ":lastSynced" to AttributeValue.N(lastEventSynced.toString())
@@ -67,7 +67,7 @@ class DynamoDbEventLog(
     override fun eventCount(): Int {
         return runBlocking {
             val response = dynamoDb.scan(ScanRequest {
-                tableName = DynamoDbSchema.EVENT_LOG_TABLE
+                tableName = DynamoDbSingleTableSchema.EVENT_LOG_TABLE
                 select = Select.Count
             })
             response.count ?: 0
@@ -76,9 +76,13 @@ class DynamoDbEventLog(
 
     private fun getNextEventId(): Long {
         return runBlocking {
+            // Use main table with PK=METADATA, SK=EVENT_COUNTER for atomic counter
             val response = dynamoDb.updateItem(UpdateItemRequest {
-                tableName = DynamoDbSchema.SYNC_STATE_TABLE
-                key = mapOf("id" to AttributeValue.S("event_counter"))
+                tableName = DynamoDbSingleTableSchema.MAIN_TABLE
+                key = mapOf(
+                    "PK" to AttributeValue.S("METADATA"),
+                    "SK" to AttributeValue.S("EVENT_COUNTER")
+                )
                 updateExpression = "ADD next_event_id :inc"
                 expressionAttributeValues = mapOf(":inc" to AttributeValue.N("1"))
                 returnValues = ReturnValue.UpdatedNew

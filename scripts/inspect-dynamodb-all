@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -e
 
+# Get the script directory
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 echo "=========================================="
 echo "DynamoDB Single-Table Complete Dump"
 echo "=========================================="
@@ -79,19 +82,19 @@ echo ""
 echo "=========================================="
 echo "USERS"
 echo "=========================================="
-./scripts/inspect-dynamodb-users
+"$SCRIPT_DIR/inspect-dynamodb-users"
 echo ""
 echo ""
 
 echo "=========================================="
 echo "ELECTIONS"
 echo "=========================================="
-./scripts/inspect-dynamodb-elections
+"$SCRIPT_DIR/inspect-dynamodb-elections"
 echo ""
 echo ""
 
 echo "=========================================="
 echo "BALLOTS"
 echo "=========================================="
-./scripts/inspect-dynamodb-ballots
+"$SCRIPT_DIR/inspect-dynamodb-ballots"
 echo ""

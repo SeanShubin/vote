@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
 set -e
 
+# Get the project root (parent of scripts directory)
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
 echo "Starting backend with DynamoDB..."
+cd "$PROJECT_ROOT"
 ./gradlew :backend:run --args="8080 dynamodb" --console=plain
