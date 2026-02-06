@@ -88,7 +88,7 @@ class ServiceImpl(
     }
 
     override fun setRole(accessToken: AccessToken, userName: String, role: Role) {
-        // TODO: Permission checking
+        requirePermission(accessToken, Permission.MANAGE_USERS)
         eventLog.appendEvent(
             accessToken.userName,
             clock.now(),
@@ -98,7 +98,7 @@ class ServiceImpl(
     }
 
     override fun removeUser(accessToken: AccessToken, userName: String) {
-        // TODO: Permission checking
+        requirePermission(accessToken, Permission.MANAGE_USERS)
         eventLog.appendEvent(
             accessToken.userName,
             clock.now(),
@@ -108,7 +108,7 @@ class ServiceImpl(
     }
 
     override fun listUsers(accessToken: AccessToken): List<UserNameRole> {
-        // TODO: Permission checking
+        requirePermission(accessToken, Permission.MANAGE_USERS)
         return queryModel.listUsers().map { user ->
             val allowedRoles = Role.entries.filter { role -> role <= user.role }
             UserNameRole(user.name, user.role, allowedRoles)
@@ -116,25 +116,33 @@ class ServiceImpl(
     }
 
     override fun addElection(accessToken: AccessToken, userName: String, electionName: String) {
+        requirePermission(accessToken, Permission.USE_APPLICATION)
+        val validElectionName = Validation.validateElectionName(electionName)
         eventLog.appendEvent(
             accessToken.userName,
             clock.now(),
-            DomainEvent.ElectionCreated(userName, electionName)
+            DomainEvent.ElectionCreated(userName, validElectionName)
         )
         synchronize()
     }
 
     override fun launchElection(accessToken: AccessToken, electionName: String, allowEdit: Boolean) {
+        requirePermission(accessToken, Permission.USE_APPLICATION)
+        requireIsElectionOwner(accessToken, electionName)
         val updates = ElectionUpdates(allowVote = true, allowEdit = allowEdit)
         updateElection(accessToken, electionName, updates)
     }
 
     override fun finalizeElection(accessToken: AccessToken, electionName: String) {
+        requirePermission(accessToken, Permission.USE_APPLICATION)
+        requireIsElectionOwner(accessToken, electionName)
         val updates = ElectionUpdates(allowVote = false, allowEdit = false)
         updateElection(accessToken, electionName, updates)
     }
 
     override fun updateElection(accessToken: AccessToken, electionName: String, electionUpdates: ElectionUpdates) {
+        requirePermission(accessToken, Permission.USE_APPLICATION)
+        requireIsElectionOwner(accessToken, electionName)
         eventLog.appendEvent(
             accessToken.userName,
             clock.now(),
@@ -178,6 +186,8 @@ class ServiceImpl(
     }
 
     override fun deleteElection(accessToken: AccessToken, electionName: String) {
+        requirePermission(accessToken, Permission.USE_APPLICATION)
+        requireIsElectionOwner(accessToken, electionName)
         eventLog.appendEvent(
             accessToken.userName,
             clock.now(),
@@ -254,6 +264,7 @@ class ServiceImpl(
         electionName: String,
         rankings: List<Ranking>
     ) {
+        requirePermission(accessToken, Permission.VOTE)
         val confirmation = uniqueIdGenerator.generate()
         val whenCast = clock.now()
         eventLog.appendEvent(
@@ -323,5 +334,37 @@ class ServiceImpl(
 
     override fun sendLoginLinkByEmail(email: String, baseUri: String) {
         notifications.sendMailEvent(email, "Login link")
+    }
+
+    // Permission checking helpers
+    private fun hasPermission(accessToken: AccessToken, permission: Permission): Boolean {
+        return queryModel.roleHasPermission(accessToken.role, permission)
+    }
+
+    private fun requirePermission(accessToken: AccessToken, permission: Permission) {
+        if (!hasPermission(accessToken, permission)) {
+            throw ServiceException(
+                ServiceException.Category.UNAUTHORIZED,
+                "User ${accessToken.userName} with role ${accessToken.role} does not have permission $permission"
+            )
+        }
+    }
+
+    private fun isSelf(accessToken: AccessToken, userName: String): Boolean {
+        return accessToken.userName == userName
+    }
+
+    private fun requireIsElectionOwner(accessToken: AccessToken, electionName: String) {
+        val election = queryModel.searchElectionByName(electionName)
+            ?: throw ServiceException(
+                ServiceException.Category.NOT_FOUND,
+                "Election '$electionName' not found"
+            )
+        if (election.ownerName != accessToken.userName) {
+            throw ServiceException(
+                ServiceException.Category.UNAUTHORIZED,
+                "User ${accessToken.userName} is not the owner of election '$electionName'"
+            )
+        }
     }
 }
