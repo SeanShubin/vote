@@ -1,10 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Start backend server only
-# TODO: Implement once backend is ready
+# Run the backend server on port 8080 (or custom port)
+PORT="${1:-8080}"
 
-echo "Starting backend server..."
-echo "TODO: Implementation pending (Milestone 1)"
-echo ""
-echo "This will run: ./gradlew :backend:run"
+echo "Starting backend server on port $PORT..."
+./gradlew :backend:run --args="$PORT" --console=plain
