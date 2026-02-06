@@ -1,0 +1,86 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Start MySQL database using Docker
+# Port: 3306
+# Database: vote
+# User: vote
+# Password: vote
+
+CONTAINER_NAME="vote-mysql"
+MYSQL_PORT=3306
+MYSQL_DATABASE="vote"
+MYSQL_USER="vote"
+MYSQL_PASSWORD="vote"
+MYSQL_ROOT_PASSWORD="rootpass"
+
+echo "Starting MySQL database..."
+
+# Check if container already exists
+if docker ps -a --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
+    echo "Container $CONTAINER_NAME already exists."
+    if docker ps --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
+        echo "Container is already running."
+    else
+        echo "Starting existing container..."
+        docker start "$CONTAINER_NAME"
+    fi
+else
+    echo "Creating new MySQL container..."
+    docker run -d \
+        --name "$CONTAINER_NAME" \
+        -e MYSQL_ROOT_PASSWORD="$MYSQL_ROOT_PASSWORD" \
+        -e MYSQL_DATABASE="$MYSQL_DATABASE" \
+        -e MYSQL_USER="$MYSQL_USER" \
+        -e MYSQL_PASSWORD="$MYSQL_PASSWORD" \
+        -p "$MYSQL_PORT:3306" \
+        mysql:8.0 \
+        --character-set-server=utf8mb4 \
+        --collation-server=utf8mb4_unicode_ci
+fi
+
+# Wait for MySQL to be ready
+echo "Waiting for MySQL to be ready..."
+sleep 5
+
+MAX_RETRIES=30
+RETRY_COUNT=0
+until docker exec "$CONTAINER_NAME" mysqladmin ping -h localhost -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" --silent 2>/dev/null; do
+    RETRY_COUNT=$((RETRY_COUNT + 1))
+    if [ $RETRY_COUNT -ge $MAX_RETRIES ]; then
+        echo "Error: MySQL did not become ready in time"
+        exit 1
+    fi
+    echo "Waiting for MySQL... ($RETRY_COUNT/$MAX_RETRIES)"
+    sleep 2
+done
+
+echo "MySQL is ready!"
+
+# Apply schema
+SCHEMA_FILE="backend/src/main/resources/database/schema.sql"
+if [ -f "$SCHEMA_FILE" ]; then
+    echo "Applying schema from $SCHEMA_FILE..."
+    docker exec -i "$CONTAINER_NAME" mysql -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE" < "$SCHEMA_FILE"
+    echo "Schema applied successfully!"
+else
+    echo "Warning: Schema file not found at $SCHEMA_FILE"
+fi
+
+echo ""
+echo "╔════════════════════════════════════════════════════════════╗"
+echo "║ MySQL Database Ready                                       ║"
+echo "╠════════════════════════════════════════════════════════════╣"
+echo "║ Host:      localhost                                       ║"
+echo "║ Port:      $MYSQL_PORT                                           ║"
+echo "║ Database:  $MYSQL_DATABASE                                         ║"
+echo "║ User:      $MYSQL_USER                                         ║"
+echo "║ Password:  $MYSQL_PASSWORD                                         ║"
+echo "║                                                            ║"
+echo "║ JDBC URL:                                                  ║"
+echo "║ jdbc:mysql://localhost:3306/vote                           ║"
+echo "║                                                            ║"
+echo "║ To stop: ./scripts/db-teardown-mysql                       ║"
+echo "║ To reset: ./scripts/db-reset-mysql                         ║"
+echo "╚════════════════════════════════════════════════════════════╝"
+echo ""

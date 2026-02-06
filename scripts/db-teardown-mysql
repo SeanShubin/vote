@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Stop and remove MySQL container
+
+CONTAINER_NAME="vote-mysql"
+
+echo "Stopping MySQL container..."
+
+if docker ps --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
+    docker stop "$CONTAINER_NAME"
+    echo "Container stopped."
+else
+    echo "Container is not running."
+fi
+
+if docker ps -a --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
+    docker rm "$CONTAINER_NAME"
+    echo "Container removed."
+else
+    echo "Container does not exist."
+fi
+
+echo "MySQL database teardown complete."

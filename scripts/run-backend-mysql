@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Run the backend server with MySQL database on port 8080 (or custom port)
+PORT="${1:-8080}"
+
+echo "Starting backend server on port $PORT with MySQL database..."
+./gradlew :backend:run --args="$PORT mysql" --console=plain

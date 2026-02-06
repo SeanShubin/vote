@@ -9,17 +9,22 @@ Discover what you can do by browsing the filenames!
 - `./scripts/build` - Build entire project
 - `./scripts/test` - Run all tests
 - `./scripts/verify` - Quick verification (build + test)
+- `./scripts/test-lifecycle` - End-to-end lifecycle test (requires running backend)
 - `./scripts/clean` - Clean all build artifacts
 
 ### Running Locally
 - `./scripts/run-local` - Start complete local environment (backend + frontend + databases)
-- `./scripts/run-backend` - Start backend server only
+- `./scripts/run-backend` - Start backend server only (in-memory mode)
+- `./scripts/run-backend-mysql` - Start backend server with MySQL database
 - `./scripts/run-frontend` - Start frontend dev server only
 
 ### Database Management
 - `./scripts/db-setup` - Start local databases (DynamoDB Local, H2)
+- `./scripts/db-setup-mysql` - Start MySQL database with Docker
 - `./scripts/db-teardown` - Stop local databases
+- `./scripts/db-teardown-mysql` - Stop and remove MySQL container
 - `./scripts/db-reset` - Reset databases to clean state
+- `./scripts/db-reset-mysql` - Reset MySQL database to clean state
 
 ### Development
 - `./scripts/watch-frontend` - Frontend development with hot reload

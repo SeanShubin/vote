@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Reset MySQL database by dropping all tables and reapplying schema
+
+CONTAINER_NAME="vote-mysql"
+MYSQL_DATABASE="vote"
+MYSQL_USER="vote"
+MYSQL_PASSWORD="vote"
+
+echo "Resetting MySQL database..."
+
+# Check if container is running
+if ! docker ps --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
+    echo "Error: Container $CONTAINER_NAME is not running."
+    echo "Run ./scripts/db-setup-mysql first."
+    exit 1
+fi
+
+# Drop all tables
+echo "Dropping all tables..."
+docker exec "$CONTAINER_NAME" mysql -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE" \
+    -e "SET FOREIGN_KEY_CHECKS = 0;
+        DROP TABLE IF EXISTS event_log;
+        DROP TABLE IF EXISTS ballots;
+        DROP TABLE IF EXISTS eligible_voters;
+        DROP TABLE IF EXISTS candidates;
+        DROP TABLE IF EXISTS elections;
+        DROP TABLE IF EXISTS users;
+        DROP TABLE IF EXISTS sync_state;
+        SET FOREIGN_KEY_CHECKS = 1;"
+
+echo "Tables dropped."
+
+# Reapply schema
+SCHEMA_FILE="backend/src/main/resources/database/schema.sql"
+if [ -f "$SCHEMA_FILE" ]; then
+    echo "Applying schema from $SCHEMA_FILE..."
+    docker exec -i "$CONTAINER_NAME" mysql -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE" < "$SCHEMA_FILE"
+    echo "Schema applied successfully!"
+else
+    echo "Error: Schema file not found at $SCHEMA_FILE"
+    exit 1
+fi
+
+echo "MySQL database reset complete."
