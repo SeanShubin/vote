@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Clean all build artifacts
+echo "Cleaning build artifacts..."
+./gradlew clean --no-daemon
+echo "✓ Clean complete"

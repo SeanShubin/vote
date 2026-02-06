@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Stop local databases
+# TODO: Implement once database setup is ready
+
+echo "Stopping local databases..."
+echo "TODO: Implementation pending (Milestone 1)"
+echo ""
+echo "This will stop:"
+echo "  - DynamoDB Local containers"
+echo "  - H2 database (shuts down automatically)"

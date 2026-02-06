@@ -1,1 +1,33 @@
+# IDEs
 /.idea/
+*.iml
+.vscode/
+*.swp
+*.swo
+*~
+
+# Gradle
+.gradle/
+build/
+gradle-app.setting
+!gradle-wrapper.jar
+!gradle-wrapper.properties
+
+# Kotlin/JS
+kotlin-js-store/
+.webpack/
+node_modules/
+package-lock.json
+yarn.lock
+yarn-error.log
+
+# Test
+test-results/
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local development
+local.properties

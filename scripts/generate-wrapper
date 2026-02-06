@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Regenerate Gradle wrapper
+GRADLE_VERSION="8.10"
+
+echo "Regenerating Gradle wrapper (version $GRADLE_VERSION)..."
+gradle wrapper --gradle-version=$GRADLE_VERSION
+echo "✓ Gradle wrapper regenerated"

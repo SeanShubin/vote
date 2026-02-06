@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Build the entire project
+echo "Building all modules..."
+./gradlew build --no-daemon
+echo "✓ Build complete"

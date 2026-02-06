@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Run all tests
+echo "Running all tests..."
+./gradlew test --no-daemon
+echo "✓ All tests passed"

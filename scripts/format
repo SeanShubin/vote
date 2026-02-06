@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Format all code
+# TODO: Configure ktlint or similar formatter
+
+echo "Formatting code..."
+echo "TODO: Formatter not yet configured"
+echo ""
+echo "Will integrate ktlint or similar when needed"

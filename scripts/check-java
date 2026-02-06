@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Check Java version
+echo "Checking Java configuration..."
+echo ""
+echo "Expected: Java 21 (per .tool-versions)"
+echo "Current:"
+java -version 2>&1 | head -n 1
+echo ""
+echo "JAVA_HOME: ${JAVA_HOME:-not set}"
+echo ""
+
+if command -v asdf &> /dev/null; then
+    echo "asdf Java version:"
+    asdf current java
+else
+    echo "asdf not found - using system Java"
+fi

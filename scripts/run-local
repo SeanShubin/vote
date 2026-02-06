@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Start complete local development environment
+# TODO: Implement once backend and frontend are ready
+# Will start:
+# - DynamoDB Local (Docker/Testcontainers)
+# - H2 database (embedded)
+# - Backend server (:8080)
+# - Frontend dev server (:3000)
+
+echo "Starting local development environment..."
+echo "TODO: Implementation pending (Milestone 1)"
+echo ""
+echo "This will eventually run:"
+echo "  - DynamoDB Local (Docker)"
+echo "  - H2 database (embedded)"
+echo "  - Backend server on :8080"
+echo "  - Frontend dev server on :3000"

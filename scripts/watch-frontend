@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Frontend development with hot reload
+# TODO: Implement once frontend is ready (Milestone 2)
+
+echo "Starting frontend in watch mode (hot reload)..."
+echo "TODO: Implementation pending (Milestone 2)"
+echo ""
+echo "This will run: ./gradlew :frontend:jsBrowserDevelopmentRun --continuous"

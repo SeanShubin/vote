@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Reset databases to clean state
+# TODO: Implement once database setup is ready
+
+echo "Resetting databases to clean state..."
+echo "TODO: Implementation pending (Milestone 1)"
+echo ""
+echo "This will:"
+echo "  - Stop existing database containers"
+echo "  - Remove data volumes"
+echo "  - Start fresh databases"

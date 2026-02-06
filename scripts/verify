@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Quick verification: clean build + test
+echo "Running verification (clean + build + test)..."
+./gradlew clean build test --no-daemon
+echo "✓ Verification complete - all checks passed"

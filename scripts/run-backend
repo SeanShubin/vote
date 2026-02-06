@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Start backend server only
+# TODO: Implement once backend is ready
+
+echo "Starting backend server..."
+echo "TODO: Implementation pending (Milestone 1)"
+echo ""
+echo "This will run: ./gradlew :backend:run"
