@@ -12,7 +12,7 @@ import kotlin.js.json
 
 object ApiClient {
     private val json = Json { ignoreUnknownKeys = true }
-    private val baseUrl = window.location.origin
+    private val baseUrl = "http://localhost:8080"  // Backend server, not frontend server
 
     suspend fun register(userName: String, email: String, password: String): Tokens {
         val request = RegisterRequest(userName, email, password)
