@@ -6,15 +6,11 @@ echo "Tearing down DynamoDB Local (Single-Table)"
 echo "=========================================="
 echo ""
 
-# Stop and remove container
-if docker ps -a --format '{{.Names}}' | grep -q '^vote-dynamodb-local$'; then
-    echo "Stopping and removing DynamoDB Local container..."
-    docker stop vote-dynamodb-local 2>/dev/null || true
-    docker rm vote-dynamodb-local 2>/dev/null || true
-    echo "✓ Container removed"
-else
-    echo "✓ No DynamoDB Local container found"
-fi
+# Note: We don't stop/remove the container since it's shared with multi-table setup
+# Just delete the single-table schema tables
+echo "Note: DynamoDB Local container is shared with multi-table setup"
+echo "To delete tables, use AWS CLI delete-table commands"
+echo "To stop the container, use: ./scripts/db-teardown-dynamodb"
 
 echo ""
 echo "=========================================="

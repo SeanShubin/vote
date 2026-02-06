@@ -7,22 +7,19 @@ echo "=========================================="
 echo ""
 
 # Check if DynamoDB Local container is already running
-if docker ps --format '{{.Names}}' | grep -q '^vote-dynamodb-local$'; then
+if docker ps --format '{{.Names}}' | grep -q '^vote-dynamodb$'; then
     echo "✓ DynamoDB Local container already running"
 else
     # Check if container exists but is stopped
-    if docker ps -a --format '{{.Names}}' | grep -q '^vote-dynamodb-local$'; then
+    if docker ps -a --format '{{.Names}}' | grep -q '^vote-dynamodb$'; then
         echo "Starting existing DynamoDB Local container..."
-        docker start vote-dynamodb-local
+        docker start vote-dynamodb
     else
         echo "Creating and starting DynamoDB Local container..."
         docker run -d \
-            --name vote-dynamodb-local \
+            --name vote-dynamodb \
             -p 8000:8000 \
-            amazon/dynamodb-local:latest \
-            -jar DynamoDBLocal.jar \
-            -sharedDb \
-            -inMemory
+            amazon/dynamodb-local
     fi
     echo "✓ DynamoDB Local container started"
 fi

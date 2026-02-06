@@ -51,21 +51,8 @@ class DynamoDbSingleTableQueryModel(
 
     override fun userCount(): Int {
         return runBlocking {
-            val response = dynamoDb.query(QueryRequest {
-                tableName = DynamoDbSingleTableSchema.MAIN_TABLE
-                keyConditionExpression = "SK = :sk"
-                filterExpression = "begins_with(PK, :prefix)"
-                expressionAttributeValues = mapOf(
-                    ":sk" to AttributeValue.S(DynamoDbSingleTableSchema.METADATA_SK),
-                    ":prefix" to AttributeValue.S(DynamoDbSingleTableSchema.USER_PREFIX)
-                )
-                select = Select.Count
-                indexName = null
-            })
-
-            // Fallback to scan if query on SK doesn't work (requires GSI on SK)
-            // For now, use scan which is acceptable for admin operations
-            val scanResponse = dynamoDb.scan(ScanRequest {
+            // Use scan for counting (acceptable for admin operations)
+            val response = dynamoDb.scan(ScanRequest {
                 tableName = DynamoDbSingleTableSchema.MAIN_TABLE
                 filterExpression = "begins_with(PK, :prefix) AND SK = :sk"
                 expressionAttributeValues = mapOf(
@@ -74,7 +61,7 @@ class DynamoDbSingleTableQueryModel(
                 )
                 select = Select.Count
             })
-            scanResponse.count ?: 0
+            response.count ?: 0
         }
     }
 

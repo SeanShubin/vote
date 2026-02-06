@@ -30,6 +30,10 @@ sealed class DatabaseConfig {
         val endpoint: String = "http://localhost:8000",
         val region: String = "us-east-1"
     ) : DatabaseConfig()
+    data class DynamoDBSingle(
+        val endpoint: String = "http://localhost:8000",
+        val region: String = "us-east-1"
+    ) : DatabaseConfig()
 }
 
 class ApplicationDependencies(
@@ -50,6 +54,7 @@ class ApplicationDependencies(
             )
         }
         is DatabaseConfig.DynamoDB -> null
+        is DatabaseConfig.DynamoDBSingle -> null
     }
 
     private data class RepositorySet(
@@ -60,6 +65,18 @@ class ApplicationDependencies(
 
     private val dynamoDbClient: DynamoDbClient? = when (databaseConfig) {
         is DatabaseConfig.DynamoDB -> {
+            DynamoDbClient {
+                region = databaseConfig.region
+                endpointUrl = Url.parse(databaseConfig.endpoint)
+                credentialsProvider = StaticCredentialsProvider(
+                    Credentials(
+                        accessKeyId = "dummy",
+                        secretAccessKey = "dummy"
+                    )
+                )
+            }
+        }
+        is DatabaseConfig.DynamoDBSingle -> {
             DynamoDbClient {
                 region = databaseConfig.region
                 endpointUrl = Url.parse(databaseConfig.endpoint)
@@ -103,6 +120,22 @@ class ApplicationDependencies(
             val eventLog = DynamoDbEventLog(dynamoDbClient!!, json)
             val commandModel = DynamoDbCommandModel(dynamoDbClient, json)
             val queryModel = DynamoDbQueryModel(dynamoDbClient, json)
+            RepositorySet(eventLog, commandModel, queryModel)
+        }
+        is DatabaseConfig.DynamoDBSingle -> {
+            // Initialize DynamoDB single-table schema if needed
+            runBlocking {
+                try {
+                    DynamoDbSingleTableSchema.createTables(dynamoDbClient!!)
+                    println("DynamoDB single-table schema created/verified")
+                } catch (e: Exception) {
+                    println("DynamoDB single-table may already exist: ${e.message}")
+                }
+            }
+
+            val eventLog = DynamoDbEventLog(dynamoDbClient!!, json)
+            val commandModel = DynamoDbSingleTableCommandModel(dynamoDbClient, json)
+            val queryModel = DynamoDbSingleTableQueryModel(dynamoDbClient, json)
             RepositorySet(eventLog, commandModel, queryModel)
         }
     }
