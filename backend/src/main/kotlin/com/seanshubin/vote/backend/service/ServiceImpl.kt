@@ -260,7 +260,11 @@ class ServiceImpl(
     }
 
     override fun getElection(accessToken: AccessToken, electionName: String): ElectionDetail {
-        throw NotImplementedError("Stub")
+        val election = queryModel.searchElectionByName(electionName)
+            ?: throw ServiceException(ServiceException.Category.NOT_FOUND, "Election not found: $electionName")
+        val candidateCount = queryModel.candidateCount(electionName)
+        val voterCount = queryModel.voterCount(electionName)
+        return election.toElectionDetail(candidateCount, voterCount)
     }
 
     override fun deleteElection(accessToken: AccessToken, electionName: String) {
@@ -358,7 +362,11 @@ class ServiceImpl(
     }
 
     override fun tally(accessToken: AccessToken, electionName: String): Tally {
-        throw NotImplementedError("Stub")
+        val election = queryModel.searchElectionByName(electionName)
+            ?: throw ServiceException(ServiceException.Category.NOT_FOUND, "Election not found: $electionName")
+        val candidates = queryModel.listCandidates(electionName)
+        val ballots = queryModel.listBallots(electionName)
+        return Tally.countBallots(electionName, election.secretBallot, candidates, ballots)
     }
 
     override fun listEligibility(accessToken: AccessToken, electionName: String): List<VoterEligibility> {
