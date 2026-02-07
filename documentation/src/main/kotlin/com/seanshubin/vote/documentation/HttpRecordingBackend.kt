@@ -1,14 +1,13 @@
 package com.seanshubin.vote.documentation
 
 import com.seanshubin.vote.contract.*
-import com.seanshubin.vote.domain.BallotSummary
-import com.seanshubin.vote.domain.Ranking
-import com.seanshubin.vote.domain.Role
-import com.seanshubin.vote.domain.Tally
-import com.seanshubin.vote.domain.UserUpdates
+import com.seanshubin.vote.domain.*
 import com.seanshubin.vote.integration.dsl.ScenarioBackend
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.modules.SerializersModule
+import kotlinx.serialization.modules.polymorphic
+import kotlinx.serialization.modules.subclass
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 
@@ -17,7 +16,15 @@ import java.nio.charset.StandardCharsets
  * Used for HTTP API documentation generation.
  */
 class HttpRecordingBackend(private val recorder: HttpRecorder) : ScenarioBackend {
-    private val json = Json { ignoreUnknownKeys = true; prettyPrint = true }
+    private val json = Json {
+        ignoreUnknownKeys = true
+        prettyPrint = true
+        serializersModule = SerializersModule {
+            polymorphic(Ballot::class) {
+                subclass(SecretBallot::class)
+            }
+        }
+    }
 
     override fun registerUser(name: String, email: String, password: String): AccessToken {
         val request = RegisterRequest(name, email, password)
@@ -108,7 +115,95 @@ class HttpRecordingBackend(private val recorder: HttpRecorder) : ScenarioBackend
         return json.decodeFromString<Tally>(response.body())
     }
 
+    override fun listUsers(token: AccessToken): List<UserNameRole> {
+        val response = recorder.get("/users", token)
+        return json.decodeFromString<List<UserNameRole>>(response.body())
+    }
+
+    override fun getUser(token: AccessToken, userName: String): UserNameEmail {
+        val encodedName = URLEncoder.encode(userName, StandardCharsets.UTF_8)
+        val response = recorder.get("/user/$encodedName", token)
+        return json.decodeFromString<UserNameEmail>(response.body())
+    }
+
+    override fun userCount(token: AccessToken): Int {
+        val response = recorder.get("/users/count", token)
+        val countMap = json.decodeFromString<Map<String, Int>>(response.body())
+        return countMap["count"] ?: 0
+    }
+
+    override fun listElections(token: AccessToken): List<ElectionSummary> {
+        val response = recorder.get("/elections", token)
+        return json.decodeFromString<List<ElectionSummary>>(response.body())
+    }
+
+    override fun getElection(token: AccessToken, electionName: String): ElectionDetail {
+        val encodedName = URLEncoder.encode(electionName, StandardCharsets.UTF_8)
+        val response = recorder.get("/election/$encodedName", token)
+        return json.decodeFromString<ElectionDetail>(response.body())
+    }
+
+    override fun electionCount(token: AccessToken): Int {
+        val response = recorder.get("/elections/count", token)
+        val countMap = json.decodeFromString<Map<String, Int>>(response.body())
+        return countMap["count"] ?: 0
+    }
+
+    override fun listCandidates(token: AccessToken, electionName: String): List<String> {
+        val encodedName = URLEncoder.encode(electionName, StandardCharsets.UTF_8)
+        val response = recorder.get("/election/$encodedName/candidates", token)
+        return json.decodeFromString<List<String>>(response.body())
+    }
+
+    override fun listEligibility(token: AccessToken, electionName: String): List<VoterEligibility> {
+        val encodedName = URLEncoder.encode(electionName, StandardCharsets.UTF_8)
+        val response = recorder.get("/election/$encodedName/eligibility", token)
+        return json.decodeFromString<List<VoterEligibility>>(response.body())
+    }
+
+    override fun isEligible(token: AccessToken, userName: String, electionName: String): Boolean {
+        val encodedElection = URLEncoder.encode(electionName, StandardCharsets.UTF_8)
+        val encodedUser = URLEncoder.encode(userName, StandardCharsets.UTF_8)
+        val response = recorder.get("/election/$encodedElection/eligible/$encodedUser", token)
+        return response.body().toBoolean()
+    }
+
+    override fun listRankings(token: AccessToken, voterName: String, electionName: String): List<Ranking> {
+        val encodedElection = URLEncoder.encode(electionName, StandardCharsets.UTF_8)
+        val encodedVoter = URLEncoder.encode(voterName, StandardCharsets.UTF_8)
+        val response = recorder.get("/election/$encodedElection/rankings/$encodedVoter", token)
+        return json.decodeFromString<List<Ranking>>(response.body())
+    }
+
+    override fun listTables(token: AccessToken): List<String> {
+        val response = recorder.get("/tables", token)
+        return json.decodeFromString<List<String>>(response.body())
+    }
+
+    override fun tableCount(token: AccessToken): Int {
+        val response = recorder.get("/tables/count", token)
+        val countMap = json.decodeFromString<Map<String, Int>>(response.body())
+        return countMap["count"] ?: 0
+    }
+
+    override fun eventCount(token: AccessToken): Int {
+        val response = recorder.get("/events/count", token)
+        val countMap = json.decodeFromString<Map<String, Int>>(response.body())
+        return countMap["count"] ?: 0
+    }
+
+    override fun tableData(token: AccessToken, tableName: String): TableData {
+        val encodedName = URLEncoder.encode(tableName, StandardCharsets.UTF_8)
+        val response = recorder.get("/table/$encodedName", token)
+        return json.decodeFromString<TableData>(response.body())
+    }
+
+    override fun permissionsForRole(role: Role): List<Permission> {
+        val response = recorder.get("/permissions/${role.name}")
+        return json.decodeFromString<List<Permission>>(response.body())
+    }
+
     override fun synchronize() {
-        // HTTP backend doesn't need synchronization - operations are immediate
+        recorder.post("/sync", "{}")
     }
 }

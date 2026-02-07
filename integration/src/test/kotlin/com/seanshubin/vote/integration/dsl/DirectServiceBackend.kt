@@ -2,11 +2,7 @@ package com.seanshubin.vote.integration.dsl
 
 import com.seanshubin.vote.contract.AccessToken
 import com.seanshubin.vote.contract.Service
-import com.seanshubin.vote.domain.BallotSummary
-import com.seanshubin.vote.domain.Ranking
-import com.seanshubin.vote.domain.Role
-import com.seanshubin.vote.domain.Tally
-import com.seanshubin.vote.domain.UserUpdates
+import com.seanshubin.vote.domain.*
 
 /**
  * Backend that executes operations by directly calling the Service implementation.
@@ -67,6 +63,66 @@ class DirectServiceBackend(private val service: Service) : ScenarioBackend {
 
     override fun tally(token: AccessToken, electionName: String): Tally {
         return service.tally(token, electionName)
+    }
+
+    override fun listUsers(token: AccessToken): List<UserNameRole> {
+        return service.listUsers(token)
+    }
+
+    override fun getUser(token: AccessToken, userName: String): UserNameEmail {
+        return service.getUser(token, userName)
+    }
+
+    override fun userCount(token: AccessToken): Int {
+        return service.userCount(token)
+    }
+
+    override fun listElections(token: AccessToken): List<ElectionSummary> {
+        return service.listElections(token)
+    }
+
+    override fun getElection(token: AccessToken, electionName: String): ElectionDetail {
+        return service.getElection(token, electionName)
+    }
+
+    override fun electionCount(token: AccessToken): Int {
+        return service.electionCount(token)
+    }
+
+    override fun listCandidates(token: AccessToken, electionName: String): List<String> {
+        return service.listCandidates(token, electionName)
+    }
+
+    override fun listEligibility(token: AccessToken, electionName: String): List<VoterEligibility> {
+        return service.listEligibility(token, electionName)
+    }
+
+    override fun isEligible(token: AccessToken, userName: String, electionName: String): Boolean {
+        return service.isEligible(token, userName, electionName)
+    }
+
+    override fun listRankings(token: AccessToken, voterName: String, electionName: String): List<Ranking> {
+        return service.listRankings(token, voterName, electionName)
+    }
+
+    override fun listTables(token: AccessToken): List<String> {
+        return service.listTables(token)
+    }
+
+    override fun tableCount(token: AccessToken): Int {
+        return service.tableCount(token)
+    }
+
+    override fun eventCount(token: AccessToken): Int {
+        return service.eventCount(token)
+    }
+
+    override fun tableData(token: AccessToken, tableName: String): TableData {
+        return service.tableData(token, tableName)
+    }
+
+    override fun permissionsForRole(role: Role): List<Permission> {
+        return service.permissionsForRole(role)
     }
 
     override fun synchronize() {

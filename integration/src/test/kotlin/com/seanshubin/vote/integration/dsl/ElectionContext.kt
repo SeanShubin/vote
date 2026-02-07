@@ -50,4 +50,26 @@ class ElectionContext(
 
     fun tally(): Tally =
         testContext.backend.tally(owner.accessToken, name)
+
+    // Query methods
+
+    fun getDetails(): com.seanshubin.vote.domain.ElectionDetail {
+        testContext.backend.synchronize()
+        return testContext.backend.getElection(owner.accessToken, name)
+    }
+
+    fun listCandidates(): List<String> {
+        testContext.backend.synchronize()
+        return testContext.backend.listCandidates(owner.accessToken, name)
+    }
+
+    fun listEligibility(): List<com.seanshubin.vote.domain.VoterEligibility> {
+        testContext.backend.synchronize()
+        return testContext.backend.listEligibility(owner.accessToken, name)
+    }
+
+    fun isEligible(voterName: String): Boolean {
+        testContext.backend.synchronize()
+        return testContext.backend.isEligible(owner.accessToken, voterName, name)
+    }
 }

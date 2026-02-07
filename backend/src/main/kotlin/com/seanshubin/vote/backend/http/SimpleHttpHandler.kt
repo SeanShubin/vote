@@ -46,6 +46,7 @@ class SimpleHttpHandler(
         try {
             when {
                 target == "/health" && request.method == "GET" -> handleHealth(response)
+                target == "/sync" && request.method == "POST" -> handleSync(response)
                 target == "/log-client-error" && request.method == "POST" -> handleLogClientError(request, response)
                 target == "/register" && request.method == "POST" -> handleRegister(request, response)
                 target == "/authenticate" && request.method == "POST" -> handleAuthenticate(request, response)
@@ -58,6 +59,10 @@ class SimpleHttpHandler(
                 target.matches(Regex("/user/[^/]+/role")) && request.method == "PUT" -> handleSetRole(request, response, target)
                 target.matches(Regex("/user/[^/]+/password")) && request.method == "PUT" -> handleChangePassword(request, response, target)
                 target.matches(Regex("/permissions/[^/]+")) && request.method == "GET" -> handlePermissionsForRole(response, target)
+                target == "/tables" && request.method == "GET" -> handleListTables(request, response)
+                target == "/tables/count" && request.method == "GET" -> handleTableCount(request, response)
+                target == "/events/count" && request.method == "GET" -> handleEventCount(request, response)
+                target.matches(Regex("/table/[^/]+")) && request.method == "GET" -> handleTableData(request, response, target)
                 target == "/election" && request.method == "POST" -> handleAddElection(request, response)
                 target == "/elections" && request.method == "GET" -> handleListElections(request, response)
                 target == "/elections/count" && request.method == "GET" -> handleElectionCount(request, response)
@@ -115,23 +120,29 @@ class SimpleHttpHandler(
 
     private fun extractUserName(target: String): String {
         val parts = target.split("/")
-        return parts[2]
+        return java.net.URLDecoder.decode(parts[2], "UTF-8")
     }
 
     private fun extractElectionName(target: String): String {
         val parts = target.split("/")
-        return parts[2]
+        return java.net.URLDecoder.decode(parts[2], "UTF-8")
     }
 
     private fun extractVoterOrUserName(target: String): String {
         val parts = target.split("/")
-        return parts[4]
+        return java.net.URLDecoder.decode(parts[4], "UTF-8")
     }
 
     private fun handleHealth(response: HttpServletResponse) {
         val result = service.health()
         response.status = HttpServletResponse.SC_OK
         response.writer.write(json.encodeToString(mapOf("status" to result)))
+    }
+
+    private fun handleSync(response: HttpServletResponse) {
+        service.synchronize()
+        response.status = HttpServletResponse.SC_OK
+        response.writer.write(json.encodeToString(mapOf("status" to "synced")))
     }
 
     private fun handleLogClientError(request: HttpServletRequest, response: HttpServletResponse) {
@@ -269,6 +280,35 @@ class SimpleHttpHandler(
         val count = service.electionCount(accessToken)
         response.status = HttpServletResponse.SC_OK
         response.writer.write(json.encodeToString(mapOf("count" to count)))
+    }
+
+    private fun handleListTables(request: HttpServletRequest, response: HttpServletResponse) {
+        val accessToken = extractAccessToken(request)
+        val tables = service.listTables(accessToken)
+        response.status = HttpServletResponse.SC_OK
+        response.writer.write(json.encodeToString(tables))
+    }
+
+    private fun handleTableCount(request: HttpServletRequest, response: HttpServletResponse) {
+        val accessToken = extractAccessToken(request)
+        val count = service.tableCount(accessToken)
+        response.status = HttpServletResponse.SC_OK
+        response.writer.write(json.encodeToString(mapOf("count" to count)))
+    }
+
+    private fun handleEventCount(request: HttpServletRequest, response: HttpServletResponse) {
+        val accessToken = extractAccessToken(request)
+        val count = service.eventCount(accessToken)
+        response.status = HttpServletResponse.SC_OK
+        response.writer.write(json.encodeToString(mapOf("count" to count)))
+    }
+
+    private fun handleTableData(request: HttpServletRequest, response: HttpServletResponse, target: String) {
+        val accessToken = extractAccessToken(request)
+        val tableName = java.net.URLDecoder.decode(target.split("/").last(), "UTF-8")
+        val tableData = service.tableData(accessToken, tableName)
+        response.status = HttpServletResponse.SC_OK
+        response.writer.write(json.encodeToString(tableData))
     }
 
     private fun handleGetElection(request: HttpServletRequest, response: HttpServletResponse, target: String) {

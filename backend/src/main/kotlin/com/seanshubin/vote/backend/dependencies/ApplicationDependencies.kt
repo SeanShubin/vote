@@ -15,6 +15,11 @@ import com.seanshubin.vote.contract.QueryModel
 import com.seanshubin.vote.contract.Service
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.modules.SerializersModule
+import kotlinx.serialization.modules.polymorphic
+import kotlinx.serialization.modules.subclass
+import com.seanshubin.vote.domain.Ballot
+import com.seanshubin.vote.domain.SecretBallot
 import org.eclipse.jetty.server.Server
 import java.sql.Connection
 import java.sql.DriverManager
@@ -37,7 +42,14 @@ class ApplicationDependencies(
     private val databaseConfig: DatabaseConfig = DatabaseConfig.InMemory,
     private val integrations: Integrations = ProductionIntegrations
 ) {
-    private val json = Json { prettyPrint = true }
+    private val json = Json {
+        prettyPrint = true
+        serializersModule = SerializersModule {
+            polymorphic(Ballot::class) {
+                subclass(SecretBallot::class)
+            }
+        }
+    }
 
     private val connection: Connection? = when (databaseConfig) {
         is DatabaseConfig.InMemory -> null

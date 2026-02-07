@@ -49,4 +49,46 @@ class UserContext(
         testContext.backend.updateUser(accessToken, userName, UserUpdates(userName = newName, email = newEmail))
         testContext.backend.synchronize()
     }
+
+    // Query methods
+
+    fun getMyProfile(): com.seanshubin.vote.domain.UserNameEmail {
+        testContext.backend.synchronize()
+        return testContext.backend.getUser(accessToken, userName)
+    }
+
+    fun listElections(): List<com.seanshubin.vote.domain.ElectionSummary> {
+        testContext.backend.synchronize()
+        return testContext.backend.listElections(accessToken)
+    }
+
+    fun getElection(electionName: String): com.seanshubin.vote.domain.ElectionDetail {
+        testContext.backend.synchronize()
+        return testContext.backend.getElection(accessToken, electionName)
+    }
+
+    fun getBallot(electionName: String): com.seanshubin.vote.domain.BallotSummary? {
+        testContext.backend.synchronize()
+        return testContext.backend.getBallot(accessToken, userName, electionName)
+    }
+
+    fun listRankings(electionName: String): List<Ranking> {
+        testContext.backend.synchronize()
+        return testContext.backend.listRankings(accessToken, userName, electionName)
+    }
+
+    fun isEligible(electionName: String): Boolean {
+        testContext.backend.synchronize()
+        return testContext.backend.isEligible(accessToken, userName, electionName)
+    }
+
+    fun listUsers(): List<com.seanshubin.vote.domain.UserNameRole> {
+        testContext.backend.synchronize()
+        return testContext.backend.listUsers(accessToken)
+    }
+
+    fun getUser(userName: String): com.seanshubin.vote.domain.UserNameEmail {
+        testContext.backend.synchronize()
+        return testContext.backend.getUser(accessToken, userName)
+    }
 }
