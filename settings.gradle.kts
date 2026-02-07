@@ -8,5 +8,6 @@ include(
     ":deploy",
     ":local",
     ":integration",
-    ":schema-diagram"
+    ":schema-diagram",
+    ":documentation"
 )

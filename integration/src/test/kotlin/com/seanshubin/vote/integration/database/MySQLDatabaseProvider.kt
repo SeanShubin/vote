@@ -21,7 +21,7 @@ class MySQLDatabaseProvider : DatabaseProvider {
         .withPassword("vote")
         .apply { start() }
 
-    private val connection: Connection = DriverManager.getConnection(
+    val connection: Connection = DriverManager.getConnection(
         container.jdbcUrl,
         container.username,
         container.password

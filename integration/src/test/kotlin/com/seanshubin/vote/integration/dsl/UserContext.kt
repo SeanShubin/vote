@@ -13,8 +13,8 @@ class UserContext(
     fun createElection(
         name: String = "Election ${testContext.integrations.sequentialIdGenerator.generate()}"
     ): ElectionContext {
-        testContext.service.addElection(accessToken, userName, name)
-        testContext.service.synchronize()
+        testContext.backend.addElection(accessToken, userName, name)
+        testContext.backend.synchronize()
         return ElectionContext(testContext, name, this)
     }
 
@@ -22,8 +22,8 @@ class UserContext(
         val rankingObjects = rankings.map { (candidate, rank) ->
             Ranking(candidate, rank)
         }
-        testContext.service.castBallot(accessToken, userName, election.name, rankingObjects)
-        testContext.service.synchronize()
+        testContext.backend.castBallot(accessToken, userName, election.name, rankingObjects)
+        testContext.backend.synchronize()
     }
 
     fun castBallot(election: ElectionContext, vararg rankings: Pair<String, Int>) {
@@ -31,22 +31,22 @@ class UserContext(
     }
 
     fun removeUser(targetUserName: String) {
-        testContext.service.removeUser(accessToken, targetUserName)
-        testContext.service.synchronize()
+        testContext.backend.removeUser(accessToken, targetUserName)
+        testContext.backend.synchronize()
     }
 
     fun changePassword(newPassword: String) {
-        testContext.service.changePassword(accessToken, userName, newPassword)
-        testContext.service.synchronize()
+        testContext.backend.changePassword(accessToken, userName, newPassword)
+        testContext.backend.synchronize()
     }
 
     fun setRole(targetUserName: String, newRole: Role) {
-        testContext.service.setRole(accessToken, targetUserName, newRole)
-        testContext.service.synchronize()
+        testContext.backend.setRole(accessToken, targetUserName, newRole)
+        testContext.backend.synchronize()
     }
 
     fun updateUser(newName: String? = null, newEmail: String? = null) {
-        testContext.service.updateUser(accessToken, userName, UserUpdates(userName = newName, email = newEmail))
-        testContext.service.synchronize()
+        testContext.backend.updateUser(accessToken, userName, UserUpdates(userName = newName, email = newEmail))
+        testContext.backend.synchronize()
     }
 }

@@ -9,37 +9,37 @@ class ElectionContext(
     private val owner: UserContext
 ) {
     fun setCandidates(vararg names: String) {
-        testContext.service.setCandidates(owner.accessToken, name, names.toList())
-        testContext.service.synchronize()
+        testContext.backend.setCandidates(owner.accessToken, name, names.toList())
+        testContext.backend.synchronize()
     }
 
     fun setEligibleVoters(vararg names: String) {
-        testContext.service.setEligibleVoters(owner.accessToken, name, names.toList())
-        testContext.service.synchronize()
+        testContext.backend.setEligibleVoters(owner.accessToken, name, names.toList())
+        testContext.backend.synchronize()
     }
 
     fun launch(allowEdit: Boolean = true) {
-        testContext.service.launchElection(owner.accessToken, name, allowEdit)
-        testContext.service.synchronize()
+        testContext.backend.launchElection(owner.accessToken, name, allowEdit)
+        testContext.backend.synchronize()
     }
 
     fun finalize() {
-        testContext.service.finalizeElection(owner.accessToken, name)
-        testContext.service.synchronize()
+        testContext.backend.finalizeElection(owner.accessToken, name)
+        testContext.backend.synchronize()
     }
 
     fun delete() {
-        testContext.service.deleteElection(owner.accessToken, name)
-        testContext.service.synchronize()
+        testContext.backend.deleteElection(owner.accessToken, name)
+        testContext.backend.synchronize()
     }
 
     fun updateRankings(voterName: String, vararg rankings: Pair<String, Int>) {
-        val ballot = testContext.service.getBallot(owner.accessToken, voterName, name)
+        val ballot = testContext.backend.getBallot(owner.accessToken, voterName, name)
         val rankingObjects = rankings.map { (candidate, rank) ->
             Ranking(candidate, rank)
         }
-        testContext.service.castBallot(owner.accessToken, voterName, name, rankingObjects)
-        testContext.service.synchronize()
+        testContext.backend.castBallot(owner.accessToken, voterName, name, rankingObjects)
+        testContext.backend.synchronize()
     }
 
     val candidates: List<String>
@@ -49,5 +49,5 @@ class ElectionContext(
         get() = testContext.database.listEligibleVoters(name)
 
     fun tally(): Tally =
-        testContext.service.tally(owner.accessToken, name)
+        testContext.backend.tally(owner.accessToken, name)
 }

@@ -24,7 +24,7 @@ class DynamoDBDatabaseProvider : DatabaseProvider {
     ).withServices(LocalStackContainer.Service.DYNAMODB)
         .apply { start() }
 
-    private val dynamoDbClient: DynamoDbClient = runBlocking {
+    val dynamoDbClient: DynamoDbClient = runBlocking {
         DynamoDbClient {
             region = "us-east-1"
             endpointUrl = Url.parse(container.getEndpointOverride(LocalStackContainer.Service.DYNAMODB).toString())

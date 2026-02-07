@@ -37,3 +37,14 @@ java {
         languageVersion.set(JavaLanguageVersion.of(21))
     }
 }
+
+// Expose test classes to other modules (for documentation generator)
+val testArchive by configurations.creating
+configurations.getByName("default").extendsFrom(testArchive)
+val testJar by tasks.registering(Jar::class) {
+    archiveClassifier.set("tests")
+    from(sourceSets["test"].output)
+}
+artifacts {
+    add("testArchive", testJar)
+}
