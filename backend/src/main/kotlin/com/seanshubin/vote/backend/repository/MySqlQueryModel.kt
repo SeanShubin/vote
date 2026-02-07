@@ -116,8 +116,8 @@ class MySqlQueryModel(
     }
 
     override fun tableCount(): Int {
-        // Count number of tables in the database (event_log, users, elections, candidates, eligible_voters, ballots, sync_state)
-        return 7
+        // Count number of tables in the database (event_log, users, elections, candidates, eligible_voters, ballots, rankings, sync_state)
+        return 8
     }
 
     override fun listUsers(): List<User> {
@@ -199,11 +199,13 @@ class MySqlQueryModel(
             stmt.setString(1, electionName)
             stmt.setString(2, voterName)
             val rs = stmt.executeQuery()
-            if (rs.next()) {
-                val rankingsJson = rs.getString("rankings")
-                json.decodeFromString(rankingsJson)
-            } else {
-                emptyList()
+            buildList {
+                while (rs.next()) {
+                    add(Ranking(
+                        candidateName = rs.getString("candidate_name"),
+                        rank = rs.getInt("rank")
+                    ))
+                }
             }
         }
     }
@@ -215,21 +217,14 @@ class MySqlQueryModel(
             val rs = stmt.executeQuery()
             buildList {
                 while (rs.next()) {
-                    val voterName = rs.getString("voter_name")
-                    val rankingsJson = rs.getString("rankings")
-                    val rankings = json.decodeFromString<List<Ranking>>(rankingsJson)
-                    rankings.forEach { ranking ->
-                        ranking.rank?.let { rank ->
-                            add(
-                                VoterElectionCandidateRank(
-                                    voter = voterName,
-                                    election = electionName,
-                                    candidate = ranking.candidateName,
-                                    rank = rank
-                                )
-                            )
-                        }
-                    }
+                    add(
+                        VoterElectionCandidateRank(
+                            voter = rs.getString("voter_name"),
+                            election = electionName,
+                            candidate = rs.getString("candidate_name"),
+                            rank = rs.getInt("rank")
+                        )
+                    )
                 }
             }
         }
@@ -259,13 +254,41 @@ class MySqlQueryModel(
         return connection.prepareStatement(sql).use { stmt ->
             stmt.setString(1, electionName)
             val rs = stmt.executeQuery()
-            buildList {
-                while (rs.next()) {
-                    add(rs.toRevealedBallot(electionName, json))
-                }
+
+            // Group rows by voter since each ranking is a separate row
+            val ballotsByVoter = mutableMapOf<String, MutableList<Pair<Ranking, BallotMetadata>>>()
+            while (rs.next()) {
+                val voterName = rs.getString("voter_name")
+                val ranking = Ranking(
+                    candidateName = rs.getString("candidate_name"),
+                    rank = rs.getInt("rank")
+                )
+                val metadata = BallotMetadata(
+                    confirmation = rs.getString("confirmation"),
+                    whenCast = Instant.fromEpochMilliseconds(rs.getTimestamp("when_cast").time)
+                )
+                ballotsByVoter.getOrPut(voterName) { mutableListOf() }.add(ranking to metadata)
+            }
+
+            // Convert to RevealedBallot list
+            ballotsByVoter.map { (voterName, rankingsWithMetadata) ->
+                val rankings = rankingsWithMetadata.map { it.first }
+                val metadata = rankingsWithMetadata.first().second // All rows have same metadata
+                RevealedBallot(
+                    voterName = voterName,
+                    electionName = electionName,
+                    rankings = rankings,
+                    confirmation = metadata.confirmation,
+                    whenCast = metadata.whenCast
+                )
             }
         }
     }
+
+    private data class BallotMetadata(
+        val confirmation: String,
+        val whenCast: Instant
+    )
 
     override fun listVoterNames(): List<String> {
         val sql = queryLoader.load("ballot-select-distinct-voters")
@@ -331,18 +354,6 @@ class MySqlQueryModel(
             },
             allowEdit = getBoolean("allow_edit"),
             allowVote = getBoolean("allow_vote")
-        )
-    }
-
-    private fun ResultSet.toRevealedBallot(electionName: String, json: Json): RevealedBallot {
-        val rankingsJson = getString("rankings")
-        val rankings = json.decodeFromString<List<Ranking>>(rankingsJson)
-        return RevealedBallot(
-            voterName = getString("voter_name"),
-            electionName = electionName,
-            rankings = rankings,
-            confirmation = getString("confirmation"),
-            whenCast = Instant.fromEpochMilliseconds(getTimestamp("when_cast").time)
         )
     }
 }

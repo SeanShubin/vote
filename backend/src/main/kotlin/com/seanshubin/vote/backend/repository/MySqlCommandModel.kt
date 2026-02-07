@@ -200,27 +200,78 @@ class MySqlCommandModel(
         confirmation: String,
         now: Instant
     ) {
-        val rankingsJson = json.encodeToString(rankings)
-        val sql = queryLoader.load("ballot-upsert")
-
-        connection.prepareStatement(sql).use { stmt ->
+        // Insert or update ballot
+        val ballotSql = queryLoader.load("ballot-upsert")
+        connection.prepareStatement(ballotSql).use { stmt ->
             stmt.setString(1, electionName)
             stmt.setString(2, voterName)
-            stmt.setString(3, rankingsJson)
-            stmt.setString(4, confirmation)
-            stmt.setTimestamp(5, Timestamp(now.toEpochMilliseconds()))
+            stmt.setString(3, confirmation)
+            stmt.setTimestamp(4, Timestamp(now.toEpochMilliseconds()))
             stmt.executeUpdate()
+        }
+
+        // Get ballot_id
+        val ballotIdSql = queryLoader.load("ballot-select-id")
+        val ballotId = connection.prepareStatement(ballotIdSql).use { stmt ->
+            stmt.setString(1, electionName)
+            stmt.setString(2, voterName)
+            val rs = stmt.executeQuery()
+            if (rs.next()) rs.getLong(1) else throw IllegalStateException("Ballot not found after insert")
+        }
+
+        // Delete old rankings (if any)
+        val deleteRankingsSql = queryLoader.load("ranking-delete-by-ballot-id")
+        connection.prepareStatement(deleteRankingsSql).use { stmt ->
+            stmt.setLong(1, ballotId)
+            stmt.executeUpdate()
+        }
+
+        // Insert new rankings (only those with non-null rank)
+        val validRankings = rankings.filter { it.rank != null }
+        if (validRankings.isNotEmpty()) {
+            val insertRankingSql = queryLoader.load("ranking-insert")
+            connection.prepareStatement(insertRankingSql).use { stmt ->
+                for (ranking in validRankings) {
+                    stmt.setLong(1, ballotId)
+                    stmt.setString(2, ranking.candidateName)
+                    stmt.setInt(3, ranking.rank!!) // Safe because we filtered nulls
+                    stmt.addBatch()
+                }
+                stmt.executeBatch()
+            }
         }
     }
 
     override fun setRankings(authority: String, confirmation: String, electionName: String, rankings: List<Ranking>) {
-        val rankingsJson = json.encodeToString(rankings)
-        val sql = queryLoader.load("ballot-update-rankings")
-        connection.prepareStatement(sql).use { stmt ->
-            stmt.setString(1, rankingsJson)
-            stmt.setString(2, confirmation)
-            stmt.setString(3, electionName)
+        // Get ballot_id
+        val ballotIdSql = queryLoader.load("ballot-select-id-by-confirmation")
+        val ballotId = connection.prepareStatement(ballotIdSql).use { stmt ->
+            stmt.setString(1, confirmation)
+            stmt.setString(2, electionName)
+            val rs = stmt.executeQuery()
+            if (rs.next()) rs.getLong(1) else throw IllegalStateException("Ballot not found: confirmation=$confirmation, election=$electionName")
+        }
+
+        // Delete old rankings
+        val deleteRankingsSql = queryLoader.load("ranking-delete-by-ballot-id")
+        connection.prepareStatement(deleteRankingsSql).use { stmt ->
+            stmt.setLong(1, ballotId)
             stmt.executeUpdate()
+        }
+
+        // Insert new rankings (only those with non-null rank)
+        val validRankings = rankings.filter { it.rank != null }
+        if (validRankings.isNotEmpty()) {
+            val insertRankingSql = queryLoader.load("ranking-insert")
+            connection.prepareStatement(insertRankingSql).use { stmt ->
+                for (ranking in validRankings) {
+                    stmt.setLong(1, ballotId)
+                    stmt.setString(2, ranking.candidateName)
+                    stmt.setInt(3, ranking.rank!!) // Safe because we filtered nulls
+                    stmt.addBatch()
+                }
+                stmt.executeBatch()
+            }
         }
     }
 

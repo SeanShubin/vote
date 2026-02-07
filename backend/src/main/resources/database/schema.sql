@@ -49,14 +49,24 @@ CREATE TABLE IF NOT EXISTS eligible_voters (
 
 -- Command Model Projection: Ballots
 CREATE TABLE IF NOT EXISTS ballots (
+    ballot_id BIGINT AUTO_INCREMENT PRIMARY KEY,
     election_name VARCHAR(255) NOT NULL,
     voter_name VARCHAR(255) NOT NULL,
-    rankings JSON NOT NULL,
     confirmation VARCHAR(255) NOT NULL,
     when_cast TIMESTAMP NOT NULL,
-    PRIMARY KEY (election_name, voter_name),
+    UNIQUE KEY unique_ballot (election_name, voter_name),
     FOREIGN KEY (election_name) REFERENCES elections(election_name) ON DELETE CASCADE,
     FOREIGN KEY (voter_name) REFERENCES users(name) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Command Model Projection: Rankings (normalized)
+CREATE TABLE IF NOT EXISTS rankings (
+    ballot_id BIGINT NOT NULL,
+    candidate_name VARCHAR(255) NOT NULL,
+    `rank` INT NOT NULL,
+    PRIMARY KEY (ballot_id, candidate_name),
+    FOREIGN KEY (ballot_id) REFERENCES ballots(ballot_id) ON DELETE CASCADE,
+    INDEX idx_ballot_rank (ballot_id, `rank`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Sync State Tracking

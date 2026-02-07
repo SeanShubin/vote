@@ -23,23 +23,27 @@ class DynamoDbHtmlGenerator(private val client: DynamoDbClient) {
             appendLine("  <p class=\"description\">All entities stored in one table using PK (Partition Key) and SK (Sort Key) pattern.</p>")
             appendLine()
 
-            val items = scanTable()
+            val dataItems = scanTable("vote_data")
+            appendLine("  <h2>Table: vote_data (${dataItems.size} items)</h2>")
+            appendLine(generateTable(dataItems))
+            appendLine()
 
-            appendLine("  <h2>Table: vote_data (${items.size} items)</h2>")
-            appendLine(generateTable(items))
+            val eventLogItems = scanTable("vote_event_log")
+            appendLine("  <h2>Table: vote_event_log (${eventLogItems.size} items)</h2>")
+            appendLine(generateEventLogTable(eventLogItems))
 
             appendLine("</body>")
             appendLine("</html>")
         }
     }
 
-    private suspend fun scanTable(): List<Map<String, AttributeValue>> {
+    private suspend fun scanTable(tableName: String): List<Map<String, AttributeValue>> {
         val items = mutableListOf<Map<String, AttributeValue>>()
         var lastEvaluatedKey: Map<String, AttributeValue>? = null
 
         do {
             val request = ScanRequest {
-                tableName = "vote_data"
+                this.tableName = tableName
                 exclusiveStartKey = lastEvaluatedKey
             }
 
@@ -48,11 +52,15 @@ class DynamoDbHtmlGenerator(private val client: DynamoDbClient) {
             lastEvaluatedKey = response.lastEvaluatedKey
         } while (lastEvaluatedKey != null)
 
-        // Sort by PK, then SK for consistent display
-        return items.sortedWith(compareBy(
-            { it["PK"]?.asS() ?: "" },
-            { it["SK"]?.asS() ?: "" }
-        ))
+        // Sort by appropriate keys for each table
+        return when (tableName) {
+            "vote_data" -> items.sortedWith(compareBy(
+                { it["PK"]?.asS() ?: "" },
+                { it["SK"]?.asS() ?: "" }
+            ))
+            "vote_event_log" -> items.sortedBy { it["event_id"]?.asN()?.toLongOrNull() ?: 0L }
+            else -> items
+        }
     }
 
     private fun generateTable(items: List<Map<String, AttributeValue>>): String = buildString {
@@ -94,6 +102,46 @@ class DynamoDbHtmlGenerator(private val client: DynamoDbClient) {
                     "SK" -> " class=\"sk\""
                     else -> ""
                 }
+                appendLine("        <td$cssClass>$value</td>")
+            }
+            appendLine("      </tr>")
+        }
+
+        appendLine("    </tbody>")
+        appendLine("  </table>")
+    }
+
+    private fun generateEventLogTable(items: List<Map<String, AttributeValue>>): String = buildString {
+        if (items.isEmpty()) {
+            appendLine("  <p class=\"empty\">(empty table)</p>")
+            return@buildString
+        }
+
+        // Collect all attribute names
+        val allAttributes = items
+            .flatMap { it.keys }
+            .distinct()
+            .sorted()
+
+        // Put event_id first
+        val orderedAttributes = listOf("event_id") + allAttributes.filter { it != "event_id" }
+
+        appendLine("  <table>")
+        appendLine("    <thead>")
+        appendLine("      <tr>")
+        for (attr in orderedAttributes) {
+            val cssClass = if (attr == "event_id") " class=\"pk\"" else ""
+            appendLine("        <th$cssClass>$attr</th>")
+        }
+        appendLine("      </tr>")
+        appendLine("    </thead>")
+        appendLine("    <tbody>")
+
+        for (item in items) {
+            appendLine("      <tr>")
+            for (attr in orderedAttributes) {
+                val value = item[attr]?.let { formatAttributeValue(it) } ?: ""
+                val cssClass = if (attr == "event_id") " class=\"pk\"" else ""
                 appendLine("        <td$cssClass>$value</td>")
             }
             appendLine("      </tr>")

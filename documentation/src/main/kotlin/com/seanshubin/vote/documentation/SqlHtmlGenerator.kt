@@ -19,15 +19,7 @@ class SqlHtmlGenerator(private val connection: Connection) {
         appendLine("  <p class=\"description\">Complete database state after running the comprehensive scenario.</p>")
         appendLine()
 
-        val tables = listOf(
-            "event_log",
-            "users",
-            "elections",
-            "candidates",
-            "eligible_voters",
-            "ballots",
-            "sync_state"
-        )
+        val tables = getTableNames()
 
         for (tableName in tables) {
             appendLine("  <h2>Table: $tableName</h2>")
@@ -37,6 +29,102 @@ class SqlHtmlGenerator(private val connection: Connection) {
 
         appendLine("</body>")
         appendLine("</html>")
+    }
+
+    private fun getTableNames(): List<String> {
+        val statement = connection.createStatement()
+        val resultSet = statement.executeQuery("SHOW TABLES")
+        val tables = mutableListOf<String>()
+        while (resultSet.next()) {
+            tables.add(resultSet.getString(1))
+        }
+        resultSet.close()
+        statement.close()
+
+        // Order tables by dependencies for better readability
+        return orderTablesByDependencies(tables)
+    }
+
+    private fun orderTablesByDependencies(tables: List<String>): List<String> {
+        // Domain tables: topologically sorted by foreign key dependencies
+        // event_log: historical record (after domain state)
+        // sync_state: operational metadata (last - rarely needed)
+
+        val eventLog = "event_log"
+        val syncState = "sync_state"
+        val domainTables = tables.filter { it != eventLog && it != syncState }
+
+        // Get foreign key dependencies
+        val dependencies = getForeignKeyDependencies(domainTables)
+
+        // Topological sort
+        val sorted = topologicalSort(domainTables, dependencies)
+
+        // Construct final order: domain tables, then event_log, then sync_state
+        return buildList {
+            addAll(sorted)
+            if (tables.contains(eventLog)) add(eventLog)
+            if (tables.contains(syncState)) add(syncState)
+        }
+    }
+
+    private fun getForeignKeyDependencies(tables: List<String>): Map<String, Set<String>> {
+        val dependencies = mutableMapOf<String, MutableSet<String>>()
+
+        val sql = """
+            SELECT
+                TABLE_NAME,
+                REFERENCED_TABLE_NAME
+            FROM information_schema.KEY_COLUMN_USAGE
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND REFERENCED_TABLE_NAME IS NOT NULL
+        """.trimIndent()
+
+        val statement = connection.createStatement()
+        val resultSet = statement.executeQuery(sql)
+
+        while (resultSet.next()) {
+            val table = resultSet.getString("TABLE_NAME")
+            val referencedTable = resultSet.getString("REFERENCED_TABLE_NAME")
+
+            if (table in tables && referencedTable in tables) {
+                dependencies.getOrPut(table) { mutableSetOf() }.add(referencedTable)
+            }
+        }
+
+        resultSet.close()
+        statement.close()
+
+        return dependencies
+    }
+
+    private fun topologicalSort(tables: List<String>, dependencies: Map<String, Set<String>>): List<String> {
+        val sorted = mutableListOf<String>()
+        val visited = mutableSetOf<String>()
+        val visiting = mutableSetOf<String>()
+
+        fun visit(table: String) {
+            if (table in visited) return
+            if (table in visiting) {
+                // Cycle detected - fall back to original order for this table
+                return
+            }
+
+            visiting.add(table)
+
+            // Visit dependencies first (tables this table references)
+            dependencies[table]?.forEach { dependency ->
+                visit(dependency)
+            }
+
+            visiting.remove(table)
+            visited.add(table)
+            sorted.add(table)
+        }
+
+        tables.forEach { visit(it) }
+
+        return sorted
     }
 
     private fun generateTable(tableName: String): String = buildString {
