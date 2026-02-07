@@ -10,7 +10,7 @@ object HtmlTableGenerator {
         sb.appendLine("<html>")
         sb.appendLine("<head>")
         sb.appendLine("    <meta charset=\"UTF-8\">")
-        sb.appendLine("    <title>Database Schema</title>")
+        sb.appendLine("    <title>Data Model</title>")
         sb.appendLine("    <style>")
         sb.appendLine("        body { font-family: Arial, sans-serif; margin: 20px; }")
         sb.appendLine("        h1 { color: #333; }")
@@ -24,7 +24,7 @@ object HtmlTableGenerator {
         sb.appendLine("    </style>")
         sb.appendLine("</head>")
         sb.appendLine("<body>")
-        sb.appendLine("    <h1>Database Schema</h1>")
+        sb.appendLine("    <h1>Data Model</h1>")
 
         // Embed SVG diagram if available
         if (svgFile != null && svgFile.exists()) {

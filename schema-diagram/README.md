@@ -1,15 +1,15 @@
-# Schema Diagram Generator
+# Data Model Diagram Generator
 
-Generates relational model diagrams directly from `schema.sql` at build time, ensuring documentation cannot drift from actual code.
+Generates conceptual data model diagrams directly from `schema.sql` at build time, ensuring documentation cannot drift from actual code.
 
 ## Overview
 
-This module parses the MySQL schema definition and generates multiple diagram formats:
+This module parses the MySQL schema definition (canonical representation of the conceptual data model) and generates multiple diagram formats:
 
 - **GraphViz (.dot)** - For rendering with Graphviz tools
 - **GraphViz SVG (.svg)** - Pre-rendered diagram (if `dot` is installed)
 - **Mermaid (.mmd)** - GitHub-native ER diagrams
-- **HTML table** - Browsable schema documentation
+- **HTML table** - Browsable data model documentation
 
 **Key benefit**: Diagrams are regenerated from the actual schema file on every build, so they cannot become stale.
 
@@ -86,10 +86,11 @@ This follows the same principle as the `code-structure` static analysis tool:
 
 > **Documents cannot drift from reality when they're generated from the actual code.**
 
-- **Source of truth**: `schema.sql` defines the MySQL backend schema
+- **Source of truth**: `schema.sql` defines the conceptual data model (MySQL is the canonical representation used for validation)
 - **Explicit relationships**: Foreign keys make relationships obvious (not implicit)
 - **Build-time generation**: Diagrams regenerate on every build
 - **Multiple formats**: GraphViz for rendering, Mermaid for GitHub, HTML for browsing
+- **Implementation-agnostic**: The conceptual model is the same across all three backends (InMemory, MySQL, DynamoDB)
 
 ## Implementation
 

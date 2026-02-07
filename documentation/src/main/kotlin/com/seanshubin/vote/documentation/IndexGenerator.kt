@@ -35,8 +35,8 @@ class IndexGenerator {
 
         appendLine("      <a href=\"schema.html\" class=\"link-card schema\">")
         appendLine("        <div class=\"link-icon\">📊</div>")
-        appendLine("        <div class=\"link-title\">Database Schema</div>")
-        appendLine("        <div class=\"link-description\">Relational model diagram showing table structure and relationships</div>")
+        appendLine("        <div class=\"link-title\">Data Model</div>")
+        appendLine("        <div class=\"link-description\">Conceptual model showing entities and relationships (MySQL canonical representation)</div>")
         appendLine("      </a>")
 
         appendLine("      <a href=\"scenario.html\" class=\"link-card scenario\">")
