@@ -132,6 +132,12 @@ class ApplicationDependencies(
         server.join()
     }
 
+    fun startNonBlocking() {
+        println("Starting server on port $port...")
+        server.start()
+        println("Server started. Visit http://localhost:$port/health")
+    }
+
     fun stop() {
         server.stop()
         connection?.close()
