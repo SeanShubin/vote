@@ -1,6 +1,8 @@
 package com.seanshubin.vote.integration
 
 import com.seanshubin.vote.domain.DomainEvent
+import com.seanshubin.vote.domain.ElectionUpdates
+import com.seanshubin.vote.domain.Permission
 import com.seanshubin.vote.domain.Ranking
 import com.seanshubin.vote.domain.Role
 import com.seanshubin.vote.integration.database.DatabaseProvider
@@ -109,6 +111,33 @@ class DatabaseCompatibilityTest {
         assertEquals("newSalt", bobWithNewPassword.salt)
         assertEquals("newHash", bobWithNewPassword.hash)
 
+        // Update email
+        commandModel.setEmail("bob", "bob", "bob-new@example.com")
+        val bobWithNewEmail = queryModel.findUserByName("bob")
+        assertEquals("bob-new@example.com", bobWithNewEmail.email)
+
+        // Search user by email
+        val bobByNewEmail = queryModel.searchUserByEmail("bob-new@example.com")
+        assertNotNull(bobByNewEmail)
+        assertEquals("bob", bobByNewEmail!!.name)
+
+        // Update user name
+        commandModel.setUserName("bob", "bob", "robert")
+        val renamedUser = queryModel.findUserByName("robert")
+        assertEquals("robert", renamedUser.name)
+        assertEquals("bob-new@example.com", renamedUser.email)
+        assertNull(queryModel.searchUserByName("bob"))
+
+        // List user names
+        val userNames = queryModel.listUserNames()
+        assertTrue(userNames.contains("alice"))
+        assertTrue(userNames.contains("robert"))
+        assertFalse(userNames.contains("bob"))
+
+        // List all users
+        val allUsers = queryModel.listUsers()
+        assertEquals(2, allUsers.size)
+
         // ========== Election Operations ==========
 
         // Create election
@@ -124,6 +153,13 @@ class DatabaseCompatibilityTest {
         // List elections
         val elections = queryModel.listElections()
         assertEquals(1, elections.size)
+
+        // Update election
+        commandModel.updateElection("alice", "Best Language", ElectionUpdates(allowVote = true, allowEdit = false))
+        val updatedElection = queryModel.searchElectionByName("Best Language")
+        assertNotNull(updatedElection)
+        assertEquals(true, updatedElection!!.allowVote)
+        assertEquals(false, updatedElection.allowEdit)
 
         // ========== Candidate Operations ==========
 
@@ -144,10 +180,10 @@ class DatabaseCompatibilityTest {
         // ========== Voter Operations ==========
 
         // Add eligible voters
-        commandModel.addVoters("alice", "Best Language", listOf("bob", "alice"))
+        commandModel.addVoters("alice", "Best Language", listOf("robert", "alice"))
         val voters = queryModel.listVotersForElection("Best Language")
         assertEquals(2, voters.size)
-        assertTrue(voters.containsAll(listOf("bob", "alice")))
+        assertTrue(voters.containsAll(listOf("robert", "alice")))
 
         assertEquals(2, queryModel.voterCount("Best Language"))
 
@@ -155,21 +191,21 @@ class DatabaseCompatibilityTest {
         commandModel.removeVoters("alice", "Best Language", listOf("alice"))
         val votersAfterRemoval = queryModel.listVotersForElection("Best Language")
         assertEquals(1, votersAfterRemoval.size)
-        assertEquals("bob", votersAfterRemoval[0])
+        assertEquals("robert", votersAfterRemoval[0])
 
         // ========== Ballot Operations ==========
 
         // Cast ballot
         val rankings = listOf(Ranking("Kotlin", 1), Ranking("Rust", 2))
-        commandModel.castBallot("bob", "bob", "Best Language", rankings, "confirmation-123", now)
+        commandModel.castBallot("robert", "robert", "Best Language", rankings, "confirmation-123", now)
 
-        val ballot = queryModel.searchBallot("bob", "Best Language")
+        val ballot = queryModel.searchBallot("robert", "Best Language")
         assertNotNull(ballot)
-        assertEquals("bob", ballot!!.voterName)
+        assertEquals("robert", ballot!!.voterName)
         assertEquals("Best Language", ballot.electionName)
         assertEquals("confirmation-123", ballot.confirmation)
 
-        val ballotRankings = queryModel.listRankings("bob", "Best Language")
+        val ballotRankings = queryModel.listRankings("robert", "Best Language")
         assertEquals(2, ballotRankings.size)
         assertEquals("Kotlin", ballotRankings[0].candidateName)
         assertEquals(1, ballotRankings[0].rank)
@@ -177,21 +213,44 @@ class DatabaseCompatibilityTest {
         // List ballots for election
         val ballots = queryModel.listBallots("Best Language")
         assertEquals(1, ballots.size)
-        assertEquals("bob", ballots[0].voterName)
+        assertEquals("robert", ballots[0].voterName)
 
         // Update ballot rankings
         val newRankings = listOf(Ranking("Rust", 1), Ranking("Kotlin", 2))
-        commandModel.setRankings("bob", "confirmation-123", "Best Language", newRankings)
-        val updatedRankings = queryModel.listRankings("bob", "Best Language")
+        commandModel.setRankings("robert", "confirmation-123", "Best Language", newRankings)
+        val updatedRankings = queryModel.listRankings("robert", "Best Language")
         assertEquals(2, updatedRankings.size)
         assertEquals("Rust", updatedRankings[0].candidateName)
         assertEquals(1, updatedRankings[0].rank)
+
+        // Update ballot timestamp
+        val newTimestamp = Instant.parse("2024-01-02T00:00:00Z")
+        commandModel.updateWhenCast("robert", "confirmation-123", newTimestamp)
+        val updatedBallot = queryModel.searchBallot("robert", "Best Language")
+        assertNotNull(updatedBallot)
+        assertEquals(newTimestamp, updatedBallot!!.whenCast)
 
         // ========== Sync State Operations ==========
 
         val lastSynced = queryModel.lastSynced()
         assertNotNull(lastSynced)
         assertEquals(2L, lastSynced)
+
+        // ========== Permission Operations ==========
+
+        // Check role has permission
+        val ownerHasManageUsers = queryModel.roleHasPermission(Role.OWNER, Permission.MANAGE_USERS)
+        assertEquals(true, ownerHasManageUsers)
+
+        // List permissions for role
+        val adminPermissions = queryModel.listPermissions(Role.ADMIN)
+        assertTrue(adminPermissions.isNotEmpty())
+
+        // ========== Table Operations ==========
+
+        // Table count (if supported by implementation)
+        val tableCountValue = queryModel.tableCount()
+        assertTrue(tableCountValue >= 0)
 
         // ========== Cleanup Operations ==========
 
@@ -202,9 +261,9 @@ class DatabaseCompatibilityTest {
         assertEquals(0, queryModel.listVotersForElection("Best Language").size)
 
         // Remove user
-        commandModel.removeUser("admin", "bob")
+        commandModel.removeUser("admin", "robert")
         assertEquals(1, queryModel.userCount())
-        assertNull(queryModel.searchUserByName("bob"))
+        assertNull(queryModel.searchUserByName("robert"))
 
         println("✓ All operations passed for ${provider.name}")
     }

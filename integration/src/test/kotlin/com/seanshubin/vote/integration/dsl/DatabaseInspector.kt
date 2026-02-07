@@ -10,6 +10,9 @@ class DatabaseInspector(private val queryModel: QueryModel) {
     fun searchUser(name: String): User? =
         queryModel.searchUserByName(name)
 
+    fun findUserOrNull(name: String): User? =
+        queryModel.searchUserByName(name)
+
     fun findBallot(voterName: String, electionName: String): BallotSummary =
         queryModel.searchBallot(voterName, electionName)
             ?: error("No ballot found for $voterName in $electionName")
@@ -30,6 +33,9 @@ class DatabaseInspector(private val queryModel: QueryModel) {
     fun searchElection(electionName: String): ElectionSummary? =
         queryModel.searchElectionByName(electionName)
 
+    fun findElectionOrNull(electionName: String): ElectionSummary? =
+        queryModel.searchElectionByName(electionName)
+
     fun userCount(): Int =
         queryModel.userCount()
 
@@ -44,4 +50,7 @@ class DatabaseInspector(private val queryModel: QueryModel) {
 
     fun listBallots(electionName: String): List<RevealedBallot> =
         queryModel.listBallots(electionName)
+
+    fun listRankings(voterName: String, electionName: String): List<Ranking> =
+        queryModel.listRankings(voterName, electionName)
 }

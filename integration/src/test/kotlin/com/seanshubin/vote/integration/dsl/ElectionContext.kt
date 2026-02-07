@@ -1,5 +1,6 @@
 package com.seanshubin.vote.integration.dsl
 
+import com.seanshubin.vote.domain.Ranking
 import com.seanshubin.vote.domain.Tally
 
 class ElectionContext(
@@ -24,6 +25,20 @@ class ElectionContext(
 
     fun finalize() {
         testContext.service.finalizeElection(owner.accessToken, name)
+        testContext.service.synchronize()
+    }
+
+    fun delete() {
+        testContext.service.deleteElection(owner.accessToken, name)
+        testContext.service.synchronize()
+    }
+
+    fun updateRankings(voterName: String, vararg rankings: Pair<String, Int>) {
+        val ballot = testContext.service.getBallot(owner.accessToken, voterName, name)
+        val rankingObjects = rankings.map { (candidate, rank) ->
+            Ranking(candidate, rank)
+        }
+        testContext.service.castBallot(owner.accessToken, voterName, name, rankingObjects)
         testContext.service.synchronize()
     }
 

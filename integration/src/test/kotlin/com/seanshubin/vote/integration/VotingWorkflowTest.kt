@@ -155,4 +155,145 @@ class VotingWorkflowTest {
         assertEquals(2, election1.candidates.size)
         assertEquals(2, election2.candidates.size)
     }
+
+    @Test
+    fun `owner can remove users`() {
+        val testContext = TestContext()
+        val (alice, bob) = testContext.registerUsers("alice", "bob")
+
+        assertEquals(2, testContext.database.userCount())
+
+        alice.removeUser("bob")
+
+        assertEquals(1, testContext.database.userCount())
+        val user = testContext.database.findUserOrNull("bob")
+        assertEquals(null, user)
+
+        // Verify event was created
+        val events = testContext.events.ofType<DomainEvent.UserRemoved>()
+        assertEquals(1, events.size)
+        assertEquals("bob", events[0].userName)
+    }
+
+    @Test
+    fun `owner can change user roles`() {
+        val testContext = TestContext()
+        val (alice, bob) = testContext.registerUsers("alice", "bob")
+
+        assertEquals(Role.USER, testContext.database.findUser("bob").role)
+
+        alice.setRole("bob", Role.ADMIN)
+
+        assertEquals(Role.ADMIN, testContext.database.findUser("bob").role)
+
+        // Verify event was created
+        val events = testContext.events.ofType<DomainEvent.UserRoleChanged>()
+        assertEquals(1, events.size)
+        assertEquals("bob", events[0].userName)
+        assertEquals(Role.ADMIN, events[0].newRole)
+    }
+
+    @Test
+    fun `user can change their password`() {
+        val testContext = TestContext()
+        val alice = testContext.registerUser("alice")
+
+        val oldHash = testContext.database.findUser("alice").hash
+
+        alice.changePassword("newPassword123")
+
+        val newHash = testContext.database.findUser("alice").hash
+        assertTrue(oldHash != newHash, "Password hash should change")
+
+        // Verify event was created
+        val events = testContext.events.ofType<DomainEvent.UserPasswordChanged>()
+        assertEquals(1, events.size)
+        assertEquals("alice", events[0].userName)
+    }
+
+    @Test
+    fun `user can change their name`() {
+        val testContext = TestContext()
+        val alice = testContext.registerUser("alice", "alice@example.com")
+
+        alice.updateUser(newName = "alice2")
+
+        val user = testContext.database.findUser("alice2")
+        assertEquals("alice2", user.name)
+        assertEquals("alice@example.com", user.email)
+
+        // Verify event was created
+        val nameEvents = testContext.events.ofType<DomainEvent.UserNameChanged>()
+        assertEquals(1, nameEvents.size)
+        assertEquals("alice", nameEvents[0].oldUserName)
+        assertEquals("alice2", nameEvents[0].newUserName)
+    }
+
+    @Test
+    fun `user can change their email`() {
+        val testContext = TestContext()
+        val alice = testContext.registerUser("alice", "alice@example.com")
+
+        alice.updateUser(newEmail = "alice-new@example.com")
+
+        val user = testContext.database.findUser("alice")
+        assertEquals("alice", user.name)
+        assertEquals("alice-new@example.com", user.email)
+
+        // Verify event was created
+        val emailEvents = testContext.events.ofType<DomainEvent.UserEmailChanged>()
+        assertEquals(1, emailEvents.size)
+        assertEquals("alice", emailEvents[0].userName)
+        assertEquals("alice-new@example.com", emailEvents[0].newEmail)
+    }
+
+    @Test
+    fun `owner can delete election`() {
+        val testContext = TestContext()
+        val alice = testContext.registerUser("alice")
+
+        val election = alice.createElection("Test Election")
+        election.setCandidates("A", "B", "C")
+
+        assertEquals(1, testContext.database.electionCount())
+
+        election.delete()
+
+        assertEquals(0, testContext.database.electionCount())
+        val foundElection = testContext.database.findElectionOrNull("Test Election")
+        assertEquals(null, foundElection)
+
+        // Verify event was created
+        val events = testContext.events.ofType<DomainEvent.ElectionDeleted>()
+        assertEquals(1, events.size)
+        assertEquals("Test Election", events[0].electionName)
+    }
+
+    @Test
+    fun `voter can update ballot rankings`() {
+        val testContext = TestContext()
+        val (alice, bob) = testContext.registerUsers("alice", "bob")
+
+        val election = alice.createElection("Programming Language")
+        election.setCandidates("Kotlin", "Rust", "Go")
+        election.setEligibleVoters("bob")
+        election.launch()
+
+        // Cast initial ballot
+        bob.castBallot(election, "Kotlin" to 1, "Rust" to 2, "Go" to 3)
+
+        val initialBallot = testContext.database.findBallot("bob", "Programming Language")
+        val initialRankings = testContext.database.listRankings("bob", "Programming Language")
+        assertEquals("Kotlin", initialRankings.first { it.rank == 1 }.candidateName)
+
+        // Update rankings
+        election.updateRankings("bob", "Rust" to 1, "Kotlin" to 2, "Go" to 3)
+
+        val updatedRankings = testContext.database.listRankings("bob", "Programming Language")
+        assertEquals("Rust", updatedRankings.first { it.rank == 1 }.candidateName)
+
+        // Verify events - initial cast plus update
+        val castEvents = testContext.events.ofType<DomainEvent.BallotCast>()
+        assertTrue(castEvents.size >= 2, "Should have at least 2 ballot cast events")
+    }
 }
