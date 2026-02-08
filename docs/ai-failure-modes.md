@@ -339,6 +339,68 @@ When AI makes decisions based on "might want" rather than explicit requests.
 
 ---
 
+### FM-011: Ignoring Loaded Architectural Rules
+
+**Category:** Context Misunderstanding
+
+**Symptom:** AI defaults to generic software advice from training instead of consulting explicitly loaded architectural rules, even when those rules directly address the situation.
+
+**Real Example:** User has dependency injection rules loaded stating "random number generators must be injected." When comparing two implementations, AI says "the simpler approach (hardcoded SecureRandom) is reasonable" - directly contradicting the loaded rule.
+
+**The Fundamental Problem:**
+- Rules ARE loaded and accessible in AI's context ✓
+- AI CAN quote rules when explicitly asked ✓
+- AI DOES NOT automatically apply rules as governing standards ✗
+- Training bias (generic advice) dominates over loaded context
+
+**Why This Occurs:**
+- **Training patterns are implicit** - Embedded in model weights, always active
+- **Loaded rules are explicit** - Present in context but require conscious consultation
+- **No automatic rule-checking** - AI treats rules as reference material, not authority
+
+**Red Flags:**
+- Conclusion contradicts loaded architectural standards
+- Generic advice ("simpler is good") when specific rule applies
+- AI doesn't mention relevant rule that's loaded
+- Evaluation based on common wisdom instead of user's standards
+- "This approach is reasonable" when it violates loaded principles
+
+**How to Challenge:**
+1. Ask: "Compare that conclusion to my loaded architectural rules"
+2. Quote: "My dependency-injection.md explicitly says..."
+3. Request: "Evaluate according to my loaded standards, not generic advice"
+4. Two-pass: "Does your analysis comply with my loaded rules?"
+
+**Prevention - Explicit Invocation Required:**
+
+❌ **Ineffective:** "Compare these implementations"
+- AI defaults to generic advice
+
+✅ **Effective:** "Compare these implementations **according to my loaded architectural rules**"
+- Forces AI to consult rules first
+
+✅ **Effective:** "Does this violate my dependency injection rule?"
+- Directly asks for rule compliance
+
+✅ **Two-pass:**
+1. "Evaluate this code"
+2. "Does your evaluation comply with my loaded standards?"
+
+**Why Agents Cannot Fix This:**
+All agents have same architecture:
+- Same training data with generic advice
+- Same context processing (rules as reference, not authority)
+- No specialized "rule enforcement" mode
+
+**Key Insight:**
+Loaded rules enable AI to apply your standards **when asked**, but do not cause AI to spontaneously apply them. Users must explicitly invoke rules in every evaluative prompt.
+
+**Case Study:** [AI Ignoring Loaded Rules](ai-ignoring-loaded-rules.md)
+
+**Related:** FM-005 (Ignoring Literal Meaning), FM-008 (Missing Context), FM-009 (Violating Constraints)
+
+---
+
 ## Quick Reference: Detection Guide
 
 ### You Might Be Facing an AI Failure Mode If...
@@ -354,6 +416,8 @@ When AI makes decisions based on "might want" rather than explicit requests.
 - ❌ "Pure" became sophisticated (FM-005)
 - ❌ Stated constraint violated (FM-009)
 - ❌ Description doesn't match output (FM-003, FM-004)
+- ❌ Generic advice contradicts loaded rules (FM-011)
+- ❌ "This approach is reasonable" when it violates your standards (FM-011)
 
 **Good Signs:**
 - ✅ AI asks clarifying questions
@@ -398,6 +462,20 @@ When AI makes decisions based on "might want" rather than explicit requests.
 
 **Template:** "Did I request [feature]? I explicitly said [constraint]. Implement exactly what I specified, nothing more."
 
+### For Ignoring Loaded Rules (FM-011)
+1. Explicitly invoke loaded rules in prompt
+2. Compare AI's conclusion to your standards
+3. Quote specific rule that was violated
+4. Request evaluation against loaded rules, not generic advice
+5. Use two-pass pattern: evaluate then verify compliance
+
+**Template:** "Compare that conclusion to my loaded architectural rules. My [rule-name] explicitly says [rule content]. Evaluate according to my standards, not generic advice."
+
+**Prevention Template (Always Use):**
+- "Evaluate this **according to my loaded architectural rules**"
+- "Does this comply with my dependency injection standard?"
+- Two-pass: "Analyze this" → "Does your analysis comply with my loaded rules?"
+
 ## Prevention Strategies
 
 ### 1. Be Explicitly Literal
@@ -430,6 +508,18 @@ When AI makes decisions based on "might want" rather than explicit requests.
 
 **Ask:** "Why did you add this? Did I request it?"
 
+### 6. Explicitly Invoke Loaded Rules
+
+**When evaluating code:** Always append rule invocation
+
+**Instead of:** "Compare these two implementations"
+
+**Say:** "Compare these two implementations **according to my loaded architectural rules**"
+
+**Or two-pass:**
+1. "Evaluate this code"
+2. "Does your evaluation comply with my loaded standards?"
+
 ## Teaching This Material
 
 ### For Training Sessions
@@ -449,6 +539,12 @@ When AI makes decisions based on "might want" rather than explicit requests.
 - Focus: FM-004, FM-006, FM-008, FM-009
 - Exercise: Write explicit constraints
 
+**Session 4: Loaded Rules & AI Limitations**
+- Case study: ai-ignoring-loaded-rules.md
+- Focus: FM-011
+- Exercise: Practice explicit rule invocation patterns
+- Key concept: AI doesn't automatically apply loaded standards
+
 ### Key Learning Objectives
 
 By the end of training, engineers should be able to:
@@ -458,6 +554,8 @@ By the end of training, engineers should be able to:
 4. ✓ Write explicit constraints
 5. ✓ Push back on "improvements"
 6. ✓ Request literal implementations
+7. ✓ Explicitly invoke loaded architectural rules
+8. ✓ Verify AI compliance with loaded standards
 
 ## Expanding This Index
 
@@ -489,8 +587,9 @@ AI assistants have consistent failure modes that can be recognized, challenged, 
 
 **Core Principle:** AI is a powerful tool, but requires human oversight to recognize when it's adding false limitations, unrequested complexity, or imposing incorrect assumptions. Your job is to keep AI on track by being explicit, challenging absolutes, and requesting literal implementations.
 
-**Master both aspects:**
+**Master three critical aspects:**
 1. **Challenge defeatism** (FM-001, FM-002, FM-010): Don't accept "can't"
 2. **Prevent over-engineering** (FM-003, FM-005, FM-007): Don't accept complexity you didn't request
+3. **Enforce loaded standards** (FM-011): Always explicitly invoke architectural rules - AI won't apply them automatically
 
 Together, these skills enable effective AI collaboration.
