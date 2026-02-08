@@ -69,6 +69,12 @@ class IndexGenerator {
         appendLine("        <div class=\"link-description\">All HTTP requests and responses with real data</div>")
         appendLine("      </a>")
 
+        appendLine("      <a href=\"../code-structure/browse/index.html\" class=\"link-card code-structure\">")
+        appendLine("        <div class=\"link-icon\">🔍</div>")
+        appendLine("        <div class=\"link-title\">Code Structure Analysis</div>")
+        appendLine("        <div class=\"link-description\">Dependency analysis, cycle detection, and package hierarchy</div>")
+        appendLine("      </a>")
+
         appendLine("    </div>")
 
         appendLine("    <div class=\"footer\">")
@@ -159,6 +165,7 @@ class IndexGenerator {
         .link-card.dynamodb { border-left-color: #ff9900; }
         .link-card.events { border-left-color: #2ecc71; }
         .link-card.http { border-left-color: #9b59b6; }
+        .link-card.code-structure { border-left-color: #e74c3c; }
         .link-icon {
             font-size: 48px;
             margin-bottom: 15px;

@@ -1,0 +1,32 @@
+{
+  "inputDir" : ".",
+  "outputDir" : "generated/code-structure",
+  "nodeLimitForGraph" : 100,
+  "sourcePrefix" : "https://github.com/SeanShubin/vote/blob/master/",
+  "sourceFileRegexPatterns" : {
+    "include" : [
+      ".*/src/main/(kotlin|java)/.*\\.(kt|java)"
+    ],
+    "exclude" : [ ]
+  },
+  "binaryFileRegexPatterns" : {
+    "include" : [
+      ".*/build/classes/.*\\.class"
+    ],
+    "exclude" : [ ]
+  },
+  "countAsErrors" : {
+    "inDirectCycle" : true,
+    "inGroupCycle" : true,
+    "ancestorDependsOnDescendant" : true,
+    "descendantDependsOnAncestor" : true
+  },
+  "maximumAllowedErrorCount" : 0,
+  "useObservationsCache" : false,
+  "includeJvmDynamicInvocations" : false,
+  "_documentation" : {
+    "description" : "Analyzes dependency structure of source code",
+    "readme" : "https://github.com/SeanShubin/code-structure/blob/master/README.md",
+    "configHelp" : "code-structure-documentation.json"
+  }
+}

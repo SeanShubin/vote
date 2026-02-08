@@ -92,6 +92,32 @@ This follows the same principle as the `code-structure` static analysis tool:
 - **Multiple formats**: GraphViz for rendering, Mermaid for GitHub, HTML for browsing
 - **Implementation-agnostic**: The conceptual model is the same across all three backends (InMemory, MySQL, DynamoDB)
 
+## Related: Code Structure Analysis
+
+This project also uses [code-structure](https://github.com/SeanShubin/code-structure) to analyze code dependencies and detect architectural issues like cycles and vertical dependencies.
+
+### Running Code Structure Analysis
+
+```bash
+./gradlew analyzeCodeStructure
+```
+
+Output is written to `generated/code-structure/`:
+- Dependency graphs
+- Cycle detection
+- Package hierarchy analysis
+- Browsable HTML reports
+
+### Configuration
+
+The `code-structure-config.json` file at the project root controls:
+- Which source files to analyze
+- Which compiled classes to examine
+- Error thresholds for cycles and vertical dependencies
+- Output format and location
+
+See [code-structure documentation](https://github.com/SeanShubin/code-structure) for details.
+
 ## Implementation
 
 The generator consists of:
