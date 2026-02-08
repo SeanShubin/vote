@@ -15,7 +15,10 @@ import java.nio.charset.StandardCharsets
  * Backend that executes operations by making HTTP calls through HttpRecorder.
  * Used for HTTP API documentation generation.
  */
-class HttpRecordingBackend(private val recorder: HttpRecorder) : ScenarioBackend {
+class HttpRecordingBackend(
+    private val recorder: HttpRecorder,
+    private val documentationRecorder: DocumentationRecorder? = null
+) : ScenarioBackend {
     private val json = Json {
         ignoreUnknownKeys = true
         prettyPrint = true

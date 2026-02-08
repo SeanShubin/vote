@@ -155,4 +155,6 @@ class ApplicationDependencies(
         connection?.close()
         dynamoDbClient?.close()
     }
+
+    fun getEventLog(): EventLog = eventLog
 }

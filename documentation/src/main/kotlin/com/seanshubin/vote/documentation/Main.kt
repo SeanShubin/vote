@@ -45,20 +45,16 @@ fun main(args: Array<String>) {
     }
     println()
 
-    // Generate scenario summary and event log (using in-memory for fastest execution)
-    println("📝 Generating scenario summary and event log...")
+    // Generate scenario summary (using in-memory for fastest execution)
+    println("📝 Generating scenario summary...")
     val inMemoryProvider = InMemoryDatabaseProvider()
     val eventLogContext = TestContext(inMemoryProvider)
     Scenario.comprehensive(eventLogContext)
 
     val scenarioHtml = ScenarioHtmlGenerator(inMemoryProvider.eventLog).generate()
     File(outputDir, "scenario.html").writeText(scenarioHtml)
-    println("✓ Generated scenario.html (${countLines(scenarioHtml)} lines)")
-
-    val eventLogHtml = EventLogHtmlGenerator(inMemoryProvider.eventLog).generate()
-    File(outputDir, "events.html").writeText(eventLogHtml)
     inMemoryProvider.close()
-    println("✓ Generated events.html (${countLines(eventLogHtml)} lines)")
+    println("✓ Generated scenario.html (${countLines(scenarioHtml)} lines)")
     println()
 
     // Generate MySQL dump
@@ -87,20 +83,27 @@ fun main(args: Array<String>) {
     println("✓ Generated dynamodb.html (${countLines(dynamoDbHtml)} lines)")
     println()
 
-    // Generate HTTP documentation
-    println("🌐 Generating HTTP API documentation...")
+    // Generate event log and HTTP documentation with interleaved data
+    println("🌐 Generating HTTP and event documentation...")
     println("  Starting HTTP server...")
-    val httpRecorder = HttpRecorder()
+    val documentationRecorder = DocumentationRecorder()
+    val httpRecorder = HttpRecorder(documentationRecorder)
     httpRecorder.startServer()
 
     try {
-        val httpBackend = HttpRecordingBackend(httpRecorder)
+        val httpBackend = HttpRecordingBackend(httpRecorder, documentationRecorder)
         val httpContext = TestContext(backend = httpBackend)
         Scenario.comprehensive(httpContext)
-        val exchanges = httpRecorder.getExchanges()
-        val httpHtml = HttpHtmlGenerator(exchanges).generate()
+
+        // Generate events.html with HTTP context
+        val eventsHtml = EventLogHtmlGeneratorWithHttp(documentationRecorder).generate()
+        File(outputDir, "events.html").writeText(eventsHtml)
+        println("✓ Generated events.html (${countLines(eventsHtml)} lines)")
+
+        // Generate http.html with event context
+        val httpHtml = HttpHtmlGeneratorWithEvents(documentationRecorder).generate()
         File(outputDir, "http.html").writeText(httpHtml)
-        println("✓ Generated http.html (${exchanges.size} requests, ${countLines(httpHtml)} lines)")
+        println("✓ Generated http.html (${countLines(httpHtml)} lines)")
     } finally {
         httpRecorder.stopServer()
     }

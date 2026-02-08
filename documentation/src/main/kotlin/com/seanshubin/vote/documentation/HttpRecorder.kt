@@ -21,7 +21,7 @@ data class HttpExchange(
     val responseBody: String
 )
 
-class HttpRecorder {
+class HttpRecorder(private val documentationRecorder: DocumentationRecorder? = null) {
     private val exchanges = mutableListOf<HttpExchange>()
     private val json = Json { ignoreUnknownKeys = true; prettyPrint = true }
     private val compactJson = Json { ignoreUnknownKeys = true; prettyPrint = false }  // For headers
@@ -29,6 +29,7 @@ class HttpRecorder {
     private lateinit var httpClient: HttpClient
     private val port = 19876
     private val baseUrl = "http://localhost:$port"
+    private var lastEventIndex = 0L
 
     fun startServer() {
         app = ApplicationDependencies(
@@ -107,18 +108,35 @@ class HttpRecorder {
     ): HttpResponse<String> {
         val response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
 
-        exchanges.add(
-            HttpExchange(
-                method = method,
-                path = path,
-                requestHeaders = request.headers().map(),
-                requestBody = body,
-                responseStatus = response.statusCode(),
-                responseHeaders = response.headers().map(),
-                responseBody = response.body()
-            )
+        val exchange = HttpExchange(
+            method = method,
+            path = path,
+            requestHeaders = request.headers().map(),
+            requestBody = body,
+            responseStatus = response.statusCode(),
+            responseHeaders = response.headers().map(),
+            responseBody = response.body()
         )
 
+        exchanges.add(exchange)
+
+        // Record to documentation recorder if present
+        documentationRecorder?.recordHttp(exchange)
+
+        // Capture any new events that were generated
+        captureNewEvents()
+
         return response
+    }
+
+    private fun captureNewEvents() {
+        documentationRecorder?.let { recorder ->
+            val eventLog = app.getEventLog()
+            val newEvents = eventLog.eventsToSync(lastEventIndex)
+            for (envelope in newEvents) {
+                recorder.recordEvent(envelope)
+                lastEventIndex = envelope.eventId
+            }
+        }
     }
 }
