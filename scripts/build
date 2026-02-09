@@ -3,5 +3,5 @@ set -euo pipefail
 
 # Build the entire project
 echo "Building all modules..."
-./gradlew build --no-daemon
+./gradlew build analyzeCodeStructure --no-daemon
 echo "✓ Build complete"
