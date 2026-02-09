@@ -54,5 +54,5 @@ java {
 }
 
 application {
-    mainClass.set("com.seanshubin.vote.backend.MainKt")
+    mainClass.set("com.seanshubin.vote.backend.app.MainKt")
 }

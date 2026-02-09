@@ -1,4 +1,4 @@
-package com.seanshubin.vote.backend
+package com.seanshubin.vote.backend.app
 
 import com.seanshubin.vote.backend.dependencies.ApplicationDependencies
 import com.seanshubin.vote.backend.dependencies.DatabaseConfig
