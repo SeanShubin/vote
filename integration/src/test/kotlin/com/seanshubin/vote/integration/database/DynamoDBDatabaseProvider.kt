@@ -14,6 +14,7 @@ import com.seanshubin.vote.contract.QueryModel
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import org.testcontainers.containers.localstack.LocalStackContainer
+import org.testcontainers.containers.wait.strategy.Wait
 import org.testcontainers.utility.DockerImageName
 
 class DynamoDBDatabaseProvider : DatabaseProvider {
@@ -22,7 +23,11 @@ class DynamoDBDatabaseProvider : DatabaseProvider {
     private val container: LocalStackContainer = LocalStackContainer(
         DockerImageName.parse("localstack/localstack:latest")
     ).withServices(LocalStackContainer.Service.DYNAMODB)
-        .apply { start() }
+        .apply {
+            start()
+            // Wait a bit for DynamoDB to be fully ready
+            Thread.sleep(2000)
+        }
 
     val dynamoDbClient: DynamoDbClient = runBlocking {
         DynamoDbClient {
