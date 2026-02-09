@@ -60,13 +60,7 @@ class IndexGenerator {
         appendLine("      <a href=\"events.html\" class=\"link-card events\">")
         appendLine("        <div class=\"link-icon\">📝</div>")
         appendLine("        <div class=\"link-title\">Event Log</div>")
-        appendLine("        <div class=\"link-description\">Complete event sequence showing all domain events</div>")
-        appendLine("      </a>")
-
-        appendLine("      <a href=\"http.html\" class=\"link-card http\">")
-        appendLine("        <div class=\"link-icon\">🌐</div>")
-        appendLine("        <div class=\"link-title\">HTTP API Documentation</div>")
-        appendLine("        <div class=\"link-description\">All HTTP requests and responses with real data</div>")
+        appendLine("        <div class=\"link-description\">Domain events with full HTTP request/response details</div>")
         appendLine("      </a>")
 
         appendLine("      <a href=\"../code-structure/browse/index.html\" class=\"link-card code-structure\">")

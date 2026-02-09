@@ -16,15 +16,15 @@ class EventLogHtmlGeneratorWithHttp(private val recorder: DocumentationRecorder)
         appendLine("<html>")
         appendLine("<head>")
         appendLine("  <meta charset=\"UTF-8\">")
-        appendLine("  <title>Event Log with HTTP Context</title>")
+        appendLine("  <title>Event Log</title>")
         appendLine("  <style>")
         appendLine(css())
         appendLine("  </style>")
         appendLine("</head>")
         appendLine("<body>")
-        appendLine("  <h1>Event Log with HTTP Context</h1>")
-        appendLine("  <p class=\"description\">Events grouped with the HTTP calls that triggered them.</p>")
-        appendLine("  <p class=\"description\">Each event from the scenario summary becomes a section showing its HTTP context.</p>")
+        appendLine("  <h1>Event Log</h1>")
+        appendLine("  <p class=\"description\">Domain events with full HTTP request/response details.</p>")
+        appendLine("  <p class=\"description\">Each event shows the complete HTTP interactions that triggered it.</p>")
         appendLine()
 
         appendLine("  <div class=\"stats\">")
@@ -74,18 +74,28 @@ class EventLogHtmlGeneratorWithHttp(private val recorder: DocumentationRecorder)
 
     private fun generateHttpCall(exchange: HttpExchange): String = buildString {
         val methodColor = getMethodColor(exchange.method)
+        val statusColor = getStatusColor(exchange.responseStatus)
 
         appendLine("        <div class=\"http-call\">")
         appendLine("          <div class=\"http-header\">")
         appendLine("            <span class=\"method\" style=\"background-color: $methodColor;\">${exchange.method}</span>")
         appendLine("            <span class=\"path\">${escapeHtml(exchange.path)}</span>")
-        appendLine("            <span class=\"status\">${exchange.responseStatus}</span>")
+        appendLine("            <span class=\"status\" style=\"color: $statusColor;\">${exchange.responseStatus}</span>")
         appendLine("          </div>")
+
+        appendLine("          <div class=\"http-details\">")
         if (exchange.requestBody != null && exchange.requestBody != "{}") {
-            appendLine("          <div class=\"http-body\">")
-            appendLine("            <pre>${escapeHtml(exchange.requestBody)}</pre>")
-        appendLine("          </div>")
+            appendLine("            <div class=\"detail-section\">")
+            appendLine("              <div class=\"detail-label\">Request</div>")
+            appendLine("              <pre class=\"code\">${escapeHtml(exchange.requestBody)}</pre>")
+            appendLine("            </div>")
         }
+        appendLine("            <div class=\"detail-section\">")
+        appendLine("              <div class=\"detail-label\">Response</div>")
+        appendLine("              <pre class=\"code\">${escapeHtml(exchange.responseBody)}</pre>")
+        appendLine("            </div>")
+        appendLine("          </div>")
+
         appendLine("        </div>")
     }
 
@@ -233,6 +243,14 @@ class EventLogHtmlGeneratorWithHttp(private val recorder: DocumentationRecorder)
         else -> "#95a5a6"
     }
 
+    private fun getStatusColor(status: Int): String = when {
+        status in 200..299 -> "#2ecc71"
+        status in 300..399 -> "#3498db"
+        status in 400..499 -> "#f39c12"
+        status >= 500 -> "#e74c3c"
+        else -> "#95a5a6"
+    }
+
     private fun css() = """
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -296,47 +314,64 @@ class EventLogHtmlGeneratorWithHttp(private val recorder: DocumentationRecorder)
             border-left: 3px solid #3498db;
         }
         .http-call {
-            margin-bottom: 10px;
+            margin-bottom: 20px;
+            background: #f8f9fa;
+            border-radius: 6px;
+            padding: 15px;
         }
         .http-header {
             display: flex;
             align-items: center;
             gap: 10px;
-            padding: 8px;
-            background: #f8f9fa;
-            border-radius: 4px;
+            margin-bottom: 10px;
         }
         .method {
-            padding: 4px 10px;
+            padding: 6px 12px;
             border-radius: 4px;
             color: white;
-            font-size: 11px;
+            font-size: 12px;
             font-weight: 700;
-            min-width: 55px;
+            min-width: 60px;
             text-align: center;
         }
         .path {
             font-family: monospace;
-            font-size: 13px;
+            font-size: 14px;
             flex: 1;
         }
         .status {
             font-family: monospace;
-            font-size: 13px;
-            color: #2ecc71;
+            font-size: 14px;
+            font-weight: bold;
         }
-        .http-body {
-            margin-top: 5px;
-            margin-left: 75px;
+        .http-details {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
         }
-        .http-body pre {
+        .detail-section {
+            background: white;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .detail-label {
+            font-size: 11px;
+            color: #7f8c8d;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 5px;
+            font-weight: 600;
+        }
+        .code {
             background: #2c3e50;
             color: #ecf0f1;
             padding: 10px;
             border-radius: 4px;
             font-size: 11px;
-            margin: 0;
+            line-height: 1.4;
             overflow-x: auto;
+            margin: 0;
+            font-family: 'Monaco', 'Menlo', monospace;
         }
         .event-detail {
             margin-top: 15px;

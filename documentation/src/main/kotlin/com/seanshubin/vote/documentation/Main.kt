@@ -95,15 +95,10 @@ fun main(args: Array<String>) {
         val httpContext = TestContext(backend = httpBackend)
         Scenario.comprehensive(httpContext)
 
-        // Generate events.html with HTTP context
+        // Generate events.html with full HTTP details
         val eventsHtml = EventLogHtmlGeneratorWithHttp(documentationRecorder).generate()
         File(outputDir, "events.html").writeText(eventsHtml)
         println("✓ Generated events.html (${countLines(eventsHtml)} lines)")
-
-        // Generate http.html with event context
-        val httpHtml = HttpHtmlGeneratorWithEvents(documentationRecorder).generate()
-        File(outputDir, "http.html").writeText(httpHtml)
-        println("✓ Generated http.html (${countLines(httpHtml)} lines)")
     } finally {
         httpRecorder.stopServer()
     }

@@ -43,6 +43,8 @@ tasks.register("generateDocumentation") {
     description = "Generate sample data documentation (SQL, DynamoDB, Events, HTTP)"
     group = "documentation"
     dependsOn("compileKotlin")
+    dependsOn(":schema-diagram:generateSchemaDiagram")
+    dependsOn(":analyzeCodeStructure")
 
     val outputDir = file("../generated/documentation")
 
