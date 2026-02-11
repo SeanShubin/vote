@@ -9,7 +9,7 @@ The project now uses the [code-structure](https://github.com/SeanShubin/code-str
 ### Files Modified
 
 1. **`settings.gradle.kts`** - Added `pluginManagement` block with `mavenLocal()` repository
-2. **`build.gradle.kts`** - Added plugin declaration: `id("com.seanshubin.code.structure") version "1.1.1"`
+2. **`build.gradle.kts`** - Added plugin declaration: `id("com.seanshubin.code.structure") version "1.1.2"`
 3. **`code-structure-config.json`** - Configuration file for analysis rules
 
 ### Using Local Maven Build (Current)

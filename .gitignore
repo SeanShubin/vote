@@ -1,39 +1,21 @@
-# IDEs
-/.idea/
-*.iml
-.vscode/
-*.swp
-*.swo
+**/.idea
+**/out
+**/*.iml
+**/*.ipr
+**/*.iws
+**/target
+cdk.out
+generated/
+logs/
+downloaded
+secrets
+local-config
 *~
+*#
+.#*
+.DS_Store
+dependency-reduced-pom.xml
 
 # Gradle
-.gradle/
-build/
-gradle-app.setting
-!gradle-wrapper.jar
-!gradle-wrapper.properties
-
-# Kotlin/JS
-kotlin-js-store/
-.webpack/
-node_modules/
-package-lock.json
-yarn.lock
-yarn-error.log
-
-# Kotlin compiler
-.kotlin/
-
-# Test
-test-results/
-*.log
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Local development
-local.properties
-
-# Generated documentation
-/generated_/
+**/.gradle
+**/build

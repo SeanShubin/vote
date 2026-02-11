@@ -2,18 +2,14 @@
   "inputDir" : ".",
   "outputDir" : "generated/code-structure",
   "nodeLimitForGraph" : 100,
-  "sourcePrefix" : "https://github.com/SeanShubin/vote/blob/master/",
+  "sourcePrefix" : "https://github.com/developer github name/name-parts/blob/master/",
   "sourceFileRegexPatterns" : {
-    "include" : [
-      ".*/src/main/(kotlin|java)/.*\\.(kt|java)"
-    ],
+    "include" : [ ".*/src/main/(kotlin|java)/.*\\.(kt|java)" ],
     "exclude" : [ ]
   },
   "binaryFileRegexPatterns" : {
-    "include" : [
-      ".*/build/classes/.*\\.class"
-    ],
-    "exclude" : [ ]
+    "include" : [ ".*/target/.*\\.class" ],
+    "exclude" : [ ".*/testdata/.*", ".*/generated/.*" ]
   },
   "countAsErrors" : {
     "inDirectCycle" : true,

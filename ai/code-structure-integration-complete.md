@@ -12,7 +12,7 @@
 
 **Files Modified in vote project**:
 - `settings.gradle.kts` - Added `pluginManagement` with `mavenLocal()` repository
-- `build.gradle.kts` - Added plugin: `id("com.seanshubin.code.structure") version "1.1.1"`
+- `build.gradle.kts` - Added plugin: `id("com.seanshubin.code.structure") version "1.1.2"`
 - `code-structure-config.json` - Created configuration file
 
 **Result**: Plugin loads and executes successfully from local Maven repository.
@@ -177,7 +177,7 @@ pluginManagement {
 }
 
 plugins {
-    id("com.seanshubin.code.structure") version "1.1.1"
+    id("com.seanshubin.code.structure") version "1.1.2"
 }
 ```
 
