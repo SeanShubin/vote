@@ -51,6 +51,17 @@ interface ScenarioBackend {
     fun tableData(token: AccessToken, tableName: String): TableData
     fun permissionsForRole(role: Role): List<Permission>
 
+    // Token operations
+    fun refresh(refreshToken: com.seanshubin.vote.contract.RefreshToken): com.seanshubin.vote.contract.Tokens
+    fun authenticateWithToken(accessToken: AccessToken): com.seanshubin.vote.contract.Tokens
+    fun authenticate(nameOrEmail: String, password: String): com.seanshubin.vote.contract.Tokens
+
+    // Election updates
+    fun updateElection(token: AccessToken, electionName: String, updates: ElectionUpdates)
+
+    // Email login
+    fun sendLoginLinkByEmail(email: String, baseUri: String)
+
     // Synchronization (for event sourcing)
     fun synchronize()
 }

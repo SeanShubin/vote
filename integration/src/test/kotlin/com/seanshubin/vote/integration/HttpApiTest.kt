@@ -493,4 +493,222 @@ class HttpApiTest {
         // Should fail during deserialization
         assertEquals(400, response.statusCode())
     }
+
+    // ========== Token Operations Tests ==========
+
+    @Test
+    fun `refresh token returns new tokens`() {
+        val tokens = register("alice")
+
+        val refreshBody = json.encodeToString(tokens.refreshToken)
+        val response = post("/refresh", refreshBody)
+
+        assertEquals(200, response.statusCode())
+        val newTokens = json.decodeFromString<Tokens>(response.body())
+        assertEquals("alice", newTokens.accessToken.userName)
+    }
+
+    // ========== Election Update Tests ==========
+
+    @Test
+    fun `update election secret ballot succeeds`() {
+        val tokens = register("alice")
+        post("/election", """{"userName":"alice","electionName":"Test"}""", tokens.accessToken)
+
+        val response = put("/election/Test", """{"secretBallot":false}""", tokens.accessToken)
+
+        assertEquals(200, response.statusCode())
+    }
+
+    @Test
+    fun `update election voting time window succeeds`() {
+        val tokens = register("alice")
+        post("/election", """{"userName":"alice","electionName":"Test"}""", tokens.accessToken)
+
+        val response = put("/election/Test",
+            """{"noVotingBefore":"2024-01-01T00:00:00Z","noVotingAfter":"2024-12-31T23:59:59Z"}""",
+            tokens.accessToken)
+
+        assertEquals(200, response.statusCode())
+    }
+
+    @Test
+    fun `update election allowVote and allowEdit succeeds`() {
+        val tokens = register("alice")
+        post("/election", """{"userName":"alice","electionName":"Test"}""", tokens.accessToken)
+
+        val response = put("/election/Test", """{"allowVote":true,"allowEdit":false}""", tokens.accessToken)
+
+        assertEquals(200, response.statusCode())
+    }
+
+    // ========== System Operations ==========
+
+    @Test
+    fun `sync endpoint succeeds`() {
+        val tokens = register("alice")
+
+        val response = post("/sync", "", tokens.accessToken)
+
+        assertEquals(200, response.statusCode())
+    }
+
+    @Test
+    fun `log client error succeeds`() {
+        val response = post("/log-client-error", """{"message":"Test error","stackTrace":"Test stack","url":"http://example.com","userAgent":"Test Agent","timestamp":"2024-01-01T00:00:00Z"}""")
+
+        assertEquals(200, response.statusCode())
+    }
+
+    // ========== Administrative Query Tests ==========
+
+    @Test
+    fun `get user count returns number`() {
+        val tokens = register("alice")
+        register("bob")
+
+        val response = get("/users/count", tokens.accessToken)
+
+        assertEquals(200, response.statusCode())
+        val body = response.body()
+        val count = body.substringAfter("\"count\":").substringBefore("}").trim().toInt()
+        assertTrue(count >= 2)
+    }
+
+    @Test
+    fun `get election count returns number`() {
+        val tokens = register("alice")
+        post("/election", """{"userName":"alice","electionName":"E1"}""", tokens.accessToken)
+        post("/election", """{"userName":"alice","electionName":"E2"}""", tokens.accessToken)
+
+        val response = get("/elections/count", tokens.accessToken)
+
+        assertEquals(200, response.statusCode())
+        val body = response.body()
+        val count = body.substringAfter("\"count\":").substringBefore("}").trim().toInt()
+        assertTrue(count >= 2)
+    }
+
+    @Test
+    fun `list tables returns array`() {
+        val tokens = register("alice")
+
+        val response = get("/tables", tokens.accessToken)
+
+        assertEquals(200, response.statusCode())
+        val body = response.body()
+        // InMemory database returns empty array for table names
+        assertTrue(body.contains("["), "Expected array but got: $body")
+    }
+
+    @Test
+    fun `get table count returns number`() {
+        val tokens = register("alice")
+
+        val response = get("/tables/count", tokens.accessToken)
+
+        assertEquals(200, response.statusCode())
+        val body = response.body()
+        val count = body.substringAfter("\"count\":").substringBefore("}").trim().toInt()
+        assertTrue(count > 0)
+    }
+
+    @Test
+    fun `get event count returns number`() {
+        val tokens = register("alice")
+
+        val response = get("/events/count", tokens.accessToken)
+
+        assertEquals(200, response.statusCode())
+        val body = response.body()
+        val count = body.substringAfter("\"count\":").substringBefore("}").trim().toInt()
+        assertTrue(count > 0, "Should have at least one event from user registration")
+    }
+
+    @Test
+    fun `get table data returns table structure`() {
+        val tokens = register("alice")
+
+        val response = get("/table/user", tokens.accessToken)
+
+        assertEquals(200, response.statusCode())
+        val body = response.body()
+        assertTrue(body.contains("columnNames"), "Expected 'columnNames' but got: $body")
+        assertTrue(body.contains("rows"), "Expected 'rows' but got: $body")
+    }
+
+    @Test
+    fun `get permissions for role returns list`() {
+        register("alice") // Need at least one user for server to be initialized
+
+        val response = get("/permissions/USER")
+
+        assertEquals(200, response.statusCode())
+        assertTrue(response.body().contains("["))
+    }
+
+    // ========== Election Detail Query Tests ==========
+
+    @Test
+    fun `get voter rankings returns list`() {
+        val aliceTokens = register("alice")
+        val bobTokens = register("bob")
+        post("/election", """{"userName":"alice","electionName":"Lang"}""", aliceTokens.accessToken)
+        put("/election/Lang/candidates", """{"candidateNames":["A","B"]}""", aliceTokens.accessToken)
+        put("/election/Lang/eligibility", """{"voterNames":["bob"]}""", aliceTokens.accessToken)
+        post("/election/Lang/launch", """{"allowEdit":true}""", aliceTokens.accessToken)
+        post("/election/Lang/ballot",
+            """{"voterName":"bob","rankings":[{"candidateName":"A","rank":1}]}""",
+            bobTokens.accessToken)
+
+        val response = get("/election/Lang/rankings/bob", bobTokens.accessToken)
+
+        assertEquals(200, response.statusCode())
+        assertTrue(response.body().contains("candidateName"))
+        assertTrue(response.body().contains("rank"))
+    }
+
+    @Test
+    fun `get election eligibility list returns voters`() {
+        val aliceTokens = register("alice")
+        register("bob")
+        post("/election", """{"userName":"alice","electionName":"Test"}""", aliceTokens.accessToken)
+        put("/election/Test/eligibility", """{"voterNames":["bob"]}""", aliceTokens.accessToken)
+
+        val response = get("/election/Test/eligibility", aliceTokens.accessToken)
+
+        assertEquals(200, response.statusCode())
+        assertTrue(response.body().contains("bob"))
+    }
+
+    @Test
+    fun `check voter eligibility returns boolean`() {
+        val aliceTokens = register("alice")
+        val bobTokens = register("bob")
+        post("/election", """{"userName":"alice","electionName":"Test"}""", aliceTokens.accessToken)
+        put("/election/Test/eligibility", """{"voterNames":["bob"]}""", aliceTokens.accessToken)
+
+        val response = get("/election/Test/eligibility/bob", bobTokens.accessToken)
+
+        assertEquals(200, response.statusCode())
+        val body = response.body()
+        val eligible = body.substringAfter("\"eligible\":").substringBefore("}").trim().toBoolean()
+        assertEquals(true, eligible)
+    }
+
+    @Test
+    fun `check voter eligibility for ineligible voter returns false`() {
+        val aliceTokens = register("alice")
+        val bobTokens = register("bob")
+        register("charlie")
+        post("/election", """{"userName":"alice","electionName":"Test"}""", aliceTokens.accessToken)
+        put("/election/Test/eligibility", """{"voterNames":["bob"]}""", aliceTokens.accessToken)
+
+        val response = get("/election/Test/eligibility/charlie", bobTokens.accessToken)
+
+        assertEquals(200, response.statusCode())
+        val body = response.body()
+        val eligible = body.substringAfter("\"eligible\":").substringBefore("}").trim().toBoolean()
+        assertEquals(false, eligible)
+    }
 }

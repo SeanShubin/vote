@@ -4,6 +4,7 @@ import com.seanshubin.vote.contract.Notifications
 
 class FakeNotifications : Notifications {
     val events = mutableListOf<String>()
+    val sentMails = mutableListOf<Pair<String, String>>()
 
     override fun databaseEvent(name: String, statement: String) {
         events.add("database: $name - $statement")
@@ -35,5 +36,6 @@ class FakeNotifications : Notifications {
 
     override fun sendMailEvent(to: String, subject: String) {
         events.add("mail: to=$to, subject=$subject")
+        sentMails.add(to to subject)
     }
 }

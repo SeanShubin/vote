@@ -17,6 +17,25 @@ fun RegisterPage(
     var isLoading by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
+    val handleRegister = {
+        if (!isLoading) {
+            isLoading = true
+            errorMessage = null
+            scope.launch {
+                try {
+                    val tokens = ApiClient.register(userName, email, password)
+                    val tokenJson = """{"userName":"$userName","role":"USER"}"""
+                    onLoginSuccess(tokenJson, userName)
+                } catch (e: Exception) {
+                    ApiClient.logErrorToServer(e)
+                    errorMessage = e.message ?: "Registration failed"
+                } finally {
+                    isLoading = false
+                }
+            }
+        }
+    }
+
     Div({ classes("container") }) {
         H1 { Text("Vote - Register") }
 
@@ -31,39 +50,37 @@ fun RegisterPage(
                 placeholder("Username")
                 value(userName)
                 onInput { userName = it.value }
+                onKeyDown { event ->
+                    if (event.key == "Enter") {
+                        handleRegister()
+                    }
+                }
             }
 
             Input(InputType.Email) {
                 placeholder("Email")
                 value(email)
                 onInput { email = it.value }
+                onKeyDown { event ->
+                    if (event.key == "Enter") {
+                        handleRegister()
+                    }
+                }
             }
 
             Input(InputType.Password) {
                 placeholder("Password")
                 value(password)
                 onInput { password = it.value }
+                onKeyDown { event ->
+                    if (event.key == "Enter") {
+                        handleRegister()
+                    }
+                }
             }
 
             Button({
-                onClick {
-                    if (!isLoading) {
-                        isLoading = true
-                        errorMessage = null
-                        scope.launch {
-                            try {
-                                val tokens = ApiClient.register(userName, email, password)
-                                val tokenJson = """{"userName":"$userName","role":"USER"}"""
-                                onLoginSuccess(tokenJson, userName)
-                            } catch (e: Exception) {
-                                ApiClient.logErrorToServer(e)
-                                errorMessage = e.message ?: "Registration failed"
-                            } finally {
-                                isLoading = false
-                            }
-                        }
-                    }
-                }
+                onClick { handleRegister() }
             }) {
                 Text(if (isLoading) "Registering..." else "Register")
             }

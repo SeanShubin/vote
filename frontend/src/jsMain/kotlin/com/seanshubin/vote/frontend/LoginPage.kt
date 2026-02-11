@@ -16,6 +16,25 @@ fun LoginPage(
     var isLoading by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
+    val handleLogin = {
+        if (!isLoading) {
+            isLoading = true
+            errorMessage = null
+            scope.launch {
+                try {
+                    val tokens = ApiClient.authenticate(userName, password)
+                    val tokenJson = """{"userName":"$userName","role":"USER"}"""
+                    onLoginSuccess(tokenJson, userName)
+                } catch (e: Exception) {
+                    ApiClient.logErrorToServer(e)
+                    errorMessage = e.message ?: "Login failed"
+                } finally {
+                    isLoading = false
+                }
+            }
+        }
+    }
+
     Div({ classes("container") }) {
         H1 { Text("Vote - Login") }
 
@@ -30,33 +49,26 @@ fun LoginPage(
                 placeholder("Username")
                 value(userName)
                 onInput { userName = it.value }
+                onKeyDown { event ->
+                    if (event.key == "Enter") {
+                        handleLogin()
+                    }
+                }
             }
 
             Input(InputType.Password) {
                 placeholder("Password")
                 value(password)
                 onInput { password = it.value }
+                onKeyDown { event ->
+                    if (event.key == "Enter") {
+                        handleLogin()
+                    }
+                }
             }
 
             Button({
-                onClick {
-                    if (!isLoading) {
-                        isLoading = true
-                        errorMessage = null
-                        scope.launch {
-                            try {
-                                val tokens = ApiClient.authenticate(userName, password)
-                                val tokenJson = """{"userName":"$userName","role":"USER"}"""
-                                onLoginSuccess(tokenJson, userName)
-                            } catch (e: Exception) {
-                                ApiClient.logErrorToServer(e)
-                                errorMessage = e.message ?: "Login failed"
-                            } finally {
-                                isLoading = false
-                            }
-                        }
-                    }
-                }
+                onClick { handleLogin() }
             }) {
                 Text(if (isLoading) "Logging in..." else "Login")
             }

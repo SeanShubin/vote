@@ -125,6 +125,26 @@ class DirectServiceBackend(private val service: Service) : ScenarioBackend {
         return service.permissionsForRole(role)
     }
 
+    override fun refresh(refreshToken: com.seanshubin.vote.contract.RefreshToken): com.seanshubin.vote.contract.Tokens {
+        return service.refresh(refreshToken)
+    }
+
+    override fun authenticateWithToken(accessToken: AccessToken): com.seanshubin.vote.contract.Tokens {
+        return service.authenticateWithToken(accessToken)
+    }
+
+    override fun authenticate(nameOrEmail: String, password: String): com.seanshubin.vote.contract.Tokens {
+        return service.authenticate(nameOrEmail, password)
+    }
+
+    override fun updateElection(token: AccessToken, electionName: String, updates: ElectionUpdates) {
+        service.updateElection(token, electionName, updates)
+    }
+
+    override fun sendLoginLinkByEmail(email: String, baseUri: String) {
+        service.sendLoginLinkByEmail(email, baseUri)
+    }
+
     override fun synchronize() {
         service.synchronize()
     }

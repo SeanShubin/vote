@@ -70,6 +70,8 @@ input[type="number"]:focus {
 }
 
 .textarea {
+    display: block;
+    width: 100%;
     padding: 0.75rem;
     border: 1px solid #ddd;
     border-radius: 4px;
@@ -77,6 +79,7 @@ input[type="number"]:focus {
     font-family: inherit;
     resize: vertical;
     min-height: 100px;
+    margin-bottom: 1rem;
 }
 
 .textarea:focus {
