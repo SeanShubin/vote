@@ -110,7 +110,7 @@ class LoginPageRenderTest {
             ComposeTestHelper.pressEnterInInput(testId, "Password")
 
             // Wait for all coroutines (handleLogin coroutine) to complete
-            this@runTest.testScheduler.advanceUntilIdle()
+            advanceUntilIdle()
 
             // then
             assertEquals(1, fakeClient.authenticateCalls.size, "Expected 1 authenticate call but got ${fakeClient.authenticateCalls.size}")
@@ -147,7 +147,7 @@ class LoginPageRenderTest {
             ComposeTestHelper.pressEnterInInput(testId, "Username")
 
             // Wait for all coroutines to complete
-            this@runTest.testScheduler.advanceUntilIdle()
+            advanceUntilIdle()
 
             // then
             assertEquals(1, fakeClient.authenticateCalls.size, "Expected 1 authenticate call but got ${fakeClient.authenticateCalls.size}")
@@ -184,7 +184,7 @@ class LoginPageRenderTest {
             ComposeTestHelper.clickButtonByText(testId, "Login")
 
             // Wait for all coroutines to complete
-            this@runTest.testScheduler.advanceUntilIdle()
+            advanceUntilIdle()
 
             // then
             assertEquals(1, fakeClient.authenticateCalls.size, "Expected 1 authenticate call but got ${fakeClient.authenticateCalls.size}")
@@ -229,7 +229,7 @@ class LoginPageRenderTest {
             ComposeTestHelper.clickButtonByText(testId, "Login")
 
             // Wait for all coroutines to complete
-            this@runTest.testScheduler.advanceUntilIdle()
+            advanceUntilIdle()
 
             // then
             assertTrue(loginSuccessCalled, "Login success callback should be invoked")

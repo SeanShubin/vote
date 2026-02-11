@@ -74,7 +74,7 @@ class RegisterPageRenderTest {
             ComposeTestHelper.pressEnterInInput(testId, "Password")
 
             // Wait for all coroutines to complete
-            this@runTest.testScheduler.advanceUntilIdle()
+            advanceUntilIdle()
 
             // then
             assertEquals(1, fakeClient.registerCalls.size, "Expected 1 register call but got ${fakeClient.registerCalls.size}")
@@ -113,7 +113,7 @@ class RegisterPageRenderTest {
             ComposeTestHelper.pressEnterInInput(testId, "Email")
 
             // Wait for all coroutines to complete
-            this@runTest.testScheduler.advanceUntilIdle()
+            advanceUntilIdle()
 
             // then
             assertEquals(1, fakeClient.registerCalls.size, "Expected 1 register call but got ${fakeClient.registerCalls.size}")
@@ -152,7 +152,7 @@ class RegisterPageRenderTest {
             ComposeTestHelper.clickButtonByText(testId, "Register")
 
             // Wait for all coroutines to complete
-            this@runTest.testScheduler.advanceUntilIdle()
+            advanceUntilIdle()
 
             // then
             assertEquals(1, fakeClient.registerCalls.size, "Expected 1 register call but got ${fakeClient.registerCalls.size}")
@@ -199,7 +199,7 @@ class RegisterPageRenderTest {
             ComposeTestHelper.clickButtonByText(testId, "Register")
 
             // Wait for all coroutines to complete
-            this@runTest.testScheduler.advanceUntilIdle()
+            advanceUntilIdle()
 
             // then
             assertTrue(registrationSuccessCalled, "Registration success callback should be invoked")

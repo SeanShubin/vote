@@ -1,5 +1,7 @@
 package com.seanshubin.vote.frontend
 
+import kotlinx.coroutines.test.TestScope
+
 /**
  * Test helper utilities that encapsulate JavaScript DOM interactions for testing Compose for Web.
  *
@@ -158,4 +160,12 @@ object ComposeTestHelper {
             removeRootFunction(testId)
         }
     }
+}
+
+/**
+ * Extension function to simplify advancing test coroutines to idle.
+ * Use this after triggering async operations in tests to wait for all coroutines to complete.
+ */
+fun TestScope.advanceUntilIdle() {
+    testScheduler.advanceUntilIdle()
 }

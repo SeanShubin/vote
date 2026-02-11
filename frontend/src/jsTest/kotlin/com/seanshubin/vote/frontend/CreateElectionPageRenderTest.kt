@@ -59,7 +59,7 @@ class CreateElectionPageRenderTest {
             ComposeTestHelper.clickButtonByText(testId, "Create")
 
             // Wait for all coroutines to complete
-            this@runTest.testScheduler.advanceUntilIdle()
+            advanceUntilIdle()
 
             // then
             assertEquals(1, fakeClient.createElectionCalls.size, "Expected 1 createElection call but got ${fakeClient.createElectionCalls.size}")
@@ -92,7 +92,7 @@ class CreateElectionPageRenderTest {
             ComposeTestHelper.clickButtonByText(testId, "Create")
 
             // Wait for all coroutines to complete
-            this@runTest.testScheduler.advanceUntilIdle()
+            advanceUntilIdle()
 
             // then - should not call createElection
             assertEquals(0, fakeClient.createElectionCalls.size, "Should not create election with empty name")
