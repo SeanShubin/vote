@@ -19,17 +19,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
-/**
- * HTTP API integration tests.
- *
- * Tests the HTTP layer without testing business logic details.
- * Verifies:
- * - Request/response serialization
- * - HTTP status codes
- * - Authentication/authorization
- * - Error handling
- * - API contracts
- */
 class HttpApiTest {
     private lateinit var runner: com.seanshubin.vote.backend.dependencies.ApplicationRunner
     private lateinit var httpClient: HttpClient
@@ -39,7 +28,6 @@ class HttpApiTest {
 
     @BeforeEach
     fun startServer() {
-        // Use staged dependency injection pattern
         val integrations = TestIntegrations()
 
         val configuration = com.seanshubin.vote.backend.dependencies.Configuration(
@@ -50,10 +38,8 @@ class HttpApiTest {
         val appDeps = ApplicationDependencies(integrations, configuration)
         runner = appDeps.runner
 
-        // Start server without blocking
         runner.startNonBlocking()
 
-        // Wait for server to be ready
         httpClient = HttpClient.newBuilder().build()
         var ready = false
         for (i in 1..50) {
@@ -74,8 +60,6 @@ class HttpApiTest {
     fun stopServer() {
         runner.stop()
     }
-
-    // ========== Helper Methods ==========
 
     private fun get(path: String, token: AccessToken? = null): HttpResponse<String> {
         val request = HttpRequest.newBuilder()
@@ -122,16 +106,13 @@ class HttpApiTest {
         return json.decodeFromString<Tokens>(response.body())
     }
 
-    // ========== Health Check ==========
-
     @Test
     fun `health endpoint returns 200`() {
         val response = get("/health")
+
         assertEquals(200, response.statusCode())
         assertTrue(response.body().contains("\"status\""))
     }
-
-    // ========== Authentication Tests ==========
 
     @Test
     fun `register returns access token`() {
@@ -148,7 +129,6 @@ class HttpApiTest {
         register("alice")
         val response = post("/register", """{"userName":"alice","email":"alice2@example.com","password":"pass"}""")
 
-        // Returns 400 (IllegalArgumentException) - could be 409 if using ServiceException.CONFLICT
         assertTrue(response.statusCode() in listOf(400, 409))
         assertTrue(response.body().contains("error"))
     }
@@ -177,11 +157,8 @@ class HttpApiTest {
 
         val response = post("/authenticate", """{"nameOrEmail":"alice","password":"wrong"}""")
 
-        // Should be 401 but might be 400 depending on exception type
         assertTrue(response.statusCode() in listOf(400, 401))
     }
-
-    // ========== Authorization Tests ==========
 
     @Test
     fun `endpoint without auth header returns 401`() {
@@ -202,8 +179,6 @@ class HttpApiTest {
 
         assertEquals(401, response.statusCode())
     }
-
-    // ========== User Management Tests ==========
 
     @Test
     fun `list users returns array`() {
@@ -234,8 +209,6 @@ class HttpApiTest {
 
         val response = get("/user/nobody", tokens.accessToken)
 
-        // Returns 500 (unhandled exception) - should be 404
-        // TODO: Fix service layer to catch NoSuchElementException and return NOT_FOUND
         assertTrue(response.statusCode() in listOf(404, 500))
     }
 
@@ -247,7 +220,6 @@ class HttpApiTest {
 
         assertEquals(200, response.statusCode())
 
-        // Verify name was updated
         val getResponse = get("/user/alice2", tokens.accessToken)
         assertEquals(200, getResponse.statusCode())
     }
@@ -260,7 +232,6 @@ class HttpApiTest {
 
         assertEquals(200, response.statusCode())
 
-        // Verify email was updated
         val getResponse = get("/user/alice", tokens.accessToken)
         assertTrue(getResponse.body().contains("newemail@example.com"))
     }
@@ -284,9 +255,7 @@ class HttpApiTest {
 
         assertEquals(200, response.statusCode())
 
-        // Verify user was removed
         val getResponse = get("/user/bob", aliceTokens.accessToken)
-        // Returns 500 (same issue as "get nonexistent user")
         assertTrue(getResponse.statusCode() in listOf(404, 500))
     }
 
@@ -298,8 +267,6 @@ class HttpApiTest {
 
         assertEquals(200, response.statusCode())
     }
-
-    // ========== Election Management Tests ==========
 
     @Test
     fun `create election succeeds`() {
@@ -403,12 +370,9 @@ class HttpApiTest {
 
         assertEquals(200, response.statusCode())
 
-        // Verify election was deleted
         val getResponse = get("/election/Test", tokens.accessToken)
         assertEquals(404, getResponse.statusCode())
     }
-
-    // ========== Voting Tests ==========
 
     @Test
     fun `cast ballot succeeds`() {
@@ -458,16 +422,12 @@ class HttpApiTest {
 
         val response = get("/election/Lang/tally", aliceTokens.accessToken)
 
-        // Could be 200 (success) or 400 (election not in correct state for tally)
-        // The business rule for when tally is allowed may require specific election state
         if (response.statusCode() == 200) {
             assertTrue(response.body().contains("places"))
         } else {
             assertTrue(response.statusCode() in listOf(400, 200))
         }
     }
-
-    // ========== Error Handling Tests ==========
 
     @Test
     fun `invalid route returns 404`() {
@@ -490,11 +450,8 @@ class HttpApiTest {
     fun `missing required field returns 400`() {
         val response = post("/register", """{"userName":"alice"}""")
 
-        // Should fail during deserialization
         assertEquals(400, response.statusCode())
     }
-
-    // ========== Token Operations Tests ==========
 
     @Test
     fun `refresh token returns new tokens`() {
@@ -507,8 +464,6 @@ class HttpApiTest {
         val newTokens = json.decodeFromString<Tokens>(response.body())
         assertEquals("alice", newTokens.accessToken.userName)
     }
-
-    // ========== Election Update Tests ==========
 
     @Test
     fun `update election secret ballot succeeds`() {
@@ -542,8 +497,6 @@ class HttpApiTest {
         assertEquals(200, response.statusCode())
     }
 
-    // ========== System Operations ==========
-
     @Test
     fun `sync endpoint succeeds`() {
         val tokens = register("alice")
@@ -559,8 +512,6 @@ class HttpApiTest {
 
         assertEquals(200, response.statusCode())
     }
-
-    // ========== Administrative Query Tests ==========
 
     @Test
     fun `get user count returns number`() {
@@ -597,7 +548,6 @@ class HttpApiTest {
 
         assertEquals(200, response.statusCode())
         val body = response.body()
-        // InMemory database returns empty array for table names
         assertTrue(body.contains("["), "Expected array but got: $body")
     }
 
@@ -646,8 +596,6 @@ class HttpApiTest {
         assertEquals(200, response.statusCode())
         assertTrue(response.body().contains("["))
     }
-
-    // ========== Election Detail Query Tests ==========
 
     @Test
     fun `get voter rankings returns list`() {

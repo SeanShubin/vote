@@ -1,22 +1,154 @@
 # Testing Strategy
 
-This document describes the comprehensive testing strategy for the Vote application. The testing architecture consists of three complementary test categories, each serving a distinct purpose.
+## Why We Test
 
-## Overview
+We organize tests around four distinct purposes, each serving a different audience and verification goal:
 
-The testing strategy is designed to ensure correctness at multiple levels:
+### 1. Business Logic Tests
 
-1. **Business Logic Tests** - Verify domain behavior against database contract, no real integrations
-2. **Smoke Tests** - Verify database implementations behave identically (InMemory, MySQL, DynamoDB)
-3. **HTTP Boundary Tests** - Verify HTTP communication layer (headers, tokens, serialization)
+**Purpose:** Test business logic completely without testing implementation details such as how the code is structured. We should be certain the code works properly no matter what the implementation happens to be. These should be so self-documenting that a product manager could look at them and have confidence the features they asked for actually exist. No interactions with real integration points.
+
+**Who reads these:** Product managers, domain experts, developers
+
+**What they verify:** The features exist and work as specified
+
+**Example:**
+```kotlin
+@Test
+fun `voters can cast ballots after launch`() {
+    val testContext = TestContext()
+    val (alice, bob, charlie) = testContext.registerUsers("alice", "bob", "charlie")
+
+    val election = alice.createElection("Programming Language")
+    election.setCandidates("Kotlin", "Rust", "Go")
+    election.setEligibleVoters("bob", "charlie")
+    election.launch()
+
+    bob.castBallot(election, "Kotlin" to 1, "Rust" to 2, "Go" to 3)
+    charlie.castBallot(election, "Rust" to 1, "Kotlin" to 2, "Go" to 3)
+
+    val tally = election.tally()
+    assertEquals(2, tally.ballots.size)
+}
+```
+
+**Location:** `integration/src/test/kotlin/.../VotingWorkflowTest.kt` (20 tests)
+
+**How they work:** Uses TestContext DSL with fake integrations (fake clock, fake ID generator, fake notifications). Tests the real service layer with fake infrastructure at boundaries. Fast, deterministic, no network or file I/O.
+
+---
+
+### 2. HTTP Interaction Tests
+
+**Purpose:** Test HTTP interactions. These should be complete and so self-documenting that an integration engineer could use them as a specification.
+
+**Who reads these:** Integration engineers, API consumers, developers
+
+**What they verify:** The HTTP API contract - request formats, response formats, status codes, headers, error handling
+
+**Example:**
+```kotlin
+@Test
+fun `cast ballot returns 200 and updates rankings`() {
+    val aliceTokens = register("alice")
+    val bobTokens = register("bob")
+    post("/election", """{"userName":"alice","electionName":"Lang"}""", aliceTokens.accessToken)
+    put("/election/Lang/candidates", """{"candidateNames":["Kotlin","Rust"]}""", aliceTokens.accessToken)
+    put("/election/Lang/eligibility", """{"voterNames":["bob"]}""", aliceTokens.accessToken)
+    post("/election/Lang/launch", """{"allowEdit":true}""", aliceTokens.accessToken)
+
+    val response = post("/election/Lang/ballot",
+        """{"voterName":"bob","rankings":[{"candidateName":"Kotlin","rank":1}]}""",
+        bobTokens.accessToken)
+
+    assertEquals(200, response.statusCode())
+}
+```
+
+**Location:** `integration/src/test/kotlin/.../HttpApiTest.kt` (48 tests)
+
+**How they work:** Starts real HTTP server on test port. Uses Java HttpClient to make actual HTTP requests. Verifies serialization, deserialization, authentication, and HTTP-specific concerns. Uses InMemory database for fast execution.
+
+---
+
+### 3. Database Interaction Tests
+
+**Purpose:** Happy path scenario that exercises each feature using real databases to uncover if databases behave the way the code expects them to behave.
+
+**Who reads these:** Infrastructure engineers, database administrators, developers
+
+**What they verify:** The application works correctly with each supported database (InMemory, MySQL, DynamoDB)
+
+**Example:**
+```kotlin
+@ParameterizedTest(name = "{0}")
+@MethodSource("providerNames")
+fun `comprehensive scenario works identically across all backends`(providerName: String) {
+    val provider = createProvider(providerName)
+    val context = TestContext(provider = provider)
+
+    Scenario.comprehensive(context)
+
+    assertEquals(4, context.userCount())
+    assertEquals(2, context.electionCount())
+}
+```
+
+**Location:** `integration/src/test/kotlin/.../ScenarioCompatibilityTest.kt` (3 tests)
+
+**How they work:** Parameterized tests that run the same comprehensive scenario against multiple database implementations. Uses TestContainers to spin up real MySQL and DynamoDB instances. Verifies that database-specific behavior (transactions, consistency, queries) works as expected.
+
+---
+
+### 4. Frontend Tests
+
+**Purpose:** These tests should be complete and so self-documenting that a product manager could look at them and have confidence the features they asked for actually exist.
+
+**Who reads these:** Product managers, UX designers, developers
+
+**What they verify:** The UI features exist, are accessible, and work correctly from a user perspective
+
+**Status:** Planned - not yet implemented
+
+**How they would work:** Browser automation testing the compiled JavaScript frontend against a real HTTP server. Would verify UI flows, accessibility, and user interactions.
+
+---
+
+## Test Organization
+
+```
+integration/src/test/kotlin/.../
+├── VotingWorkflowTest.kt           # Business Logic Tests (20 tests)
+├── HttpApiTest.kt                   # HTTP Interaction Tests (48 tests)
+├── ScenarioCompatibilityTest.kt    # Database Interaction Tests (3 tests)
+├── dsl/
+│   ├── TestContext.kt              # Main DSL entry point
+│   ├── UserContext.kt              # User-scoped operations
+│   ├── ElectionContext.kt          # Election-scoped operations
+│   ├── ScenarioBackend.kt          # Backend abstraction
+│   ├── DirectServiceBackend.kt     # Direct service calls
+│   ├── EventInspector.kt           # Event verification
+│   └── DatabaseInspector.kt        # Database state verification
+├── scenario/
+│   └── Scenario.kt                 # Comprehensive scenario
+├── database/
+│   ├── DatabaseProvider.kt         # Storage abstraction
+│   ├── InMemoryDatabaseProvider.kt
+│   ├── MySQLDatabaseProvider.kt
+│   └── DynamoDBDatabaseProvider.kt
+└── fake/
+    └── TestIntegrations.kt         # Fake implementations
+```
+
+**Total: 71 tests, all passing**
+
+---
 
 ## Test Infrastructure
 
-### Core Components
+### TestContext
 
-#### TestContext (`integration/src/test/kotlin/.../dsl/TestContext.kt`)
-
-The main entry point for the test DSL. Provides:
+The main entry point for the test DSL:
 
 ```kotlin
 val context = TestContext(
@@ -37,7 +169,7 @@ val context = TestContext(
 val alice = context.registerUser("alice", "alice@example.com", "password")
 val election = alice.createElection("Best Language")
 election.setCandidates("Kotlin", "Rust", "Go")
-election.launch(allowEdit = true)
+election.launch()
 
 // Verify events
 context.events.assertEvent<UserRegistered>()
@@ -47,7 +179,36 @@ val users = context.database.allUsers()
 assertEquals(1, users.size)
 ```
 
-#### DatabaseProvider (`integration/src/test/kotlin/.../database/DatabaseProvider.kt`)
+### UserContext
+
+Provides user-scoped operations:
+```kotlin
+val alice = context.registerUser("alice", "alice@example.com", "password")
+
+alice.createElection("Best Language")
+alice.listElections()
+alice.changePassword("newpass")
+alice.updateUser(newEmail = "newemail@example.com")
+alice.setRole("bob", Role.ADMIN)
+alice.removeUser("bob")
+```
+
+### ElectionContext
+
+Provides election-scoped operations:
+```kotlin
+val election = alice.createElection("Best Language")
+
+election.setCandidates("Kotlin", "Rust", "Go")
+election.listCandidates()
+election.setEligibleVoters("bob", "charlie")
+election.launch()
+election.finalize()
+election.tally()
+election.delete()
+```
+
+### DatabaseProvider
 
 Interface abstracting storage implementations:
 
@@ -62,380 +223,58 @@ interface DatabaseProvider : AutoCloseable {
 
 **Implementations:**
 - `InMemoryDatabaseProvider` - Default, no external dependencies
-- `MySQLDatabaseProvider` - Integrates with real MySQL database
-- `DynamoDBDatabaseProvider` - Integrates with real DynamoDB
+- `MySQLDatabaseProvider` - Real MySQL database via TestContainers
+- `DynamoDBDatabaseProvider` - Real DynamoDB via TestContainers
 
-#### ScenarioBackend (`integration/src/test/kotlin/.../dsl/ScenarioBackend.kt`)
+### ScenarioBackend
 
 Abstraction over how API calls are made:
-
-- `DirectServiceBackend` - Calls ServiceImpl directly (for business logic tests)
+- `DirectServiceBackend` - Calls ServiceImpl directly (for business logic and database tests)
 - `HttpBackend` - Makes HTTP requests (for HTTP boundary tests)
 
-#### Scenario (`integration/src/test/kotlin/.../scenario/Scenario.kt`)
+### Comprehensive Scenario
 
-Comprehensive happy-path scenario that exercises **every Service API operation**:
-
-```kotlin
-object Scenario {
-    fun comprehensive(context: TestContext) {
-        // Exercises ALL 40+ Service methods
-        // - User registration, authentication, profile management, role changes
-        // - Election creation, candidate management, eligibility, launching
-        // - Ballot casting, editing, retrieval
-        // - Tallying and finalization
-        // - Administrative queries (user count, election count, event count, table data)
-        // - Election deletion
-    }
-}
-```
-
-### Test DSL Classes
-
-#### UserContext
-
-Provides user-scoped operations:
-```kotlin
-val alice = context.registerUser("alice", "alice@example.com", "password")
-
-alice.createElection("Best Language")
-alice.listElections()
-alice.getMyProfile()
-alice.changePassword("newpass")
-alice.updateUser(newEmail = "newemail@example.com")
-alice.setRole("bob", Role.ADMIN)
-alice.listUsers()
-```
-
-#### ElectionContext
-
-Provides election-scoped operations:
-```kotlin
-val election = alice.createElection("Best Language")
-
-election.setCandidates("Kotlin", "Rust", "Go")
-election.listCandidates()
-election.setEligibleVoters("bob", "charlie")
-election.listEligibility()
-election.launch(allowEdit = true)
-election.finalize()
-election.tally()
-election.delete()
-```
-
-## 1. Business Logic Tests
-
-**Purpose**: Verify domain behavior and business rules without touching real infrastructure.
-
-**Location**: `integration/src/test/kotlin/com/seanshubin/vote/integration/VotingWorkflowTest.kt`
-
-**Characteristics:**
-- Uses `TestContext` with default (InMemory) provider
-- Uses `DirectServiceBackend` (direct service calls)
-- All integrations are fakes (fake clock, fake ID generator, fake notifications)
-- Verifies both events and database state
-- **Complete coverage** - tests happy path AND error conditions
-- Tests verify against database contract, not implementation details
-
-**Example test:**
-
-```kotlin
-@Test
-fun `first registered user becomes owner`() {
-    val context = TestContext()
-
-    val alice = context.registerUser("alice", "alice@example.com", "password")
-
-    // Verify event was emitted
-    context.events.assertEvent<UserRegistered> {
-        assertEquals("alice", it.userName)
-        assertEquals(Role.OWNER, it.role)
-    }
-
-    // Verify database state
-    val user = context.database.getUser("alice")
-    assertEquals(Role.OWNER, user.role)
-
-    // Verify token reflects role
-    assertEquals(Role.OWNER, alice.accessToken.role)
-}
-
-@Test
-fun `cannot vote in election that is not launched`() {
-    val context = TestContext()
-    val alice = context.registerUser("alice")
-    val bob = context.registerUser("bob")
-
-    val election = alice.createElection("Test")
-    election.setCandidates("A", "B")
-    election.setEligibleVoters("bob")
-
-    // Should fail - election not launched
-    assertThrows<IllegalStateException> {
-        bob.castBallot(election, "A" to 1, "B" to 2)
-    }
-}
-```
-
-**What to test:**
-- User registration and role assignment (first user = OWNER, others = USER)
-- Authentication flows
-- Authorization (permission checks for each operation)
-- Election lifecycle (draft → launched → finalized)
-- Voting rules (eligibility, edit restrictions, duplicate prevention)
-- Condorcet winner calculation
-- Error conditions (invalid operations, permission denials)
-- Event emission (verify correct events with correct data)
-- Database state consistency
-
-**Running business logic tests:**
-```bash
-./gradlew :integration:test --tests "VotingWorkflowTest"
-```
-
-## 2. Smoke Tests
-
-**Purpose**: Verify that all database implementations (InMemory, MySQL, DynamoDB) behave identically under the comprehensive scenario.
-
-**Location**: `integration/src/test/kotlin/com/seanshubin/vote/integration/ScenarioCompatibilityTest.kt`
-
-**Characteristics:**
-- Uses `TestContext` with parameterized DatabaseProvider
-- Uses `DirectServiceBackend` (direct service calls)
-- Exercises **every API operation at least once** via `Scenario.comprehensive()`
-- **Happy path only** - no error conditions
-- Verifies database behavior matches code expectations across all backends
-- Parameterized test runs same scenario against all three backends
-
-**Example test:**
-
-```kotlin
-@ParameterizedTest(name = "{0}")
-@MethodSource("providerNames")
-fun `comprehensive scenario works identically across all backends`(providerName: String) {
-    val provider = createProvider(providerName)
-
-    try {
-        val context = TestContext(provider = provider)
-
-        // Run comprehensive scenario exercising all 40+ API operations
-        Scenario.comprehensive(context)
-
-        // Verify final state
-        assertEquals(4, context.userCount())
-        assertEquals(2, context.electionCount())  // 2 remain after deletion
-        assertTrue(context.eventCount() > 0)
-
-        // Verify database tables exist
-        val tables = context.listTables()
-        assertTrue(tables.contains("user"))
-        assertTrue(tables.contains("election"))
-
-        // Verify specific data
-        val users = context.listUsers()
-        assertTrue(users.any { it.userName == "alice" && it.role == Role.OWNER })
-        assertTrue(users.any { it.userName == "bob" && it.role == Role.ADMIN })
-
-    } finally {
-        provider.close()
-    }
-}
-
-companion object {
-    @JvmStatic
-    fun providerNames() = Stream.of("InMemory", "MySQL", "DynamoDB")
-
-    private fun createProvider(name: String): DatabaseProvider = when (name) {
-        "InMemory" -> InMemoryDatabaseProvider()
-        "MySQL" -> MySQLDatabaseProvider()
-        "DynamoDB" -> DynamoDBDatabaseProvider()
-        else -> throw IllegalArgumentException("Unknown provider: $name")
-    }
-}
-```
-
-**What the comprehensive scenario covers:**
-- User registration (4 users)
-- Role management (promoting to ADMIN)
-- Password changes
-- Email updates
-- User name updates
-- Election creation (3 elections)
-- Candidate configuration
-- Eligibility configuration
-- Election launching (with allowEdit=true and allowEdit=false)
-- Ballot casting (multiple ballots)
-- Ballot editing (when allowed)
-- Election finalization
-- Tallying
-- Election deletion
+The `Scenario.comprehensive()` method exercises **every Service API operation**:
+- User registration, authentication, profile management, role changes
+- Election creation, candidate management, eligibility, launching
+- Ballot casting, editing, retrieval
+- Tallying and finalization
 - Administrative queries (user count, election count, event count, table data)
-- Permission queries
+- Election deletion
 
-**Running smoke tests:**
+This scenario is the smoke test specification - when adding new Service methods, add them to the comprehensive scenario.
+
+### Fake Infrastructure
+
+Tests inject fake implementations at I/O boundaries:
+- `FakeClock` - deterministic time (no wall clock dependency)
+- `FakeIdGenerator` - sequential IDs (no randomness)
+- `FakeNotifications` - captures events (no actual email/logging)
+- `FakePasswordUtil` - predictable hashing (no crypto overhead)
+
+Real service layer runs with fake infrastructure. Tests verify actual composition and wiring.
+
+---
+
+## Running Tests
+
 ```bash
-# All backends
+# All tests
+./gradlew :integration:test
+
+# Business logic tests
+./gradlew :integration:test --tests "VotingWorkflowTest"
+
+# HTTP tests
+./gradlew :integration:test --tests "HttpApiTest"
+
+# Database tests (all backends)
 ./gradlew :integration:test --tests "ScenarioCompatibilityTest"
 
 # Specific backend
 ./gradlew :integration:test --tests "ScenarioCompatibilityTest" --tests "*InMemory*"
 ./gradlew :integration:test --tests "ScenarioCompatibilityTest" --tests "*MySQL*"
 ./gradlew :integration:test --tests "ScenarioCompatibilityTest" --tests "*DynamoDB*"
-```
-
-**Setup requirements:**
-- **InMemory**: No setup required
-- **MySQL**: Requires MySQL running locally or via Docker
-- **DynamoDB**: Requires DynamoDB Local running or AWS credentials
-
-## 3. HTTP Boundary Tests
-
-**Purpose**: Verify the HTTP communication layer including headers, tokens, serialization, status codes, and error responses.
-
-**Location**: `integration/src/test/kotlin/com/seanshubin/vote/integration/HttpApiTest.kt`
-
-**Characteristics:**
-- Starts real HTTP server with InMemory database
-- Uses Java `HttpClient` to make real HTTP requests
-- Tests serialization/deserialization of requests and responses
-- Tests authentication via Bearer tokens
-- Tests authorization (correct status codes for permission denials)
-- Tests error handling (malformed JSON, missing fields, invalid data)
-- **Complete coverage** - tests happy path AND error conditions
-- Uses `TestIntegrations` but runs through full HTTP stack
-
-**Example test:**
-
-```kotlin
-@Test
-fun `register returns access token`() {
-    val response = post("/register", """{"userName":"alice","email":"alice@example.com","password":"pass"}""")
-
-    assertEquals(200, response.statusCode())
-    val tokens = json.decodeFromString<Tokens>(response.body())
-    assertNotNull(tokens.accessToken)
-    assertEquals("alice", tokens.accessToken.userName)
-}
-
-@Test
-fun `endpoint without auth header returns 401`() {
-    val response = get("/users")
-
-    assertEquals(401, response.statusCode())
-    assertTrue(response.body().contains("Authorization"))
-}
-
-@Test
-fun `register with duplicate username returns error`() {
-    register("alice")
-    val response = post("/register", """{"userName":"alice","email":"alice2@example.com","password":"pass"}""")
-
-    assertTrue(response.statusCode() in listOf(400, 409))
-    assertTrue(response.body().contains("error"))
-}
-
-@Test
-fun `register with malformed JSON returns 400`() {
-    val response = post("/register", """{"userName":"alice","email":""")
-
-    assertEquals(400, response.statusCode())
-}
-
-@Test
-fun `cast ballot succeeds with valid token`() {
-    val aliceTokens = register("alice")
-    val bobTokens = register("bob")
-    post("/election", """{"userName":"alice","electionName":"Lang"}""", aliceTokens.accessToken)
-    put("/election/Lang/candidates", """{"candidateNames":["A","B"]}""", aliceTokens.accessToken)
-    put("/election/Lang/eligibility", """{"voterNames":["bob"]}""", aliceTokens.accessToken)
-    post("/election/Lang/launch", """{"allowEdit":true}""", aliceTokens.accessToken)
-
-    val response = post("/election/Lang/ballot",
-        """{"voterName":"bob","rankings":[{"candidateName":"A","rank":1}]}""",
-        bobTokens.accessToken)
-
-    assertEquals(200, response.statusCode())
-}
-```
-
-**What to test:**
-- Registration endpoint (success, duplicate username, malformed JSON)
-- Authentication endpoint (success, wrong password, missing user)
-- Authorization (401 when no token, 403 when insufficient permissions)
-- All HTTP methods (GET, POST, PUT, DELETE)
-- Request serialization (JSON structure, required fields)
-- Response serialization (correct JSON structure)
-- Header handling (Authorization Bearer tokens, Content-Type)
-- Status codes (200, 400, 401, 403, 404, 500)
-- Error messages (meaningful error descriptions)
-- URL encoding (spaces in election names)
-
-**Test infrastructure:**
-```kotlin
-@BeforeEach
-fun startServer() {
-    val integrations = TestIntegrations()
-    val configuration = Configuration(port = 9876, databaseConfig = DatabaseConfig.InMemory)
-    val appDeps = ApplicationDependencies(integrations, configuration)
-    runner = appDeps.runner
-    runner.startNonBlocking()
-
-    httpClient = HttpClient.newBuilder().build()
-    waitForServerReady()
-}
-
-@AfterEach
-fun stopServer() {
-    runner.stop()
-}
-```
-
-**Running HTTP boundary tests:**
-```bash
-./gradlew :integration:test --tests "HttpApiTest"
-```
-
-## Test Organization
-
-```
-integration/
-└── src/
-    └── test/
-        └── kotlin/
-            └── com/seanshubin/vote/integration/
-                ├── VotingWorkflowTest.kt           # Business logic tests
-                ├── ScenarioCompatibilityTest.kt    # Smoke tests
-                ├── HttpApiTest.kt                  # HTTP boundary tests
-                ├── dsl/
-                │   ├── TestContext.kt              # Main DSL entry point
-                │   ├── UserContext.kt              # User-scoped operations
-                │   ├── ElectionContext.kt          # Election-scoped operations
-                │   ├── ScenarioBackend.kt          # Backend abstraction
-                │   ├── DirectServiceBackend.kt     # Direct service calls
-                │   ├── HttpBackend.kt              # HTTP calls (if implemented)
-                │   ├── EventInspector.kt           # Event verification
-                │   └── DatabaseInspector.kt        # Database state verification
-                ├── scenario/
-                │   └── Scenario.kt                 # Comprehensive scenario
-                ├── database/
-                │   ├── DatabaseProvider.kt         # Storage abstraction
-                │   ├── InMemoryDatabaseProvider.kt
-                │   ├── MySQLDatabaseProvider.kt
-                │   └── DynamoDBDatabaseProvider.kt
-                └── fake/
-                    └── TestIntegrations.kt         # Fake implementations
-```
-
-## Running All Tests
-
-```bash
-# All tests
-./gradlew :integration:test
-
-# Specific test category
-./gradlew :integration:test --tests "VotingWorkflowTest"
-./gradlew :integration:test --tests "ScenarioCompatibilityTest"
-./gradlew :integration:test --tests "HttpApiTest"
 
 # With output
 ./gradlew :integration:test --info
@@ -444,6 +283,13 @@ integration/
 ./gradlew :integration:test --continuous
 ```
 
+**Setup requirements:**
+- **InMemory**: No setup required
+- **MySQL**: TestContainers starts MySQL automatically (requires Docker)
+- **DynamoDB**: TestContainers starts DynamoDB Local automatically (requires Docker)
+
+---
+
 ## Writing New Tests
 
 ### Adding a Business Logic Test
@@ -451,24 +297,23 @@ integration/
 ```kotlin
 @Test
 fun `describe the behavior being tested`() {
-    // Arrange: Set up test context and data
+    // Arrange
     val context = TestContext()
     val alice = context.registerUser("alice")
     val bob = context.registerUser("bob")
 
-    // Act: Perform the operation
+    // Act
     val election = alice.createElection("Test Election")
     election.setCandidates("A", "B")
 
-    // Assert: Verify events
-    context.events.assertEvent<ElectionAdded> {
+    // Assert events
+    context.events.assertEvent<ElectionCreated> {
         assertEquals("Test Election", it.electionName)
     }
 
-    // Assert: Verify database state
-    val elections = context.database.allElections()
+    // Assert database state
+    val elections = context.database.listElections()
     assertEquals(1, elections.size)
-    assertEquals("Test Election", elections[0].name)
 }
 ```
 
@@ -477,7 +322,6 @@ fun `describe the behavior being tested`() {
 When adding new Service API operations, update `Scenario.comprehensive()`:
 
 ```kotlin
-// Add the new operation in the appropriate section
 private fun demonstrateNewFeature(context: TestContext, alice: UserContext) {
     // Exercise the new API operation
     val result = alice.newOperation("param")
@@ -502,45 +346,82 @@ fun `new endpoint returns expected status and structure`() {
 }
 ```
 
-## Coverage Goals
-
-### Business Logic Tests
-- **Goal**: 100% coverage of business rules and error conditions
-- **Current**: Core workflows covered, expand error condition coverage as needed
-- **Focus**: Every business rule should have a test verifying correct behavior AND incorrect behavior
-
-### Smoke Tests
-- **Goal**: Every Service API method exercised at least once
-- **Current**: `Scenario.comprehensive()` covers all 40+ methods
-- **Maintenance**: When adding new Service methods, add to comprehensive scenario
-
-### HTTP Boundary Tests
-- **Goal**: Every HTTP endpoint covered with success and failure cases
-- **Current**: Core endpoints covered
-- **Focus**: Authentication, authorization, serialization, error codes
+---
 
 ## Test Principles
 
-1. **Business logic tests use fake integrations** - No real clock, no real IDs, no real notifications
-2. **Smoke tests verify backend compatibility** - Same behavior across InMemory, MySQL, DynamoDB
-3. **HTTP tests verify communication** - Headers, tokens, serialization, status codes
-4. **TestContext provides consistent API** - Same DSL works with different backends
-5. **Scenario exercises everything** - Comprehensive scenario is the smoke test specification
-6. **Tests are readable** - DSL makes tests read like specifications
-7. **Tests are isolated** - Each test creates its own context
-8. **Tests are fast** - Business logic tests run in milliseconds (no I/O)
+1. **Purpose drives design** - Each test type serves a clear audience and verification goal
+2. **Tests are self-documenting** - Test names and bodies read like specifications
+3. **Tests don't test implementation** - Verify behavior through public API, not internal structure
+4. **Business logic tests use fakes** - No real clock, no real IDs, no real notifications
+5. **Database tests verify compatibility** - Same behavior across InMemory, MySQL, DynamoDB
+6. **HTTP tests verify communication** - Headers, tokens, serialization, status codes
+7. **TestContext provides consistent API** - Same DSL works with different backends
+8. **Scenario exercises everything** - Comprehensive scenario is the smoke test specification
+9. **Tests are isolated** - Each test creates its own context
+10. **Tests are fast** - Business logic tests run in milliseconds (no I/O)
+
+---
+
+## Coverage Summary
+
+| Test Type | Purpose | Integration Level | Coverage | Tests |
+|-----------|---------|-------------------|----------|-------|
+| **Business Logic** | Verify features exist and work | None (all fakes) | Complete | 20 |
+| **HTTP Boundary** | Verify API contract | HTTP + InMemory | Complete | 48 |
+| **Database** | Verify backend compatibility | Real databases | Happy path | 3 |
+| **Frontend** | Verify UI works | Browser + HTTP | Planned | 0 |
+| **Total** | | | | **71** |
+
+This strategy ensures:
+- ✅ Features work correctly (product managers can verify via business logic tests)
+- ✅ API contract is correct (integration engineers can verify via HTTP tests)
+- ✅ Works with real databases (infrastructure engineers can verify via database tests)
+- ✅ Fast feedback (business logic tests run in milliseconds)
+- ✅ Confidence in deployment (database tests verify real integrations)
+
+---
+
+## Troubleshooting
+
+### MySQL tests fail with connection error
+- Ensure Docker is running
+- TestContainers will automatically start MySQL
+- Check Docker logs: `docker logs <container-id>`
+
+### DynamoDB tests fail
+- Ensure Docker is running
+- TestContainers will automatically start DynamoDB Local
+- Check Docker logs: `docker logs <container-id>`
+
+### HTTP tests fail with "address already in use"
+- Another test didn't clean up properly
+- Check that `@AfterEach` is stopping the server
+- Restart IDE/terminal to release port
+
+### Tests pass individually but fail when run together
+- Check for shared mutable state
+- Ensure each test creates its own `TestContext`
+- Verify `TestIntegrations` resets properly
+- Look for static state in fake implementations
+
+### TestContainers fails to start
+- Ensure Docker daemon is running
+- Check Docker resource limits (memory, CPU)
+- Try: `docker system prune` to clean up old containers
+- Check TestContainers logs in `build/test-results/test/`
+
+---
 
 ## Future Enhancements
 
 ### Potential additions:
-
-1. **Performance tests** - Measure throughput and latency under load
-2. **Concurrency tests** - Verify thread safety and race condition handling
-3. **Frontend tests** - Browser automation for UI workflows
-4. **API contract tests** - Verify frontend and backend agree on contract
-5. **Security tests** - Penetration testing, input validation fuzzing
-6. **Chaos tests** - Network failures, database failures, partial failures
-7. **Migration tests** - Verify data migrations don't break existing data
+1. **Frontend tests** - Browser automation for UI workflows
+2. **Performance tests** - Measure throughput and latency under load
+3. **Concurrency tests** - Verify thread safety and race condition handling
+4. **Security tests** - Penetration testing, input validation fuzzing
+5. **Chaos tests** - Network failures, database failures, partial failures
+6. **Migration tests** - Verify data migrations don't break existing data
 
 ### Test data builders:
 
@@ -564,42 +445,3 @@ val alice = context.userBuilder("alice")
     .withPassword("securepass123")
     .register()
 ```
-
-## Troubleshooting
-
-### MySQL tests fail with connection error
-- Ensure MySQL is running: `docker run -p 3306:3306 -e MYSQL_ROOT_PASSWORD=password mysql`
-- Check connection string in `MySQLDatabaseProvider`
-- Verify database credentials
-
-### DynamoDB tests fail
-- Ensure DynamoDB Local is running or AWS credentials are configured
-- Check endpoint configuration in `DynamoDBDatabaseProvider`
-
-### HTTP tests fail with "address already in use"
-- Another test didn't clean up properly
-- Check that `@AfterEach` is stopping the server
-- Use unique ports for each test class if needed
-
-### Tests pass individually but fail when run together
-- Check for shared mutable state
-- Ensure each test creates its own `TestContext`
-- Verify `TestIntegrations` resets properly
-
-## Summary
-
-The three-tier testing strategy provides comprehensive coverage:
-
-| Test Type | Purpose | Integration Level | Coverage Type |
-|-----------|---------|------------------|---------------|
-| **Business Logic** | Verify domain behavior | None (all fakes) | Complete (happy + errors) |
-| **Smoke** | Verify backend compatibility | Real databases | Happy path only |
-| **HTTP Boundary** | Verify communication | HTTP stack + InMemory DB | Complete (happy + errors) |
-
-This strategy ensures:
-- ✅ Business rules are correct (business logic tests)
-- ✅ All backends work identically (smoke tests)
-- ✅ HTTP layer works correctly (boundary tests)
-- ✅ Fast feedback (business logic tests run in milliseconds)
-- ✅ Confidence in deployment (smoke tests verify real integrations)
-- ✅ API contract verification (boundary tests)

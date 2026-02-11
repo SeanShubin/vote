@@ -40,7 +40,6 @@ class VotingWorkflowTest {
         assertEquals(3, election.candidates.size)
         assertTrue(election.candidates.containsAll(listOf("Kotlin", "Rust", "Go")))
 
-        // Verify event was created
         val candidateEvents = testContext.events.ofType<DomainEvent.CandidatesAdded>()
         assertEquals(1, candidateEvents.size)
         assertEquals("Best Programming Language", candidateEvents[0].electionName)
@@ -62,11 +61,9 @@ class VotingWorkflowTest {
         val tally = election.tally()
         assertEquals(2, tally.ballots.size)
 
-        // Verify events
         val ballotEvents = testContext.events.ofType<DomainEvent.BallotCast>()
         assertEquals(2, ballotEvents.size)
 
-        // Verify database
         val bobBallot = testContext.database.findBallot("bob", "Programming Language")
         assertEquals("bob", bobBallot.voterName)
 
@@ -106,33 +103,26 @@ class VotingWorkflowTest {
         val testContext = TestContext()
         val (alice, bob) = testContext.registerUsers("alice", "bob")
 
-        // Create election
         val election = alice.createElection("Favorite Color")
         assertEquals("alice", testContext.database.findElection("Favorite Color").ownerName)
 
-        // Add candidates
         election.setCandidates("Red", "Blue", "Green")
         assertEquals(3, election.candidates.size)
 
-        // Add eligible voters
         election.setEligibleVoters("bob")
         assertEquals(listOf("bob"), election.eligibleVoters)
 
-        // Launch election
         election.launch()
         val launchedElection = testContext.database.findElection("Favorite Color")
         assertTrue(launchedElection.allowVote)
 
-        // Cast ballot
         bob.castBallot(election, "Blue" to 1, "Red" to 2, "Green" to 3)
 
-        // Finalize election
         election.finalize()
         val finalizedElection = testContext.database.findElection("Favorite Color")
         assertEquals(false, finalizedElection.allowVote)
         assertEquals(false, finalizedElection.allowEdit)
 
-        // Verify all events occurred in order
         val events = testContext.events.all()
         assertTrue(events.any { it is DomainEvent.ElectionCreated })
         assertTrue(events.any { it is DomainEvent.CandidatesAdded })
@@ -169,7 +159,6 @@ class VotingWorkflowTest {
         val user = testContext.database.findUserOrNull("bob")
         assertEquals(null, user)
 
-        // Verify event was created
         val events = testContext.events.ofType<DomainEvent.UserRemoved>()
         assertEquals(1, events.size)
         assertEquals("bob", events[0].userName)
@@ -186,7 +175,6 @@ class VotingWorkflowTest {
 
         assertEquals(Role.ADMIN, testContext.database.findUser("bob").role)
 
-        // Verify event was created
         val events = testContext.events.ofType<DomainEvent.UserRoleChanged>()
         assertEquals(1, events.size)
         assertEquals("bob", events[0].userName)
@@ -205,7 +193,6 @@ class VotingWorkflowTest {
         val newHash = testContext.database.findUser("alice").hash
         assertTrue(oldHash != newHash, "Password hash should change")
 
-        // Verify event was created
         val events = testContext.events.ofType<DomainEvent.UserPasswordChanged>()
         assertEquals(1, events.size)
         assertEquals("alice", events[0].userName)
@@ -222,7 +209,6 @@ class VotingWorkflowTest {
         assertEquals("alice2", user.name)
         assertEquals("alice@example.com", user.email)
 
-        // Verify event was created
         val nameEvents = testContext.events.ofType<DomainEvent.UserNameChanged>()
         assertEquals(1, nameEvents.size)
         assertEquals("alice", nameEvents[0].oldUserName)
@@ -240,7 +226,6 @@ class VotingWorkflowTest {
         assertEquals("alice", user.name)
         assertEquals("alice-new@example.com", user.email)
 
-        // Verify event was created
         val emailEvents = testContext.events.ofType<DomainEvent.UserEmailChanged>()
         assertEquals(1, emailEvents.size)
         assertEquals("alice", emailEvents[0].userName)
@@ -263,7 +248,6 @@ class VotingWorkflowTest {
         val foundElection = testContext.database.findElectionOrNull("Test Election")
         assertEquals(null, foundElection)
 
-        // Verify event was created
         val events = testContext.events.ofType<DomainEvent.ElectionDeleted>()
         assertEquals(1, events.size)
         assertEquals("Test Election", events[0].electionName)
@@ -279,20 +263,17 @@ class VotingWorkflowTest {
         election.setEligibleVoters("bob")
         election.launch()
 
-        // Cast initial ballot
         bob.castBallot(election, "Kotlin" to 1, "Rust" to 2, "Go" to 3)
 
         val initialBallot = testContext.database.findBallot("bob", "Programming Language")
         val initialRankings = testContext.database.listRankings("bob", "Programming Language")
         assertEquals("Kotlin", initialRankings.first { it.rank == 1 }.candidateName)
 
-        // Update rankings
         election.updateRankings("bob", "Rust" to 1, "Kotlin" to 2, "Go" to 3)
 
         val updatedRankings = testContext.database.listRankings("bob", "Programming Language")
         assertEquals("Rust", updatedRankings.first { it.rank == 1 }.candidateName)
 
-        // Verify events - initial cast plus update
         val castEvents = testContext.events.ofType<DomainEvent.BallotCast>()
         assertTrue(castEvents.size >= 2, "Should have at least 2 ballot cast events")
     }
@@ -302,11 +283,9 @@ class VotingWorkflowTest {
         val testContext = TestContext()
         val alice = testContext.registerUser("alice", "alice@example.com", "password")
 
-        // Get refresh token from initial registration
         val tokens = testContext.backend.authenticate("alice", "password")
         val refreshToken = tokens.refreshToken
 
-        // Refresh to get new tokens
         val newTokens = testContext.backend.refresh(refreshToken)
 
         assertEquals("alice", newTokens.accessToken.userName)
@@ -319,7 +298,6 @@ class VotingWorkflowTest {
         val testContext = TestContext()
         val alice = testContext.registerUser("alice", "alice@example.com", "password")
 
-        // Use existing access token to get new tokens
         val newTokens = testContext.backend.authenticateWithToken(alice.accessToken)
 
         assertEquals("alice", newTokens.accessToken.userName)
@@ -340,11 +318,9 @@ class VotingWorkflowTest {
         val election = alice.createElection("Test Election")
         election.setCandidates("A", "B")
 
-        // Initially not secret ballot (default is false based on ElectionSummary defaults)
         val initialElection = testContext.database.findElection("Test Election")
-        assertEquals(true, initialElection.secretBallot) // Default is actually true
+        assertEquals(true, initialElection.secretBallot)
 
-        // Disable secret ballot
         val updates = com.seanshubin.vote.domain.ElectionUpdates(secretBallot = false)
         testContext.backend.updateElection(alice.accessToken, "Test Election", updates)
         testContext.backend.synchronize()
@@ -352,7 +328,6 @@ class VotingWorkflowTest {
         val updatedElection = testContext.database.findElection("Test Election")
         assertEquals(false, updatedElection.secretBallot)
 
-        // Verify event was created
         val events = testContext.events.ofType<DomainEvent.ElectionUpdated>()
         assertTrue(events.any { it.secretBallot == false })
     }
@@ -369,7 +344,6 @@ class VotingWorkflowTest {
         val oneHourLater = kotlinx.datetime.Instant.fromEpochMilliseconds(now.toEpochMilliseconds() + 3600000)
         val twoHoursLater = kotlinx.datetime.Instant.fromEpochMilliseconds(now.toEpochMilliseconds() + 7200000)
 
-        // Set voting window
         val updates = com.seanshubin.vote.domain.ElectionUpdates(
             noVotingBefore = oneHourLater,
             noVotingAfter = twoHoursLater
@@ -381,7 +355,6 @@ class VotingWorkflowTest {
         assertEquals(oneHourLater, updatedElection.noVotingBefore)
         assertEquals(twoHoursLater, updatedElection.noVotingAfter)
 
-        // Verify event was created
         val events = testContext.events.ofType<DomainEvent.ElectionUpdated>()
         assertTrue(events.any { it.noVotingBefore == oneHourLater && it.noVotingAfter == twoHoursLater })
     }
@@ -399,7 +372,6 @@ class VotingWorkflowTest {
         val election = alice.createElection("Test Election")
         election.setCandidates("A", "B")
 
-        // Set flags directly via updateElection
         val updates = com.seanshubin.vote.domain.ElectionUpdates(
             allowVote = true,
             allowEdit = false
@@ -411,7 +383,6 @@ class VotingWorkflowTest {
         assertEquals(true, updatedElection.allowVote)
         assertEquals(false, updatedElection.allowEdit)
 
-        // Verify event was created
         val events = testContext.events.ofType<DomainEvent.ElectionUpdated>()
         assertTrue(events.any { it.allowVote == true && it.allowEdit == false })
     }
@@ -420,10 +391,8 @@ class VotingWorkflowTest {
     fun `send login link by email triggers notification`() {
         val testContext = TestContext()
 
-        // Send login link
         testContext.backend.sendLoginLinkByEmail("user@example.com", "http://localhost:3000")
 
-        // Verify notification was sent
         val notifications = testContext.integrations.notifications as com.seanshubin.vote.integration.fake.FakeNotifications
         val sentMails = notifications.sentMails
         assertEquals(1, sentMails.size)
