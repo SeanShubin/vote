@@ -35,8 +35,8 @@ class CreateElectionPageRenderTest {
             val content = js("document.querySelector('#create-election-render-test')") as? Any
             assertTrue(content != null, "CreateElectionPage should render")
 
-            // Verify input field exists
-            val electionNameInput = js("document.querySelector('#create-election-render-test input[type=\"text\"]')") as? Any
+            // Verify input field exists - query by placeholder (how users identify fields)
+            val electionNameInput = js("document.querySelector('#create-election-render-test input[placeholder=\"Election Name\"]')") as? Any
             assertTrue(electionNameInput != null, "Election name input should exist")
         } finally {
             js("document.body.removeChild(root)")
@@ -68,18 +68,21 @@ class CreateElectionPageRenderTest {
             }
 
             // when - enter election name and click create button
+            // Query by placeholder (how users identify fields) instead of type
             js("""
-                var input = document.querySelector('#create-election-button-test input[type="text"]')
+                var input = document.querySelector('#create-election-button-test input[placeholder="Election Name"]')
                 input.value = 'Test Election'
                 input.dispatchEvent(new Event('input', { bubbles: true }))
             """)
             delay(100)
 
+            // Query button by text (how users identify it) instead of position
             js("""
-                var buttons = document.querySelectorAll('#create-election-button-test button')
-                if (buttons && buttons.length > 0) {
-                    buttons[0].click()
-                }
+                (function() {
+                    var buttons = Array.from(document.querySelectorAll('#create-election-button-test button'));
+                    var createButton = buttons.find(function(btn) { return btn.textContent.trim() === 'Create'; });
+                    if (createButton) createButton.click();
+                })()
             """)
             delay(200)
 
@@ -116,11 +119,13 @@ class CreateElectionPageRenderTest {
             }
 
             // when - click create button without entering election name
+            // Query button by text (how users identify it) instead of position
             js("""
-                var buttons = document.querySelectorAll('#create-election-empty-test button')
-                if (buttons && buttons.length > 0) {
-                    buttons[0].click()
-                }
+                (function() {
+                    var buttons = Array.from(document.querySelectorAll('#create-election-empty-test button'));
+                    var createButton = buttons.find(function(btn) { return btn.textContent.trim() === 'Create'; });
+                    if (createButton) createButton.click();
+                })()
             """)
             delay(200)
 

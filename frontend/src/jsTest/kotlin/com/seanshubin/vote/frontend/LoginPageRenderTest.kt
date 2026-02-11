@@ -51,9 +51,9 @@ class LoginPageRenderTest {
             val content = js("document.querySelector('#login-render-test')") as? Any
             assertTrue(content != null, "LoginPage should render")
 
-            // Verify input fields exist
-            val usernameInput = js("document.querySelector('#login-render-test input[type=\"text\"]')") as? Any
-            val passwordInput = js("document.querySelector('#login-render-test input[type=\"password\"]')") as? Any
+            // Verify input fields exist - query by placeholder (how users identify fields)
+            val usernameInput = js("document.querySelector('#login-render-test input[placeholder=\"Username\"]')") as? Any
+            val passwordInput = js("document.querySelector('#login-render-test input[placeholder=\"Password\"]')") as? Any
             assertTrue(usernameInput != null, "Username input should exist")
             assertTrue(passwordInput != null, "Password input should exist")
         } finally {
@@ -79,15 +79,15 @@ class LoginPageRenderTest {
                 )
             }
 
-            // Try to set input values
+            // Try to set input values - query by placeholder
             js("""
-                var usernameInput = document.querySelector('#login-diagnostic-test input[type="text"]')
+                var usernameInput = document.querySelector('#login-diagnostic-test input[placeholder="Username"]')
                 usernameInput.value = 'testuser'
             """)
 
             // Read back the value
             val readValue = js("""
-                var usernameInput = document.querySelector('#login-diagnostic-test input[type="text"]')
+                var usernameInput = document.querySelector('#login-diagnostic-test input[placeholder="Username"]')
                 usernameInput.value
             """) as? String
 
@@ -129,22 +129,23 @@ class LoginPageRenderTest {
             }
 
             // when - enter username and password, then press Enter in password field
+            // Query by placeholder (how users identify fields) instead of type
             js("""
-                var usernameInput = document.querySelector('#login-enter-password-test input[type="text"]')
+                var usernameInput = document.querySelector('#login-enter-password-test input[placeholder="Username"]')
                 usernameInput.value = 'alice'
                 usernameInput.dispatchEvent(new Event('input', { bubbles: true }))
             """)
             delay(100)
 
             js("""
-                var passwordInput = document.querySelector('#login-enter-password-test input[type="password"]')
+                var passwordInput = document.querySelector('#login-enter-password-test input[placeholder="Password"]')
                 passwordInput.value = 'password123'
                 passwordInput.dispatchEvent(new Event('input', { bubbles: true }))
             """)
             delay(100)
 
             js("""
-                var passwordInput = document.querySelector('#login-enter-password-test input[type="password"]')
+                var passwordInput = document.querySelector('#login-enter-password-test input[placeholder="Password"]')
                 var event = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })
                 passwordInput.dispatchEvent(event)
             """)
@@ -187,22 +188,23 @@ class LoginPageRenderTest {
             }
 
             // when - enter username and password, then press Enter in username field
+            // Query by placeholder (how users identify fields) instead of type
             js("""
-                var usernameInput = document.querySelector('#login-enter-username-test input[type="text"]')
+                var usernameInput = document.querySelector('#login-enter-username-test input[placeholder="Username"]')
                 usernameInput.value = 'bob'
                 usernameInput.dispatchEvent(new Event('input', { bubbles: true }))
             """)
             delay(100)
 
             js("""
-                var passwordInput = document.querySelector('#login-enter-username-test input[type="password"]')
+                var passwordInput = document.querySelector('#login-enter-username-test input[placeholder="Password"]')
                 passwordInput.value = 'securepass'
                 passwordInput.dispatchEvent(new Event('input', { bubbles: true }))
             """)
             delay(100)
 
             js("""
-                var usernameInput = document.querySelector('#login-enter-username-test input[type="text"]')
+                var usernameInput = document.querySelector('#login-enter-username-test input[placeholder="Username"]')
                 var event = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })
                 usernameInput.dispatchEvent(event)
             """)
@@ -245,25 +247,28 @@ class LoginPageRenderTest {
             }
 
             // when - enter username and password, then click login button
+            // Query by placeholder (how users identify fields) instead of type
             js("""
-                var usernameInput = document.querySelector('#login-button-click-test input[type="text"]')
+                var usernameInput = document.querySelector('#login-button-click-test input[placeholder="Username"]')
                 usernameInput.value = 'charlie'
                 usernameInput.dispatchEvent(new Event('input', { bubbles: true }))
             """)
             delay(100)
 
             js("""
-                var passwordInput = document.querySelector('#login-button-click-test input[type="password"]')
+                var passwordInput = document.querySelector('#login-button-click-test input[placeholder="Password"]')
                 passwordInput.value = 'mypassword'
                 passwordInput.dispatchEvent(new Event('input', { bubbles: true }))
             """)
             delay(100)
 
+            // Query button by text (how users identify it) instead of position
             js("""
-                var buttons = document.querySelectorAll('#login-button-click-test button')
-                if (buttons && buttons.length > 0) {
-                    buttons[0].click()
-                }
+                (function() {
+                    var buttons = Array.from(document.querySelectorAll('#login-button-click-test button'));
+                    var loginButton = buttons.find(function(btn) { return btn.textContent.trim() === 'Login'; });
+                    if (loginButton) loginButton.click();
+                })()
             """)
             delay(200)
 
@@ -310,25 +315,28 @@ class LoginPageRenderTest {
             }
 
             // when - enter username and password, then click login button
+            // Query by placeholder (how users identify fields) instead of type
             js("""
-                var usernameInput = document.querySelector('#login-callback-test input[type="text"]')
+                var usernameInput = document.querySelector('#login-callback-test input[placeholder="Username"]')
                 usernameInput.value = 'dave'
                 usernameInput.dispatchEvent(new Event('input', { bubbles: true }))
             """)
             delay(100)
 
             js("""
-                var passwordInput = document.querySelector('#login-callback-test input[type="password"]')
+                var passwordInput = document.querySelector('#login-callback-test input[placeholder="Password"]')
                 passwordInput.value = 'password'
                 passwordInput.dispatchEvent(new Event('input', { bubbles: true }))
             """)
             delay(100)
 
+            // Query button by text (how users identify it) instead of position
             js("""
-                var buttons = document.querySelectorAll('#login-callback-test button')
-                if (buttons && buttons.length > 0) {
-                    buttons[0].click()
-                }
+                (function() {
+                    var buttons = Array.from(document.querySelectorAll('#login-callback-test button'));
+                    var loginButton = buttons.find(function(btn) { return btn.textContent.trim() === 'Login'; });
+                    if (loginButton) loginButton.click();
+                })()
             """)
             delay(200)
 

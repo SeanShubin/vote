@@ -39,10 +39,10 @@ class RegisterPageRenderTest {
             val content = js("document.querySelector('#register-render-test')") as? Any
             assertTrue(content != null, "RegisterPage should render")
 
-            // Verify input fields exist
-            val usernameInput = js("document.querySelector('#register-render-test input[type=\"text\"]')") as? Any
-            val emailInput = js("document.querySelector('#register-render-test input[type=\"email\"]')") as? Any
-            val passwordInput = js("document.querySelector('#register-render-test input[type=\"password\"]')") as? Any
+            // Verify input fields exist - query by placeholder (how users identify fields)
+            val usernameInput = js("document.querySelector('#register-render-test input[placeholder=\"Username\"]')") as? Any
+            val emailInput = js("document.querySelector('#register-render-test input[placeholder=\"Email\"]')") as? Any
+            val passwordInput = js("document.querySelector('#register-render-test input[placeholder=\"Password\"]')") as? Any
             assertTrue(usernameInput != null, "Username input should exist")
             assertTrue(emailInput != null, "Email input should exist")
             assertTrue(passwordInput != null, "Password input should exist")
@@ -79,29 +79,30 @@ class RegisterPageRenderTest {
             }
 
             // when - enter username, email, and password, then press Enter in password field
+            // Query by placeholder (how users identify fields) instead of type
             js("""
-                var usernameInput = document.querySelector('#register-enter-password-test input[type="text"]')
+                var usernameInput = document.querySelector('#register-enter-password-test input[placeholder="Username"]')
                 usernameInput.value = 'alice'
                 usernameInput.dispatchEvent(new Event('input', { bubbles: true }))
             """)
             delay(100)
 
             js("""
-                var emailInput = document.querySelector('#register-enter-password-test input[type="email"]')
+                var emailInput = document.querySelector('#register-enter-password-test input[placeholder="Email"]')
                 emailInput.value = 'alice@example.com'
                 emailInput.dispatchEvent(new Event('input', { bubbles: true }))
             """)
             delay(100)
 
             js("""
-                var passwordInput = document.querySelector('#register-enter-password-test input[type="password"]')
+                var passwordInput = document.querySelector('#register-enter-password-test input[placeholder="Password"]')
                 passwordInput.value = 'password123'
                 passwordInput.dispatchEvent(new Event('input', { bubbles: true }))
             """)
             delay(100)
 
             js("""
-                var passwordInput = document.querySelector('#register-enter-password-test input[type="password"]')
+                var passwordInput = document.querySelector('#register-enter-password-test input[placeholder="Password"]')
                 var event = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })
                 passwordInput.dispatchEvent(event)
             """)
@@ -145,29 +146,30 @@ class RegisterPageRenderTest {
             }
 
             // when - enter username, email, and password, then press Enter in email field
+            // Query by placeholder (how users identify fields) instead of type
             js("""
-                var usernameInput = document.querySelector('#register-enter-email-test input[type="text"]')
+                var usernameInput = document.querySelector('#register-enter-email-test input[placeholder="Username"]')
                 usernameInput.value = 'bob'
                 usernameInput.dispatchEvent(new Event('input', { bubbles: true }))
             """)
             delay(100)
 
             js("""
-                var emailInput = document.querySelector('#register-enter-email-test input[type="email"]')
+                var emailInput = document.querySelector('#register-enter-email-test input[placeholder="Email"]')
                 emailInput.value = 'bob@example.com'
                 emailInput.dispatchEvent(new Event('input', { bubbles: true }))
             """)
             delay(100)
 
             js("""
-                var passwordInput = document.querySelector('#register-enter-email-test input[type="password"]')
+                var passwordInput = document.querySelector('#register-enter-email-test input[placeholder="Password"]')
                 passwordInput.value = 'securepass'
                 passwordInput.dispatchEvent(new Event('input', { bubbles: true }))
             """)
             delay(100)
 
             js("""
-                var emailInput = document.querySelector('#register-enter-email-test input[type="email"]')
+                var emailInput = document.querySelector('#register-enter-email-test input[placeholder="Email"]')
                 var event = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })
                 emailInput.dispatchEvent(event)
             """)
@@ -211,32 +213,35 @@ class RegisterPageRenderTest {
             }
 
             // when - enter username, email, and password, then click register button
+            // Query by placeholder (how users identify fields) instead of type
             js("""
-                var usernameInput = document.querySelector('#register-button-click-test input[type="text"]')
+                var usernameInput = document.querySelector('#register-button-click-test input[placeholder="Username"]')
                 usernameInput.value = 'charlie'
                 usernameInput.dispatchEvent(new Event('input', { bubbles: true }))
             """)
             delay(100)
 
             js("""
-                var emailInput = document.querySelector('#register-button-click-test input[type="email"]')
+                var emailInput = document.querySelector('#register-button-click-test input[placeholder="Email"]')
                 emailInput.value = 'charlie@example.com'
                 emailInput.dispatchEvent(new Event('input', { bubbles: true }))
             """)
             delay(100)
 
             js("""
-                var passwordInput = document.querySelector('#register-button-click-test input[type="password"]')
+                var passwordInput = document.querySelector('#register-button-click-test input[placeholder="Password"]')
                 passwordInput.value = 'mypassword'
                 passwordInput.dispatchEvent(new Event('input', { bubbles: true }))
             """)
             delay(100)
 
+            // Query button by text (how users identify it) instead of position
             js("""
-                var buttons = document.querySelectorAll('#register-button-click-test button')
-                if (buttons && buttons.length > 0) {
-                    buttons[0].click()
-                }
+                (function() {
+                    var buttons = Array.from(document.querySelectorAll('#register-button-click-test button'));
+                    var registerButton = buttons.find(function(btn) { return btn.textContent.trim() === 'Register'; });
+                    if (registerButton) registerButton.click();
+                })()
             """)
             delay(200)
 
@@ -284,32 +289,35 @@ class RegisterPageRenderTest {
             }
 
             // when - enter username, email, and password, then click register button
+            // Query by placeholder (how users identify fields) instead of type
             js("""
-                var usernameInput = document.querySelector('#register-callback-test input[type="text"]')
+                var usernameInput = document.querySelector('#register-callback-test input[placeholder="Username"]')
                 usernameInput.value = 'dave'
                 usernameInput.dispatchEvent(new Event('input', { bubbles: true }))
             """)
             delay(100)
 
             js("""
-                var emailInput = document.querySelector('#register-callback-test input[type="email"]')
+                var emailInput = document.querySelector('#register-callback-test input[placeholder="Email"]')
                 emailInput.value = 'dave@example.com'
                 emailInput.dispatchEvent(new Event('input', { bubbles: true }))
             """)
             delay(100)
 
             js("""
-                var passwordInput = document.querySelector('#register-callback-test input[type="password"]')
+                var passwordInput = document.querySelector('#register-callback-test input[placeholder="Password"]')
                 passwordInput.value = 'password'
                 passwordInput.dispatchEvent(new Event('input', { bubbles: true }))
             """)
             delay(100)
 
+            // Query button by text (how users identify it) instead of position
             js("""
-                var buttons = document.querySelectorAll('#register-callback-test button')
-                if (buttons && buttons.length > 0) {
-                    buttons[0].click()
-                }
+                (function() {
+                    var buttons = Array.from(document.querySelectorAll('#register-callback-test button'));
+                    var registerButton = buttons.find(function(btn) { return btn.textContent.trim() === 'Register'; });
+                    if (registerButton) registerButton.click();
+                })()
             """)
             delay(200)
 
