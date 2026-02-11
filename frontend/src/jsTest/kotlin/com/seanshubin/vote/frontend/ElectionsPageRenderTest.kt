@@ -13,15 +13,11 @@ class ElectionsPageRenderTest {
     fun electionsPageRendersWithLoadingState() = runTest {
         // given
         val fakeClient = FakeApiClient()
-        // Make listElections slow to keep loading state visible
         fakeClient.listElectionsResult = Result.success(emptyList())
 
         val testId = "elections-render-test"
-        val root = js("document.createElement('div')")
-        js("root.id = 'elections-render-test'")
-        js("document.body.appendChild(root)")
 
-        try {
+        ComposeTestHelper.createTestRoot(testId).use {
             // when
             renderComposable(rootElementId = testId) {
                 ElectionsPage(
@@ -32,15 +28,11 @@ class ElectionsPageRenderTest {
                 )
             }
 
-            // then - verify it rendered
-            val content = js("document.querySelector('#elections-render-test')") as? Any
-            assertTrue(content != null, "ElectionsPage should render")
-
-            // Verify heading exists
-            val heading = js("document.querySelector('#elections-render-test h1')") as? Any
-            assertTrue(heading != null, "Heading should exist")
-        } finally {
-            js("document.body.removeChild(root)")
+            // then - verify it rendered with heading
+            assertTrue(
+                ComposeTestHelper.elementExists(testId, "h1"),
+                "Heading should exist"
+            )
         }
     }
 
@@ -55,11 +47,8 @@ class ElectionsPageRenderTest {
         fakeClient.listElectionsResult = Result.success(elections)
 
         val testId = "elections-list-test"
-        val root = js("document.createElement('div')")
-        js("root.id = 'elections-list-test'")
-        js("document.body.appendChild(root)")
 
-        try {
+        ComposeTestHelper.createTestRoot(testId).use {
             renderComposable(rootElementId = testId) {
                 ElectionsPage(
                     apiClient = fakeClient,
@@ -72,14 +61,13 @@ class ElectionsPageRenderTest {
             // Wait for LaunchedEffect to complete
             delay(500)
 
-            // then - verify elections are rendered (check for election names in text)
-            val content = js("document.querySelector('#elections-list-test')") as? Any
-            assertTrue(content != null, "ElectionsPage should render")
-
+            // then - verify it rendered
             // Note: LaunchedEffect execution in tests is not guaranteed without special setup
             // This test verifies rendering, but LaunchedEffect may not execute in test environment
-        } finally {
-            js("document.body.removeChild(root)")
+            assertTrue(
+                ComposeTestHelper.elementExists(testId, "h1"),
+                "Heading should exist"
+            )
         }
     }
 }

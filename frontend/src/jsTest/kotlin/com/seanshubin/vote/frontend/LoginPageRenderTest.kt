@@ -4,7 +4,6 @@ import com.seanshubin.vote.contract.AccessToken
 import com.seanshubin.vote.contract.RefreshToken
 import com.seanshubin.vote.contract.Tokens
 import com.seanshubin.vote.domain.Role
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runTest
 import org.jetbrains.compose.web.renderComposable
 import kotlin.test.Test
@@ -16,13 +15,13 @@ import kotlin.test.assertTrue
  * Testing LoginPage by rendering and simulating interactions.
  *
  * Pattern demonstrated:
- * 1. Create root element dynamically
+ * 1. Create test root with ComposeTestHelper
  * 2. Render composable with fake dependencies
- * 3. Query rendered DOM
- * 4. Simulate user interactions (typing, clicking, keyboard events)
- * 5. Verify state changes and API calls
+ * 3. Interact with UI using ComposeTestHelper utilities (no raw JavaScript)
+ * 4. Verify state changes and API calls
  *
- * This follows the React @testing-library pattern with createTester factory.
+ * ComposeTestHelper eliminates the need to write JavaScript in tests,
+ * making them easier to write, read, and maintain.
  */
 class LoginPageRenderTest {
 
@@ -31,46 +30,9 @@ class LoginPageRenderTest {
         // given
         val fakeClient = FakeApiClient()
         val testId = "login-render-test"
-        val root = js("document.createElement('div')")
-        js("root.id = 'login-render-test'")
-        js("document.body.appendChild(root)")
 
-        var loginSuccessCalled = false
-
-        try {
+        ComposeTestHelper.createTestRoot(testId).use {
             // when
-            renderComposable(rootElementId = testId) {
-                LoginPage(
-                    apiClient = fakeClient,
-                    onLoginSuccess = { _, _ -> loginSuccessCalled = true },
-                    onNavigateToRegister = { }
-                )
-            }
-
-            // then - verify it rendered
-            val content = js("document.querySelector('#login-render-test')") as? Any
-            assertTrue(content != null, "LoginPage should render")
-
-            // Verify input fields exist - query by placeholder (how users identify fields)
-            val usernameInput = js("document.querySelector('#login-render-test input[placeholder=\"Username\"]')") as? Any
-            val passwordInput = js("document.querySelector('#login-render-test input[placeholder=\"Password\"]')") as? Any
-            assertTrue(usernameInput != null, "Username input should exist")
-            assertTrue(passwordInput != null, "Password input should exist")
-        } finally {
-            js("document.body.removeChild(root)")
-        }
-    }
-
-    @Test
-    fun loginPageInputsCanBeSet() = runTest {
-        // Diagnostic test: can we set input values and read them back?
-        val fakeClient = FakeApiClient()
-        val testId = "login-diagnostic-test"
-        val root = js("document.createElement('div')")
-        js("root.id = 'login-diagnostic-test'")
-        js("document.body.appendChild(root)")
-
-        try {
             renderComposable(rootElementId = testId) {
                 LoginPage(
                     apiClient = fakeClient,
@@ -79,13 +41,37 @@ class LoginPageRenderTest {
                 )
             }
 
-            // Try to set input values - query by placeholder
-            js("""
-                var usernameInput = document.querySelector('#login-diagnostic-test input[placeholder="Username"]')
-                usernameInput.value = 'testuser'
-            """)
+            // then - verify it rendered with expected input fields
+            assertTrue(
+                ComposeTestHelper.inputExistsByPlaceholder(testId, "Username"),
+                "Username input should exist"
+            )
+            assertTrue(
+                ComposeTestHelper.inputExistsByPlaceholder(testId, "Password"),
+                "Password input should exist"
+            )
+        }
+    }
 
-            // Read back the value
+    @Test
+    fun loginPageInputsCanBeSet() = runTest {
+        // Diagnostic test: can we set input values and read them back?
+        val fakeClient = FakeApiClient()
+        val testId = "login-diagnostic-test"
+
+        ComposeTestHelper.createTestRoot(testId).use {
+            renderComposable(rootElementId = testId) {
+                LoginPage(
+                    apiClient = fakeClient,
+                    onLoginSuccess = { _, _ -> },
+                    onNavigateToRegister = { }
+                )
+            }
+
+            // Set input value using helper
+            ComposeTestHelper.setInputByPlaceholder(testId, "Username", "testuser")
+
+            // Read back the value to verify it was set
             val readValue = js("""
                 var usernameInput = document.querySelector('#login-diagnostic-test input[placeholder="Username"]')
                 usernameInput.value
@@ -93,13 +79,8 @@ class LoginPageRenderTest {
 
             println("DEBUG: Input value after setting: $readValue")
             assertEquals("testuser", readValue, "Input value should be readable")
-        } finally {
-            js("document.body.removeChild(root)")
         }
     }
-
-    // UPDATE: Experimental tests show Compose DOES respond to DOM events!
-    // Re-enabling tests to see why they originally failed.
 
     @Test
     fun loginPageEnterKeyInPasswordFieldTriggersAuthentication() = runTest {
@@ -112,51 +93,26 @@ class LoginPageRenderTest {
         fakeClient.authenticateResult = Result.success(expectedTokens)
 
         val testId = "login-enter-password-test"
-        val root = js("document.createElement('div')")
-        js("root.id = 'login-enter-password-test'")
-        js("document.body.appendChild(root)")
 
-        var loginSuccessCalled = false
-
-        try {
+        ComposeTestHelper.createTestRoot(testId).use {
             renderComposable(rootElementId = testId) {
                 LoginPage(
                     apiClient = fakeClient,
-                    onLoginSuccess = { _, _ -> loginSuccessCalled = true },
+                    onLoginSuccess = { _, _ -> },
                     onNavigateToRegister = { },
                     coroutineScope = this@runTest
                 )
             }
 
             // when - enter username and password, then press Enter in password field
-            // Query by placeholder (how users identify fields) instead of type
-            js("""
-                var usernameInput = document.querySelector('#login-enter-password-test input[placeholder="Username"]')
-                usernameInput.value = 'alice'
-                usernameInput.dispatchEvent(new Event('input', { bubbles: true }))
-            """)
-            delay(100)
-
-            js("""
-                var passwordInput = document.querySelector('#login-enter-password-test input[placeholder="Password"]')
-                passwordInput.value = 'password123'
-                passwordInput.dispatchEvent(new Event('input', { bubbles: true }))
-            """)
-            delay(100)
-
-            js("""
-                var passwordInput = document.querySelector('#login-enter-password-test input[placeholder="Password"]')
-                var event = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })
-                passwordInput.dispatchEvent(event)
-            """)
-            delay(200)
+            ComposeTestHelper.setInputByPlaceholder(testId, "Username", "alice")
+            ComposeTestHelper.setInputByPlaceholder(testId, "Password", "password123")
+            ComposeTestHelper.pressEnterInInput(testId, "Password")
 
             // then
             assertEquals(1, fakeClient.authenticateCalls.size, "Expected 1 authenticate call but got ${fakeClient.authenticateCalls.size}")
             assertEquals("alice", fakeClient.authenticateCalls[0].userName)
             assertEquals("password123", fakeClient.authenticateCalls[0].password)
-        } finally {
-            js("document.body.removeChild(root)")
         }
     }
 
@@ -171,51 +127,26 @@ class LoginPageRenderTest {
         fakeClient.authenticateResult = Result.success(expectedTokens)
 
         val testId = "login-enter-username-test"
-        val root = js("document.createElement('div')")
-        js("root.id = 'login-enter-username-test'")
-        js("document.body.appendChild(root)")
 
-        var loginSuccessCalled = false
-
-        try {
+        ComposeTestHelper.createTestRoot(testId).use {
             renderComposable(rootElementId = testId) {
                 LoginPage(
                     apiClient = fakeClient,
-                    onLoginSuccess = { _, _ -> loginSuccessCalled = true },
+                    onLoginSuccess = { _, _ -> },
                     onNavigateToRegister = { },
                     coroutineScope = this@runTest
                 )
             }
 
             // when - enter username and password, then press Enter in username field
-            // Query by placeholder (how users identify fields) instead of type
-            js("""
-                var usernameInput = document.querySelector('#login-enter-username-test input[placeholder="Username"]')
-                usernameInput.value = 'bob'
-                usernameInput.dispatchEvent(new Event('input', { bubbles: true }))
-            """)
-            delay(100)
-
-            js("""
-                var passwordInput = document.querySelector('#login-enter-username-test input[placeholder="Password"]')
-                passwordInput.value = 'securepass'
-                passwordInput.dispatchEvent(new Event('input', { bubbles: true }))
-            """)
-            delay(100)
-
-            js("""
-                var usernameInput = document.querySelector('#login-enter-username-test input[placeholder="Username"]')
-                var event = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })
-                usernameInput.dispatchEvent(event)
-            """)
-            delay(200)
+            ComposeTestHelper.setInputByPlaceholder(testId, "Username", "bob")
+            ComposeTestHelper.setInputByPlaceholder(testId, "Password", "securepass")
+            ComposeTestHelper.pressEnterInInput(testId, "Username")
 
             // then
             assertEquals(1, fakeClient.authenticateCalls.size, "Expected 1 authenticate call but got ${fakeClient.authenticateCalls.size}")
             assertEquals("bob", fakeClient.authenticateCalls[0].userName)
             assertEquals("securepass", fakeClient.authenticateCalls[0].password)
-        } finally {
-            js("document.body.removeChild(root)")
         }
     }
 
@@ -230,54 +161,26 @@ class LoginPageRenderTest {
         fakeClient.authenticateResult = Result.success(expectedTokens)
 
         val testId = "login-button-click-test"
-        val root = js("document.createElement('div')")
-        js("root.id = 'login-button-click-test'")
-        js("document.body.appendChild(root)")
 
-        var loginSuccessCalled = false
-
-        try {
+        ComposeTestHelper.createTestRoot(testId).use {
             renderComposable(rootElementId = testId) {
                 LoginPage(
                     apiClient = fakeClient,
-                    onLoginSuccess = { _, _ -> loginSuccessCalled = true },
+                    onLoginSuccess = { _, _ -> },
                     onNavigateToRegister = { },
                     coroutineScope = this@runTest
                 )
             }
 
             // when - enter username and password, then click login button
-            // Query by placeholder (how users identify fields) instead of type
-            js("""
-                var usernameInput = document.querySelector('#login-button-click-test input[placeholder="Username"]')
-                usernameInput.value = 'charlie'
-                usernameInput.dispatchEvent(new Event('input', { bubbles: true }))
-            """)
-            delay(100)
-
-            js("""
-                var passwordInput = document.querySelector('#login-button-click-test input[placeholder="Password"]')
-                passwordInput.value = 'mypassword'
-                passwordInput.dispatchEvent(new Event('input', { bubbles: true }))
-            """)
-            delay(100)
-
-            // Query button by text (how users identify it) instead of position
-            js("""
-                (function() {
-                    var buttons = Array.from(document.querySelectorAll('#login-button-click-test button'));
-                    var loginButton = buttons.find(function(btn) { return btn.textContent.trim() === 'Login'; });
-                    if (loginButton) loginButton.click();
-                })()
-            """)
-            delay(200)
+            ComposeTestHelper.setInputByPlaceholder(testId, "Username", "charlie")
+            ComposeTestHelper.setInputByPlaceholder(testId, "Password", "mypassword")
+            ComposeTestHelper.clickButtonByText(testId, "Login")
 
             // then
             assertEquals(1, fakeClient.authenticateCalls.size, "Expected 1 authenticate call but got ${fakeClient.authenticateCalls.size}")
             assertEquals("charlie", fakeClient.authenticateCalls[0].userName)
             assertEquals("mypassword", fakeClient.authenticateCalls[0].password)
-        } finally {
-            js("document.body.removeChild(root)")
         }
     }
 
@@ -292,15 +195,12 @@ class LoginPageRenderTest {
         fakeClient.authenticateResult = Result.success(expectedTokens)
 
         val testId = "login-callback-test"
-        val root = js("document.createElement('div')")
-        js("root.id = 'login-callback-test'")
-        js("document.body.appendChild(root)")
 
         var loginSuccessCalled = false
         var capturedToken: String? = null
         var capturedUserName: String? = null
 
-        try {
+        ComposeTestHelper.createTestRoot(testId).use {
             renderComposable(rootElementId = testId) {
                 LoginPage(
                     apiClient = fakeClient,
@@ -315,37 +215,14 @@ class LoginPageRenderTest {
             }
 
             // when - enter username and password, then click login button
-            // Query by placeholder (how users identify fields) instead of type
-            js("""
-                var usernameInput = document.querySelector('#login-callback-test input[placeholder="Username"]')
-                usernameInput.value = 'dave'
-                usernameInput.dispatchEvent(new Event('input', { bubbles: true }))
-            """)
-            delay(100)
-
-            js("""
-                var passwordInput = document.querySelector('#login-callback-test input[placeholder="Password"]')
-                passwordInput.value = 'password'
-                passwordInput.dispatchEvent(new Event('input', { bubbles: true }))
-            """)
-            delay(100)
-
-            // Query button by text (how users identify it) instead of position
-            js("""
-                (function() {
-                    var buttons = Array.from(document.querySelectorAll('#login-callback-test button'));
-                    var loginButton = buttons.find(function(btn) { return btn.textContent.trim() === 'Login'; });
-                    if (loginButton) loginButton.click();
-                })()
-            """)
-            delay(200)
+            ComposeTestHelper.setInputByPlaceholder(testId, "Username", "dave")
+            ComposeTestHelper.setInputByPlaceholder(testId, "Password", "password")
+            ComposeTestHelper.clickButtonByText(testId, "Login")
 
             // then
             assertTrue(loginSuccessCalled, "Login success callback should be invoked")
             assertEquals("dave", capturedUserName)
             assertNotNull(capturedToken)
-        } finally {
-            js("document.body.removeChild(root)")
         }
     }
 }

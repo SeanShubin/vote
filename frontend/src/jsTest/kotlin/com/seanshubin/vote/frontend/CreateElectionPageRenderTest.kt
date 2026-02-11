@@ -1,6 +1,5 @@
 package com.seanshubin.vote.frontend
 
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runTest
 import org.jetbrains.compose.web.renderComposable
 import kotlin.test.Test
@@ -14,32 +13,23 @@ class CreateElectionPageRenderTest {
         // given
         val fakeClient = FakeApiClient()
         val testId = "create-election-render-test"
-        val root = js("document.createElement('div')")
-        js("root.id = 'create-election-render-test'")
-        js("document.body.appendChild(root)")
 
-        var electionCreatedCalled = false
-
-        try {
+        ComposeTestHelper.createTestRoot(testId).use {
             // when
             renderComposable(rootElementId = testId) {
                 CreateElectionPage(
                     apiClient = fakeClient,
                     authToken = "test-token",
-                    onElectionCreated = { electionCreatedCalled = true },
+                    onElectionCreated = { },
                     onBack = { }
                 )
             }
 
-            // then - verify it rendered
-            val content = js("document.querySelector('#create-election-render-test')") as? Any
-            assertTrue(content != null, "CreateElectionPage should render")
-
-            // Verify input field exists - query by placeholder (how users identify fields)
-            val electionNameInput = js("document.querySelector('#create-election-render-test input[placeholder=\"Election Name\"]')") as? Any
-            assertTrue(electionNameInput != null, "Election name input should exist")
-        } finally {
-            js("document.body.removeChild(root)")
+            // then - verify it rendered with expected input field
+            assertTrue(
+                ComposeTestHelper.inputExistsByPlaceholder(testId, "Election Name"),
+                "Election name input should exist"
+            )
         }
     }
 
@@ -50,13 +40,10 @@ class CreateElectionPageRenderTest {
         fakeClient.createElectionResult = Result.success("Test Election")
 
         val testId = "create-election-button-test"
-        val root = js("document.createElement('div')")
-        js("root.id = 'create-election-button-test'")
-        js("document.body.appendChild(root)")
 
         var capturedElectionName: String? = null
 
-        try {
+        ComposeTestHelper.createTestRoot(testId).use {
             renderComposable(rootElementId = testId) {
                 CreateElectionPage(
                     apiClient = fakeClient,
@@ -68,31 +55,14 @@ class CreateElectionPageRenderTest {
             }
 
             // when - enter election name and click create button
-            // Query by placeholder (how users identify fields) instead of type
-            js("""
-                var input = document.querySelector('#create-election-button-test input[placeholder="Election Name"]')
-                input.value = 'Test Election'
-                input.dispatchEvent(new Event('input', { bubbles: true }))
-            """)
-            delay(100)
-
-            // Query button by text (how users identify it) instead of position
-            js("""
-                (function() {
-                    var buttons = Array.from(document.querySelectorAll('#create-election-button-test button'));
-                    var createButton = buttons.find(function(btn) { return btn.textContent.trim() === 'Create'; });
-                    if (createButton) createButton.click();
-                })()
-            """)
-            delay(200)
+            ComposeTestHelper.setInputByPlaceholder(testId, "Election Name", "Test Election")
+            ComposeTestHelper.clickButtonByText(testId, "Create")
 
             // then
             assertEquals(1, fakeClient.createElectionCalls.size, "Expected 1 createElection call but got ${fakeClient.createElectionCalls.size}")
             assertEquals("test-token", fakeClient.createElectionCalls[0].authToken)
             assertEquals("Test Election", fakeClient.createElectionCalls[0].electionName)
             assertEquals("Test Election", capturedElectionName)
-        } finally {
-            js("document.body.removeChild(root)")
         }
     }
 
@@ -103,11 +73,8 @@ class CreateElectionPageRenderTest {
         fakeClient.createElectionResult = Result.success("Test Election")
 
         val testId = "create-election-empty-test"
-        val root = js("document.createElement('div')")
-        js("root.id = 'create-election-empty-test'")
-        js("document.body.appendChild(root)")
 
-        try {
+        ComposeTestHelper.createTestRoot(testId).use {
             renderComposable(rootElementId = testId) {
                 CreateElectionPage(
                     apiClient = fakeClient,
@@ -119,20 +86,10 @@ class CreateElectionPageRenderTest {
             }
 
             // when - click create button without entering election name
-            // Query button by text (how users identify it) instead of position
-            js("""
-                (function() {
-                    var buttons = Array.from(document.querySelectorAll('#create-election-empty-test button'));
-                    var createButton = buttons.find(function(btn) { return btn.textContent.trim() === 'Create'; });
-                    if (createButton) createButton.click();
-                })()
-            """)
-            delay(200)
+            ComposeTestHelper.clickButtonByText(testId, "Create")
 
             // then - should not call createElection
             assertEquals(0, fakeClient.createElectionCalls.size, "Should not create election with empty name")
-        } finally {
-            js("document.body.removeChild(root)")
         }
     }
 }
