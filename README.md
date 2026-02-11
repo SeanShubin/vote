@@ -39,7 +39,7 @@ Tests are organized by concern and can be run independently:
 # Backend unit tests (71 tests) - InMemory backend, fast
 ./gradlew :backend:test
 
-# Frontend tests (32 tests) - FakeApiClient, no browser needed
+# Frontend tests (38 tests) - FakeApiClient, no browser needed
 ./gradlew :frontend:jsTest
 
 # Integration tests (48 tests) - HTTP API boundary tests
@@ -51,9 +51,11 @@ Tests are organized by concern and can be run independently:
 
 **Test organization**:
 - `backend/src/test/kotlin/` - Business logic tests using InMemory backend
-- `frontend/src/jsTest/kotlin/` - Frontend behavior tests with FakeApiClient
+- `frontend/src/jsTest/kotlin/` - Frontend tests with FakeApiClient (includes UI interaction tests)
 - `integration/src/test/kotlin/` - HTTP API tests with real backend
 - All tests are self-documenting with descriptive names
+
+See `frontend-testing-root-cause-found.md` for technical details on testing Compose for Web.
 
 **Test philosophy**: Tests use injected interfaces (fake I/O boundaries) rather than mocking internal collaborators. This enables fast, reliable, complete test coverage without heavyweight dependencies.
 
