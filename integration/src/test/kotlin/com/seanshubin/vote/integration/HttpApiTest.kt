@@ -31,7 +31,7 @@ import kotlin.test.assertTrue
  * - API contracts
  */
 class HttpApiTest {
-    private lateinit var app: ApplicationDependencies
+    private lateinit var runner: com.seanshubin.vote.backend.dependencies.ApplicationRunner
     private lateinit var httpClient: HttpClient
     private val json = Json { ignoreUnknownKeys = true }
     private val port = 9876 // Use non-standard port for tests
@@ -39,15 +39,19 @@ class HttpApiTest {
 
     @BeforeEach
     fun startServer() {
-        // Start embedded Jetty server with in-memory database
-        app = ApplicationDependencies(
+        // Use staged dependency injection pattern
+        val integrations = TestIntegrations()
+
+        val configuration = com.seanshubin.vote.backend.dependencies.Configuration(
             port = port,
-            databaseConfig = DatabaseConfig.InMemory,
-            integrations = TestIntegrations()
+            databaseConfig = DatabaseConfig.InMemory
         )
 
+        val appDeps = ApplicationDependencies(integrations, configuration)
+        runner = appDeps.runner
+
         // Start server without blocking
-        app.startNonBlocking()
+        runner.startNonBlocking()
 
         // Wait for server to be ready
         httpClient = HttpClient.newBuilder().build()
@@ -68,7 +72,7 @@ class HttpApiTest {
 
     @AfterEach
     fun stopServer() {
-        app.stop()
+        runner.stop()
     }
 
     // ========== Helper Methods ==========

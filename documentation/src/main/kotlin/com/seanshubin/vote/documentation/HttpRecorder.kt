@@ -25,19 +25,25 @@ class HttpRecorder(private val documentationRecorder: DocumentationRecorder? = n
     private val exchanges = mutableListOf<HttpExchange>()
     private val json = Json { ignoreUnknownKeys = true; prettyPrint = true }
     private val compactJson = Json { ignoreUnknownKeys = true; prettyPrint = false }  // For headers
-    private lateinit var app: ApplicationDependencies
+    private lateinit var runner: com.seanshubin.vote.backend.dependencies.ApplicationRunner
     private lateinit var httpClient: HttpClient
     private val port = 19876
     private val baseUrl = "http://localhost:$port"
     private var lastEventIndex = 0L
 
     fun startServer() {
-        app = ApplicationDependencies(
+        // Use staged dependency injection pattern
+        val integrations = TestIntegrations()
+
+        val configuration = com.seanshubin.vote.backend.dependencies.Configuration(
             port = port,
-            databaseConfig = DatabaseConfig.InMemory,
-            integrations = TestIntegrations()
+            databaseConfig = DatabaseConfig.InMemory
         )
-        app.startNonBlocking()
+
+        val appDeps = ApplicationDependencies(integrations, configuration)
+        runner = appDeps.runner
+
+        runner.startNonBlocking()
         httpClient = HttpClient.newBuilder().build()
 
         // Wait for server ready
@@ -57,7 +63,7 @@ class HttpRecorder(private val documentationRecorder: DocumentationRecorder? = n
     }
 
     fun stopServer() {
-        app.stop()
+        runner.stop()
     }
 
     fun getExchanges(): List<HttpExchange> = exchanges.toList()
@@ -131,7 +137,7 @@ class HttpRecorder(private val documentationRecorder: DocumentationRecorder? = n
 
     private fun captureNewEvents() {
         documentationRecorder?.let { recorder ->
-            val eventLog = app.getEventLog()
+            val eventLog = runner.getEventLog()
             val newEvents = eventLog.eventsToSync(lastEventIndex)
             for (envelope in newEvents) {
                 recorder.recordEvent(envelope)
