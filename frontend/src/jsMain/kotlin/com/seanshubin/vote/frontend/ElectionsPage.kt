@@ -3,6 +3,7 @@ package com.seanshubin.vote.frontend
 import androidx.compose.runtime.*
 import com.seanshubin.vote.contract.ApiClient
 import com.seanshubin.vote.domain.ElectionSummary
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.web.dom.*
 
@@ -11,12 +12,12 @@ fun ElectionsPage(
     apiClient: ApiClient,
     authToken: String,
     onSelectElection: (String) -> Unit,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    coroutineScope: CoroutineScope = rememberCoroutineScope()
 ) {
     var elections by remember { mutableStateOf<List<ElectionSummary>>(emptyList()) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var isLoading by remember { mutableStateOf(true) }
-    val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
         try {

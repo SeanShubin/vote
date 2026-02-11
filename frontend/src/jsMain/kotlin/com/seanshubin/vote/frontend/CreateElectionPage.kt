@@ -2,6 +2,7 @@ package com.seanshubin.vote.frontend
 
 import androidx.compose.runtime.*
 import com.seanshubin.vote.contract.ApiClient
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.web.attributes.*
 import org.jetbrains.compose.web.dom.*
@@ -11,12 +12,12 @@ fun CreateElectionPage(
     apiClient: ApiClient,
     authToken: String,
     onElectionCreated: (String) -> Unit,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    coroutineScope: CoroutineScope = rememberCoroutineScope()
 ) {
     var electionName by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var isLoading by remember { mutableStateOf(false) }
-    val scope = rememberCoroutineScope()
 
     Div({ classes("container") }) {
         H1 { Text("Create Election") }
@@ -39,7 +40,7 @@ fun CreateElectionPage(
                     if (!isLoading && electionName.isNotBlank()) {
                         isLoading = true
                         errorMessage = null
-                        scope.launch {
+                        coroutineScope.launch {
                             try {
                                 apiClient.createElection(authToken, electionName)
                                 onElectionCreated(electionName)

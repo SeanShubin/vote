@@ -3,6 +3,7 @@ package com.seanshubin.vote.frontend
 import androidx.compose.runtime.*
 import com.seanshubin.vote.contract.ApiClient
 import com.seanshubin.vote.domain.*
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.web.attributes.*
 import org.jetbrains.compose.web.dom.*
@@ -12,7 +13,8 @@ fun ElectionDetailPage(
     apiClient: ApiClient,
     authToken: String,
     electionName: String,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    coroutineScope: CoroutineScope = rememberCoroutineScope()
 ) {
     var election by remember { mutableStateOf<ElectionSummary?>(null) }
     var candidates by remember { mutableStateOf<List<String>>(emptyList()) }
@@ -20,7 +22,6 @@ fun ElectionDetailPage(
     var successMessage by remember { mutableStateOf<String?>(null) }
     var isLoading by remember { mutableStateOf(true) }
     var currentView by remember { mutableStateOf("details") }
-    val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
         try {
@@ -83,7 +84,7 @@ fun ElectionDetailPage(
                     apiClient, authToken, electionName, candidates,
                     onSuccess = { msg ->
                         successMessage = msg
-                        scope.launch {
+                        coroutineScope.launch {
                             try {
                                 candidates = apiClient.listCandidates(authToken, electionName)
                             } catch (e: Exception) {
@@ -131,12 +132,12 @@ fun ElectionSetupView(
     electionName: String,
     existingCandidates: List<String>,
     onSuccess: (String) -> Unit,
-    onError: (String) -> Unit
+    onError: (String) -> Unit,
+    coroutineScope: CoroutineScope = rememberCoroutineScope()
 ) {
     var candidatesText by remember { mutableStateOf(existingCandidates.joinToString("\n")) }
     var votersText by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
-    val scope = rememberCoroutineScope()
 
     Div({ classes("section") }) {
         H2 { Text("Setup Candidates") }
@@ -155,7 +156,7 @@ fun ElectionSetupView(
                     val candidates = candidatesText.split("\n")
                         .map { it.trim() }
                         .filter { it.isNotBlank() }
-                    scope.launch {
+                    coroutineScope.launch {
                         try {
                             apiClient.setCandidates(authToken, electionName, candidates)
                             onSuccess("Candidates updated successfully")
@@ -188,7 +189,7 @@ fun ElectionSetupView(
                     val voters = votersText.split("\n")
                         .map { it.trim() }
                         .filter { it.isNotBlank() }
-                    scope.launch {
+                    coroutineScope.launch {
                         try {
                             apiClient.setEligibleVoters(authToken, electionName, voters)
                             onSuccess("Eligible voters updated successfully")
@@ -211,7 +212,7 @@ fun ElectionSetupView(
             onClick {
                 if (!isLoading) {
                     isLoading = true
-                    scope.launch {
+                    coroutineScope.launch {
                         try {
                             apiClient.launchElection(authToken, electionName)
                             onSuccess("Election launched successfully")
@@ -237,11 +238,11 @@ fun VotingView(
     electionName: String,
     candidates: List<String>,
     onSuccess: (String) -> Unit,
-    onError: (String) -> Unit
+    onError: (String) -> Unit,
+    coroutineScope: CoroutineScope = rememberCoroutineScope()
 ) {
     var rankings by remember { mutableStateOf(candidates.mapIndexed { index, name -> name to (index + 1) }) }
     var isLoading by remember { mutableStateOf(false) }
-    val scope = rememberCoroutineScope()
 
     Div({ classes("section") }) {
         H2 { Text("Cast Ballot") }
@@ -277,7 +278,7 @@ fun VotingView(
                         val ballotRankings = rankings.map { (name, rank) ->
                             Ranking(name, rank)
                         }
-                        scope.launch {
+                        coroutineScope.launch {
                             try {
                                 val confirmation = apiClient.castBallot(authToken, electionName, ballotRankings)
                                 onSuccess("Ballot cast successfully! Confirmation: $confirmation")
