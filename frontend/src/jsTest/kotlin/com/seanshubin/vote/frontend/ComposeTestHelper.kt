@@ -1,7 +1,5 @@
 package com.seanshubin.vote.frontend
 
-import kotlinx.coroutines.delay
-
 /**
  * Test helper utilities that encapsulate JavaScript DOM interactions for testing Compose for Web.
  *
@@ -10,23 +8,27 @@ import kotlinx.coroutines.delay
  * - Easier to read (intent is clear from function names)
  * - Easier to maintain (JavaScript details centralized here)
  * - Type-safe (Kotlin compiler validates parameters)
+ *
+ * Note: These helpers do NOT include delays. Tests should use TestScope.advanceUntilIdle()
+ * after actions that trigger coroutines to wait for all async work to complete.
  */
 object ComposeTestHelper {
 
     /**
-     * Sets an input value by finding it via placeholder text.
-     * Automatically dispatches the input event and waits for Compose to react.
+     * Sets an input value by finding it via placeholder text and dispatches the input event.
+     *
+     * Note: This is synchronous - it updates the DOM immediately. If the input event triggers
+     * a coroutine, the test should call advanceUntilIdle() afterward.
      *
      * @param containerId The ID of the container element (test root)
      * @param placeholder The placeholder text that identifies the input (e.g., "Username", "Password")
      * @param value The value to set
      */
-    suspend fun setInputByPlaceholder(
+    fun setInputByPlaceholder(
         containerId: String,
         placeholder: String,
         value: String
     ) {
-        // Use js() with a function that takes parameters to avoid string interpolation
         val setInputFunction = js("""
             (function(containerId, placeholder, value) {
                 var input = document.querySelector('#' + containerId + ' input[placeholder="' + placeholder + '"]');
@@ -35,17 +37,18 @@ object ComposeTestHelper {
             })
         """)
         setInputFunction(containerId, placeholder, value)
-        delay(100) // Allow Compose to react to the input event
     }
 
     /**
      * Clicks a button by finding it via visible text.
-     * Automatically waits for Compose to react and any async operations to complete.
+     *
+     * Note: This is synchronous - it clicks the button immediately. If the button's onClick
+     * handler launches a coroutine, the test should call advanceUntilIdle() afterward.
      *
      * @param containerId The ID of the container element (test root)
      * @param buttonText The visible text on the button (e.g., "Login", "Register", "Create")
      */
-    suspend fun clickButtonByText(
+    fun clickButtonByText(
         containerId: String,
         buttonText: String
     ) {
@@ -57,17 +60,18 @@ object ComposeTestHelper {
             })
         """)
         clickButtonFunction(containerId, buttonText)
-        delay(200) // Allow async operations (API calls, state updates) to complete
     }
 
     /**
      * Presses the Enter key in an input field found by placeholder.
-     * Automatically waits for Compose to react and any async operations to complete.
+     *
+     * Note: This is synchronous - it dispatches the keyboard event immediately. If the keydown
+     * handler launches a coroutine, the test should call advanceUntilIdle() afterward.
      *
      * @param containerId The ID of the container element (test root)
      * @param placeholder The placeholder text that identifies the input (e.g., "Username", "Password")
      */
-    suspend fun pressEnterInInput(
+    fun pressEnterInInput(
         containerId: String,
         placeholder: String
     ) {
@@ -79,12 +83,10 @@ object ComposeTestHelper {
             })
         """)
         pressEnterFunction(containerId, placeholder)
-        delay(200) // Allow async operations (API calls, state updates) to complete
     }
 
     /**
      * Verifies that an element exists by querying for it.
-     * Returns the element if found, null otherwise.
      *
      * @param containerId The ID of the container element (test root)
      * @param selector The CSS selector to find the element

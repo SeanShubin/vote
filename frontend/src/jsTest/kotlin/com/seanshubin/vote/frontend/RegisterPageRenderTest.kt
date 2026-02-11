@@ -73,6 +73,9 @@ class RegisterPageRenderTest {
             ComposeTestHelper.setInputByPlaceholder(testId, "Password", "password123")
             ComposeTestHelper.pressEnterInInput(testId, "Password")
 
+            // Wait for all coroutines to complete
+            this@runTest.testScheduler.advanceUntilIdle()
+
             // then
             assertEquals(1, fakeClient.registerCalls.size, "Expected 1 register call but got ${fakeClient.registerCalls.size}")
             assertEquals("alice", fakeClient.registerCalls[0].userName)
@@ -109,6 +112,9 @@ class RegisterPageRenderTest {
             ComposeTestHelper.setInputByPlaceholder(testId, "Password", "securepass")
             ComposeTestHelper.pressEnterInInput(testId, "Email")
 
+            // Wait for all coroutines to complete
+            this@runTest.testScheduler.advanceUntilIdle()
+
             // then
             assertEquals(1, fakeClient.registerCalls.size, "Expected 1 register call but got ${fakeClient.registerCalls.size}")
             assertEquals("bob", fakeClient.registerCalls[0].userName)
@@ -144,6 +150,9 @@ class RegisterPageRenderTest {
             ComposeTestHelper.setInputByPlaceholder(testId, "Email", "charlie@example.com")
             ComposeTestHelper.setInputByPlaceholder(testId, "Password", "mypassword")
             ComposeTestHelper.clickButtonByText(testId, "Register")
+
+            // Wait for all coroutines to complete
+            this@runTest.testScheduler.advanceUntilIdle()
 
             // then
             assertEquals(1, fakeClient.registerCalls.size, "Expected 1 register call but got ${fakeClient.registerCalls.size}")
@@ -188,6 +197,9 @@ class RegisterPageRenderTest {
             ComposeTestHelper.setInputByPlaceholder(testId, "Email", "dave@example.com")
             ComposeTestHelper.setInputByPlaceholder(testId, "Password", "password")
             ComposeTestHelper.clickButtonByText(testId, "Register")
+
+            // Wait for all coroutines to complete
+            this@runTest.testScheduler.advanceUntilIdle()
 
             // then
             assertTrue(registrationSuccessCalled, "Registration success callback should be invoked")

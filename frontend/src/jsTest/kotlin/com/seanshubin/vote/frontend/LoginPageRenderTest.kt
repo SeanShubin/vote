@@ -18,10 +18,10 @@ import kotlin.test.assertTrue
  * 1. Create test root with ComposeTestHelper
  * 2. Render composable with fake dependencies
  * 3. Interact with UI using ComposeTestHelper utilities (no raw JavaScript)
- * 4. Verify state changes and API calls
+ * 4. Use advanceUntilIdle() to wait for all coroutines to complete
+ * 5. Verify state changes and API calls
  *
- * ComposeTestHelper eliminates the need to write JavaScript in tests,
- * making them easier to write, read, and maintain.
+ * ComposeTestHelper eliminates raw JavaScript, advanceUntilIdle() eliminates arbitrary delays.
  */
 class LoginPageRenderTest {
 
@@ -109,6 +109,9 @@ class LoginPageRenderTest {
             ComposeTestHelper.setInputByPlaceholder(testId, "Password", "password123")
             ComposeTestHelper.pressEnterInInput(testId, "Password")
 
+            // Wait for all coroutines (handleLogin coroutine) to complete
+            this@runTest.testScheduler.advanceUntilIdle()
+
             // then
             assertEquals(1, fakeClient.authenticateCalls.size, "Expected 1 authenticate call but got ${fakeClient.authenticateCalls.size}")
             assertEquals("alice", fakeClient.authenticateCalls[0].userName)
@@ -143,6 +146,9 @@ class LoginPageRenderTest {
             ComposeTestHelper.setInputByPlaceholder(testId, "Password", "securepass")
             ComposeTestHelper.pressEnterInInput(testId, "Username")
 
+            // Wait for all coroutines to complete
+            this@runTest.testScheduler.advanceUntilIdle()
+
             // then
             assertEquals(1, fakeClient.authenticateCalls.size, "Expected 1 authenticate call but got ${fakeClient.authenticateCalls.size}")
             assertEquals("bob", fakeClient.authenticateCalls[0].userName)
@@ -176,6 +182,9 @@ class LoginPageRenderTest {
             ComposeTestHelper.setInputByPlaceholder(testId, "Username", "charlie")
             ComposeTestHelper.setInputByPlaceholder(testId, "Password", "mypassword")
             ComposeTestHelper.clickButtonByText(testId, "Login")
+
+            // Wait for all coroutines to complete
+            this@runTest.testScheduler.advanceUntilIdle()
 
             // then
             assertEquals(1, fakeClient.authenticateCalls.size, "Expected 1 authenticate call but got ${fakeClient.authenticateCalls.size}")
@@ -218,6 +227,9 @@ class LoginPageRenderTest {
             ComposeTestHelper.setInputByPlaceholder(testId, "Username", "dave")
             ComposeTestHelper.setInputByPlaceholder(testId, "Password", "password")
             ComposeTestHelper.clickButtonByText(testId, "Login")
+
+            // Wait for all coroutines to complete
+            this@runTest.testScheduler.advanceUntilIdle()
 
             // then
             assertTrue(loginSuccessCalled, "Login success callback should be invoked")

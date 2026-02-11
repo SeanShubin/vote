@@ -58,6 +58,9 @@ class CreateElectionPageRenderTest {
             ComposeTestHelper.setInputByPlaceholder(testId, "Election Name", "Test Election")
             ComposeTestHelper.clickButtonByText(testId, "Create")
 
+            // Wait for all coroutines to complete
+            this@runTest.testScheduler.advanceUntilIdle()
+
             // then
             assertEquals(1, fakeClient.createElectionCalls.size, "Expected 1 createElection call but got ${fakeClient.createElectionCalls.size}")
             assertEquals("test-token", fakeClient.createElectionCalls[0].authToken)
@@ -87,6 +90,9 @@ class CreateElectionPageRenderTest {
 
             // when - click create button without entering election name
             ComposeTestHelper.clickButtonByText(testId, "Create")
+
+            // Wait for all coroutines to complete
+            this@runTest.testScheduler.advanceUntilIdle()
 
             // then - should not call createElection
             assertEquals(0, fakeClient.createElectionCalls.size, "Should not create election with empty name")
