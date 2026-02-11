@@ -12,6 +12,120 @@ This project implements a Condorcet voting system (ranked-choice with pairwise c
 
 **Key architectural insight**: All three backends expose the same `QueryModel` interface using natural keys (election names, voter names), hiding implementation details (SQL joins, DynamoDB composite keys, etc.). This lets developers write tests and admin tools against a simple relational model while production uses optimized storage patterns.
 
+## For New Engineers
+
+### Entry Points
+
+The application has two main entry points:
+
+- **Backend**: `backend/src/main/kotlin/com/seanshubin/vote/backend/Main.kt`
+  - Implements staged dependency injection pattern
+  - Creates `ProductionIntegrations` (I/O boundaries)
+  - Wires `ApplicationDependencies` (services, repositories)
+  - Starts Jetty HTTP server
+
+- **Frontend**: `frontend/src/jsMain/kotlin/com/seanshubin/vote/frontend/Main.kt`
+  - Creates `ProductionFrontendIntegrations` (ApiClient)
+  - Renders Compose for Web UI
+  - Connects to backend HTTP API
+
+Both entry points follow the same pattern: create integrations → wire dependencies → run.
+
+### Test Suites
+
+Tests are organized by concern and can be run independently:
+
+```bash
+# Backend unit tests (71 tests) - InMemory backend, fast
+./gradlew :backend:test
+
+# Frontend tests (32 tests) - FakeApiClient, no browser needed
+./gradlew :frontend:jsTest
+
+# Integration tests (48 tests) - HTTP API boundary tests
+./gradlew :integration:test
+
+# Run all tests
+./gradlew test
+```
+
+**Test organization**:
+- `backend/src/test/kotlin/` - Business logic tests using InMemory backend
+- `frontend/src/jsTest/kotlin/` - Frontend behavior tests with FakeApiClient
+- `integration/src/test/kotlin/` - HTTP API tests with real backend
+- All tests are self-documenting with descriptive names
+
+**Test philosophy**: Tests use injected interfaces (fake I/O boundaries) rather than mocking internal collaborators. This enables fast, reliable, complete test coverage without heavyweight dependencies.
+
+### Static Analysis Documentation
+
+Generate and view static analysis reports:
+
+```bash
+# Generate all static analysis reports
+./scripts/generate-docs.sh
+
+# View the report index
+open schema-diagram/index.html
+```
+
+The reports include:
+- Package dependencies (cycles, vertical dependencies)
+- Module structure
+- Code organization metrics
+- Schema diagrams
+- Architectural compliance
+
+Configuration is in `code-structure-config.json`.
+
+### Running the Application Locally
+
+**Backend** (choose one database):
+
+```bash
+# Option 1: DynamoDB Local (recommended)
+./scripts/db-setup-dynamodb
+./scripts/run-backend-dynamodb
+
+# Option 2: MySQL
+./scripts/db-setup-mysql
+./scripts/run-backend-mysql
+
+# Option 3: InMemory (testing only)
+./gradlew :backend:run
+```
+
+Backend starts on `http://localhost:8080`
+
+**Frontend**:
+
+```bash
+# Development build with webpack dev server
+./gradlew :frontend:jsBrowserDevelopmentRun
+
+# Production build
+./gradlew :frontend:jsBrowserProductionWebpack
+```
+
+Frontend serves on `http://localhost:8088` (development) and connects to backend at `http://localhost:8080`.
+
+**Create test data**:
+
+```bash
+# After starting backend, create test election and ballots
+./scripts/setup-test-ballot dynamodb  # or mysql
+```
+
+**Verify data**:
+
+```bash
+# View relational projection (admin view)
+./scripts/inspect-dynamodb-all
+
+# View raw storage (debug view)
+./scripts/inspect-dynamodb-raw-all
+```
+
 ## Quick Start
 
 ### Prerequisites
