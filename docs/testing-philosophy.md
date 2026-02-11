@@ -1,452 +1,257 @@
-# Testing Philosophy: Easy to Maintain
+# Testing Philosophy
 
-## Core Principle
+## Why We Test
 
-**Tests should read like specifications, not implementation details.**
+We organize tests around four distinct purposes, each serving a different audience and verification goal:
 
-Tests that are easy to maintain have these properties:
-1. **Clear intent** - What behavior is being tested?
-2. **Minimal brittleness** - Only break when actual behavior changes
-3. **Good defaults** - Most things "just work" without explicit setup
-4. **Composable** - Build complex scenarios from simple operations
-5. **Debuggable** - Failures explain what went wrong
+### 1. Business Logic Tests
+**Purpose:** Test business logic completely without testing implementation details such as how the code is structured. We should be certain the code works properly no matter what the implementation happens to be. These should be so self-documenting that a product manager could look at them and have confidence the features they asked for actually exist. No interactions with real integration points.
 
-## Architecture Enables This
+**Who reads these:** Product managers, domain experts, developers
 
-Your dependency injection architecture makes this possible:
+**What they verify:** The features exist and work as specified
 
-```kotlin
-// Production
-val integrations = ProductionIntegrations(realClock, realDatabase, realIdGenerator)
-val service = ServiceImpl(integrations, eventLog, commandModel, queryModel)
-
-// Testing
-val integrations = TestIntegrations(fakeClock, fakeDatabase, fakeIdGenerator)
-val service = ServiceImpl(integrations, eventLog, commandModel, queryModel)
-```
-
-**Same service code, different infrastructure. Fast, deterministic, testable.**
-
-## Test Style: User-Level Operations
-
-### Bad: Coupled to Implementation
+**Example:**
 ```kotlin
 @Test
-fun test() {
-    val salt = "fake-salt-123"
-    val hash = passwordUtil.hash("secret", salt)
-    eventLog.appendEvent("system", clock.now(),
-        DomainEvent.UserRegistered("sean", "sean@email.com", salt, hash, Role.OWNER))
-    commandModel.synchronize()
+fun `voters can cast ballots after launch`() {
+    val (alice, bob, charlie) = testContext.registerUsers("alice", "bob", "charlie")
 
-    val user = queryModel.findUserByName("sean")
-    assertEquals("sean@email.com", user.email)
-    assertEquals(Role.OWNER, user.role)
-}
-```
-
-**Problems:**
-- Test knows about events, salts, hashes, synchronization
-- Breaks when event structure changes
-- Doesn't test the actual user journey
-- Hard to understand what behavior is being tested
-
-### Good: User-Level Operations
-```kotlin
-@Test
-fun `first user becomes owner`() {
-    val sean = testContext.registerUser("sean", "sean@email.com", "secret")
-
-    assertEquals("OWNER", sean.role)
-}
-```
-
-**Benefits:**
-- Reads like a specification
-- Tests real registration flow (HTTP → Service → Events → Database)
-- Doesn't break when event structure changes
-- Clear intent: "first user becomes owner"
-
-## Test Style: Scenario Building
-
-### Bad: Repeated Setup
-```kotlin
-@Test
-fun `owner can create election`() {
-    // 20 lines of setup
-    eventLog.appendEvent(...)
-    eventLog.appendEvent(...)
-    commandModel.synchronize()
-
-    // actual test
-}
-
-@Test
-fun `owner can add candidates`() {
-    // Same 20 lines of setup again!
-    eventLog.appendEvent(...)
-    eventLog.appendEvent(...)
-    commandModel.synchronize()
-
-    // actual test
-}
-```
-
-### Good: Composable Operations
-```kotlin
-@Test
-fun `owner can create election`() {
-    val alice = testContext.registerUser("alice")
-    val election = alice.createElection("Favorite Language")
-
-    assertEquals("alice", election.ownerName)
-    assertEquals("Favorite Language", election.electionName)
-}
-
-@Test
-fun `owner can add candidates`() {
-    val alice = testContext.registerUser("alice")
-    val election = alice.createElection("Favorite Language")
+    val election = alice.createElection("Programming Language")
     election.setCandidates("Kotlin", "Rust", "Go")
-
-    assertEquals(listOf("Kotlin", "Rust", "Go"), election.candidates)
-}
-```
-
-**Key insight:** `alice.createElection()` returns a context object that knows about the election, so you can keep building on it.
-
-## Test Style: Multiple Perspectives
-
-Tests should verify correctness from different angles:
-
-```kotlin
-@Test
-fun `casting ballot creates event and updates database`() {
-    val (alice, bob) = testContext.registerUsers("alice", "bob")
-    val election = alice.createElection("Best Language")
-    election.setCandidates("Kotlin", "Rust", "Go")
-    election.setEligibleVoters("alice", "bob")
+    election.setEligibleVoters("bob", "charlie")
     election.launch()
 
-    // Act
-    bob.castBallot(election, rankings = listOf(
-        "Kotlin" to 1,
-        "Rust" to 2,
-        "Go" to 3
-    ))
+    bob.castBallot(election, "Kotlin" to 1, "Rust" to 2, "Go" to 3)
+    charlie.castBallot(election, "Rust" to 1, "Kotlin" to 2, "Go" to 3)
 
-    // Assert from event perspective
-    val events = testContext.events.ofType<DomainEvent.BallotCast>()
-    assertEquals(1, events.size)
-    assertEquals("bob", events[0].voterName)
-    assertEquals("Best Language", events[0].electionName)
-
-    // Assert from database perspective
-    val ballot = testContext.database.findBallot(voterName = "bob", electionName = "Best Language")
-    assertEquals(3, ballot.rankings.size)
-    assertEquals("Kotlin", ballot.rankings.first { it.rank == 1 }.candidateName)
-
-    // Assert from query perspective
     val tally = election.tally()
-    assertEquals(1, tally.ballots.size)
+    assertEquals(2, tally.ballots.size)
 }
 ```
 
-**Three perspectives:**
-1. Events - "did the right event happen?"
-2. Database - "is the data stored correctly?"
-3. Queries - "does the application see the right thing?"
+**How they work:** Uses TestContext DSL with fake integrations (fake clock, fake database, fake ID generator). Tests the real service layer with fake infrastructure at boundaries. Fast, deterministic, no network or file I/O.
 
-This catches bugs at different layers.
+---
 
-## Implementation: TestContext
+### 2. HTTP Interaction Tests
+**Purpose:** Test HTTP interactions. These should be complete and so self-documenting that an integration engineer could use them as a specification.
+
+**Who reads these:** Integration engineers, API consumers, developers
+
+**What they verify:** The HTTP API contract - request formats, response formats, status codes, headers, error handling
+
+**Example:**
+```kotlin
+@Test
+fun `cast ballot returns 200 and updates rankings`() {
+    val aliceTokens = register("alice")
+    val bobTokens = register("bob")
+    post("/election", """{"userName":"alice","electionName":"Lang"}""", aliceTokens.accessToken)
+    put("/election/Lang/candidates", """{"candidateNames":["Kotlin","Rust"]}""", aliceTokens.accessToken)
+    put("/election/Lang/eligibility", """{"voterNames":["bob"]}""", aliceTokens.accessToken)
+    post("/election/Lang/launch", """{"allowEdit":true}""", aliceTokens.accessToken)
+
+    val response = post("/election/Lang/ballot",
+        """{"voterName":"bob","rankings":[{"candidateName":"Kotlin","rank":1}]}""",
+        bobTokens.accessToken)
+
+    assertEquals(200, response.statusCode())
+
+    val rankings = get("/election/Lang/rankings/bob", bobTokens.accessToken)
+    assertTrue(rankings.body().contains("Kotlin"))
+}
+```
+
+**How they work:** Starts real HTTP server on test port. Uses Java HttpClient to make actual HTTP requests. Verifies serialization, deserialization, authentication, and HTTP-specific concerns. Uses InMemory database for fast execution.
+
+---
+
+### 3. Database Interaction Tests
+**Purpose:** Happy path scenario that exercises each feature using real databases to uncover if databases behave the way the code expects them to behave.
+
+**Who reads these:** Infrastructure engineers, database administrators, developers
+
+**What they verify:** The application works correctly with each supported database (MySQL, DynamoDB, etc.)
+
+**Example:**
+```kotlin
+@ParameterizedTest
+@MethodSource("backendProvider")
+fun `comprehensive voting scenario`(backend: ScenarioBackend) {
+    val scenario = Scenario.comprehensive()
+
+    scenario.execute(backend)
+    scenario.verify(backend)
+}
+
+companion object {
+    @JvmStatic
+    fun backendProvider() = listOf(
+        InMemoryBackend(),
+        MySQLBackend(testContainer),
+        DynamoDBBackend(testContainer)
+    )
+}
+```
+
+**How they work:** Parameterized tests that run the same comprehensive scenario against multiple database implementations. Uses TestContainers to spin up real MySQL and DynamoDB instances. Verifies that database-specific behavior (transactions, consistency, queries) works as expected.
+
+---
+
+### 4. Frontend Tests
+**Purpose:** These tests should be complete and so self-documenting that a product manager could look at them and have confidence the features they asked for actually exist.
+
+**Who reads these:** Product managers, UX designers, developers
+
+**What they verify:** The UI features exist, are accessible, and work correctly from a user perspective
+
+**Example (planned):**
+```kotlin
+@Test
+fun `user can create election and add candidates`() {
+    browser.navigateTo("/")
+    browser.login("alice", "password")
+
+    browser.click("Create Election")
+    browser.fillField("Election Name", "Best Language")
+    browser.click("Save")
+
+    browser.click("Add Candidates")
+    browser.fillField("Candidate 1", "Kotlin")
+    browser.fillField("Candidate 2", "Rust")
+    browser.click("Save Candidates")
+
+    browser.assertVisible("Kotlin")
+    browser.assertVisible("Rust")
+}
+```
+
+**How they work (planned):** Browser automation testing the compiled JavaScript frontend against a real HTTP server. Verifies UI flows, accessibility, and user interactions.
+
+---
+
+## Test Organization
+
+```
+integration/src/test/kotlin/
+├── VotingWorkflowTest.kt           # Business Logic Tests (20 tests)
+├── HttpApiTest.kt                   # HTTP Interaction Tests (48 tests)
+├── ScenarioCompatibilityTest.kt    # Database Interaction Tests (3 tests)
+└── (frontend tests - planned)
+```
+
+**Total: 71 tests, all passing**
+
+---
+
+## Core Principles
+
+### Tests Read Like Specifications
+Test names and bodies should be understandable by non-programmers:
+- ✅ `first user becomes owner`
+- ❌ `test_registration_001`
+
+### Tests Don't Test Implementation Details
+Tests should verify behavior, not structure:
+- ✅ Tests verify features work through public API
+- ❌ Tests don't assert on event structure, internal class organization, or private methods
+
+### Tests Are Self-Documenting
+The test code itself is the specification:
+- ✅ Clear intent from test name and operations
+- ❌ Don't add comment blocks explaining what tests do
+
+### Changes Don't Break Unrelated Tests
+Tests should be resilient to internal refactoring:
+- ✅ Add field to User? Tests still pass (they don't assert all fields)
+- ✅ Change event structure? Tests using DSL operations still work
+- ❌ Rename internal class? Should not break any tests
+
+---
+
+## Implementation Details
+
+### TestContext DSL
+
+Business logic tests use a domain-specific language for readable test code:
 
 ```kotlin
 class TestContext {
-    // Fake infrastructure
-    val clock = FakeClock()
-    val idGenerator = SequentialIdGenerator()
-    val passwordUtil = FakePasswordUtil()
-
-    // Real components with fake infrastructure
-    private val integrations = TestIntegrations(clock, idGenerator, passwordUtil)
-    private val eventLog = InMemoryEventLog()
-    private val commandModel = InMemoryCommandModel()
-    private val queryModel = InMemoryQueryModel(commandModel)
-    private val service = ServiceImpl(integrations, eventLog, commandModel, queryModel)
-
-    // Test helpers
-    val events = EventInspector(eventLog)
-    val database = DatabaseInspector(queryModel)
-
-    fun registerUser(
-        name: String = "user${idGenerator.next()}",
-        email: String = "${name}@example.com",
-        password: String = "password"
-    ): UserContext {
-        val tokens = service.register(name, email, password)
-        service.synchronize()
-        return UserContext(this, name, tokens.accessToken)
-    }
-
-    fun registerUsers(vararg names: String): List<UserContext> =
-        names.map { registerUser(it) }
+    fun registerUser(name: String): UserContext
+    fun registerUsers(vararg names: String): List<UserContext>
 }
 
-class UserContext(
-    private val testContext: TestContext,
-    val userName: String,
-    private val accessToken: AccessToken
-) {
-    fun createElection(
-        name: String = "Election ${testContext.idGenerator.next()}"
-    ): ElectionContext {
-        testContext.service.addElection(accessToken, userName, name)
-        testContext.service.synchronize()
-        return ElectionContext(testContext, name, this)
-    }
-
-    fun castBallot(election: ElectionContext, rankings: List<Pair<String, Int>>) {
-        val rankingObjects = rankings.map { (candidate, rank) ->
-            Ranking(candidate, rank)
-        }
-        testContext.service.castBallot(accessToken, userName, election.name, rankingObjects)
-        testContext.service.synchronize()
-    }
+class UserContext {
+    fun createElection(name: String): ElectionContext
+    fun castBallot(election: ElectionContext, rankings: List<Pair<String, Int>>)
 }
 
-class ElectionContext(
-    private val testContext: TestContext,
-    val name: String,
-    private val owner: UserContext
-) {
-    fun setCandidates(vararg names: String) {
-        testContext.service.setCandidates(owner.accessToken, name, names.toList())
-        testContext.service.synchronize()
-    }
-
-    fun setEligibleVoters(vararg names: String) {
-        testContext.service.setEligibleVoters(owner.accessToken, name, names.toList())
-        testContext.service.synchronize()
-    }
-
-    fun launch(allowEdit: Boolean = true) {
-        testContext.service.launchElection(owner.accessToken, name, allowEdit)
-        testContext.service.synchronize()
-    }
-
-    val candidates: List<String>
-        get() = testContext.database.listCandidates(name)
-
-    fun tally(): Tally =
-        testContext.service.tally(owner.accessToken, name)
+class ElectionContext {
+    fun setCandidates(vararg names: String)
+    fun setEligibleVoters(vararg names: String)
+    fun launch()
+    fun tally(): Tally
 }
 ```
 
-## Implementation: Inspectors
+### Fake Infrastructure
 
+Tests inject fake implementations at I/O boundaries:
+- `FakeClock` - deterministic time (no wall clock dependency)
+- `FakeIdGenerator` - sequential IDs (no randomness)
+- `FakeNotifications` - captures events (no actual email/logging)
+
+Real service layer runs with fake infrastructure. Tests verify actual composition and wiring.
+
+### Multiple Verification Perspectives
+
+Tests can verify correctness from different angles:
+- **Events:** "Did the right command execute?"
+- **Database:** "Is the data stored correctly?"
+- **Queries:** "Does the application see the right thing?"
+
+This catches bugs at different layers:
 ```kotlin
-class EventInspector(private val eventLog: EventLog) {
-    inline fun <reified T : DomainEvent> ofType(): List<T> =
-        eventLog.allEvents()
-            .map { it.event }
-            .filterIsInstance<T>()
+// Verify event occurred
+val events = testContext.events.ofType<DomainEvent.BallotCast>()
+assertEquals(1, events.size)
 
-    fun last(): DomainEvent =
-        eventLog.allEvents().last().event
+// Verify database state
+val ballot = testContext.database.findBallot("bob", "Best Language")
+assertEquals(3, ballot.rankings.size)
 
-    fun count(): Int =
-        eventLog.allEvents().size
-}
-
-class DatabaseInspector(private val queryModel: QueryModel) {
-    fun findUser(name: String): User =
-        queryModel.findUserByName(name)
-
-    fun findBallot(voterName: String, electionName: String): BallotSummary =
-        queryModel.searchBallot(voterName, electionName)
-            ?: error("No ballot found for $voterName in $electionName")
-
-    fun listCandidates(electionName: String): List<String> =
-        queryModel.listCandidates(electionName)
-
-    fun userCount(): Int =
-        queryModel.userCount()
-
-    fun electionCount(): Int =
-        queryModel.electionCount()
-}
+// Verify query result
+val tally = election.tally()
+assertEquals(1, tally.ballots.size)
 ```
 
-## Implementation: Fakes
+### Good Defaults
 
-```kotlin
-class FakeClock : Clock {
-    private var currentTime = Instant.parse("2024-01-01T00:00:00Z")
+DSL operations provide sensible defaults to reduce boilerplate:
+- `registerUser()` generates email automatically: `"${name}@example.com"`
+- `createElection()` generates name if not provided: `"Election ${id}"`
+- Most tests can omit irrelevant details
 
-    override fun now(): Instant = currentTime
+### Fast Execution
 
-    fun advance(duration: Duration) {
-        currentTime = currentTime.plus(duration)
-    }
+Business logic tests run without:
+- Real database connections
+- Network calls
+- File system operations
+- Browser automation
 
-    fun set(time: Instant) {
-        currentTime = time
-    }
-}
+Thousands of tests run in seconds. Deterministic results from fake clock and ID generator.
 
-class SequentialIdGenerator : UniqueIdGenerator {
-    private var counter = 0
-
-    override fun next(): String {
-        return "id-${++counter}"
-    }
-}
-
-class FakePasswordUtil : PasswordUtil {
-    override fun generateSalt(): String = "fake-salt"
-
-    override fun hash(password: String, salt: String): String =
-        "hash-for: $password"
-
-    override fun verify(password: String, salt: String, hash: String): Boolean =
-        hash == "hash-for: $password"
-}
-```
-
-## Example Tests
-
-```kotlin
-class RegistrationTest {
-    @Test
-    fun `first user becomes owner`() {
-        val testContext = TestContext()
-        val alice = testContext.registerUser("alice")
-
-        assertEquals("OWNER", testContext.database.findUser("alice").role.name)
-    }
-
-    @Test
-    fun `second user becomes regular user`() {
-        val testContext = TestContext()
-        testContext.registerUser("alice")
-        val bob = testContext.registerUser("bob")
-
-        assertEquals("USER", testContext.database.findUser("bob").role.name)
-    }
-}
-
-class ElectionTest {
-    @Test
-    fun `owner can create election with candidates`() {
-        val testContext = TestContext()
-        val alice = testContext.registerUser("alice")
-        val election = alice.createElection("Best Language")
-        election.setCandidates("Kotlin", "Rust", "Go")
-
-        assertEquals(listOf("Kotlin", "Rust", "Go"), election.candidates)
-        assertEquals(1, testContext.events.ofType<DomainEvent.CandidatesAdded>().size)
-    }
-
-    @Test
-    fun `voters can cast ballots after launch`() {
-        val testContext = TestContext()
-        val (alice, bob, charlie) = testContext.registerUsers("alice", "bob", "charlie")
-
-        val election = alice.createElection("Programming Language")
-        election.setCandidates("Kotlin", "Rust", "Go")
-        election.setEligibleVoters("bob", "charlie")
-        election.launch()
-
-        bob.castBallot(election, rankings = listOf(
-            "Kotlin" to 1, "Rust" to 2, "Go" to 3
-        ))
-
-        charlie.castBallot(election, rankings = listOf(
-            "Rust" to 1, "Kotlin" to 2, "Go" to 3
-        ))
-
-        val tally = election.tally()
-        assertEquals(2, tally.ballots.size)
-        assertEquals(listOf("bob", "charlie"), tally.whoVoted.sorted())
-    }
-}
-
-class CondorcetAlgorithmTest {
-    @Test
-    fun `condorcet winner is ranked first`() {
-        val testContext = TestContext()
-        val (alice, bob, charlie) = testContext.registerUsers("alice", "bob", "charlie")
-        val david = testContext.registerUser("david")
-
-        val election = alice.createElection("Best Fruit")
-        election.setCandidates("Apple", "Banana", "Cherry")
-        election.setEligibleVoters("bob", "charlie", "david")
-        election.launch()
-
-        // Bob: Apple > Banana > Cherry
-        bob.castBallot(election, listOf("Apple" to 1, "Banana" to 2, "Cherry" to 3))
-
-        // Charlie: Apple > Cherry > Banana
-        charlie.castBallot(election, listOf("Apple" to 1, "Cherry" to 2, "Banana" to 3))
-
-        // David: Banana > Apple > Cherry
-        david.castBallot(election, listOf("Banana" to 1, "Apple" to 2, "Cherry" to 3))
-
-        val tally = election.tally()
-
-        // Apple beats both others pairwise (2-1 each), so it should win
-        val winner = tally.places.first()
-        assertEquals(1, winner.place)
-        assertEquals("Apple", winner.candidateName)
-    }
-}
-```
-
-## Why This Is Easy to Maintain
-
-1. **Tests read like specifications**
-   - `first user becomes owner` not `test_registration_001`
-   - Clear intent from test name and body
-
-2. **Changes don't break unrelated tests**
-   - Add field to User? Tests still pass (they don't assert all fields)
-   - Change event structure? Tests using `alice.createElection()` still work
-
-3. **Good defaults reduce boilerplate**
-   - `registerUser()` generates email automatically
-   - `createElection()` generates name if not provided
-   - Most tests can omit irrelevant details
-
-4. **Composable operations**
-   - `registerUsers("alice", "bob", "charlie")` creates three users at once
-   - `election.setCandidates(...)` returns context for further operations
-   - Build complex scenarios incrementally
-
-5. **Multiple verification strategies**
-   - Event perspective: "was the command executed?"
-   - Database perspective: "is the data correct?"
-   - Query perspective: "does the app see it right?"
-
-6. **Fast execution**
-   - No real database, no network, no browser
-   - Deterministic (fake clock, fake IDs)
-   - Can run thousands of tests in seconds
-
-7. **Clear failures**
-   - `findBallot()` throws error with message when ballot not found
-   - Assertions are specific: "expected Kotlin at rank 1, got Rust"
-   - Context objects provide natural error messages
+---
 
 ## Summary
 
-**Goal:** Tests as fast as unit tests, as comprehensive as integration tests, easy to maintain.
+**Goal:** Each test type serves a clear purpose and audience.
 
-**How:**
-- Fake infrastructure at I/O boundaries (Clock, IdGenerator, PasswordUtil)
-- Real service layer (tests actual composition and wiring)
-- User-level operations (readable, composable, maintainable)
-- Multiple perspectives (events, database, queries)
-- Good defaults (minimal boilerplate)
+**Business Logic:** Features work correctly (product managers can verify)
+**HTTP:** API contract is correct (integration engineers can verify)
+**Database:** Works with real databases (infrastructure engineers can verify)
+**Frontend:** UI works correctly (product managers can verify)
 
-**Result:** Tests that read like specifications, rarely break from unrelated changes, and run fast.
+**Result:** Comprehensive verification at multiple levels, each test category optimized for its specific purpose.
