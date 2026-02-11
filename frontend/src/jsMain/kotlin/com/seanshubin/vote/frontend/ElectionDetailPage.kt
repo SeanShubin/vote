@@ -1,6 +1,7 @@
 package com.seanshubin.vote.frontend
 
 import androidx.compose.runtime.*
+import com.seanshubin.vote.contract.ApiClient
 import com.seanshubin.vote.domain.*
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.web.attributes.*
@@ -8,6 +9,7 @@ import org.jetbrains.compose.web.dom.*
 
 @Composable
 fun ElectionDetailPage(
+    apiClient: ApiClient,
     authToken: String,
     electionName: String,
     onBack: () -> Unit
@@ -22,10 +24,10 @@ fun ElectionDetailPage(
 
     LaunchedEffect(Unit) {
         try {
-            election = ApiClient.getElection(authToken, electionName)
-            candidates = ApiClient.listCandidates(authToken, electionName)
+            election = apiClient.getElection(authToken, electionName)
+            candidates = apiClient.listCandidates(authToken, electionName)
         } catch (e: Exception) {
-            ApiClient.logErrorToServer(e)
+            apiClient.logErrorToServer(e)
             errorMessage = e.message ?: "Failed to load election"
         } finally {
             isLoading = false
@@ -78,12 +80,12 @@ fun ElectionDetailPage(
             when (currentView) {
                 "details" -> ElectionDetailsView(election!!)
                 "setup" -> ElectionSetupView(
-                    authToken, electionName, candidates,
+                    apiClient, authToken, electionName, candidates,
                     onSuccess = { msg ->
                         successMessage = msg
                         scope.launch {
                             try {
-                                candidates = ApiClient.listCandidates(authToken, electionName)
+                                candidates = apiClient.listCandidates(authToken, electionName)
                             } catch (e: Exception) {
                                 // Ignore
                             }
@@ -92,12 +94,12 @@ fun ElectionDetailPage(
                     onError = { msg -> errorMessage = msg }
                 )
                 "vote" -> VotingView(
-                    authToken, electionName, candidates,
+                    apiClient, authToken, electionName, candidates,
                     onSuccess = { msg -> successMessage = msg },
                     onError = { msg -> errorMessage = msg }
                 )
                 "tally" -> TallyView(
-                    authToken, electionName,
+                    apiClient, authToken, electionName,
                     onError = { msg -> errorMessage = msg }
                 )
             }
@@ -124,6 +126,7 @@ fun ElectionDetailsView(election: ElectionSummary) {
 
 @Composable
 fun ElectionSetupView(
+    apiClient: ApiClient,
     authToken: String,
     electionName: String,
     existingCandidates: List<String>,
@@ -154,10 +157,10 @@ fun ElectionSetupView(
                         .filter { it.isNotBlank() }
                     scope.launch {
                         try {
-                            ApiClient.setCandidates(authToken, electionName, candidates)
+                            apiClient.setCandidates(authToken, electionName, candidates)
                             onSuccess("Candidates updated successfully")
                         } catch (e: Exception) {
-                            ApiClient.logErrorToServer(e)
+                            apiClient.logErrorToServer(e)
                             onError(e.message ?: "Failed to update candidates")
                         } finally {
                             isLoading = false
@@ -187,10 +190,10 @@ fun ElectionSetupView(
                         .filter { it.isNotBlank() }
                     scope.launch {
                         try {
-                            ApiClient.setEligibleVoters(authToken, electionName, voters)
+                            apiClient.setEligibleVoters(authToken, electionName, voters)
                             onSuccess("Eligible voters updated successfully")
                         } catch (e: Exception) {
-                            ApiClient.logErrorToServer(e)
+                            apiClient.logErrorToServer(e)
                             onError(e.message ?: "Failed to update eligible voters")
                         } finally {
                             isLoading = false
@@ -210,10 +213,10 @@ fun ElectionSetupView(
                     isLoading = true
                     scope.launch {
                         try {
-                            ApiClient.launchElection(authToken, electionName)
+                            apiClient.launchElection(authToken, electionName)
                             onSuccess("Election launched successfully")
                         } catch (e: Exception) {
-                            ApiClient.logErrorToServer(e)
+                            apiClient.logErrorToServer(e)
                             onError(e.message ?: "Failed to launch election")
                         } finally {
                             isLoading = false
@@ -229,6 +232,7 @@ fun ElectionSetupView(
 
 @Composable
 fun VotingView(
+    apiClient: ApiClient,
     authToken: String,
     electionName: String,
     candidates: List<String>,
@@ -275,10 +279,10 @@ fun VotingView(
                         }
                         scope.launch {
                             try {
-                                val confirmation = ApiClient.castBallot(authToken, electionName, ballotRankings)
+                                val confirmation = apiClient.castBallot(authToken, electionName, ballotRankings)
                                 onSuccess("Ballot cast successfully! Confirmation: $confirmation")
                             } catch (e: Exception) {
-                                ApiClient.logErrorToServer(e)
+                                apiClient.logErrorToServer(e)
                                 onError(e.message ?: "Failed to cast ballot")
                             } finally {
                                 isLoading = false
@@ -295,6 +299,7 @@ fun VotingView(
 
 @Composable
 fun TallyView(
+    apiClient: ApiClient,
     authToken: String,
     electionName: String,
     onError: (String) -> Unit
@@ -305,9 +310,9 @@ fun TallyView(
 
     LaunchedEffect(Unit) {
         try {
-            tally = ApiClient.getTally(authToken, electionName)
+            tally = apiClient.getTally(authToken, electionName)
         } catch (e: Exception) {
-            ApiClient.logErrorToServer(e)
+            apiClient.logErrorToServer(e)
             onError(e.message ?: "Failed to load tally")
         } finally {
             isLoading = false

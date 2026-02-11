@@ -1,12 +1,14 @@
 package com.seanshubin.vote.frontend
 
 import androidx.compose.runtime.*
+import com.seanshubin.vote.contract.ApiClient
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.web.attributes.*
 import org.jetbrains.compose.web.dom.*
 
 @Composable
 fun CreateElectionPage(
+    apiClient: ApiClient,
     authToken: String,
     onElectionCreated: (String) -> Unit,
     onBack: () -> Unit
@@ -39,10 +41,10 @@ fun CreateElectionPage(
                         errorMessage = null
                         scope.launch {
                             try {
-                                ApiClient.createElection(authToken, electionName)
+                                apiClient.createElection(authToken, electionName)
                                 onElectionCreated(electionName)
                             } catch (e: Exception) {
-                                ApiClient.logErrorToServer(e)
+                                apiClient.logErrorToServer(e)
                                 errorMessage = e.message ?: "Failed to create election"
                             } finally {
                                 isLoading = false

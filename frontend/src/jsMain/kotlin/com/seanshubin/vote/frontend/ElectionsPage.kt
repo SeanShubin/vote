@@ -1,12 +1,14 @@
 package com.seanshubin.vote.frontend
 
 import androidx.compose.runtime.*
+import com.seanshubin.vote.contract.ApiClient
 import com.seanshubin.vote.domain.ElectionSummary
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.web.dom.*
 
 @Composable
 fun ElectionsPage(
+    apiClient: ApiClient,
     authToken: String,
     onSelectElection: (String) -> Unit,
     onBack: () -> Unit
@@ -18,9 +20,9 @@ fun ElectionsPage(
 
     LaunchedEffect(Unit) {
         try {
-            elections = ApiClient.listElections(authToken)
+            elections = apiClient.listElections(authToken)
         } catch (e: Exception) {
-            ApiClient.logErrorToServer(e)
+            apiClient.logErrorToServer(e)
             errorMessage = e.message ?: "Failed to load elections"
         } finally {
             isLoading = false

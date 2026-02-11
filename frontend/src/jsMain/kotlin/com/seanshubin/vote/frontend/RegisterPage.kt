@@ -1,12 +1,14 @@
 package com.seanshubin.vote.frontend
 
 import androidx.compose.runtime.*
+import com.seanshubin.vote.contract.ApiClient
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.web.attributes.*
 import org.jetbrains.compose.web.dom.*
 
 @Composable
 fun RegisterPage(
+    apiClient: ApiClient,
     onLoginSuccess: (String, String) -> Unit,
     onNavigateToLogin: () -> Unit
 ) {
@@ -23,11 +25,11 @@ fun RegisterPage(
             errorMessage = null
             scope.launch {
                 try {
-                    val tokens = ApiClient.register(userName, email, password)
+                    val tokens = apiClient.register(userName, email, password)
                     val tokenJson = """{"userName":"$userName","role":"USER"}"""
                     onLoginSuccess(tokenJson, userName)
                 } catch (e: Exception) {
-                    ApiClient.logErrorToServer(e)
+                    apiClient.logErrorToServer(e)
                     errorMessage = e.message ?: "Registration failed"
                 } finally {
                     isLoading = false

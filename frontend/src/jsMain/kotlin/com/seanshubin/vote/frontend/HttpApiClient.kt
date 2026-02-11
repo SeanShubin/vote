@@ -10,50 +10,51 @@ import org.w3c.fetch.RequestInit
 import org.w3c.fetch.Response
 import kotlin.js.json
 
-object ApiClient {
+class HttpApiClient(
+    private val baseUrl: String = "http://localhost:8080"
+) : ApiClient {
     private val json = Json { ignoreUnknownKeys = true }
-    private val baseUrl = "http://localhost:8080"  // Backend server, not frontend server
 
-    suspend fun register(userName: String, email: String, password: String): Tokens {
+    override suspend fun register(userName: String, email: String, password: String): Tokens {
         val request = RegisterRequest(userName, email, password)
         return post<RegisterRequest, Tokens>("/register", request)
     }
 
-    suspend fun authenticate(userName: String, password: String): Tokens {
+    override suspend fun authenticate(userName: String, password: String): Tokens {
         val request = AuthenticateRequest(userName, password)
         return post<AuthenticateRequest, Tokens>("/authenticate", request)
     }
 
-    suspend fun listElections(authToken: String): List<ElectionSummary> {
+    override suspend fun listElections(authToken: String): List<ElectionSummary> {
         return getWithAuth("/elections", authToken)
     }
 
-    suspend fun createElection(authToken: String, electionName: String): String {
+    override suspend fun createElection(authToken: String, electionName: String): String {
         val userName = extractUserName(authToken)
         val request = AddElectionRequest(userName, electionName)
         postWithAuth<AddElectionRequest, Unit>("/election", request, authToken)
         return electionName
     }
 
-    suspend fun getElection(authToken: String, electionName: String): ElectionSummary {
+    override suspend fun getElection(authToken: String, electionName: String): ElectionSummary {
         return getWithAuth("/election/${encodeURIComponent(electionName)}", authToken)
     }
 
-    suspend fun setCandidates(authToken: String, electionName: String, candidates: List<String>) {
+    override suspend fun setCandidates(authToken: String, electionName: String, candidates: List<String>) {
         val request = SetCandidatesRequest(candidates)
         putWithAuth<SetCandidatesRequest, Unit>("/election/${encodeURIComponent(electionName)}/candidates", request, authToken)
     }
 
-    suspend fun listCandidates(authToken: String, electionName: String): List<String> {
+    override suspend fun listCandidates(authToken: String, electionName: String): List<String> {
         return getWithAuth("/election/${encodeURIComponent(electionName)}/candidates", authToken)
     }
 
-    suspend fun setEligibleVoters(authToken: String, electionName: String, voters: List<String>) {
+    override suspend fun setEligibleVoters(authToken: String, electionName: String, voters: List<String>) {
         val request = SetEligibleVotersRequest(voters)
         putWithAuth<SetEligibleVotersRequest, Unit>("/election/${encodeURIComponent(electionName)}/eligibility", request, authToken)
     }
 
-    suspend fun launchElection(authToken: String, electionName: String) {
+    override suspend fun launchElection(authToken: String, electionName: String) {
         val request = LaunchElectionRequest(allowEdit = true)
         postWithAuth<LaunchElectionRequest, Unit>(
             "/election/${encodeURIComponent(electionName)}/launch",
@@ -62,13 +63,36 @@ object ApiClient {
         )
     }
 
-    suspend fun castBallot(authToken: String, electionName: String, rankings: List<Ranking>): String {
+    override suspend fun castBallot(authToken: String, electionName: String, rankings: List<Ranking>): String {
         val request = CastBallotRequest(electionName, rankings)
         return postWithAuth("/election/${encodeURIComponent(electionName)}/ballot", request, authToken)
     }
 
-    suspend fun getTally(authToken: String, electionName: String): Tally {
+    override suspend fun getTally(authToken: String, electionName: String): Tally {
         return getWithAuth("/election/${encodeURIComponent(electionName)}/tally", authToken)
+    }
+
+    override fun logErrorToServer(error: Throwable) {
+        try {
+            val errorRequest = ClientErrorRequest(
+                message = error.message ?: error.toString(),
+                stackTrace = error.stackTraceToString(),
+                url = window.location.href,
+                userAgent = window.navigator.userAgent,
+                timestamp = js("new Date().toISOString()") as String
+            )
+
+            window.fetch("$baseUrl/log-client-error", RequestInit(
+                method = "POST",
+                headers = json(
+                    "Content-Type" to "application/json"
+                ),
+                body = json.encodeToString(errorRequest)
+            ))
+        } catch (loggingError: Throwable) {
+            console.error("Failed to log error to server:", loggingError)
+            console.error("Original error:", error)
+        }
     }
 
     private suspend inline fun <reified TReq, reified TRes> post(path: String, body: TReq): TRes {
@@ -155,31 +179,6 @@ object ApiClient {
         val tokenData = json.decodeFromString<kotlinx.serialization.json.JsonObject>(authToken)
         return tokenData["userName"]?.toString()?.removeSurrounding("\"")
             ?: throw IllegalArgumentException("Invalid auth token")
-    }
-
-    fun logErrorToServer(error: Throwable) {
-        try {
-            val errorRequest = ClientErrorRequest(
-                message = error.message ?: error.toString(),
-                stackTrace = error.stackTraceToString(),
-                url = window.location.href,
-                userAgent = window.navigator.userAgent,
-                timestamp = js("new Date().toISOString()") as String
-            )
-
-            // Use basic fetch without awaiting - fire and forget
-            window.fetch("$baseUrl/log-client-error", RequestInit(
-                method = "POST",
-                headers = json(
-                    "Content-Type" to "application/json"
-                ),
-                body = json.encodeToString(errorRequest)
-            ))
-        } catch (loggingError: Throwable) {
-            // If logging fails, at least show it in console
-            console.error("Failed to log error to server:", loggingError)
-            console.error("Original error:", error)
-        }
     }
 }
 
