@@ -2,6 +2,7 @@ package com.seanshubin.vote.frontend
 
 import androidx.compose.runtime.*
 import com.seanshubin.vote.contract.ApiClient
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.web.attributes.*
 import org.jetbrains.compose.web.dom.*
@@ -10,19 +11,19 @@ import org.jetbrains.compose.web.dom.*
 fun LoginPage(
     apiClient: ApiClient,
     onLoginSuccess: (String, String) -> Unit,
-    onNavigateToRegister: () -> Unit
+    onNavigateToRegister: () -> Unit,
+    coroutineScope: CoroutineScope = rememberCoroutineScope()
 ) {
     var userName by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var isLoading by remember { mutableStateOf(false) }
-    val scope = rememberCoroutineScope()
 
     val handleLogin = {
         if (!isLoading) {
             isLoading = true
             errorMessage = null
-            scope.launch {
+            coroutineScope.launch {
                 try {
                     val tokens = apiClient.authenticate(userName, password)
                     val tokenJson = """{"userName":"$userName","role":"USER"}"""

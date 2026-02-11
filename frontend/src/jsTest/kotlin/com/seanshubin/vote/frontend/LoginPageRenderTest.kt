@@ -123,7 +123,8 @@ class LoginPageRenderTest {
                 LoginPage(
                     apiClient = fakeClient,
                     onLoginSuccess = { _, _ -> loginSuccessCalled = true },
-                    onNavigateToRegister = { }
+                    onNavigateToRegister = { },
+                    coroutineScope = this@runTest
                 )
             }
 
@@ -180,7 +181,8 @@ class LoginPageRenderTest {
                 LoginPage(
                     apiClient = fakeClient,
                     onLoginSuccess = { _, _ -> loginSuccessCalled = true },
-                    onNavigateToRegister = { }
+                    onNavigateToRegister = { },
+                    coroutineScope = this@runTest
                 )
             }
 
@@ -237,7 +239,8 @@ class LoginPageRenderTest {
                 LoginPage(
                     apiClient = fakeClient,
                     onLoginSuccess = { _, _ -> loginSuccessCalled = true },
-                    onNavigateToRegister = { }
+                    onNavigateToRegister = { },
+                    coroutineScope = this@runTest
                 )
             }
 
@@ -301,7 +304,8 @@ class LoginPageRenderTest {
                         capturedToken = token
                         capturedUserName = userName
                     },
-                    onNavigateToRegister = { }
+                    onNavigateToRegister = { },
+                    coroutineScope = this@runTest
                 )
             }
 
