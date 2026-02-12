@@ -4,6 +4,7 @@ import com.seanshubin.vote.contract.AccessToken
 import com.seanshubin.vote.contract.RefreshToken
 import com.seanshubin.vote.contract.Tokens
 import com.seanshubin.vote.domain.Role
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
 import org.jetbrains.compose.web.renderComposable
 import kotlin.test.Test
@@ -13,198 +14,171 @@ import kotlin.test.assertTrue
 
 class RegisterPageRenderTest {
 
-    @Test
-    fun registerPageRendersWithUsernameEmailAndPasswordFields() = runTest {
-        // given
-        val fakeClient = FakeApiClient()
-        val testId = "register-render-test"
+    /**
+     * Test orchestrator for RegisterPage that hides infrastructure details.
+     */
+    class RegisterPageTester(
+        private val testScope: TestScope,
+        private val testId: String = "register-page-test"
+    ) : AutoCloseable {
+        private val fakeClient = FakeApiClient()
+        private val testRoot = ComposeTestHelper.createTestRoot(testId)
+        private var loginSuccessCalled = false
+        private var capturedToken: String? = null
+        private var capturedUserName: String? = null
+        private var navigateToLoginCalled = false
 
-        ComposeTestHelper.createTestRoot(testId).use {
-            // when
+        init {
             renderComposable(rootElementId = testId) {
                 RegisterPage(
                     apiClient = fakeClient,
-                    onLoginSuccess = { _, _ -> },
-                    onNavigateToLogin = { }
+                    onLoginSuccess = { token, userName ->
+                        loginSuccessCalled = true
+                        capturedToken = token
+                        capturedUserName = userName
+                    },
+                    onNavigateToLogin = { navigateToLoginCalled = true },
+                    coroutineScope = testScope
                 )
             }
+        }
 
+        // Setup methods
+        fun setupRegisterSuccess(tokens: Tokens) {
+            fakeClient.registerResult = Result.success(tokens)
+        }
+
+        fun setupRegisterFailure(error: Exception) {
+            fakeClient.registerResult = Result.failure(error)
+        }
+
+        // Action methods
+        fun enterRegistrationInfo(userName: String, email: String, password: String) {
+            ComposeTestHelper.setInputByPlaceholder(testId, "Username", userName)
+            ComposeTestHelper.setInputByPlaceholder(testId, "Email", email)
+            ComposeTestHelper.setInputByPlaceholder(testId, "Password", password)
+        }
+
+        fun pressEnterInPasswordField() {
+            ComposeTestHelper.pressEnterInInput(testId, "Password")
+            testScope.advanceUntilIdle()
+        }
+
+        fun pressEnterInEmailField() {
+            ComposeTestHelper.pressEnterInInput(testId, "Email")
+            testScope.advanceUntilIdle()
+        }
+
+        fun clickRegisterButton() {
+            ComposeTestHelper.clickButtonByText(testId, "Register")
+            testScope.advanceUntilIdle()
+        }
+
+        // Query methods
+        fun registerCalls() = fakeClient.registerCalls
+
+        fun wasLoginSuccessCallbackInvoked() = loginSuccessCalled
+
+        fun capturedAuthToken() = capturedToken
+
+        fun capturedUserName() = capturedUserName
+
+        fun wasNavigateToLoginCalled() = navigateToLoginCalled
+
+        fun usernameInputExists() = ComposeTestHelper.inputExistsByPlaceholder(testId, "Username")
+
+        fun emailInputExists() = ComposeTestHelper.inputExistsByPlaceholder(testId, "Email")
+
+        fun passwordInputExists() = ComposeTestHelper.inputExistsByPlaceholder(testId, "Password")
+
+        override fun close() {
+            testRoot.close()
+        }
+    }
+
+
+    @Test
+    fun registerPageRendersWithUsernameEmailAndPasswordFields() = runTest {
+        RegisterPageTester(this).use { tester ->
             // then - verify it rendered with expected input fields
-            assertTrue(
-                ComposeTestHelper.inputExistsByPlaceholder(testId, "Username"),
-                "Username input should exist"
-            )
-            assertTrue(
-                ComposeTestHelper.inputExistsByPlaceholder(testId, "Email"),
-                "Email input should exist"
-            )
-            assertTrue(
-                ComposeTestHelper.inputExistsByPlaceholder(testId, "Password"),
-                "Password input should exist"
-            )
+            assertTrue(tester.usernameInputExists(), "Username input should exist")
+            assertTrue(tester.emailInputExists(), "Email input should exist")
+            assertTrue(tester.passwordInputExists(), "Password input should exist")
         }
     }
 
     @Test
     fun registerPageEnterKeyInPasswordFieldTriggersRegistration() = runTest {
-        // given
-        val fakeClient = FakeApiClient()
-        val expectedTokens = Tokens(
-            AccessToken("alice", Role.USER),
-            RefreshToken("alice")
-        )
-        fakeClient.registerResult = Result.success(expectedTokens)
+        RegisterPageTester(this).use { tester ->
+            // given
+            val expectedTokens = Tokens(AccessToken("alice", Role.USER), RefreshToken("alice"))
+            tester.setupRegisterSuccess(expectedTokens)
 
-        val testId = "register-enter-password-test"
-
-        ComposeTestHelper.createTestRoot(testId).use {
-            renderComposable(rootElementId = testId) {
-                RegisterPage(
-                    apiClient = fakeClient,
-                    onLoginSuccess = { _, _ -> },
-                    onNavigateToLogin = { },
-                    coroutineScope = this@runTest
-                )
-            }
-
-            // when - enter username, email, and password, then press Enter in password field
-            ComposeTestHelper.setInputByPlaceholder(testId, "Username", "alice")
-            ComposeTestHelper.setInputByPlaceholder(testId, "Email", "alice@example.com")
-            ComposeTestHelper.setInputByPlaceholder(testId, "Password", "password123")
-            ComposeTestHelper.pressEnterInInput(testId, "Password")
-
-            // Wait for all coroutines to complete
-            advanceUntilIdle()
+            // when
+            tester.enterRegistrationInfo("alice", "alice@example.com", "password123")
+            tester.pressEnterInPasswordField()
 
             // then
-            assertEquals(1, fakeClient.registerCalls.size, "Expected 1 register call but got ${fakeClient.registerCalls.size}")
-            assertEquals("alice", fakeClient.registerCalls[0].userName)
-            assertEquals("alice@example.com", fakeClient.registerCalls[0].email)
-            assertEquals("password123", fakeClient.registerCalls[0].password)
+            assertEquals(1, tester.registerCalls().size)
+            assertEquals("alice", tester.registerCalls()[0].userName)
+            assertEquals("alice@example.com", tester.registerCalls()[0].email)
+            assertEquals("password123", tester.registerCalls()[0].password)
         }
     }
 
     @Test
     fun registerPageEnterKeyInEmailFieldTriggersRegistration() = runTest {
-        // given
-        val fakeClient = FakeApiClient()
-        val expectedTokens = Tokens(
-            AccessToken("bob", Role.USER),
-            RefreshToken("bob")
-        )
-        fakeClient.registerResult = Result.success(expectedTokens)
+        RegisterPageTester(this).use { tester ->
+            // given
+            val expectedTokens = Tokens(AccessToken("bob", Role.USER), RefreshToken("bob"))
+            tester.setupRegisterSuccess(expectedTokens)
 
-        val testId = "register-enter-email-test"
-
-        ComposeTestHelper.createTestRoot(testId).use {
-            renderComposable(rootElementId = testId) {
-                RegisterPage(
-                    apiClient = fakeClient,
-                    onLoginSuccess = { _, _ -> },
-                    onNavigateToLogin = { },
-                    coroutineScope = this@runTest
-                )
-            }
-
-            // when - enter username, email, and password, then press Enter in email field
-            ComposeTestHelper.setInputByPlaceholder(testId, "Username", "bob")
-            ComposeTestHelper.setInputByPlaceholder(testId, "Email", "bob@example.com")
-            ComposeTestHelper.setInputByPlaceholder(testId, "Password", "securepass")
-            ComposeTestHelper.pressEnterInInput(testId, "Email")
-
-            // Wait for all coroutines to complete
-            advanceUntilIdle()
+            // when
+            tester.enterRegistrationInfo("bob", "bob@example.com", "securepass")
+            tester.pressEnterInEmailField()
 
             // then
-            assertEquals(1, fakeClient.registerCalls.size, "Expected 1 register call but got ${fakeClient.registerCalls.size}")
-            assertEquals("bob", fakeClient.registerCalls[0].userName)
-            assertEquals("bob@example.com", fakeClient.registerCalls[0].email)
-            assertEquals("securepass", fakeClient.registerCalls[0].password)
+            assertEquals(1, tester.registerCalls().size)
+            assertEquals("bob", tester.registerCalls()[0].userName)
+            assertEquals("bob@example.com", tester.registerCalls()[0].email)
+            assertEquals("securepass", tester.registerCalls()[0].password)
         }
     }
 
     @Test
     fun registerButtonClickTriggersRegistration() = runTest {
-        // given
-        val fakeClient = FakeApiClient()
-        val expectedTokens = Tokens(
-            AccessToken("charlie", Role.USER),
-            RefreshToken("charlie")
-        )
-        fakeClient.registerResult = Result.success(expectedTokens)
+        RegisterPageTester(this).use { tester ->
+            // given
+            val expectedTokens = Tokens(AccessToken("charlie", Role.USER), RefreshToken("charlie"))
+            tester.setupRegisterSuccess(expectedTokens)
 
-        val testId = "register-button-click-test"
-
-        ComposeTestHelper.createTestRoot(testId).use {
-            renderComposable(rootElementId = testId) {
-                RegisterPage(
-                    apiClient = fakeClient,
-                    onLoginSuccess = { _, _ -> },
-                    onNavigateToLogin = { },
-                    coroutineScope = this@runTest
-                )
-            }
-
-            // when - enter username, email, and password, then click register button
-            ComposeTestHelper.setInputByPlaceholder(testId, "Username", "charlie")
-            ComposeTestHelper.setInputByPlaceholder(testId, "Email", "charlie@example.com")
-            ComposeTestHelper.setInputByPlaceholder(testId, "Password", "mypassword")
-            ComposeTestHelper.clickButtonByText(testId, "Register")
-
-            // Wait for all coroutines to complete
-            advanceUntilIdle()
+            // when
+            tester.enterRegistrationInfo("charlie", "charlie@example.com", "mypassword")
+            tester.clickRegisterButton()
 
             // then
-            assertEquals(1, fakeClient.registerCalls.size, "Expected 1 register call but got ${fakeClient.registerCalls.size}")
-            assertEquals("charlie", fakeClient.registerCalls[0].userName)
-            assertEquals("charlie@example.com", fakeClient.registerCalls[0].email)
-            assertEquals("mypassword", fakeClient.registerCalls[0].password)
+            assertEquals(1, tester.registerCalls().size)
+            assertEquals("charlie", tester.registerCalls()[0].userName)
+            assertEquals("charlie@example.com", tester.registerCalls()[0].email)
+            assertEquals("mypassword", tester.registerCalls()[0].password)
         }
     }
 
     @Test
     fun registerSuccessCallbackInvokedWithCorrectToken() = runTest {
-        // given
-        val fakeClient = FakeApiClient()
-        val expectedTokens = Tokens(
-            AccessToken("dave", Role.USER),
-            RefreshToken("dave")
-        )
-        fakeClient.registerResult = Result.success(expectedTokens)
+        RegisterPageTester(this).use { tester ->
+            // given
+            val expectedTokens = Tokens(AccessToken("dave", Role.USER), RefreshToken("dave"))
+            tester.setupRegisterSuccess(expectedTokens)
 
-        val testId = "register-callback-test"
-
-        var registrationSuccessCalled = false
-        var capturedToken: String? = null
-        var capturedUserName: String? = null
-
-        ComposeTestHelper.createTestRoot(testId).use {
-            renderComposable(rootElementId = testId) {
-                RegisterPage(
-                    apiClient = fakeClient,
-                    onLoginSuccess = { token, userName ->
-                        registrationSuccessCalled = true
-                        capturedToken = token
-                        capturedUserName = userName
-                    },
-                    onNavigateToLogin = { },
-                    coroutineScope = this@runTest
-                )
-            }
-
-            // when - enter username, email, and password, then click register button
-            ComposeTestHelper.setInputByPlaceholder(testId, "Username", "dave")
-            ComposeTestHelper.setInputByPlaceholder(testId, "Email", "dave@example.com")
-            ComposeTestHelper.setInputByPlaceholder(testId, "Password", "password")
-            ComposeTestHelper.clickButtonByText(testId, "Register")
-
-            // Wait for all coroutines to complete
-            advanceUntilIdle()
+            // when
+            tester.enterRegistrationInfo("dave", "dave@example.com", "password")
+            tester.clickRegisterButton()
 
             // then
-            assertTrue(registrationSuccessCalled, "Registration success callback should be invoked")
-            assertEquals("dave", capturedUserName)
-            assertNotNull(capturedToken)
+            assertTrue(tester.wasLoginSuccessCallbackInvoked(), "Registration success callback should be invoked")
+            assertEquals("dave", tester.capturedUserName())
+            assertNotNull(tester.capturedAuthToken())
         }
     }
 }

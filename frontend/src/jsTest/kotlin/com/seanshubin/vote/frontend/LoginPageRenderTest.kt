@@ -4,6 +4,7 @@ import com.seanshubin.vote.contract.AccessToken
 import com.seanshubin.vote.contract.RefreshToken
 import com.seanshubin.vote.contract.Tokens
 import com.seanshubin.vote.domain.Role
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
 import org.jetbrains.compose.web.renderComposable
 import kotlin.test.Test
@@ -25,191 +26,24 @@ import kotlin.test.assertTrue
  */
 class LoginPageRenderTest {
 
-    @Test
-    fun loginPageRendersWithUsernameAndPasswordFields() = runTest {
-        // given
-        val fakeClient = FakeApiClient()
-        val testId = "login-render-test"
+    /**
+     * Test orchestrator that handles infrastructure details and provides a clean API for testing LoginPage.
+     *
+     * Pattern: Hide test infrastructure (fake client, test root, rendering, DOM interaction)
+     * behind domain-specific methods that focus on behavior.
+     */
+    class LoginPageTester(
+        private val testScope: TestScope,
+        private val testId: String = "login-page-test"
+    ) : AutoCloseable {
+        private val fakeClient = FakeApiClient()
+        private val testRoot = ComposeTestHelper.createTestRoot(testId)
+        private var loginSuccessCalled = false
+        private var capturedToken: String? = null
+        private var capturedUserName: String? = null
+        private var navigateToRegisterCalled = false
 
-        ComposeTestHelper.createTestRoot(testId).use {
-            // when
-            renderComposable(rootElementId = testId) {
-                LoginPage(
-                    apiClient = fakeClient,
-                    onLoginSuccess = { _, _ -> },
-                    onNavigateToRegister = { }
-                )
-            }
-
-            // then - verify it rendered with expected input fields
-            assertTrue(
-                ComposeTestHelper.inputExistsByPlaceholder(testId, "Username"),
-                "Username input should exist"
-            )
-            assertTrue(
-                ComposeTestHelper.inputExistsByPlaceholder(testId, "Password"),
-                "Password input should exist"
-            )
-        }
-    }
-
-    @Test
-    fun loginPageInputsCanBeSet() = runTest {
-        // Diagnostic test: can we set input values and read them back?
-        val fakeClient = FakeApiClient()
-        val testId = "login-diagnostic-test"
-
-        ComposeTestHelper.createTestRoot(testId).use {
-            renderComposable(rootElementId = testId) {
-                LoginPage(
-                    apiClient = fakeClient,
-                    onLoginSuccess = { _, _ -> },
-                    onNavigateToRegister = { }
-                )
-            }
-
-            // Set input value using helper
-            ComposeTestHelper.setInputByPlaceholder(testId, "Username", "testuser")
-
-            // Read back the value to verify it was set
-            val readValue = js("""
-                var usernameInput = document.querySelector('#login-diagnostic-test input[placeholder="Username"]')
-                usernameInput.value
-            """) as? String
-
-            println("DEBUG: Input value after setting: $readValue")
-            assertEquals("testuser", readValue, "Input value should be readable")
-        }
-    }
-
-    @Test
-    fun loginPageEnterKeyInPasswordFieldTriggersAuthentication() = runTest {
-        // given
-        val fakeClient = FakeApiClient()
-        val expectedTokens = Tokens(
-            AccessToken("alice", Role.USER),
-            RefreshToken("alice")
-        )
-        fakeClient.authenticateResult = Result.success(expectedTokens)
-
-        val testId = "login-enter-password-test"
-
-        ComposeTestHelper.createTestRoot(testId).use {
-            renderComposable(rootElementId = testId) {
-                LoginPage(
-                    apiClient = fakeClient,
-                    onLoginSuccess = { _, _ -> },
-                    onNavigateToRegister = { },
-                    coroutineScope = this@runTest
-                )
-            }
-
-            // when - enter username and password, then press Enter in password field
-            ComposeTestHelper.setInputByPlaceholder(testId, "Username", "alice")
-            ComposeTestHelper.setInputByPlaceholder(testId, "Password", "password123")
-            ComposeTestHelper.pressEnterInInput(testId, "Password")
-
-            // Wait for all coroutines (handleLogin coroutine) to complete
-            advanceUntilIdle()
-
-            // then
-            assertEquals(1, fakeClient.authenticateCalls.size, "Expected 1 authenticate call but got ${fakeClient.authenticateCalls.size}")
-            assertEquals("alice", fakeClient.authenticateCalls[0].userName)
-            assertEquals("password123", fakeClient.authenticateCalls[0].password)
-        }
-    }
-
-    @Test
-    fun loginPageEnterKeyInUsernameFieldTriggersAuthentication() = runTest {
-        // given
-        val fakeClient = FakeApiClient()
-        val expectedTokens = Tokens(
-            AccessToken("bob", Role.USER),
-            RefreshToken("bob")
-        )
-        fakeClient.authenticateResult = Result.success(expectedTokens)
-
-        val testId = "login-enter-username-test"
-
-        ComposeTestHelper.createTestRoot(testId).use {
-            renderComposable(rootElementId = testId) {
-                LoginPage(
-                    apiClient = fakeClient,
-                    onLoginSuccess = { _, _ -> },
-                    onNavigateToRegister = { },
-                    coroutineScope = this@runTest
-                )
-            }
-
-            // when - enter username and password, then press Enter in username field
-            ComposeTestHelper.setInputByPlaceholder(testId, "Username", "bob")
-            ComposeTestHelper.setInputByPlaceholder(testId, "Password", "securepass")
-            ComposeTestHelper.pressEnterInInput(testId, "Username")
-
-            // Wait for all coroutines to complete
-            advanceUntilIdle()
-
-            // then
-            assertEquals(1, fakeClient.authenticateCalls.size, "Expected 1 authenticate call but got ${fakeClient.authenticateCalls.size}")
-            assertEquals("bob", fakeClient.authenticateCalls[0].userName)
-            assertEquals("securepass", fakeClient.authenticateCalls[0].password)
-        }
-    }
-
-    @Test
-    fun loginButtonClickTriggersAuthentication() = runTest {
-        // given
-        val fakeClient = FakeApiClient()
-        val expectedTokens = Tokens(
-            AccessToken("charlie", Role.USER),
-            RefreshToken("charlie")
-        )
-        fakeClient.authenticateResult = Result.success(expectedTokens)
-
-        val testId = "login-button-click-test"
-
-        ComposeTestHelper.createTestRoot(testId).use {
-            renderComposable(rootElementId = testId) {
-                LoginPage(
-                    apiClient = fakeClient,
-                    onLoginSuccess = { _, _ -> },
-                    onNavigateToRegister = { },
-                    coroutineScope = this@runTest
-                )
-            }
-
-            // when - enter username and password, then click login button
-            ComposeTestHelper.setInputByPlaceholder(testId, "Username", "charlie")
-            ComposeTestHelper.setInputByPlaceholder(testId, "Password", "mypassword")
-            ComposeTestHelper.clickButtonByText(testId, "Login")
-
-            // Wait for all coroutines to complete
-            advanceUntilIdle()
-
-            // then
-            assertEquals(1, fakeClient.authenticateCalls.size, "Expected 1 authenticate call but got ${fakeClient.authenticateCalls.size}")
-            assertEquals("charlie", fakeClient.authenticateCalls[0].userName)
-            assertEquals("mypassword", fakeClient.authenticateCalls[0].password)
-        }
-    }
-
-    @Test
-    fun loginSuccessCallbackInvokedWithCorrectToken() = runTest {
-        // given
-        val fakeClient = FakeApiClient()
-        val expectedTokens = Tokens(
-            AccessToken("dave", Role.OWNER),
-            RefreshToken("dave")
-        )
-        fakeClient.authenticateResult = Result.success(expectedTokens)
-
-        val testId = "login-callback-test"
-
-        var loginSuccessCalled = false
-        var capturedToken: String? = null
-        var capturedUserName: String? = null
-
-        ComposeTestHelper.createTestRoot(testId).use {
+        init {
             renderComposable(rootElementId = testId) {
                 LoginPage(
                     apiClient = fakeClient,
@@ -218,23 +52,141 @@ class LoginPageRenderTest {
                         capturedToken = token
                         capturedUserName = userName
                     },
-                    onNavigateToRegister = { },
-                    coroutineScope = this@runTest
+                    onNavigateToRegister = { navigateToRegisterCalled = true },
+                    coroutineScope = testScope
                 )
             }
+        }
 
-            // when - enter username and password, then click login button
-            ComposeTestHelper.setInputByPlaceholder(testId, "Username", "dave")
-            ComposeTestHelper.setInputByPlaceholder(testId, "Password", "password")
+        // Setup methods - configure fake behavior
+        fun setupAuthenticateSuccess(tokens: Tokens) {
+            fakeClient.authenticateResult = Result.success(tokens)
+        }
+
+        fun setupAuthenticateFailure(error: Exception) {
+            fakeClient.authenticateResult = Result.failure(error)
+        }
+
+        // Action methods - interact with the UI
+        fun enterCredentials(userName: String, password: String) {
+            ComposeTestHelper.setInputByPlaceholder(testId, "Username", userName)
+            ComposeTestHelper.setInputByPlaceholder(testId, "Password", password)
+        }
+
+        fun pressEnterInPasswordField() {
+            ComposeTestHelper.pressEnterInInput(testId, "Password")
+            testScope.advanceUntilIdle()
+        }
+
+        fun pressEnterInUsernameField() {
+            ComposeTestHelper.pressEnterInInput(testId, "Username")
+            testScope.advanceUntilIdle()
+        }
+
+        fun clickLoginButton() {
             ComposeTestHelper.clickButtonByText(testId, "Login")
+            testScope.advanceUntilIdle()
+        }
 
-            // Wait for all coroutines to complete
-            advanceUntilIdle()
+        // Query methods - verify state
+        fun authenticateCalls() = fakeClient.authenticateCalls
+
+        fun wasLoginSuccessCallbackInvoked() = loginSuccessCalled
+
+        fun capturedAuthToken() = capturedToken
+
+        fun capturedUserName() = capturedUserName
+
+        fun wasNavigateToRegisterCalled() = navigateToRegisterCalled
+
+        fun usernameInputExists() = ComposeTestHelper.inputExistsByPlaceholder(testId, "Username")
+
+        fun passwordInputExists() = ComposeTestHelper.inputExistsByPlaceholder(testId, "Password")
+
+        override fun close() {
+            testRoot.close()
+        }
+    }
+
+
+    @Test
+    fun loginPageRendersWithUsernameAndPasswordFields() = runTest {
+        LoginPageTester(this).use { tester ->
+            // then - verify it rendered with expected input fields
+            assertTrue(tester.usernameInputExists(), "Username input should exist")
+            assertTrue(tester.passwordInputExists(), "Password input should exist")
+        }
+    }
+
+    @Test
+    fun loginPageEnterKeyInPasswordFieldTriggersAuthentication() = runTest {
+        LoginPageTester(this).use { tester ->
+            // given
+            val expectedTokens = Tokens(AccessToken("alice", Role.USER), RefreshToken("alice"))
+            tester.setupAuthenticateSuccess(expectedTokens)
+
+            // when
+            tester.enterCredentials("alice", "password123")
+            tester.pressEnterInPasswordField()
 
             // then
-            assertTrue(loginSuccessCalled, "Login success callback should be invoked")
-            assertEquals("dave", capturedUserName)
-            assertNotNull(capturedToken)
+            assertEquals(1, tester.authenticateCalls().size)
+            assertEquals("alice", tester.authenticateCalls()[0].userName)
+            assertEquals("password123", tester.authenticateCalls()[0].password)
+        }
+    }
+
+    @Test
+    fun loginPageEnterKeyInUsernameFieldTriggersAuthentication() = runTest {
+        LoginPageTester(this).use { tester ->
+            // given
+            val expectedTokens = Tokens(AccessToken("bob", Role.USER), RefreshToken("bob"))
+            tester.setupAuthenticateSuccess(expectedTokens)
+
+            // when
+            tester.enterCredentials("bob", "securepass")
+            tester.pressEnterInUsernameField()
+
+            // then
+            assertEquals(1, tester.authenticateCalls().size)
+            assertEquals("bob", tester.authenticateCalls()[0].userName)
+            assertEquals("securepass", tester.authenticateCalls()[0].password)
+        }
+    }
+
+    @Test
+    fun loginButtonClickTriggersAuthentication() = runTest {
+        LoginPageTester(this).use { tester ->
+            // given
+            val expectedTokens = Tokens(AccessToken("charlie", Role.USER), RefreshToken("charlie"))
+            tester.setupAuthenticateSuccess(expectedTokens)
+
+            // when
+            tester.enterCredentials("charlie", "mypassword")
+            tester.clickLoginButton()
+
+            // then
+            assertEquals(1, tester.authenticateCalls().size)
+            assertEquals("charlie", tester.authenticateCalls()[0].userName)
+            assertEquals("mypassword", tester.authenticateCalls()[0].password)
+        }
+    }
+
+    @Test
+    fun loginSuccessCallbackInvokedWithCorrectToken() = runTest {
+        LoginPageTester(this).use { tester ->
+            // given
+            val expectedTokens = Tokens(AccessToken("dave", Role.OWNER), RefreshToken("dave"))
+            tester.setupAuthenticateSuccess(expectedTokens)
+
+            // when
+            tester.enterCredentials("dave", "password")
+            tester.clickLoginButton()
+
+            // then
+            assertTrue(tester.wasLoginSuccessCallbackInvoked(), "Login success callback should be invoked")
+            assertEquals("dave", tester.capturedUserName())
+            assertNotNull(tester.capturedAuthToken())
         }
     }
 }
