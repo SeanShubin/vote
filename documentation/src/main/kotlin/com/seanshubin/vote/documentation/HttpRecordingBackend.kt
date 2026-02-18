@@ -206,6 +206,36 @@ class HttpRecordingBackend(
         return json.decodeFromString<List<Permission>>(response.body())
     }
 
+    override fun refresh(refreshToken: RefreshToken): Tokens {
+        val body = json.encodeToString(refreshToken)
+        val response = recorder.post("/refresh", body)
+        return json.decodeFromString<Tokens>(response.body())
+    }
+
+    override fun authenticateWithToken(accessToken: AccessToken): Tokens {
+        val body = json.encodeToString(accessToken)
+        val response = recorder.post("/authenticate-with-token", body)
+        return json.decodeFromString<Tokens>(response.body())
+    }
+
+    override fun authenticate(nameOrEmail: String, password: String): Tokens {
+        val request = AuthenticateRequest(nameOrEmail, password)
+        val body = json.encodeToString(request)
+        val response = recorder.post("/authenticate", body)
+        return json.decodeFromString<Tokens>(response.body())
+    }
+
+    override fun updateElection(token: AccessToken, electionName: String, updates: ElectionUpdates) {
+        val body = json.encodeToString(updates)
+        val encodedName = URLEncoder.encode(electionName, StandardCharsets.UTF_8)
+        recorder.put("/election/$encodedName", body, token)
+    }
+
+    override fun sendLoginLinkByEmail(email: String, baseUri: String) {
+        val body = """{"email":"$email","baseUri":"$baseUri"}"""
+        recorder.post("/login-link", body)
+    }
+
     override fun synchronize() {
         recorder.post("/sync", "{}")
     }
