@@ -51,6 +51,10 @@ p {
     margin-top: 1rem;
 }
 
+.form button {
+    margin-top: 0;
+}
+
 input[type="text"],
 input[type="email"],
 input[type="password"],
@@ -96,6 +100,7 @@ button {
     font-size: 1rem;
     cursor: pointer;
     transition: background-color 0.2s;
+    margin-top: 1rem;
 }
 
 button:hover {
@@ -132,6 +137,10 @@ button:disabled {
     margin-top: 1rem;
 }
 
+.menu button {
+    margin-top: 0;
+}
+
 .tabs {
     display: flex;
     gap: 0.5rem;
@@ -145,6 +154,7 @@ button:disabled {
     color: #3498db;
     border: none;
     padding: 0.5rem 1rem;
+    margin-top: 0;
 }
 
 .tabs button:hover {
@@ -173,6 +183,7 @@ button:disabled {
 
 .election-item button {
     padding: 0.5rem 1rem;
+    margin-top: 0;
 }
 
 .ranking-row {
