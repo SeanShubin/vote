@@ -19,6 +19,24 @@ fun CreateElectionPage(
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var isLoading by remember { mutableStateOf(false) }
 
+    val handleCreateElection = {
+        if (!isLoading && electionName.isNotBlank()) {
+            isLoading = true
+            errorMessage = null
+            coroutineScope.launch {
+                try {
+                    apiClient.createElection(authToken, electionName)
+                    onElectionCreated(electionName)
+                } catch (e: Exception) {
+                    apiClient.logErrorToServer(e)
+                    errorMessage = e.message ?: "Failed to create election"
+                } finally {
+                    isLoading = false
+                }
+            }
+        }
+    }
+
     Div({ classes("container") }) {
         H1 { Text("Create Election") }
 
@@ -33,26 +51,15 @@ fun CreateElectionPage(
                 placeholder("Election Name")
                 value(electionName)
                 onInput { electionName = it.value }
+                onKeyDown { event ->
+                    if (event.key == "Enter") {
+                        handleCreateElection()
+                    }
+                }
             }
 
             Button({
-                onClick {
-                    if (!isLoading && electionName.isNotBlank()) {
-                        isLoading = true
-                        errorMessage = null
-                        coroutineScope.launch {
-                            try {
-                                apiClient.createElection(authToken, electionName)
-                                onElectionCreated(electionName)
-                            } catch (e: Exception) {
-                                apiClient.logErrorToServer(e)
-                                errorMessage = e.message ?: "Failed to create election"
-                            } finally {
-                                isLoading = false
-                            }
-                        }
-                    }
-                }
+                onClick { handleCreateElection() }
             }) {
                 Text(if (isLoading) "Creating..." else "Create")
             }

@@ -53,6 +53,11 @@ class CreateElectionPageRenderTest {
             testScope.advanceUntilIdle()
         }
 
+        fun pressEnterInElectionName() {
+            ComposeTestHelper.pressEnterInInput(testId, "Election Name")
+            testScope.advanceUntilIdle()
+        }
+
         // Query methods
         fun createElectionCalls() = fakeClient.createElectionCalls
 
@@ -105,6 +110,24 @@ class CreateElectionPageRenderTest {
 
             // then - should not call createElection
             assertEquals(0, tester.createElectionCalls().size, "Should not create election with empty name")
+        }
+    }
+
+    @Test
+    fun pressingEnterCreatesElection() = runTest {
+        CreateElectionPageTester(this).use { tester ->
+            // given
+            tester.setupCreateElectionSuccess("Test Election")
+
+            // when
+            tester.enterElectionName("Test Election")
+            tester.pressEnterInElectionName()
+
+            // then
+            assertEquals(1, tester.createElectionCalls().size)
+            assertEquals("test-token", tester.createElectionCalls()[0].authToken)
+            assertEquals("Test Election", tester.createElectionCalls()[0].electionName)
+            assertEquals("Test Election", tester.capturedElectionName())
         }
     }
 }
