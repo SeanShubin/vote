@@ -1,0 +1,273 @@
+{
+  "scenarioNumber": "03",
+  "scenarioName": "03-contrast-instant-runoff",
+  "displayName": "Contrast Instant Runoff",
+  "electionName": "Contrast Instant Runoff Election",
+  "ownerName": "owner",
+  "candidates": [
+    {
+      "originalName": "satisfactory",
+      "displayName": "Satisfactory"
+    },
+    {
+      "originalName": "only-liked-by-two",
+      "displayName": "Only Liked By Two"
+    },
+    {
+      "originalName": "a-only-liked-by-one",
+      "displayName": "A Only Liked By One"
+    },
+    {
+      "originalName": "b-only-liked-by-one",
+      "displayName": "B Only Liked By One"
+    },
+    {
+      "originalName": "c-only-liked-by-one",
+      "displayName": "C Only Liked By One"
+    },
+    {
+      "originalName": "d-only-liked-by-one",
+      "displayName": "D Only Liked By One"
+    },
+    {
+      "originalName": "e-only-liked-by-one",
+      "displayName": "E Only Liked By One"
+    },
+    {
+      "originalName": "f-only-liked-by-one",
+      "displayName": "F Only Liked By One"
+    },
+    {
+      "originalName": "g-only-liked-by-one",
+      "displayName": "G Only Liked By One"
+    },
+    {
+      "originalName": "h-only-liked-by-one",
+      "displayName": "H Only Liked By One"
+    }
+  ],
+  "voters": [
+    {
+      "originalName": "christian-herring",
+      "displayName": "Christian Herring",
+      "email": "christian.herring@example.com"
+    },
+    {
+      "originalName": "tony-yates",
+      "displayName": "Tony Yates",
+      "email": "tony.yates@example.com"
+    },
+    {
+      "originalName": "melisa-townsend",
+      "displayName": "Melisa Townsend",
+      "email": "melisa.townsend@example.com"
+    },
+    {
+      "originalName": "carey-pena",
+      "displayName": "Carey Pena",
+      "email": "carey.pena@example.com"
+    },
+    {
+      "originalName": "shari-buckley",
+      "displayName": "Shari Buckley",
+      "email": "shari.buckley@example.com"
+    },
+    {
+      "originalName": "lizzie-cooper",
+      "displayName": "Lizzie Cooper",
+      "email": "lizzie.cooper@example.com"
+    },
+    {
+      "originalName": "cody-trevino",
+      "displayName": "Cody Trevino",
+      "email": "cody.trevino@example.com"
+    },
+    {
+      "originalName": "lucy-byrd",
+      "displayName": "Lucy Byrd",
+      "email": "lucy.byrd@example.com"
+    },
+    {
+      "originalName": "brooks-warner",
+      "displayName": "Brooks Warner",
+      "email": "brooks.warner@example.com"
+    },
+    {
+      "originalName": "sung-best",
+      "displayName": "Sung Best",
+      "email": "sung.best@example.com"
+    }
+  ],
+  "ballots": [
+    {
+      "voterOriginalName": "carey-pena",
+      "voterDisplayName": "Carey Pena",
+      "confirmation": "b78caec0-2c0a-4c39-a9d8-64d50e30a1cc",
+      "rankings": [
+        {
+          "candidateOriginalName": "only-liked-by-two",
+          "candidateDisplayName": "Only Liked By Two",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "satisfactory",
+          "candidateDisplayName": "Satisfactory",
+          "rank": 2
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "tony-yates",
+      "voterDisplayName": "Tony Yates",
+      "confirmation": "cdd03711-e842-4d03-ab72-ee4baf39c8a7",
+      "rankings": [
+        {
+          "candidateOriginalName": "only-liked-by-two",
+          "candidateDisplayName": "Only Liked By Two",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "satisfactory",
+          "candidateDisplayName": "Satisfactory",
+          "rank": 2
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "lucy-byrd",
+      "voterDisplayName": "Lucy Byrd",
+      "confirmation": "a36d3efc-2ebe-46e5-9bdb-c55cdb42bc2b",
+      "rankings": [
+        {
+          "candidateOriginalName": "a-only-liked-by-one",
+          "candidateDisplayName": "A Only Liked By One",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "satisfactory",
+          "candidateDisplayName": "Satisfactory",
+          "rank": 2
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "lizzie-cooper",
+      "voterDisplayName": "Lizzie Cooper",
+      "confirmation": "f604512b-af8c-466a-b1b4-5b5f29d0158e",
+      "rankings": [
+        {
+          "candidateOriginalName": "b-only-liked-by-one",
+          "candidateDisplayName": "B Only Liked By One",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "satisfactory",
+          "candidateDisplayName": "Satisfactory",
+          "rank": 2
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "christian-herring",
+      "voterDisplayName": "Christian Herring",
+      "confirmation": "8e0b5d9b-9eff-419e-95a7-7eb264722ff1",
+      "rankings": [
+        {
+          "candidateOriginalName": "c-only-liked-by-one",
+          "candidateDisplayName": "C Only Liked By One",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "satisfactory",
+          "candidateDisplayName": "Satisfactory",
+          "rank": 2
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "melisa-townsend",
+      "voterDisplayName": "Melisa Townsend",
+      "confirmation": "008ba37e-4d4d-48cd-b9cf-02b93d7e5f90",
+      "rankings": [
+        {
+          "candidateOriginalName": "d-only-liked-by-one",
+          "candidateDisplayName": "D Only Liked By One",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "satisfactory",
+          "candidateDisplayName": "Satisfactory",
+          "rank": 2
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "brooks-warner",
+      "voterDisplayName": "Brooks Warner",
+      "confirmation": "324e8632-8aa2-4542-a656-eef3ed6b2987",
+      "rankings": [
+        {
+          "candidateOriginalName": "e-only-liked-by-one",
+          "candidateDisplayName": "E Only Liked By One",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "satisfactory",
+          "candidateDisplayName": "Satisfactory",
+          "rank": 2
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "shari-buckley",
+      "voterDisplayName": "Shari Buckley",
+      "confirmation": "5fa28ea6-f2c7-47c2-bb79-1e9c940b4f3c",
+      "rankings": [
+        {
+          "candidateOriginalName": "f-only-liked-by-one",
+          "candidateDisplayName": "F Only Liked By One",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "satisfactory",
+          "candidateDisplayName": "Satisfactory",
+          "rank": 2
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "cody-trevino",
+      "voterDisplayName": "Cody Trevino",
+      "confirmation": "7946fde3-16c1-4a3c-9b1a-35b1458c407b",
+      "rankings": [
+        {
+          "candidateOriginalName": "g-only-liked-by-one",
+          "candidateDisplayName": "G Only Liked By One",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "satisfactory",
+          "candidateDisplayName": "Satisfactory",
+          "rank": 2
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "sung-best",
+      "voterDisplayName": "Sung Best",
+      "confirmation": "2e249883-b9ef-4aa2-a22b-2e515f2a3583",
+      "rankings": [
+        {
+          "candidateOriginalName": "h-only-liked-by-one",
+          "candidateDisplayName": "H Only Liked By One",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "satisfactory",
+          "candidateDisplayName": "Satisfactory",
+          "rank": 2
+        }
+      ]
+    }
+  ]
+}

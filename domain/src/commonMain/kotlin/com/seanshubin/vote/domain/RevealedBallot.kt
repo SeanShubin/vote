@@ -3,9 +3,11 @@ package com.seanshubin.vote.domain
 import com.seanshubin.vote.domain.Ranking.Companion.effectiveRankings
 import com.seanshubin.vote.domain.Ranking.Companion.matchOrderToCandidates
 import kotlinx.datetime.Instant
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
+@SerialName("RevealedBallot")
 data class RevealedBallot(
     val voterName: String,
     val electionName: String,

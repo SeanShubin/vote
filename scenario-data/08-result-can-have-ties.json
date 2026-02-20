@@ -1,0 +1,166 @@
+{
+  "scenarioNumber": "08",
+  "scenarioName": "08-result-can-have-ties",
+  "displayName": "Result Can Have Ties",
+  "electionName": "Result Can Have Ties Election",
+  "ownerName": "owner",
+  "candidates": [
+    {
+      "originalName": "dona-choi",
+      "displayName": "Dona Choi"
+    },
+    {
+      "originalName": "ivan-becker",
+      "displayName": "Ivan Becker"
+    },
+    {
+      "originalName": "russell-frank",
+      "displayName": "Russell Frank"
+    },
+    {
+      "originalName": "max-hale",
+      "displayName": "Max Hale"
+    },
+    {
+      "originalName": "mohammed-mayo",
+      "displayName": "Mohammed Mayo"
+    }
+  ],
+  "voters": [
+    {
+      "originalName": "ben-buckley",
+      "displayName": "Ben Buckley",
+      "email": "ben.buckley@example.com"
+    },
+    {
+      "originalName": "elva-miller",
+      "displayName": "Elva Miller",
+      "email": "elva.miller@example.com"
+    },
+    {
+      "originalName": "hilda-dalton",
+      "displayName": "Hilda Dalton",
+      "email": "hilda.dalton@example.com"
+    },
+    {
+      "originalName": "miles-finley",
+      "displayName": "Miles Finley",
+      "email": "miles.finley@example.com"
+    },
+    {
+      "originalName": "wilda-webster",
+      "displayName": "Wilda Webster",
+      "email": "wilda.webster@example.com"
+    }
+  ],
+  "ballots": [
+    {
+      "voterOriginalName": "hilda-dalton",
+      "voterDisplayName": "Hilda Dalton",
+      "confirmation": "466eacb9-7ce9-471a-91a7-8c4c85289993",
+      "rankings": [
+        {
+          "candidateOriginalName": "mohammed-mayo",
+          "candidateDisplayName": "Mohammed Mayo",
+          "rank": 3
+        },
+        {
+          "candidateOriginalName": "dona-choi",
+          "candidateDisplayName": "Dona Choi",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "max-hale",
+          "candidateDisplayName": "Max Hale",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "ivan-becker",
+          "candidateDisplayName": "Ivan Becker",
+          "rank": 4
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "wilda-webster",
+      "voterDisplayName": "Wilda Webster",
+      "confirmation": "c6f221c3-8090-4624-9f26-e12384b1b815",
+      "rankings": [
+        {
+          "candidateOriginalName": "mohammed-mayo",
+          "candidateDisplayName": "Mohammed Mayo",
+          "rank": 4
+        },
+        {
+          "candidateOriginalName": "russell-frank",
+          "candidateDisplayName": "Russell Frank",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "dona-choi",
+          "candidateDisplayName": "Dona Choi",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "max-hale",
+          "candidateDisplayName": "Max Hale",
+          "rank": 3
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "miles-finley",
+      "voterDisplayName": "Miles Finley",
+      "confirmation": "132c4bbe-bfab-47af-a5b9-0de5504eebfa",
+      "rankings": [
+        {
+          "candidateOriginalName": "russell-frank",
+          "candidateDisplayName": "Russell Frank",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "ivan-becker",
+          "candidateDisplayName": "Ivan Becker",
+          "rank": 4
+        },
+        {
+          "candidateOriginalName": "max-hale",
+          "candidateDisplayName": "Max Hale",
+          "rank": 3
+        },
+        {
+          "candidateOriginalName": "mohammed-mayo",
+          "candidateDisplayName": "Mohammed Mayo",
+          "rank": 1
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "ben-buckley",
+      "voterDisplayName": "Ben Buckley",
+      "confirmation": "a4172882-10da-40b4-820e-3824466eb1e3",
+      "rankings": [
+        {
+          "candidateOriginalName": "russell-frank",
+          "candidateDisplayName": "Russell Frank",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "mohammed-mayo",
+          "candidateDisplayName": "Mohammed Mayo",
+          "rank": 4
+        },
+        {
+          "candidateOriginalName": "ivan-becker",
+          "candidateDisplayName": "Ivan Becker",
+          "rank": 3
+        },
+        {
+          "candidateOriginalName": "max-hale",
+          "candidateDisplayName": "Max Hale",
+          "rank": 2
+        }
+      ]
+    }
+  ]
+}

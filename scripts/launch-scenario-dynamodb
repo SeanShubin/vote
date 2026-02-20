@@ -1,0 +1,269 @@
+#!/usr/bin/env bash
+set -e
+
+# Launch vote application with DynamoDB database and pre-loaded scenario data
+
+if [ $# -ne 1 ]; then
+    echo "Usage: $0 <scenario-number-or-name>"
+    echo ""
+    echo "Examples:"
+    echo "  $0 01-contrast-first-past-the-post"
+    echo "  $0 01    # Can use just the number"
+    echo ""
+    echo "Available scenarios:"
+    ls -1 scenario-data/*.json 2>/dev/null | xargs -n 1 basename -s .json || echo "  (none - run ./scripts/convert-scenarios first)"
+    exit 1
+fi
+
+SCENARIO_PATTERN="$1"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+LOG_DIR="$PROJECT_DIR/logs"
+SCENARIO_DATA_DIR="$PROJECT_DIR/scenario-data"
+BASE_URL="http://localhost:8080"
+
+# Helper function to make API calls with error checking
+api_call() {
+    local method="$1"
+    local url="$2"
+    local auth="$3"
+    local data="$4"
+    local description="$5"
+
+    local response
+    local http_code
+
+    if [ -n "$auth" ] && [ -n "$data" ]; then
+        response=$(curl -s -w "\n%{http_code}" -X "$method" "$url" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer $auth" \
+            -d "$data")
+    elif [ -n "$auth" ]; then
+        response=$(curl -s -w "\n%{http_code}" -X "$method" "$url" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer $auth")
+    elif [ -n "$data" ]; then
+        response=$(curl -s -w "\n%{http_code}" -X "$method" "$url" \
+            -H "Content-Type: application/json" \
+            -d "$data")
+    else
+        response=$(curl -s -w "\n%{http_code}" -X "$method" "$url")
+    fi
+
+    http_code=$(echo "$response" | tail -1)
+    body=$(echo "$response" | sed '$d')
+
+    if [[ "$http_code" -ge 400 ]]; then
+        echo "   ERROR: $description failed with HTTP $http_code"
+        echo "   Response: $body"
+        exit 1
+    fi
+
+    echo "$body"
+}
+
+# Find matching scenario file
+SCENARIO_FILE=$(find "$SCENARIO_DATA_DIR" -name "${SCENARIO_PATTERN}*.json" 2>/dev/null | head -n 1)
+
+if [ -z "$SCENARIO_FILE" ]; then
+    echo "ERROR: No scenario found matching '$SCENARIO_PATTERN'"
+    echo ""
+    echo "Available scenarios:"
+    ls -1 "$SCENARIO_DATA_DIR"/*.json 2>/dev/null | xargs -n 1 basename -s .json || echo "  (none - run ./scripts/convert-scenarios first)"
+    exit 1
+fi
+
+SCENARIO_NAME=$(basename "$SCENARIO_FILE" .json)
+DISPLAY_NAME=$(jq -r '.displayName' "$SCENARIO_FILE")
+
+# Enable verbose output if DEBUG=1
+if [ "${DEBUG:-0}" = "1" ]; then
+    set -x
+fi
+
+mkdir -p "$LOG_DIR"
+
+echo "=== Launch Scenario (DynamoDB): $DISPLAY_NAME ==="
+echo
+
+# 1. Terminate existing processes
+echo "1. Terminating existing processes..."
+"$SCRIPT_DIR/terminate-all"
+sleep 1
+
+# 2. Roll logs
+echo "2. Rolling logs..."
+"$SCRIPT_DIR/roll-logs"
+
+# 3. Purge database
+echo "3. Purging DynamoDB tables..."
+"$SCRIPT_DIR/purge-dynamodb"
+
+# 4. Build frontend (incremental)
+echo "4. Building frontend (incremental)..."
+cd "$PROJECT_DIR"
+./gradlew :frontend:build --no-daemon
+
+# 5. Start backend
+echo "5. Starting backend (DynamoDB)..."
+cd "$PROJECT_DIR"
+./gradlew :backend:run --args="8080 dynamodb" --console=plain > "$LOG_DIR/backend.log" 2>&1 &
+BACKEND_PID=$!
+echo "   Backend started (PID: $BACKEND_PID, log: logs/backend.log)"
+
+# 6. Wait for backend
+echo "6. Waiting for backend to be ready..."
+for i in {1..30}; do
+  if curl -s "$BASE_URL/health" > /dev/null 2>&1; then
+    echo "   Backend ready!"
+    break
+  fi
+  if [ $i -eq 30 ]; then
+    echo "   ERROR: Backend did not start within 30 seconds"
+    echo "   Check logs/backend.log for details"
+    exit 1
+  fi
+  sleep 1
+done
+
+# 7. Load scenario data
+echo "7. Loading scenario data: $DISPLAY_NAME..."
+ELECTION_NAME=$(jq -r '.electionName' "$SCENARIO_FILE")
+OWNER_NAME=$(jq -r '.ownerName' "$SCENARIO_FILE")
+
+# Register owner
+echo "   Registering owner ($OWNER_NAME)..."
+OWNER_RESPONSE=$(api_call "POST" "$BASE_URL/register" "" \
+    "{\"userName\":\"$OWNER_NAME\",\"email\":\"owner@example.com\",\"password\":\"password\"}" \
+    "Register owner")
+
+# Validate response has accessToken
+if ! echo "$OWNER_RESPONSE" | jq -e '.accessToken' > /dev/null 2>&1; then
+    echo "   ERROR: Registration response missing accessToken"
+    echo "   Response: $OWNER_RESPONSE"
+    exit 1
+fi
+
+OWNER_TOKEN=$(echo "$OWNER_RESPONSE" | jq -r '.accessToken | @json')
+echo "   ✓ Owner registered"
+
+# Register voters
+VOTER_COUNT=$(jq -r '.voters | length' "$SCENARIO_FILE")
+echo "   Registering $VOTER_COUNT voters..."
+
+# Create temporary file to store voter tokens (bash 3.2 compatible)
+VOTER_TOKENS_FILE=$(mktemp)
+trap "rm -f $VOTER_TOKENS_FILE" EXIT
+
+for i in $(seq 0 $((VOTER_COUNT - 1))); do
+    VOTER_NAME=$(jq -r ".voters[$i].displayName" "$SCENARIO_FILE")
+    VOTER_EMAIL=$(jq -r ".voters[$i].email" "$SCENARIO_FILE")
+
+    VOTER_RESPONSE=$(api_call "POST" "$BASE_URL/register" "" \
+        "{\"userName\":\"$VOTER_NAME\",\"email\":\"$VOTER_EMAIL\",\"password\":\"password\"}" \
+        "Register voter $VOTER_NAME")
+
+    # Validate response
+    if ! echo "$VOTER_RESPONSE" | jq -e '.accessToken' > /dev/null 2>&1; then
+        echo "   ERROR: Voter registration response missing accessToken"
+        echo "   Response: $VOTER_RESPONSE"
+        exit 1
+    fi
+
+    VOTER_TOKEN=$(echo "$VOTER_RESPONSE" | jq -r '.accessToken | @json')
+    echo "$VOTER_NAME|$VOTER_TOKEN" >> "$VOTER_TOKENS_FILE"
+done
+echo "   ✓ Registered $VOTER_COUNT voters"
+
+# Create election
+echo "   Creating election..."
+ENCODED_ELECTION=$(jq -rn --arg name "$ELECTION_NAME" '$name | @uri')
+
+api_call "POST" "$BASE_URL/election" "$OWNER_TOKEN" \
+    "{\"userName\":\"$OWNER_NAME\",\"electionName\":\"$ELECTION_NAME\"}" \
+    "Create election" > /dev/null
+echo "   ✓ Election created"
+
+# Set candidates
+CANDIDATE_NAMES=$(jq -r '[.candidates[].displayName] | @json' "$SCENARIO_FILE")
+CANDIDATE_COUNT=$(jq -r '.candidates | length' "$SCENARIO_FILE")
+
+api_call "PUT" "$BASE_URL/election/$ENCODED_ELECTION/candidates" "$OWNER_TOKEN" \
+    "{\"candidateNames\":$CANDIDATE_NAMES}" \
+    "Set candidates" > /dev/null
+echo "   ✓ Added $CANDIDATE_COUNT candidates"
+
+# Set eligible voters
+VOTER_NAMES=$(jq -r '[.voters[].displayName] | @json' "$SCENARIO_FILE")
+
+api_call "PUT" "$BASE_URL/election/$ENCODED_ELECTION/eligibility" "$OWNER_TOKEN" \
+    "{\"voterNames\":$VOTER_NAMES}" \
+    "Set eligible voters" > /dev/null
+echo "   ✓ Added $VOTER_COUNT eligible voters"
+
+# Launch election (revealed ballots)
+api_call "POST" "$BASE_URL/election/$ENCODED_ELECTION/launch" "$OWNER_TOKEN" \
+    '{"allowEdit":false}' \
+    "Launch election" > /dev/null
+echo "   ✓ Election launched (revealed ballots)"
+
+# Cast ballots
+BALLOT_COUNT=$(jq -r '.ballots | length' "$SCENARIO_FILE")
+echo "   Casting $BALLOT_COUNT ballots..."
+
+for i in $(seq 0 $((BALLOT_COUNT - 1))); do
+    VOTER_NAME=$(jq -r ".ballots[$i].voterDisplayName" "$SCENARIO_FILE")
+    VOTER_TOKEN=$(grep "^$VOTER_NAME|" "$VOTER_TOKENS_FILE" | cut -d'|' -f2)
+
+    # Build rankings JSON
+    RANKINGS=$(jq -r ".ballots[$i].rankings | map({candidateName: .candidateDisplayName, rank: .rank}) | @json" "$SCENARIO_FILE")
+
+    api_call "POST" "$BASE_URL/election/$ENCODED_ELECTION/ballot" "$VOTER_TOKEN" \
+        "{\"voterName\":\"$VOTER_NAME\",\"rankings\":$RANKINGS}" \
+        "Cast ballot for $VOTER_NAME" > /dev/null
+done
+echo "   ✓ Cast $BALLOT_COUNT ballots"
+
+# 8. Start frontend
+echo "8. Starting frontend server..."
+cd "$PROJECT_DIR/frontend/build/dist/js/productionExecutable"
+python3 -m http.server 3000 > "$LOG_DIR/frontend.log" 2>&1 &
+FRONTEND_PID=$!
+echo "   Frontend started (PID: $FRONTEND_PID, log: logs/frontend.log)"
+
+# 9. Wait for frontend
+echo "9. Waiting for frontend to be ready..."
+for i in {1..10}; do
+  if curl -s http://localhost:3000 > /dev/null 2>&1; then
+    echo "   Frontend ready!"
+    break
+  fi
+  if [ $i -eq 10 ]; then
+    echo "   ERROR: Frontend did not start within 10 seconds"
+    echo "   Check logs/frontend.log for details"
+    exit 1
+  fi
+  sleep 1
+done
+
+# 10. Open browser
+echo "10. Opening browser..."
+open http://localhost:3000
+
+echo
+echo "=== Development Environment Ready ==="
+echo "Backend:  http://localhost:8080 (DynamoDB)"
+echo "Frontend: http://localhost:3000"
+echo "Logs:     logs/backend.log, logs/frontend.log"
+echo ""
+echo "Scenario: $DISPLAY_NAME"
+echo "Election: $ELECTION_NAME"
+echo "Candidates: $CANDIDATE_COUNT"
+echo "Voters: $VOTER_COUNT"
+echo "Ballots: $BALLOT_COUNT"
+echo ""
+echo "Login credentials:"
+echo "  Owner: $OWNER_NAME / password"
+echo "  All voters: <voter-name> / password"
+echo ""
+echo "To stop: ./scripts/terminate-all"

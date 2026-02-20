@@ -1,6 +1,9 @@
 package com.seanshubin.vote.domain
 
-interface Ballot {
+import kotlinx.serialization.Serializable
+
+@Serializable
+sealed interface Ballot {
     val rankings: List<Ranking>
 
     companion object {

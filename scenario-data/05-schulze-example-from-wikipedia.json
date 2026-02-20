@@ -1,0 +1,1723 @@
+{
+  "scenarioNumber": "05",
+  "scenarioName": "05-schulze-example-from-wikipedia",
+  "displayName": "Schulze Example From Wikipedia",
+  "electionName": "Schulze Example From Wikipedia Election",
+  "ownerName": "owner",
+  "candidates": [
+    {
+      "originalName": "Alpha",
+      "displayName": "Alpha"
+    },
+    {
+      "originalName": "Beta",
+      "displayName": "Beta"
+    },
+    {
+      "originalName": "Charlie",
+      "displayName": "Charlie"
+    },
+    {
+      "originalName": "Delta",
+      "displayName": "Delta"
+    },
+    {
+      "originalName": "Echo",
+      "displayName": "Echo"
+    }
+  ],
+  "voters": [
+    {
+      "originalName": "aaron-stevens",
+      "displayName": "Aaron Stevens",
+      "email": "aaron.stevens@example.com"
+    },
+    {
+      "originalName": "aisha-nguyen",
+      "displayName": "Aisha Nguyen",
+      "email": "aisha.nguyen@example.com"
+    },
+    {
+      "originalName": "alisha-blackburn",
+      "displayName": "Alisha Blackburn",
+      "email": "alisha.blackburn@example.com"
+    },
+    {
+      "originalName": "bill-johns",
+      "displayName": "Bill Johns",
+      "email": "bill.johns@example.com"
+    },
+    {
+      "originalName": "celia-frost",
+      "displayName": "Celia Frost",
+      "email": "celia.frost@example.com"
+    },
+    {
+      "originalName": "christopher-kim",
+      "displayName": "Christopher Kim",
+      "email": "christopher.kim@example.com"
+    },
+    {
+      "originalName": "clint-bird",
+      "displayName": "Clint Bird",
+      "email": "clint.bird@example.com"
+    },
+    {
+      "originalName": "colette-cuevas",
+      "displayName": "Colette Cuevas",
+      "email": "colette.cuevas@example.com"
+    },
+    {
+      "originalName": "corinne-sutton",
+      "displayName": "Corinne Sutton",
+      "email": "corinne.sutton@example.com"
+    },
+    {
+      "originalName": "dewayne-fitzgerald",
+      "displayName": "Dewayne Fitzgerald",
+      "email": "dewayne.fitzgerald@example.com"
+    },
+    {
+      "originalName": "doris-morton",
+      "displayName": "Doris Morton",
+      "email": "doris.morton@example.com"
+    },
+    {
+      "originalName": "elvin-pham",
+      "displayName": "Elvin Pham",
+      "email": "elvin.pham@example.com"
+    },
+    {
+      "originalName": "erin-fletcher",
+      "displayName": "Erin Fletcher",
+      "email": "erin.fletcher@example.com"
+    },
+    {
+      "originalName": "fern-henry",
+      "displayName": "Fern Henry",
+      "email": "fern.henry@example.com"
+    },
+    {
+      "originalName": "garland-mcgrath",
+      "displayName": "Garland Mcgrath",
+      "email": "garland.mcgrath@example.com"
+    },
+    {
+      "originalName": "glenda-dougherty",
+      "displayName": "Glenda Dougherty",
+      "email": "glenda.dougherty@example.com"
+    },
+    {
+      "originalName": "gloria-myers",
+      "displayName": "Gloria Myers",
+      "email": "gloria.myers@example.com"
+    },
+    {
+      "originalName": "harris-figueroa",
+      "displayName": "Harris Figueroa",
+      "email": "harris.figueroa@example.com"
+    },
+    {
+      "originalName": "hillary-powers",
+      "displayName": "Hillary Powers",
+      "email": "hillary.powers@example.com"
+    },
+    {
+      "originalName": "ira-kerr",
+      "displayName": "Ira Kerr",
+      "email": "ira.kerr@example.com"
+    },
+    {
+      "originalName": "israel-hayes",
+      "displayName": "Israel Hayes",
+      "email": "israel.hayes@example.com"
+    },
+    {
+      "originalName": "janis-mcfarland",
+      "displayName": "Janis Mcfarland",
+      "email": "janis.mcfarland@example.com"
+    },
+    {
+      "originalName": "jasper-ali",
+      "displayName": "Jasper Ali",
+      "email": "jasper.ali@example.com"
+    },
+    {
+      "originalName": "jewell-pratt",
+      "displayName": "Jewell Pratt",
+      "email": "jewell.pratt@example.com"
+    },
+    {
+      "originalName": "jorge-barron",
+      "displayName": "Jorge Barron",
+      "email": "jorge.barron@example.com"
+    },
+    {
+      "originalName": "julian-serrano",
+      "displayName": "Julian Serrano",
+      "email": "julian.serrano@example.com"
+    },
+    {
+      "originalName": "kara-castaneda",
+      "displayName": "Kara Castaneda",
+      "email": "kara.castaneda@example.com"
+    },
+    {
+      "originalName": "kim-bruce",
+      "displayName": "Kim Bruce",
+      "email": "kim.bruce@example.com"
+    },
+    {
+      "originalName": "lessie-collier",
+      "displayName": "Lessie Collier",
+      "email": "lessie.collier@example.com"
+    },
+    {
+      "originalName": "lilia-fleming",
+      "displayName": "Lilia Fleming",
+      "email": "lilia.fleming@example.com"
+    },
+    {
+      "originalName": "loren-mayer",
+      "displayName": "Loren Mayer",
+      "email": "loren.mayer@example.com"
+    },
+    {
+      "originalName": "loretta-duffy",
+      "displayName": "Loretta Duffy",
+      "email": "loretta.duffy@example.com"
+    },
+    {
+      "originalName": "lowell-pace",
+      "displayName": "Lowell Pace",
+      "email": "lowell.pace@example.com"
+    },
+    {
+      "originalName": "luciano-higgins",
+      "displayName": "Luciano Higgins",
+      "email": "luciano.higgins@example.com"
+    },
+    {
+      "originalName": "maryellen-le",
+      "displayName": "Maryellen Le",
+      "email": "maryellen.le@example.com"
+    },
+    {
+      "originalName": "mattie-reyes",
+      "displayName": "Mattie Reyes",
+      "email": "mattie.reyes@example.com"
+    },
+    {
+      "originalName": "michael-montes",
+      "displayName": "Michael Montes",
+      "email": "michael.montes@example.com"
+    },
+    {
+      "originalName": "muriel-morris",
+      "displayName": "Muriel Morris",
+      "email": "muriel.morris@example.com"
+    },
+    {
+      "originalName": "oliver-richard",
+      "displayName": "Oliver Richard",
+      "email": "oliver.richard@example.com"
+    },
+    {
+      "originalName": "paul-oconnor",
+      "displayName": "Paul Oconnor",
+      "email": "paul.oconnor@example.com"
+    },
+    {
+      "originalName": "reinaldo-tate",
+      "displayName": "Reinaldo Tate",
+      "email": "reinaldo.tate@example.com"
+    },
+    {
+      "originalName": "rene-sanders",
+      "displayName": "Rene Sanders",
+      "email": "rene.sanders@example.com"
+    },
+    {
+      "originalName": "robin-mora",
+      "displayName": "Robin Mora",
+      "email": "robin.mora@example.com"
+    },
+    {
+      "originalName": "rosario-potts",
+      "displayName": "Rosario Potts",
+      "email": "rosario.potts@example.com"
+    },
+    {
+      "originalName": "sallie-medina",
+      "displayName": "Sallie Medina",
+      "email": "sallie.medina@example.com"
+    },
+    {
+      "originalName": "sammy-english",
+      "displayName": "Sammy English",
+      "email": "sammy.english@example.com"
+    },
+    {
+      "originalName": "theron-russo",
+      "displayName": "Theron Russo",
+      "email": "theron.russo@example.com"
+    },
+    {
+      "originalName": "truman-mueller",
+      "displayName": "Truman Mueller",
+      "email": "truman.mueller@example.com"
+    },
+    {
+      "originalName": "waldo-cervantes",
+      "displayName": "Waldo Cervantes",
+      "email": "waldo.cervantes@example.com"
+    },
+    {
+      "originalName": "willa-tate",
+      "displayName": "Willa Tate",
+      "email": "willa.tate@example.com"
+    }
+  ],
+  "ballots": [
+    {
+      "voterOriginalName": "aaron-stevens",
+      "voterDisplayName": "Aaron Stevens",
+      "confirmation": "9f74ab6c-bbae-4827-a2bc-c57b1b7df68a",
+      "rankings": [
+        {
+          "candidateOriginalName": "Alpha",
+          "candidateDisplayName": "Alpha",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "Charlie",
+          "candidateDisplayName": "Charlie",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "Beta",
+          "candidateDisplayName": "Beta",
+          "rank": 3
+        },
+        {
+          "candidateOriginalName": "Echo",
+          "candidateDisplayName": "Echo",
+          "rank": 4
+        },
+        {
+          "candidateOriginalName": "Delta",
+          "candidateDisplayName": "Delta",
+          "rank": 5
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "aisha-nguyen",
+      "voterDisplayName": "Aisha Nguyen",
+      "confirmation": "371a331d-9797-4436-8539-b7ee60690950",
+      "rankings": [
+        {
+          "candidateOriginalName": "Alpha",
+          "candidateDisplayName": "Alpha",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "Charlie",
+          "candidateDisplayName": "Charlie",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "Beta",
+          "candidateDisplayName": "Beta",
+          "rank": 3
+        },
+        {
+          "candidateOriginalName": "Echo",
+          "candidateDisplayName": "Echo",
+          "rank": 4
+        },
+        {
+          "candidateOriginalName": "Delta",
+          "candidateDisplayName": "Delta",
+          "rank": 5
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "alisha-blackburn",
+      "voterDisplayName": "Alisha Blackburn",
+      "confirmation": "eef6352a-1053-4650-96f1-277c000e8de8",
+      "rankings": [
+        {
+          "candidateOriginalName": "Alpha",
+          "candidateDisplayName": "Alpha",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "Charlie",
+          "candidateDisplayName": "Charlie",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "Beta",
+          "candidateDisplayName": "Beta",
+          "rank": 3
+        },
+        {
+          "candidateOriginalName": "Echo",
+          "candidateDisplayName": "Echo",
+          "rank": 4
+        },
+        {
+          "candidateOriginalName": "Delta",
+          "candidateDisplayName": "Delta",
+          "rank": 5
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "bill-johns",
+      "voterDisplayName": "Bill Johns",
+      "confirmation": "0018eb77-72ac-48b1-9cc1-bdcc23e041ae",
+      "rankings": [
+        {
+          "candidateOriginalName": "Alpha",
+          "candidateDisplayName": "Alpha",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "Charlie",
+          "candidateDisplayName": "Charlie",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "Beta",
+          "candidateDisplayName": "Beta",
+          "rank": 3
+        },
+        {
+          "candidateOriginalName": "Echo",
+          "candidateDisplayName": "Echo",
+          "rank": 4
+        },
+        {
+          "candidateOriginalName": "Delta",
+          "candidateDisplayName": "Delta",
+          "rank": 5
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "celia-frost",
+      "voterDisplayName": "Celia Frost",
+      "confirmation": "5c444be5-1029-45ba-9fcb-9d615bf2fd8f",
+      "rankings": [
+        {
+          "candidateOriginalName": "Alpha",
+          "candidateDisplayName": "Alpha",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "Charlie",
+          "candidateDisplayName": "Charlie",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "Beta",
+          "candidateDisplayName": "Beta",
+          "rank": 3
+        },
+        {
+          "candidateOriginalName": "Echo",
+          "candidateDisplayName": "Echo",
+          "rank": 4
+        },
+        {
+          "candidateOriginalName": "Delta",
+          "candidateDisplayName": "Delta",
+          "rank": 5
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "christopher-kim",
+      "voterDisplayName": "Christopher Kim",
+      "confirmation": "6177335b-5c16-469b-99f8-99936fae4500",
+      "rankings": [
+        {
+          "candidateOriginalName": "Alpha",
+          "candidateDisplayName": "Alpha",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "Delta",
+          "candidateDisplayName": "Delta",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "Echo",
+          "candidateDisplayName": "Echo",
+          "rank": 3
+        },
+        {
+          "candidateOriginalName": "Charlie",
+          "candidateDisplayName": "Charlie",
+          "rank": 4
+        },
+        {
+          "candidateOriginalName": "Beta",
+          "candidateDisplayName": "Beta",
+          "rank": 5
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "clint-bird",
+      "voterDisplayName": "Clint Bird",
+      "confirmation": "b73781b4-4278-4c90-a1c3-ab5d9885ffac",
+      "rankings": [
+        {
+          "candidateOriginalName": "Alpha",
+          "candidateDisplayName": "Alpha",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "Delta",
+          "candidateDisplayName": "Delta",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "Echo",
+          "candidateDisplayName": "Echo",
+          "rank": 3
+        },
+        {
+          "candidateOriginalName": "Charlie",
+          "candidateDisplayName": "Charlie",
+          "rank": 4
+        },
+        {
+          "candidateOriginalName": "Beta",
+          "candidateDisplayName": "Beta",
+          "rank": 5
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "colette-cuevas",
+      "voterDisplayName": "Colette Cuevas",
+      "confirmation": "c7f58cc4-11cc-4ad4-b324-7c37d4c9a858",
+      "rankings": [
+        {
+          "candidateOriginalName": "Alpha",
+          "candidateDisplayName": "Alpha",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "Delta",
+          "candidateDisplayName": "Delta",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "Echo",
+          "candidateDisplayName": "Echo",
+          "rank": 3
+        },
+        {
+          "candidateOriginalName": "Charlie",
+          "candidateDisplayName": "Charlie",
+          "rank": 4
+        },
+        {
+          "candidateOriginalName": "Beta",
+          "candidateDisplayName": "Beta",
+          "rank": 5
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "corinne-sutton",
+      "voterDisplayName": "Corinne Sutton",
+      "confirmation": "4d47f25a-cc23-4841-89fb-810114e37de9",
+      "rankings": [
+        {
+          "candidateOriginalName": "Alpha",
+          "candidateDisplayName": "Alpha",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "Delta",
+          "candidateDisplayName": "Delta",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "Echo",
+          "candidateDisplayName": "Echo",
+          "rank": 3
+        },
+        {
+          "candidateOriginalName": "Charlie",
+          "candidateDisplayName": "Charlie",
+          "rank": 4
+        },
+        {
+          "candidateOriginalName": "Beta",
+          "candidateDisplayName": "Beta",
+          "rank": 5
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "dewayne-fitzgerald",
+      "voterDisplayName": "Dewayne Fitzgerald",
+      "confirmation": "cc5fe76b-45a1-4e51-a1f3-ef45f3462ba0",
+      "rankings": [
+        {
+          "candidateOriginalName": "Alpha",
+          "candidateDisplayName": "Alpha",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "Delta",
+          "candidateDisplayName": "Delta",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "Echo",
+          "candidateDisplayName": "Echo",
+          "rank": 3
+        },
+        {
+          "candidateOriginalName": "Charlie",
+          "candidateDisplayName": "Charlie",
+          "rank": 4
+        },
+        {
+          "candidateOriginalName": "Beta",
+          "candidateDisplayName": "Beta",
+          "rank": 5
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "doris-morton",
+      "voterDisplayName": "Doris Morton",
+      "confirmation": "4bdcf791-9cb2-43ad-b804-a0c8953657dc",
+      "rankings": [
+        {
+          "candidateOriginalName": "Beta",
+          "candidateDisplayName": "Beta",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "Echo",
+          "candidateDisplayName": "Echo",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "Delta",
+          "candidateDisplayName": "Delta",
+          "rank": 3
+        },
+        {
+          "candidateOriginalName": "Alpha",
+          "candidateDisplayName": "Alpha",
+          "rank": 4
+        },
+        {
+          "candidateOriginalName": "Charlie",
+          "candidateDisplayName": "Charlie",
+          "rank": 5
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "elvin-pham",
+      "voterDisplayName": "Elvin Pham",
+      "confirmation": "5873cbe7-7b4b-44eb-9ee2-fad40483cee9",
+      "rankings": [
+        {
+          "candidateOriginalName": "Beta",
+          "candidateDisplayName": "Beta",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "Echo",
+          "candidateDisplayName": "Echo",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "Delta",
+          "candidateDisplayName": "Delta",
+          "rank": 3
+        },
+        {
+          "candidateOriginalName": "Alpha",
+          "candidateDisplayName": "Alpha",
+          "rank": 4
+        },
+        {
+          "candidateOriginalName": "Charlie",
+          "candidateDisplayName": "Charlie",
+          "rank": 5
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "erin-fletcher",
+      "voterDisplayName": "Erin Fletcher",
+      "confirmation": "99828833-f54c-4ab3-b76c-69f463d9469c",
+      "rankings": [
+        {
+          "candidateOriginalName": "Beta",
+          "candidateDisplayName": "Beta",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "Echo",
+          "candidateDisplayName": "Echo",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "Delta",
+          "candidateDisplayName": "Delta",
+          "rank": 3
+        },
+        {
+          "candidateOriginalName": "Alpha",
+          "candidateDisplayName": "Alpha",
+          "rank": 4
+        },
+        {
+          "candidateOriginalName": "Charlie",
+          "candidateDisplayName": "Charlie",
+          "rank": 5
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "garland-mcgrath",
+      "voterDisplayName": "Garland Mcgrath",
+      "confirmation": "5f487278-107e-457d-9a35-94deaa1dc147",
+      "rankings": [
+        {
+          "candidateOriginalName": "Beta",
+          "candidateDisplayName": "Beta",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "Echo",
+          "candidateDisplayName": "Echo",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "Delta",
+          "candidateDisplayName": "Delta",
+          "rank": 3
+        },
+        {
+          "candidateOriginalName": "Alpha",
+          "candidateDisplayName": "Alpha",
+          "rank": 4
+        },
+        {
+          "candidateOriginalName": "Charlie",
+          "candidateDisplayName": "Charlie",
+          "rank": 5
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "glenda-dougherty",
+      "voterDisplayName": "Glenda Dougherty",
+      "confirmation": "393cf982-08b7-470f-9eac-255430ba4c28",
+      "rankings": [
+        {
+          "candidateOriginalName": "Beta",
+          "candidateDisplayName": "Beta",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "Echo",
+          "candidateDisplayName": "Echo",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "Delta",
+          "candidateDisplayName": "Delta",
+          "rank": 3
+        },
+        {
+          "candidateOriginalName": "Alpha",
+          "candidateDisplayName": "Alpha",
+          "rank": 4
+        },
+        {
+          "candidateOriginalName": "Charlie",
+          "candidateDisplayName": "Charlie",
+          "rank": 5
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "gloria-myers",
+      "voterDisplayName": "Gloria Myers",
+      "confirmation": "6686e647-e02f-45f9-944b-e7412ae35115",
+      "rankings": [
+        {
+          "candidateOriginalName": "Beta",
+          "candidateDisplayName": "Beta",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "Echo",
+          "candidateDisplayName": "Echo",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "Delta",
+          "candidateDisplayName": "Delta",
+          "rank": 3
+        },
+        {
+          "candidateOriginalName": "Alpha",
+          "candidateDisplayName": "Alpha",
+          "rank": 4
+        },
+        {
+          "candidateOriginalName": "Charlie",
+          "candidateDisplayName": "Charlie",
+          "rank": 5
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "harris-figueroa",
+      "voterDisplayName": "Harris Figueroa",
+      "confirmation": "d566ed23-4651-430d-bb56-03429d93041c",
+      "rankings": [
+        {
+          "candidateOriginalName": "Beta",
+          "candidateDisplayName": "Beta",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "Echo",
+          "candidateDisplayName": "Echo",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "Delta",
+          "candidateDisplayName": "Delta",
+          "rank": 3
+        },
+        {
+          "candidateOriginalName": "Alpha",
+          "candidateDisplayName": "Alpha",
+          "rank": 4
+        },
+        {
+          "candidateOriginalName": "Charlie",
+          "candidateDisplayName": "Charlie",
+          "rank": 5
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "hillary-powers",
+      "voterDisplayName": "Hillary Powers",
+      "confirmation": "363d6119-9658-4acf-a294-43491f88b93c",
+      "rankings": [
+        {
+          "candidateOriginalName": "Beta",
+          "candidateDisplayName": "Beta",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "Echo",
+          "candidateDisplayName": "Echo",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "Delta",
+          "candidateDisplayName": "Delta",
+          "rank": 3
+        },
+        {
+          "candidateOriginalName": "Alpha",
+          "candidateDisplayName": "Alpha",
+          "rank": 4
+        },
+        {
+          "candidateOriginalName": "Charlie",
+          "candidateDisplayName": "Charlie",
+          "rank": 5
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "ira-kerr",
+      "voterDisplayName": "Ira Kerr",
+      "confirmation": "e4c97840-e0cb-4caa-8c90-69661d6a2510",
+      "rankings": [
+        {
+          "candidateOriginalName": "Charlie",
+          "candidateDisplayName": "Charlie",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "Alpha",
+          "candidateDisplayName": "Alpha",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "Beta",
+          "candidateDisplayName": "Beta",
+          "rank": 3
+        },
+        {
+          "candidateOriginalName": "Echo",
+          "candidateDisplayName": "Echo",
+          "rank": 4
+        },
+        {
+          "candidateOriginalName": "Delta",
+          "candidateDisplayName": "Delta",
+          "rank": 5
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "israel-hayes",
+      "voterDisplayName": "Israel Hayes",
+      "confirmation": "65c311e8-6c31-4297-b139-7e5278ef217a",
+      "rankings": [
+        {
+          "candidateOriginalName": "Charlie",
+          "candidateDisplayName": "Charlie",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "Alpha",
+          "candidateDisplayName": "Alpha",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "Beta",
+          "candidateDisplayName": "Beta",
+          "rank": 3
+        },
+        {
+          "candidateOriginalName": "Echo",
+          "candidateDisplayName": "Echo",
+          "rank": 4
+        },
+        {
+          "candidateOriginalName": "Delta",
+          "candidateDisplayName": "Delta",
+          "rank": 5
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "janis-mcfarland",
+      "voterDisplayName": "Janis Mcfarland",
+      "confirmation": "dddb7d4e-6e25-4efe-aecb-0b357a05d93e",
+      "rankings": [
+        {
+          "candidateOriginalName": "Charlie",
+          "candidateDisplayName": "Charlie",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "Alpha",
+          "candidateDisplayName": "Alpha",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "Beta",
+          "candidateDisplayName": "Beta",
+          "rank": 3
+        },
+        {
+          "candidateOriginalName": "Echo",
+          "candidateDisplayName": "Echo",
+          "rank": 4
+        },
+        {
+          "candidateOriginalName": "Delta",
+          "candidateDisplayName": "Delta",
+          "rank": 5
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "jasper-ali",
+      "voterDisplayName": "Jasper Ali",
+      "confirmation": "0f941a22-b8e8-44fe-a27b-dd432321377f",
+      "rankings": [
+        {
+          "candidateOriginalName": "Charlie",
+          "candidateDisplayName": "Charlie",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "Alpha",
+          "candidateDisplayName": "Alpha",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "Echo",
+          "candidateDisplayName": "Echo",
+          "rank": 3
+        },
+        {
+          "candidateOriginalName": "Beta",
+          "candidateDisplayName": "Beta",
+          "rank": 4
+        },
+        {
+          "candidateOriginalName": "Delta",
+          "candidateDisplayName": "Delta",
+          "rank": 5
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "jewell-pratt",
+      "voterDisplayName": "Jewell Pratt",
+      "confirmation": "b2b4d161-4caa-4214-ad1e-1f8300fb3461",
+      "rankings": [
+        {
+          "candidateOriginalName": "Charlie",
+          "candidateDisplayName": "Charlie",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "Alpha",
+          "candidateDisplayName": "Alpha",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "Echo",
+          "candidateDisplayName": "Echo",
+          "rank": 3
+        },
+        {
+          "candidateOriginalName": "Beta",
+          "candidateDisplayName": "Beta",
+          "rank": 4
+        },
+        {
+          "candidateOriginalName": "Delta",
+          "candidateDisplayName": "Delta",
+          "rank": 5
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "julian-serrano",
+      "voterDisplayName": "Julian Serrano",
+      "confirmation": "8809fa90-247f-4639-ac5d-dfec6752f48c",
+      "rankings": [
+        {
+          "candidateOriginalName": "Charlie",
+          "candidateDisplayName": "Charlie",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "Alpha",
+          "candidateDisplayName": "Alpha",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "Echo",
+          "candidateDisplayName": "Echo",
+          "rank": 3
+        },
+        {
+          "candidateOriginalName": "Beta",
+          "candidateDisplayName": "Beta",
+          "rank": 4
+        },
+        {
+          "candidateOriginalName": "Delta",
+          "candidateDisplayName": "Delta",
+          "rank": 5
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "kara-castaneda",
+      "voterDisplayName": "Kara Castaneda",
+      "confirmation": "f1c0f9a8-d2fe-4e92-ac31-3f31f1a85031",
+      "rankings": [
+        {
+          "candidateOriginalName": "Charlie",
+          "candidateDisplayName": "Charlie",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "Alpha",
+          "candidateDisplayName": "Alpha",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "Echo",
+          "candidateDisplayName": "Echo",
+          "rank": 3
+        },
+        {
+          "candidateOriginalName": "Beta",
+          "candidateDisplayName": "Beta",
+          "rank": 4
+        },
+        {
+          "candidateOriginalName": "Delta",
+          "candidateDisplayName": "Delta",
+          "rank": 5
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "kim-bruce",
+      "voterDisplayName": "Kim Bruce",
+      "confirmation": "edb81659-e965-420d-84b5-04293e94ff90",
+      "rankings": [
+        {
+          "candidateOriginalName": "Charlie",
+          "candidateDisplayName": "Charlie",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "Alpha",
+          "candidateDisplayName": "Alpha",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "Echo",
+          "candidateDisplayName": "Echo",
+          "rank": 3
+        },
+        {
+          "candidateOriginalName": "Beta",
+          "candidateDisplayName": "Beta",
+          "rank": 4
+        },
+        {
+          "candidateOriginalName": "Delta",
+          "candidateDisplayName": "Delta",
+          "rank": 5
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "lessie-collier",
+      "voterDisplayName": "Lessie Collier",
+      "confirmation": "7a608dc4-f98d-47e0-8d88-54d0fb9ae4f4",
+      "rankings": [
+        {
+          "candidateOriginalName": "Charlie",
+          "candidateDisplayName": "Charlie",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "Alpha",
+          "candidateDisplayName": "Alpha",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "Echo",
+          "candidateDisplayName": "Echo",
+          "rank": 3
+        },
+        {
+          "candidateOriginalName": "Beta",
+          "candidateDisplayName": "Beta",
+          "rank": 4
+        },
+        {
+          "candidateOriginalName": "Delta",
+          "candidateDisplayName": "Delta",
+          "rank": 5
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "lilia-fleming",
+      "voterDisplayName": "Lilia Fleming",
+      "confirmation": "9cf12ebd-da3e-4b80-8232-b76abc092c2d",
+      "rankings": [
+        {
+          "candidateOriginalName": "Charlie",
+          "candidateDisplayName": "Charlie",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "Alpha",
+          "candidateDisplayName": "Alpha",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "Echo",
+          "candidateDisplayName": "Echo",
+          "rank": 3
+        },
+        {
+          "candidateOriginalName": "Beta",
+          "candidateDisplayName": "Beta",
+          "rank": 4
+        },
+        {
+          "candidateOriginalName": "Delta",
+          "candidateDisplayName": "Delta",
+          "rank": 5
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "loren-mayer",
+      "voterDisplayName": "Loren Mayer",
+      "confirmation": "6db0dd05-092f-4a72-8f55-a13abd836e76",
+      "rankings": [
+        {
+          "candidateOriginalName": "Charlie",
+          "candidateDisplayName": "Charlie",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "Beta",
+          "candidateDisplayName": "Beta",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "Alpha",
+          "candidateDisplayName": "Alpha",
+          "rank": 3
+        },
+        {
+          "candidateOriginalName": "Delta",
+          "candidateDisplayName": "Delta",
+          "rank": 4
+        },
+        {
+          "candidateOriginalName": "Echo",
+          "candidateDisplayName": "Echo",
+          "rank": 5
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "loretta-duffy",
+      "voterDisplayName": "Loretta Duffy",
+      "confirmation": "dc021cbf-736d-45a9-936b-cdcfe3b9efde",
+      "rankings": [
+        {
+          "candidateOriginalName": "Charlie",
+          "candidateDisplayName": "Charlie",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "Beta",
+          "candidateDisplayName": "Beta",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "Alpha",
+          "candidateDisplayName": "Alpha",
+          "rank": 3
+        },
+        {
+          "candidateOriginalName": "Delta",
+          "candidateDisplayName": "Delta",
+          "rank": 4
+        },
+        {
+          "candidateOriginalName": "Echo",
+          "candidateDisplayName": "Echo",
+          "rank": 5
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "lowell-pace",
+      "voterDisplayName": "Lowell Pace",
+      "confirmation": "4a214f0a-cd05-4305-a07c-91d0c6cac380",
+      "rankings": [
+        {
+          "candidateOriginalName": "Delta",
+          "candidateDisplayName": "Delta",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "Charlie",
+          "candidateDisplayName": "Charlie",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "Echo",
+          "candidateDisplayName": "Echo",
+          "rank": 3
+        },
+        {
+          "candidateOriginalName": "Beta",
+          "candidateDisplayName": "Beta",
+          "rank": 4
+        },
+        {
+          "candidateOriginalName": "Alpha",
+          "candidateDisplayName": "Alpha",
+          "rank": 5
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "luciano-higgins",
+      "voterDisplayName": "Luciano Higgins",
+      "confirmation": "ff1e5518-8342-4077-bb13-b04a46e5909f",
+      "rankings": [
+        {
+          "candidateOriginalName": "Delta",
+          "candidateDisplayName": "Delta",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "Charlie",
+          "candidateDisplayName": "Charlie",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "Echo",
+          "candidateDisplayName": "Echo",
+          "rank": 3
+        },
+        {
+          "candidateOriginalName": "Beta",
+          "candidateDisplayName": "Beta",
+          "rank": 4
+        },
+        {
+          "candidateOriginalName": "Alpha",
+          "candidateDisplayName": "Alpha",
+          "rank": 5
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "mattie-reyes",
+      "voterDisplayName": "Mattie Reyes",
+      "confirmation": "1d9d685f-4095-4bfe-8090-d571f810840b",
+      "rankings": [
+        {
+          "candidateOriginalName": "Delta",
+          "candidateDisplayName": "Delta",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "Charlie",
+          "candidateDisplayName": "Charlie",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "Echo",
+          "candidateDisplayName": "Echo",
+          "rank": 3
+        },
+        {
+          "candidateOriginalName": "Beta",
+          "candidateDisplayName": "Beta",
+          "rank": 4
+        },
+        {
+          "candidateOriginalName": "Alpha",
+          "candidateDisplayName": "Alpha",
+          "rank": 5
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "michael-montes",
+      "voterDisplayName": "Michael Montes",
+      "confirmation": "99dab56e-9608-44db-9607-cb377093c631",
+      "rankings": [
+        {
+          "candidateOriginalName": "Delta",
+          "candidateDisplayName": "Delta",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "Charlie",
+          "candidateDisplayName": "Charlie",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "Echo",
+          "candidateDisplayName": "Echo",
+          "rank": 3
+        },
+        {
+          "candidateOriginalName": "Beta",
+          "candidateDisplayName": "Beta",
+          "rank": 4
+        },
+        {
+          "candidateOriginalName": "Alpha",
+          "candidateDisplayName": "Alpha",
+          "rank": 5
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "muriel-morris",
+      "voterDisplayName": "Muriel Morris",
+      "confirmation": "e7e3421d-a4ff-4319-ab17-48431f6796cf",
+      "rankings": [
+        {
+          "candidateOriginalName": "Delta",
+          "candidateDisplayName": "Delta",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "Charlie",
+          "candidateDisplayName": "Charlie",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "Echo",
+          "candidateDisplayName": "Echo",
+          "rank": 3
+        },
+        {
+          "candidateOriginalName": "Beta",
+          "candidateDisplayName": "Beta",
+          "rank": 4
+        },
+        {
+          "candidateOriginalName": "Alpha",
+          "candidateDisplayName": "Alpha",
+          "rank": 5
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "oliver-richard",
+      "voterDisplayName": "Oliver Richard",
+      "confirmation": "117e5b60-884d-4076-ad2e-72552e4e4e6f",
+      "rankings": [
+        {
+          "candidateOriginalName": "Delta",
+          "candidateDisplayName": "Delta",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "Charlie",
+          "candidateDisplayName": "Charlie",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "Echo",
+          "candidateDisplayName": "Echo",
+          "rank": 3
+        },
+        {
+          "candidateOriginalName": "Beta",
+          "candidateDisplayName": "Beta",
+          "rank": 4
+        },
+        {
+          "candidateOriginalName": "Alpha",
+          "candidateDisplayName": "Alpha",
+          "rank": 5
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "paul-oconnor",
+      "voterDisplayName": "Paul Oconnor",
+      "confirmation": "83cd82c1-1147-48c3-ae72-068e60af76a5",
+      "rankings": [
+        {
+          "candidateOriginalName": "Delta",
+          "candidateDisplayName": "Delta",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "Charlie",
+          "candidateDisplayName": "Charlie",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "Echo",
+          "candidateDisplayName": "Echo",
+          "rank": 3
+        },
+        {
+          "candidateOriginalName": "Beta",
+          "candidateDisplayName": "Beta",
+          "rank": 4
+        },
+        {
+          "candidateOriginalName": "Alpha",
+          "candidateDisplayName": "Alpha",
+          "rank": 5
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "reinaldo-tate",
+      "voterDisplayName": "Reinaldo Tate",
+      "confirmation": "db6840cd-6caf-45fc-986c-6fe5a4ea3fa5",
+      "rankings": [
+        {
+          "candidateOriginalName": "Echo",
+          "candidateDisplayName": "Echo",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "Beta",
+          "candidateDisplayName": "Beta",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "Alpha",
+          "candidateDisplayName": "Alpha",
+          "rank": 3
+        },
+        {
+          "candidateOriginalName": "Delta",
+          "candidateDisplayName": "Delta",
+          "rank": 4
+        },
+        {
+          "candidateOriginalName": "Charlie",
+          "candidateDisplayName": "Charlie",
+          "rank": 5
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "rene-sanders",
+      "voterDisplayName": "Rene Sanders",
+      "confirmation": "bd69a627-58c6-4023-b703-31fa81170685",
+      "rankings": [
+        {
+          "candidateOriginalName": "Echo",
+          "candidateDisplayName": "Echo",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "Beta",
+          "candidateDisplayName": "Beta",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "Alpha",
+          "candidateDisplayName": "Alpha",
+          "rank": 3
+        },
+        {
+          "candidateOriginalName": "Delta",
+          "candidateDisplayName": "Delta",
+          "rank": 4
+        },
+        {
+          "candidateOriginalName": "Charlie",
+          "candidateDisplayName": "Charlie",
+          "rank": 5
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "robin-mora",
+      "voterDisplayName": "Robin Mora",
+      "confirmation": "10bf7fa5-4923-40d4-a560-974c21b98d31",
+      "rankings": [
+        {
+          "candidateOriginalName": "Echo",
+          "candidateDisplayName": "Echo",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "Beta",
+          "candidateDisplayName": "Beta",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "Alpha",
+          "candidateDisplayName": "Alpha",
+          "rank": 3
+        },
+        {
+          "candidateOriginalName": "Delta",
+          "candidateDisplayName": "Delta",
+          "rank": 4
+        },
+        {
+          "candidateOriginalName": "Charlie",
+          "candidateDisplayName": "Charlie",
+          "rank": 5
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "rosario-potts",
+      "voterDisplayName": "Rosario Potts",
+      "confirmation": "ebd8181c-9964-497d-a635-9e542cc9a1dd",
+      "rankings": [
+        {
+          "candidateOriginalName": "Echo",
+          "candidateDisplayName": "Echo",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "Beta",
+          "candidateDisplayName": "Beta",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "Alpha",
+          "candidateDisplayName": "Alpha",
+          "rank": 3
+        },
+        {
+          "candidateOriginalName": "Delta",
+          "candidateDisplayName": "Delta",
+          "rank": 4
+        },
+        {
+          "candidateOriginalName": "Charlie",
+          "candidateDisplayName": "Charlie",
+          "rank": 5
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "sallie-medina",
+      "voterDisplayName": "Sallie Medina",
+      "confirmation": "bab0bd5e-5f5e-454e-b671-c2fcc826b816",
+      "rankings": [
+        {
+          "candidateOriginalName": "Echo",
+          "candidateDisplayName": "Echo",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "Beta",
+          "candidateDisplayName": "Beta",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "Alpha",
+          "candidateDisplayName": "Alpha",
+          "rank": 3
+        },
+        {
+          "candidateOriginalName": "Delta",
+          "candidateDisplayName": "Delta",
+          "rank": 4
+        },
+        {
+          "candidateOriginalName": "Charlie",
+          "candidateDisplayName": "Charlie",
+          "rank": 5
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "sammy-english",
+      "voterDisplayName": "Sammy English",
+      "confirmation": "82387a93-127d-4bc4-9524-80b33650c5ff",
+      "rankings": [
+        {
+          "candidateOriginalName": "Echo",
+          "candidateDisplayName": "Echo",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "Beta",
+          "candidateDisplayName": "Beta",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "Alpha",
+          "candidateDisplayName": "Alpha",
+          "rank": 3
+        },
+        {
+          "candidateOriginalName": "Delta",
+          "candidateDisplayName": "Delta",
+          "rank": 4
+        },
+        {
+          "candidateOriginalName": "Charlie",
+          "candidateDisplayName": "Charlie",
+          "rank": 5
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "theron-russo",
+      "voterDisplayName": "Theron Russo",
+      "confirmation": "b020a08f-2393-4697-acfe-a68196e3b54d",
+      "rankings": [
+        {
+          "candidateOriginalName": "Echo",
+          "candidateDisplayName": "Echo",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "Beta",
+          "candidateDisplayName": "Beta",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "Alpha",
+          "candidateDisplayName": "Alpha",
+          "rank": 3
+        },
+        {
+          "candidateOriginalName": "Delta",
+          "candidateDisplayName": "Delta",
+          "rank": 4
+        },
+        {
+          "candidateOriginalName": "Charlie",
+          "candidateDisplayName": "Charlie",
+          "rank": 5
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "waldo-cervantes",
+      "voterDisplayName": "Waldo Cervantes",
+      "confirmation": "ab643a39-0a0e-4eaf-a2f9-784eb09a74e3",
+      "rankings": [
+        {
+          "candidateOriginalName": "Echo",
+          "candidateDisplayName": "Echo",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "Beta",
+          "candidateDisplayName": "Beta",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "Alpha",
+          "candidateDisplayName": "Alpha",
+          "rank": 3
+        },
+        {
+          "candidateOriginalName": "Delta",
+          "candidateDisplayName": "Delta",
+          "rank": 4
+        },
+        {
+          "candidateOriginalName": "Charlie",
+          "candidateDisplayName": "Charlie",
+          "rank": 5
+        }
+      ]
+    }
+  ]
+}

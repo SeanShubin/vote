@@ -1,0 +1,320 @@
+{
+  "scenarioNumber": "04",
+  "scenarioName": "04-resolve-cycle-using-schulze-method",
+  "displayName": "Resolve Cycle Using Schulze Method",
+  "electionName": "Resolve Cycle Using Schulze Method Election",
+  "ownerName": "owner",
+  "candidates": [
+    {
+      "originalName": "rock",
+      "displayName": "Rock"
+    },
+    {
+      "originalName": "paper",
+      "displayName": "Paper"
+    },
+    {
+      "originalName": "scissors",
+      "displayName": "Scissors"
+    }
+  ],
+  "voters": [
+    {
+      "originalName": "forest-foster",
+      "displayName": "Forest Foster",
+      "email": "forest.foster@example.com"
+    },
+    {
+      "originalName": "daren-mcfarland",
+      "displayName": "Daren Mcfarland",
+      "email": "daren.mcfarland@example.com"
+    },
+    {
+      "originalName": "delmer-hodge",
+      "displayName": "Delmer Hodge",
+      "email": "delmer.hodge@example.com"
+    },
+    {
+      "originalName": "romeo-cooper",
+      "displayName": "Romeo Cooper",
+      "email": "romeo.cooper@example.com"
+    },
+    {
+      "originalName": "wilmer-medina",
+      "displayName": "Wilmer Medina",
+      "email": "wilmer.medina@example.com"
+    },
+    {
+      "originalName": "dwayne-conrad",
+      "displayName": "Dwayne Conrad",
+      "email": "dwayne.conrad@example.com"
+    },
+    {
+      "originalName": "lamar-duke",
+      "displayName": "Lamar Duke",
+      "email": "lamar.duke@example.com"
+    },
+    {
+      "originalName": "mario-valdez",
+      "displayName": "Mario Valdez",
+      "email": "mario.valdez@example.com"
+    },
+    {
+      "originalName": "josefa-fritz",
+      "displayName": "Josefa Fritz",
+      "email": "josefa.fritz@example.com"
+    },
+    {
+      "originalName": "bethany-alexander",
+      "displayName": "Bethany Alexander",
+      "email": "bethany.alexander@example.com"
+    },
+    {
+      "originalName": "dolores-black",
+      "displayName": "Dolores Black",
+      "email": "dolores.black@example.com"
+    },
+    {
+      "originalName": "eric-cervantes",
+      "displayName": "Eric Cervantes",
+      "email": "eric.cervantes@example.com"
+    },
+    {
+      "originalName": "dianna-frank",
+      "displayName": "Dianna Frank",
+      "email": "dianna.frank@example.com"
+    },
+    {
+      "originalName": "denise-jenkins",
+      "displayName": "Denise Jenkins",
+      "email": "denise.jenkins@example.com"
+    },
+    {
+      "originalName": "amy-villa",
+      "displayName": "Amy Villa",
+      "email": "amy.villa@example.com"
+    }
+  ],
+  "ballots": [
+    {
+      "voterOriginalName": "daren-mcfarland",
+      "voterDisplayName": "Daren Mcfarland",
+      "confirmation": "e0d0282b-0076-44cc-92e5-749b4f700519",
+      "rankings": [
+        {
+          "candidateOriginalName": "paper",
+          "candidateDisplayName": "Paper",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "rock",
+          "candidateDisplayName": "Rock",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "scissors",
+          "candidateDisplayName": "Scissors",
+          "rank": 3
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "denise-jenkins",
+      "voterDisplayName": "Denise Jenkins",
+      "confirmation": "f3ae3ed0-a577-470c-91c1-fa31538fa3ad",
+      "rankings": [
+        {
+          "candidateOriginalName": "rock",
+          "candidateDisplayName": "Rock",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "scissors",
+          "candidateDisplayName": "Scissors",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "paper",
+          "candidateDisplayName": "Paper",
+          "rank": 3
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "dwayne-conrad",
+      "voterDisplayName": "Dwayne Conrad",
+      "confirmation": "027fe41e-8fe7-4ab6-8ebc-9320f667f2dd",
+      "rankings": [
+        {
+          "candidateOriginalName": "scissors",
+          "candidateDisplayName": "Scissors",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "paper",
+          "candidateDisplayName": "Paper",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "rock",
+          "candidateDisplayName": "Rock",
+          "rank": 3
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "mario-valdez",
+      "voterDisplayName": "Mario Valdez",
+      "confirmation": "a2af7895-06cd-4fa8-a365-926bc71774ac",
+      "rankings": [
+        {
+          "candidateOriginalName": "scissors",
+          "candidateDisplayName": "Scissors",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "paper",
+          "candidateDisplayName": "Paper",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "rock",
+          "candidateDisplayName": "Rock",
+          "rank": 3
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "delmer-hodge",
+      "voterDisplayName": "Delmer Hodge",
+      "confirmation": "1e583380-18be-4400-a8e8-1bf09b07efde",
+      "rankings": [
+        {
+          "candidateOriginalName": "rock",
+          "candidateDisplayName": "Rock",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "scissors",
+          "candidateDisplayName": "Scissors",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "paper",
+          "candidateDisplayName": "Paper",
+          "rank": 3
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "romeo-cooper",
+      "voterDisplayName": "Romeo Cooper",
+      "confirmation": "de625b3a-bbf7-4ed7-b3ff-fdfd5d82d06a",
+      "rankings": [
+        {
+          "candidateOriginalName": "paper",
+          "candidateDisplayName": "Paper",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "rock",
+          "candidateDisplayName": "Rock",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "scissors",
+          "candidateDisplayName": "Scissors",
+          "rank": 3
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "dianna-frank",
+      "voterDisplayName": "Dianna Frank",
+      "confirmation": "94a4019f-44a7-4507-9ec4-2ad0c7bd095d",
+      "rankings": [
+        {
+          "candidateOriginalName": "paper",
+          "candidateDisplayName": "Paper",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "rock",
+          "candidateDisplayName": "Rock",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "scissors",
+          "candidateDisplayName": "Scissors",
+          "rank": 3
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "lamar-duke",
+      "voterDisplayName": "Lamar Duke",
+      "confirmation": "7b5d411b-6d3c-40de-bf99-9bb14b7c7696",
+      "rankings": [
+        {
+          "candidateOriginalName": "rock",
+          "candidateDisplayName": "Rock",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "scissors",
+          "candidateDisplayName": "Scissors",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "paper",
+          "candidateDisplayName": "Paper",
+          "rank": 3
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "josefa-fritz",
+      "voterDisplayName": "Josefa Fritz",
+      "confirmation": "f4783128-9e82-4140-b59b-118fa1d54b1e",
+      "rankings": [
+        {
+          "candidateOriginalName": "scissors",
+          "candidateDisplayName": "Scissors",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "paper",
+          "candidateDisplayName": "Paper",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "rock",
+          "candidateDisplayName": "Rock",
+          "rank": 3
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "eric-cervantes",
+      "voterDisplayName": "Eric Cervantes",
+      "confirmation": "694e9191-57bc-463a-8f47-1b983fcb1b13",
+      "rankings": [
+        {
+          "candidateOriginalName": "rock",
+          "candidateDisplayName": "Rock",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "scissors",
+          "candidateDisplayName": "Scissors",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "paper",
+          "candidateDisplayName": "Paper",
+          "rank": 3
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,273 @@
+{
+  "scenarioNumber": "02",
+  "scenarioName": "02-reduce-tactical-voting",
+  "displayName": "Reduce Tactical Voting",
+  "electionName": "Reduce Tactical Voting Election",
+  "ownerName": "owner",
+  "candidates": [
+    {
+      "originalName": "Preferred",
+      "displayName": "Preferred"
+    },
+    {
+      "originalName": "Spoiler",
+      "displayName": "Spoiler"
+    },
+    {
+      "originalName": "Unpopular",
+      "displayName": "Unpopular"
+    }
+  ],
+  "voters": [
+    {
+      "originalName": "Alice",
+      "displayName": "Alice",
+      "email": "alice@example.com"
+    },
+    {
+      "originalName": "Bob",
+      "displayName": "Bob",
+      "email": "bob@example.com"
+    },
+    {
+      "originalName": "Carol",
+      "displayName": "Carol",
+      "email": "carol@example.com"
+    },
+    {
+      "originalName": "Dave",
+      "displayName": "Dave",
+      "email": "dave@example.com"
+    },
+    {
+      "originalName": "Eve",
+      "displayName": "Eve",
+      "email": "eve@example.com"
+    },
+    {
+      "originalName": "Frank",
+      "displayName": "Frank",
+      "email": "frank@example.com"
+    },
+    {
+      "originalName": "Grace",
+      "displayName": "Grace",
+      "email": "grace@example.com"
+    },
+    {
+      "originalName": "Heidi",
+      "displayName": "Heidi",
+      "email": "heidi@example.com"
+    },
+    {
+      "originalName": "Ivy",
+      "displayName": "Ivy",
+      "email": "ivy@example.com"
+    },
+    {
+      "originalName": "Judy",
+      "displayName": "Judy",
+      "email": "judy@example.com"
+    }
+  ],
+  "ballots": [
+    {
+      "voterOriginalName": "Alice",
+      "voterDisplayName": "Alice",
+      "confirmation": "dfb27db8-df47-4069-a584-4066558f6ec6",
+      "rankings": [
+        {
+          "candidateOriginalName": "Preferred",
+          "candidateDisplayName": "Preferred",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "Unpopular",
+          "candidateDisplayName": "Unpopular",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "Spoiler",
+          "candidateDisplayName": "Spoiler",
+          "rank": 3
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "Bob",
+      "voterDisplayName": "Bob",
+      "confirmation": "b97c34da-0a8c-46b3-92e1-027999a45d36",
+      "rankings": [
+        {
+          "candidateOriginalName": "Preferred",
+          "candidateDisplayName": "Preferred",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "Unpopular",
+          "candidateDisplayName": "Unpopular",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "Spoiler",
+          "candidateDisplayName": "Spoiler",
+          "rank": 3
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "Carol",
+      "voterDisplayName": "Carol",
+      "confirmation": "c24f0fa4-3739-40e0-830c-75376e7eeb77",
+      "rankings": [
+        {
+          "candidateOriginalName": "Preferred",
+          "candidateDisplayName": "Preferred",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "Unpopular",
+          "candidateDisplayName": "Unpopular",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "Spoiler",
+          "candidateDisplayName": "Spoiler",
+          "rank": 3
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "Dave",
+      "voterDisplayName": "Dave",
+      "confirmation": "c3ef1ff2-61f8-48ce-8776-d69eb2e3d7f5",
+      "rankings": [
+        {
+          "candidateOriginalName": "Unpopular",
+          "candidateDisplayName": "Unpopular",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "Preferred",
+          "candidateDisplayName": "Preferred",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "Spoiler",
+          "candidateDisplayName": "Spoiler",
+          "rank": 3
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "Eve",
+      "voterDisplayName": "Eve",
+      "confirmation": "f827392d-a0ab-4f2d-abb2-a850dd0d4239",
+      "rankings": [
+        {
+          "candidateOriginalName": "Unpopular",
+          "candidateDisplayName": "Unpopular",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "Preferred",
+          "candidateDisplayName": "Preferred",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "Spoiler",
+          "candidateDisplayName": "Spoiler",
+          "rank": 3
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "Frank",
+      "voterDisplayName": "Frank",
+      "confirmation": "e0a7dd5f-dd0e-4635-bb7c-9e25af2bc2ec",
+      "rankings": [
+        {
+          "candidateOriginalName": "Unpopular",
+          "candidateDisplayName": "Unpopular",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "Preferred",
+          "candidateDisplayName": "Preferred",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "Spoiler",
+          "candidateDisplayName": "Spoiler",
+          "rank": 3
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "Grace",
+      "voterDisplayName": "Grace",
+      "confirmation": "6561cc4e-f939-48d7-9771-2f15298622ab",
+      "rankings": [
+        {
+          "candidateOriginalName": "Unpopular",
+          "candidateDisplayName": "Unpopular",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "Preferred",
+          "candidateDisplayName": "Preferred",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "Spoiler",
+          "candidateDisplayName": "Spoiler",
+          "rank": 3
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "Heidi",
+      "voterDisplayName": "Heidi",
+      "confirmation": "e1413f5e-d155-4568-a78c-6630f13897fd",
+      "rankings": [
+        {
+          "candidateOriginalName": "Spoiler",
+          "candidateDisplayName": "Spoiler",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "Preferred",
+          "candidateDisplayName": "Preferred",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "Unpopular",
+          "candidateDisplayName": "Unpopular",
+          "rank": 3
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "Ivy",
+      "voterDisplayName": "Ivy",
+      "confirmation": "8bcc9a02-1a41-4724-ba36-b733a416d190",
+      "rankings": [
+        {
+          "candidateOriginalName": "Spoiler",
+          "candidateDisplayName": "Spoiler",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "Preferred",
+          "candidateDisplayName": "Preferred",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "Unpopular",
+          "candidateDisplayName": "Unpopular",
+          "rank": 3
+        }
+      ]
+    }
+  ]
+}

@@ -5,9 +5,6 @@ import com.seanshubin.vote.domain.*
 import com.seanshubin.vote.integration.dsl.ScenarioBackend
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.modules.SerializersModule
-import kotlinx.serialization.modules.polymorphic
-import kotlinx.serialization.modules.subclass
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 
@@ -22,11 +19,6 @@ class HttpRecordingBackend(
     private val json = Json {
         ignoreUnknownKeys = true
         prettyPrint = true
-        serializersModule = SerializersModule {
-            polymorphic(Ballot::class) {
-                subclass(SecretBallot::class)
-            }
-        }
     }
 
     override fun registerUser(name: String, email: String, password: String): AccessToken {

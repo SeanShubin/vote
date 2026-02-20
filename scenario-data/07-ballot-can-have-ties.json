@@ -1,0 +1,189 @@
+{
+  "scenarioNumber": "07",
+  "scenarioName": "07-ballot-can-have-ties",
+  "displayName": "Ballot Can Have Ties",
+  "electionName": "Ballot Can Have Ties Election",
+  "ownerName": "owner",
+  "candidates": [
+    {
+      "originalName": "willie-carney",
+      "displayName": "Willie Carney"
+    },
+    {
+      "originalName": "john-estrada",
+      "displayName": "John Estrada"
+    },
+    {
+      "originalName": "francisco-daugherty",
+      "displayName": "Francisco Daugherty"
+    },
+    {
+      "originalName": "brady-pena",
+      "displayName": "Brady Pena"
+    }
+  ],
+  "voters": [
+    {
+      "originalName": "zachary-jimenez",
+      "displayName": "Zachary Jimenez",
+      "email": "zachary.jimenez@example.com"
+    },
+    {
+      "originalName": "weston-freeman",
+      "displayName": "Weston Freeman",
+      "email": "weston.freeman@example.com"
+    },
+    {
+      "originalName": "angelia-wilcox",
+      "displayName": "Angelia Wilcox",
+      "email": "angelia.wilcox@example.com"
+    },
+    {
+      "originalName": "bryon-bartlett",
+      "displayName": "Bryon Bartlett",
+      "email": "bryon.bartlett@example.com"
+    },
+    {
+      "originalName": "lawrence-long",
+      "displayName": "Lawrence Long",
+      "email": "lawrence.long@example.com"
+    }
+  ],
+  "ballots": [
+    {
+      "voterOriginalName": "bryon-bartlett",
+      "voterDisplayName": "Bryon Bartlett",
+      "confirmation": "2b86f214-c7f6-4bc4-ba96-6b0936441617",
+      "rankings": [
+        {
+          "candidateOriginalName": "john-estrada",
+          "candidateDisplayName": "John Estrada",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "willie-carney",
+          "candidateDisplayName": "Willie Carney",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "francisco-daugherty",
+          "candidateDisplayName": "Francisco Daugherty",
+          "rank": 3
+        },
+        {
+          "candidateOriginalName": "brady-pena",
+          "candidateDisplayName": "Brady Pena",
+          "rank": 4
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "angelia-wilcox",
+      "voterDisplayName": "Angelia Wilcox",
+      "confirmation": "db3ca988-53db-4678-9ca0-a5c88c677ba1",
+      "rankings": [
+        {
+          "candidateOriginalName": "willie-carney",
+          "candidateDisplayName": "Willie Carney",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "francisco-daugherty",
+          "candidateDisplayName": "Francisco Daugherty",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "brady-pena",
+          "candidateDisplayName": "Brady Pena",
+          "rank": 3
+        },
+        {
+          "candidateOriginalName": "john-estrada",
+          "candidateDisplayName": "John Estrada",
+          "rank": 4
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "weston-freeman",
+      "voterDisplayName": "Weston Freeman",
+      "confirmation": "7b54e6cb-9f4a-4386-b691-5e0d4e7233df",
+      "rankings": [
+        {
+          "candidateOriginalName": "francisco-daugherty",
+          "candidateDisplayName": "Francisco Daugherty",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "brady-pena",
+          "candidateDisplayName": "Brady Pena",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "john-estrada",
+          "candidateDisplayName": "John Estrada",
+          "rank": 3
+        },
+        {
+          "candidateOriginalName": "willie-carney",
+          "candidateDisplayName": "Willie Carney",
+          "rank": 4
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "lawrence-long",
+      "voterDisplayName": "Lawrence Long",
+      "confirmation": "6a28619a-b3bb-4da0-a5bf-6eccbf786e09",
+      "rankings": [
+        {
+          "candidateOriginalName": "brady-pena",
+          "candidateDisplayName": "Brady Pena",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "john-estrada",
+          "candidateDisplayName": "John Estrada",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "willie-carney",
+          "candidateDisplayName": "Willie Carney",
+          "rank": 3
+        },
+        {
+          "candidateOriginalName": "francisco-daugherty",
+          "candidateDisplayName": "Francisco Daugherty",
+          "rank": 4
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "zachary-jimenez",
+      "voterDisplayName": "Zachary Jimenez",
+      "confirmation": "2ffa5166-0838-43a5-b9b9-2998c824e644",
+      "rankings": [
+        {
+          "candidateOriginalName": "john-estrada",
+          "candidateDisplayName": "John Estrada",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "willie-carney",
+          "candidateDisplayName": "Willie Carney",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "francisco-daugherty",
+          "candidateDisplayName": "Francisco Daugherty",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "brady-pena",
+          "candidateDisplayName": "Brady Pena",
+          "rank": 3
+        }
+      ]
+    }
+  ]
+}

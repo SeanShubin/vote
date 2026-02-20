@@ -1,0 +1,538 @@
+{
+  "scenarioNumber": "09",
+  "scenarioName": "09-random-data",
+  "displayName": "Random Data",
+  "electionName": "Random Data Election",
+  "ownerName": "owner",
+  "candidates": [
+    {
+      "originalName": "carmela-graves",
+      "displayName": "Carmela Graves"
+    },
+    {
+      "originalName": "elias-ramirez",
+      "displayName": "Elias Ramirez"
+    },
+    {
+      "originalName": "mervin-shea",
+      "displayName": "Mervin Shea"
+    },
+    {
+      "originalName": "heath-schroeder",
+      "displayName": "Heath Schroeder"
+    },
+    {
+      "originalName": "marquis-reese",
+      "displayName": "Marquis Reese"
+    }
+  ],
+  "voters": [
+    {
+      "originalName": "avery-zamora",
+      "displayName": "Avery Zamora",
+      "email": "avery.zamora@example.com"
+    },
+    {
+      "originalName": "saul-patel",
+      "displayName": "Saul Patel",
+      "email": "saul.patel@example.com"
+    },
+    {
+      "originalName": "les-ramsey",
+      "displayName": "Les Ramsey",
+      "email": "les.ramsey@example.com"
+    },
+    {
+      "originalName": "tracie-lucas",
+      "displayName": "Tracie Lucas",
+      "email": "tracie.lucas@example.com"
+    },
+    {
+      "originalName": "sasha-wells",
+      "displayName": "Sasha Wells",
+      "email": "sasha.wells@example.com"
+    },
+    {
+      "originalName": "julianne-meyer",
+      "displayName": "Julianne Meyer",
+      "email": "julianne.meyer@example.com"
+    },
+    {
+      "originalName": "aurora-clarke",
+      "displayName": "Aurora Clarke",
+      "email": "aurora.clarke@example.com"
+    },
+    {
+      "originalName": "darius-townsend",
+      "displayName": "Darius Townsend",
+      "email": "darius.townsend@example.com"
+    },
+    {
+      "originalName": "laura-cook",
+      "displayName": "Laura Cook",
+      "email": "laura.cook@example.com"
+    },
+    {
+      "originalName": "ken-fox",
+      "displayName": "Ken Fox",
+      "email": "ken.fox@example.com"
+    },
+    {
+      "originalName": "cara-howell",
+      "displayName": "Cara Howell",
+      "email": "cara.howell@example.com"
+    },
+    {
+      "originalName": "alex-spencer",
+      "displayName": "Alex Spencer",
+      "email": "alex.spencer@example.com"
+    },
+    {
+      "originalName": "carey-oneill",
+      "displayName": "Carey Oneill",
+      "email": "carey.oneill@example.com"
+    },
+    {
+      "originalName": "tanya-gibbs",
+      "displayName": "Tanya Gibbs",
+      "email": "tanya.gibbs@example.com"
+    },
+    {
+      "originalName": "mara-benton",
+      "displayName": "Mara Benton",
+      "email": "mara.benton@example.com"
+    },
+    {
+      "originalName": "joni-myers",
+      "displayName": "Joni Myers",
+      "email": "joni.myers@example.com"
+    },
+    {
+      "originalName": "gertrude-arnold",
+      "displayName": "Gertrude Arnold",
+      "email": "gertrude.arnold@example.com"
+    },
+    {
+      "originalName": "will-snyder",
+      "displayName": "Will Snyder",
+      "email": "will.snyder@example.com"
+    },
+    {
+      "originalName": "cory-walters",
+      "displayName": "Cory Walters",
+      "email": "cory.walters@example.com"
+    },
+    {
+      "originalName": "carey-bryan",
+      "displayName": "Carey Bryan",
+      "email": "carey.bryan@example.com"
+    }
+  ],
+  "ballots": [
+    {
+      "voterOriginalName": "aurora-clarke",
+      "voterDisplayName": "Aurora Clarke",
+      "confirmation": "fafed6e8-9d20-4b49-be51-550c9c051f3c",
+      "rankings": [
+        {
+          "candidateOriginalName": "heath-schroeder",
+          "candidateDisplayName": "Heath Schroeder",
+          "rank": 4
+        },
+        {
+          "candidateOriginalName": "marquis-reese",
+          "candidateDisplayName": "Marquis Reese",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "carmela-graves",
+          "candidateDisplayName": "Carmela Graves",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "elias-ramirez",
+          "candidateDisplayName": "Elias Ramirez",
+          "rank": 3
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "tracie-lucas",
+      "voterDisplayName": "Tracie Lucas",
+      "confirmation": "1a68bfa5-1cdb-490b-96a0-ce2e4c3a2874",
+      "rankings": [
+        {
+          "candidateOriginalName": "elias-ramirez",
+          "candidateDisplayName": "Elias Ramirez",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "mervin-shea",
+          "candidateDisplayName": "Mervin Shea",
+          "rank": 3
+        },
+        {
+          "candidateOriginalName": "heath-schroeder",
+          "candidateDisplayName": "Heath Schroeder",
+          "rank": 4
+        },
+        {
+          "candidateOriginalName": "marquis-reese",
+          "candidateDisplayName": "Marquis Reese",
+          "rank": 2
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "les-ramsey",
+      "voterDisplayName": "Les Ramsey",
+      "confirmation": "ee9da4ef-296e-4b0a-92cf-70804c51ec3f",
+      "rankings": [
+        {
+          "candidateOriginalName": "marquis-reese",
+          "candidateDisplayName": "Marquis Reese",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "elias-ramirez",
+          "candidateDisplayName": "Elias Ramirez",
+          "rank": 3
+        },
+        {
+          "candidateOriginalName": "carmela-graves",
+          "candidateDisplayName": "Carmela Graves",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "mervin-shea",
+          "candidateDisplayName": "Mervin Shea",
+          "rank": 4
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "darius-townsend",
+      "voterDisplayName": "Darius Townsend",
+      "confirmation": "7618e06c-8938-4ede-873f-f5d8dbc41199",
+      "rankings": [
+        {
+          "candidateOriginalName": "mervin-shea",
+          "candidateDisplayName": "Mervin Shea",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "marquis-reese",
+          "candidateDisplayName": "Marquis Reese",
+          "rank": 4
+        },
+        {
+          "candidateOriginalName": "heath-schroeder",
+          "candidateDisplayName": "Heath Schroeder",
+          "rank": 3
+        },
+        {
+          "candidateOriginalName": "carmela-graves",
+          "candidateDisplayName": "Carmela Graves",
+          "rank": 1
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "tanya-gibbs",
+      "voterDisplayName": "Tanya Gibbs",
+      "confirmation": "47f359a7-22bd-40c8-a07d-9f9d9f8c0224",
+      "rankings": [
+        {
+          "candidateOriginalName": "mervin-shea",
+          "candidateDisplayName": "Mervin Shea",
+          "rank": 3
+        },
+        {
+          "candidateOriginalName": "heath-schroeder",
+          "candidateDisplayName": "Heath Schroeder",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "elias-ramirez",
+          "candidateDisplayName": "Elias Ramirez",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "carmela-graves",
+          "candidateDisplayName": "Carmela Graves",
+          "rank": 4
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "cory-walters",
+      "voterDisplayName": "Cory Walters",
+      "confirmation": "bff09127-2a9a-42ab-89dd-5828c9aba73b",
+      "rankings": [
+        {
+          "candidateOriginalName": "marquis-reese",
+          "candidateDisplayName": "Marquis Reese",
+          "rank": 3
+        },
+        {
+          "candidateOriginalName": "elias-ramirez",
+          "candidateDisplayName": "Elias Ramirez",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "heath-schroeder",
+          "candidateDisplayName": "Heath Schroeder",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "carmela-graves",
+          "candidateDisplayName": "Carmela Graves",
+          "rank": 4
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "julianne-meyer",
+      "voterDisplayName": "Julianne Meyer",
+      "confirmation": "db072bbc-e09a-417e-9cf8-e2c634196bc8",
+      "rankings": [
+        {
+          "candidateOriginalName": "elias-ramirez",
+          "candidateDisplayName": "Elias Ramirez",
+          "rank": 3
+        },
+        {
+          "candidateOriginalName": "mervin-shea",
+          "candidateDisplayName": "Mervin Shea",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "carmela-graves",
+          "candidateDisplayName": "Carmela Graves",
+          "rank": 4
+        },
+        {
+          "candidateOriginalName": "marquis-reese",
+          "candidateDisplayName": "Marquis Reese",
+          "rank": 1
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "carey-oneill",
+      "voterDisplayName": "Carey Oneill",
+      "confirmation": "0c6da704-ae4d-436b-b49b-e503deed9f3b",
+      "rankings": [
+        {
+          "candidateOriginalName": "elias-ramirez",
+          "candidateDisplayName": "Elias Ramirez",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "marquis-reese",
+          "candidateDisplayName": "Marquis Reese",
+          "rank": 3
+        },
+        {
+          "candidateOriginalName": "carmela-graves",
+          "candidateDisplayName": "Carmela Graves",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "heath-schroeder",
+          "candidateDisplayName": "Heath Schroeder",
+          "rank": 4
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "avery-zamora",
+      "voterDisplayName": "Avery Zamora",
+      "confirmation": "46ee4e29-ef12-4d4e-91f3-19d4eb87d59f",
+      "rankings": [
+        {
+          "candidateOriginalName": "marquis-reese",
+          "candidateDisplayName": "Marquis Reese",
+          "rank": 4
+        },
+        {
+          "candidateOriginalName": "elias-ramirez",
+          "candidateDisplayName": "Elias Ramirez",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "heath-schroeder",
+          "candidateDisplayName": "Heath Schroeder",
+          "rank": 3
+        },
+        {
+          "candidateOriginalName": "mervin-shea",
+          "candidateDisplayName": "Mervin Shea",
+          "rank": 1
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "carey-bryan",
+      "voterDisplayName": "Carey Bryan",
+      "confirmation": "607a541a-369d-4380-933a-7d9d2f978730",
+      "rankings": [
+        {
+          "candidateOriginalName": "carmela-graves",
+          "candidateDisplayName": "Carmela Graves",
+          "rank": 4
+        },
+        {
+          "candidateOriginalName": "heath-schroeder",
+          "candidateDisplayName": "Heath Schroeder",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "elias-ramirez",
+          "candidateDisplayName": "Elias Ramirez",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "mervin-shea",
+          "candidateDisplayName": "Mervin Shea",
+          "rank": 3
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "saul-patel",
+      "voterDisplayName": "Saul Patel",
+      "confirmation": "9d1196e4-d134-4399-8689-2f1157da8561",
+      "rankings": [
+        {
+          "candidateOriginalName": "marquis-reese",
+          "candidateDisplayName": "Marquis Reese",
+          "rank": 3
+        },
+        {
+          "candidateOriginalName": "heath-schroeder",
+          "candidateDisplayName": "Heath Schroeder",
+          "rank": 4
+        },
+        {
+          "candidateOriginalName": "elias-ramirez",
+          "candidateDisplayName": "Elias Ramirez",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "mervin-shea",
+          "candidateDisplayName": "Mervin Shea",
+          "rank": 2
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "mara-benton",
+      "voterDisplayName": "Mara Benton",
+      "confirmation": "a783c133-161d-4525-af58-f9d22094783c",
+      "rankings": [
+        {
+          "candidateOriginalName": "carmela-graves",
+          "candidateDisplayName": "Carmela Graves",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "marquis-reese",
+          "candidateDisplayName": "Marquis Reese",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "mervin-shea",
+          "candidateDisplayName": "Mervin Shea",
+          "rank": 4
+        },
+        {
+          "candidateOriginalName": "heath-schroeder",
+          "candidateDisplayName": "Heath Schroeder",
+          "rank": 3
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "gertrude-arnold",
+      "voterDisplayName": "Gertrude Arnold",
+      "confirmation": "1e80fe00-01b6-426f-9edb-dfc9995d531f",
+      "rankings": [
+        {
+          "candidateOriginalName": "marquis-reese",
+          "candidateDisplayName": "Marquis Reese",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "mervin-shea",
+          "candidateDisplayName": "Mervin Shea",
+          "rank": 4
+        },
+        {
+          "candidateOriginalName": "carmela-graves",
+          "candidateDisplayName": "Carmela Graves",
+          "rank": 3
+        },
+        {
+          "candidateOriginalName": "elias-ramirez",
+          "candidateDisplayName": "Elias Ramirez",
+          "rank": 1
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "sasha-wells",
+      "voterDisplayName": "Sasha Wells",
+      "confirmation": "7b397064-4f1e-4f9e-b0bb-36bb88dbc4a6",
+      "rankings": [
+        {
+          "candidateOriginalName": "heath-schroeder",
+          "candidateDisplayName": "Heath Schroeder",
+          "rank": 4
+        },
+        {
+          "candidateOriginalName": "mervin-shea",
+          "candidateDisplayName": "Mervin Shea",
+          "rank": 3
+        },
+        {
+          "candidateOriginalName": "carmela-graves",
+          "candidateDisplayName": "Carmela Graves",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "elias-ramirez",
+          "candidateDisplayName": "Elias Ramirez",
+          "rank": 1
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "ken-fox",
+      "voterDisplayName": "Ken Fox",
+      "confirmation": "39a05654-5881-4493-978f-b9b547f831f5",
+      "rankings": [
+        {
+          "candidateOriginalName": "carmela-graves",
+          "candidateDisplayName": "Carmela Graves",
+          "rank": 4
+        },
+        {
+          "candidateOriginalName": "marquis-reese",
+          "candidateDisplayName": "Marquis Reese",
+          "rank": 3
+        },
+        {
+          "candidateOriginalName": "elias-ramirez",
+          "candidateDisplayName": "Elias Ramirez",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "mervin-shea",
+          "candidateDisplayName": "Mervin Shea",
+          "rank": 2
+        }
+      ]
+    }
+  ]
+}

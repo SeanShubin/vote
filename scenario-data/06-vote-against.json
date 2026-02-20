@@ -1,0 +1,130 @@
+{
+  "scenarioNumber": "06",
+  "scenarioName": "06-vote-against",
+  "displayName": "Vote Against",
+  "electionName": "Vote Against Election",
+  "ownerName": "owner",
+  "candidates": [
+    {
+      "originalName": "Vanilla",
+      "displayName": "Vanilla"
+    },
+    {
+      "originalName": "Chocolate",
+      "displayName": "Chocolate"
+    },
+    {
+      "originalName": "Coconut",
+      "displayName": "Coconut"
+    },
+    {
+      "originalName": "<no-candidate>",
+      "displayName": "<no-candidate>"
+    }
+  ],
+  "voters": [
+    {
+      "originalName": "Alice",
+      "displayName": "Alice",
+      "email": "alice@example.com"
+    },
+    {
+      "originalName": "Bob",
+      "displayName": "Bob",
+      "email": "bob@example.com"
+    },
+    {
+      "originalName": "Carol",
+      "displayName": "Carol",
+      "email": "carol@example.com"
+    },
+    {
+      "originalName": "Dave",
+      "displayName": "Dave",
+      "email": "dave@example.com"
+    },
+    {
+      "originalName": "Eve",
+      "displayName": "Eve",
+      "email": "eve@example.com"
+    }
+  ],
+  "ballots": [
+    {
+      "voterOriginalName": "Alice",
+      "voterDisplayName": "Alice",
+      "confirmation": "dd8b2569-dcc6-4abc-8aff-5bd18ba557b2",
+      "rankings": [
+        {
+          "candidateOriginalName": "Vanilla",
+          "candidateDisplayName": "Vanilla",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "Chocolate",
+          "candidateDisplayName": "Chocolate",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "<no-candidate>",
+          "candidateDisplayName": "<no-candidate>",
+          "rank": 3
+        },
+        {
+          "candidateOriginalName": "Coconut",
+          "candidateDisplayName": "Coconut",
+          "rank": 4
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "Carol",
+      "voterDisplayName": "Carol",
+      "confirmation": "9b42ab31-ec3f-4174-a3a6-859c3d6df92c",
+      "rankings": [
+        {
+          "candidateOriginalName": "Chocolate",
+          "candidateDisplayName": "Chocolate",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "Vanilla",
+          "candidateDisplayName": "Vanilla",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "<no-candidate>",
+          "candidateDisplayName": "<no-candidate>",
+          "rank": 3
+        },
+        {
+          "candidateOriginalName": "Coconut",
+          "candidateDisplayName": "Coconut",
+          "rank": 4
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "Eve",
+      "voterDisplayName": "Eve",
+      "confirmation": "4f7ddf30-879a-4bb3-9cd7-84723a4f926b",
+      "rankings": [
+        {
+          "candidateOriginalName": "Coconut",
+          "candidateDisplayName": "Coconut",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "Vanilla",
+          "candidateDisplayName": "Vanilla",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "Chocolate",
+          "candidateDisplayName": "Chocolate",
+          "rank": 3
+        }
+      ]
+    }
+  ]
+}

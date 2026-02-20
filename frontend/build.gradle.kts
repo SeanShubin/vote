@@ -42,3 +42,35 @@ kotlin {
         }
     }
 }
+
+// Cache busting for frontend.js
+tasks.register("addCacheBusting") {
+    description = "Add cache busting query parameter to frontend.js reference"
+
+    val htmlSource = file("src/jsMain/resources/index.html")
+    val htmlDest = file("build/dist/js/productionExecutable/index.html")
+
+    inputs.file(htmlSource)
+    outputs.file(htmlDest)
+
+    doLast {
+        val buildTimestamp = System.currentTimeMillis()
+        val html = htmlSource.readText()
+        val modifiedHtml = html.replace(
+            """<script src="frontend.js"></script>""",
+            """<script src="frontend.js?v=$buildTimestamp"></script>"""
+        )
+        htmlDest.writeText(modifiedHtml)
+        println("✓ Cache busting added: frontend.js?v=$buildTimestamp")
+    }
+}
+
+// Run after webpack builds the production bundle
+tasks.named("jsBrowserProductionWebpack") {
+    finalizedBy("addCacheBusting")
+}
+
+// Also run after the build task to ensure it runs in incremental builds
+tasks.named("build") {
+    finalizedBy("addCacheBusting")
+}

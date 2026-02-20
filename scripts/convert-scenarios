@@ -1,0 +1,190 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Convert scenario data from condorcet3 format to vote app JSON format
+
+CONDORCET_DATA_DIR="/Users/seashubi/github.com/SeanShubin/condorcet3/jvm-backend/src/test/resources/test-data"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+VOTE_DATA_DIR="$PROJECT_DIR/scenario-data"
+
+# Check if condorcet3 data directory exists
+if [ ! -d "$CONDORCET_DATA_DIR" ]; then
+    echo "ERROR: condorcet3 data directory not found: $CONDORCET_DATA_DIR"
+    echo "Make sure condorcet3 project is checked out"
+    exit 1
+fi
+
+# Helper function: Convert hyphenated name to proper case
+# Examples: "forest-foster" → "Forest Foster", "Alice" → "Alice"
+# Special case: "<no-candidate>" → "<no-candidate>" (keep as-is)
+hyphenated_to_proper_case() {
+    local input="$1"
+
+    # Special case: keep <no-candidate> as-is
+    if [ "$input" = "<no-candidate>" ]; then
+        echo "$input"
+        return
+    fi
+
+    # If it contains hyphens, split and capitalize each part
+    if [[ "$input" == *"-"* ]]; then
+        echo "$input" | awk -F'-' '{for(i=1;i<=NF;i++) $i=toupper(substr($i,1,1)) tolower(substr($i,2))} {OFS=" "; print}'
+    else
+        # Single word: capitalize first letter only
+        echo "$input" | awk '{print toupper(substr($0,1,1)) tolower(substr($0,2))}'
+    fi
+}
+
+# Helper function: Convert name to email
+# Examples: "forest-foster" → "forest.foster@example.com", "Alice" → "alice@example.com"
+hyphenated_to_email() {
+    local input="$1"
+
+    # Remove angle brackets for <no-candidate>
+    input="${input#<}"
+    input="${input%>}"
+
+    # Convert to lowercase, replace hyphens with dots, add domain
+    echo "$input" | tr '[:upper:]' '[:lower:]' | tr '-' '.' | awk '{print $0 "@example.com"}'
+}
+
+# Helper function: Create display name from scenario name
+scenario_display_name() {
+    local scenario_name="$1"
+    # Remove number prefix, replace hyphens with spaces, capitalize each word
+    echo "$scenario_name" | sed 's/^[0-9]*-//' | tr '-' ' ' | awk '{for(i=1;i<=NF;i++) $i=toupper(substr($i,1,1)) substr($i,2)} {print}'
+}
+
+echo "=========================================="
+echo "Converting scenarios to JSON format"
+echo "=========================================="
+echo ""
+echo "Source: $CONDORCET_DATA_DIR"
+echo "Target: $VOTE_DATA_DIR"
+echo ""
+
+# Create output directory if it doesn't exist
+mkdir -p "$VOTE_DATA_DIR"
+
+# Process each scenario directory
+for scenario_dir in "$CONDORCET_DATA_DIR"/*; do
+    if [ ! -d "$scenario_dir" ]; then
+        continue
+    fi
+
+    scenario_name=$(basename "$scenario_dir")
+    input_file="$scenario_dir/input.txt"
+    output_file="$VOTE_DATA_DIR/${scenario_name}.json"
+
+    if [ ! -f "$input_file" ]; then
+        echo "WARNING: No input.txt found in $scenario_name, skipping"
+        continue
+    fi
+
+    echo "Converting $scenario_name..."
+
+    # Extract scenario number (e.g., "01" from "01-contrast-first-past-the-post")
+    scenario_number=$(echo "$scenario_name" | grep -oE '^[0-9]+')
+
+    # Generate display name
+    display_name=$(scenario_display_name "$scenario_name")
+
+    # Parse input.txt file
+    # Section markers: "candidates (name)", "eligible-to-vote (name)", "ballots (name confirmation { rank candidate })"
+
+    # Extract candidates (lines between "candidates" and next section)
+    candidates_json=$(awk '
+        /^candidates \(name\)/ {in_section=1; next}
+        /^eligible-to-vote \(name\)/ {in_section=0}
+        /^ballots \(name confirmation/ {in_section=0}
+        in_section && NF>0 {print $1}
+    ' "$input_file" | while read -r cand; do
+        [ -z "$cand" ] && continue
+        display=$(hyphenated_to_proper_case "$cand")
+        jq -n --arg orig "$cand" --arg disp "$display" '{originalName: $orig, displayName: $disp}'
+    done | jq -s '.')
+
+    # Extract voters (lines between "eligible-to-vote" and next section)
+    voters_json=$(awk '
+        /^eligible-to-vote \(name\)/ {in_section=1; next}
+        /^ballots \(name confirmation/ {in_section=0}
+        in_section && NF>0 {print $1}
+    ' "$input_file" | while read -r voter; do
+        [ -z "$voter" ] && continue
+        display=$(hyphenated_to_proper_case "$voter")
+        email=$(hyphenated_to_email "$voter")
+        jq -n --arg orig "$voter" --arg disp "$display" --arg email "$email" \
+            '{originalName: $orig, displayName: $disp, email: $email}'
+    done | jq -s '.')
+
+    # Extract ballots (lines after "ballots" header)
+    ballots_json=$(awk '
+        /^ballots \(name confirmation/ {in_section=1; next}
+        in_section && NF>0 {print $0}
+    ' "$input_file" | while read -r line; do
+        [ -z "$line" ] && continue
+
+        # Parse ballot line: voterName uuid rank1 cand1 rank2 cand2 ...
+        voter_orig=$(echo "$line" | awk '{print $1}')
+        confirmation=$(echo "$line" | awk '{print $2}')
+
+        # Get remaining fields (rankings)
+        rankings=$(echo "$line" | awk '{for(i=3;i<=NF;i++) print $i}')
+
+        # Build rankings array
+        rankings_json=$(echo "$rankings" | awk '
+            NR%2==1 {rank=$1; next}
+            NR%2==0 {cand=$1; print rank " " cand}
+        ' | while read -r rank cand; do
+            cand_display=$(hyphenated_to_proper_case "$cand")
+            jq -n --arg c_orig "$cand" --arg c_disp "$cand_display" --argjson r "$rank" \
+                '{candidateOriginalName: $c_orig, candidateDisplayName: $c_disp, rank: $r}'
+        done | jq -s '.')
+
+        voter_display=$(hyphenated_to_proper_case "$voter_orig")
+
+        jq -n \
+            --arg v_orig "$voter_orig" \
+            --arg v_disp "$voter_display" \
+            --arg conf "$confirmation" \
+            --argjson ranks "$rankings_json" \
+            '{voterOriginalName: $v_orig, voterDisplayName: $v_disp, confirmation: $conf, rankings: $ranks}'
+    done | jq -s '.')
+
+    # Build final JSON
+    jq -n \
+        --arg num "$scenario_number" \
+        --arg name "$scenario_name" \
+        --arg disp "$display_name" \
+        --arg elec "$display_name Election" \
+        --arg owner "owner" \
+        --argjson cands "$candidates_json" \
+        --argjson voters "$voters_json" \
+        --argjson ballots "$ballots_json" \
+        '{
+            scenarioNumber: $num,
+            scenarioName: $name,
+            displayName: $disp,
+            electionName: $elec,
+            ownerName: $owner,
+            candidates: $cands,
+            voters: $voters,
+            ballots: $ballots
+        }' > "$output_file"
+
+    # Count items for verification
+    cand_count=$(echo "$candidates_json" | jq 'length')
+    voter_count=$(echo "$voters_json" | jq 'length')
+    ballot_count=$(echo "$ballots_json" | jq 'length')
+
+    echo "  ✓ $scenario_name: $cand_count candidates, $voter_count voters, $ballot_count ballots"
+done
+
+echo ""
+echo "=========================================="
+echo "Conversion complete!"
+echo "=========================================="
+echo ""
+echo "Generated JSON files in: $VOTE_DATA_DIR"
+ls -1 "$VOTE_DATA_DIR"/*.json 2>/dev/null | wc -l | awk '{print "Total scenarios: " $1}'

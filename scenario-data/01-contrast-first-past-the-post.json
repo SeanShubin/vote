@@ -1,0 +1,295 @@
+{
+  "scenarioNumber": "01",
+  "scenarioName": "01-contrast-first-past-the-post",
+  "displayName": "Contrast First Past The Post",
+  "electionName": "Contrast First Past The Post Election",
+  "ownerName": "owner",
+  "candidates": [
+    {
+      "originalName": "minor-improvements",
+      "displayName": "Minor Improvements"
+    },
+    {
+      "originalName": "radical-changes",
+      "displayName": "Radical Changes"
+    },
+    {
+      "originalName": "status-quo",
+      "displayName": "Status Quo"
+    }
+  ],
+  "voters": [
+    {
+      "originalName": "Alice",
+      "displayName": "Alice",
+      "email": "alice@example.com"
+    },
+    {
+      "originalName": "Bob",
+      "displayName": "Bob",
+      "email": "bob@example.com"
+    },
+    {
+      "originalName": "Carol",
+      "displayName": "Carol",
+      "email": "carol@example.com"
+    },
+    {
+      "originalName": "Dave",
+      "displayName": "Dave",
+      "email": "dave@example.com"
+    },
+    {
+      "originalName": "Eve",
+      "displayName": "Eve",
+      "email": "eve@example.com"
+    },
+    {
+      "originalName": "Frank",
+      "displayName": "Frank",
+      "email": "frank@example.com"
+    },
+    {
+      "originalName": "Grace",
+      "displayName": "Grace",
+      "email": "grace@example.com"
+    },
+    {
+      "originalName": "Heidi",
+      "displayName": "Heidi",
+      "email": "heidi@example.com"
+    },
+    {
+      "originalName": "Ivy",
+      "displayName": "Ivy",
+      "email": "ivy@example.com"
+    },
+    {
+      "originalName": "Judy",
+      "displayName": "Judy",
+      "email": "judy@example.com"
+    }
+  ],
+  "ballots": [
+    {
+      "voterOriginalName": "Alice",
+      "voterDisplayName": "Alice",
+      "confirmation": "980fb0c0-77ba-4ffb-be3b-ef190a7f14ce",
+      "rankings": [
+        {
+          "candidateOriginalName": "minor-improvements",
+          "candidateDisplayName": "Minor Improvements",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "status-quo",
+          "candidateDisplayName": "Status Quo",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "radical-changes",
+          "candidateDisplayName": "Radical Changes",
+          "rank": 3
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "Bob",
+      "voterDisplayName": "Bob",
+      "confirmation": "87c257bc-be9f-4edf-81ac-fc8d0687745e",
+      "rankings": [
+        {
+          "candidateOriginalName": "minor-improvements",
+          "candidateDisplayName": "Minor Improvements",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "status-quo",
+          "candidateDisplayName": "Status Quo",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "radical-changes",
+          "candidateDisplayName": "Radical Changes",
+          "rank": 3
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "Carol",
+      "voterDisplayName": "Carol",
+      "confirmation": "0ad21976-c551-464f-be68-b61fcbbfd85a",
+      "rankings": [
+        {
+          "candidateOriginalName": "minor-improvements",
+          "candidateDisplayName": "Minor Improvements",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "status-quo",
+          "candidateDisplayName": "Status Quo",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "radical-changes",
+          "candidateDisplayName": "Radical Changes",
+          "rank": 3
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "Dave",
+      "voterDisplayName": "Dave",
+      "confirmation": "f68f82d5-ef9d-4f9d-9e29-5f9fc2fbc8e1",
+      "rankings": [
+        {
+          "candidateOriginalName": "status-quo",
+          "candidateDisplayName": "Status Quo",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "minor-improvements",
+          "candidateDisplayName": "Minor Improvements",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "radical-changes",
+          "candidateDisplayName": "Radical Changes",
+          "rank": 3
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "Eve",
+      "voterDisplayName": "Eve",
+      "confirmation": "051a5a89-9242-4381-8067-55d5bac12775",
+      "rankings": [
+        {
+          "candidateOriginalName": "status-quo",
+          "candidateDisplayName": "Status Quo",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "minor-improvements",
+          "candidateDisplayName": "Minor Improvements",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "radical-changes",
+          "candidateDisplayName": "Radical Changes",
+          "rank": 3
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "Frank",
+      "voterDisplayName": "Frank",
+      "confirmation": "9afb4b66-1023-438a-a81f-e4783b3f45ce",
+      "rankings": [
+        {
+          "candidateOriginalName": "status-quo",
+          "candidateDisplayName": "Status Quo",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "minor-improvements",
+          "candidateDisplayName": "Minor Improvements",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "radical-changes",
+          "candidateDisplayName": "Radical Changes",
+          "rank": 3
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "Grace",
+      "voterDisplayName": "Grace",
+      "confirmation": "0023a873-c36f-48f0-b25a-6206c2602ee6",
+      "rankings": [
+        {
+          "candidateOriginalName": "radical-changes",
+          "candidateDisplayName": "Radical Changes",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "minor-improvements",
+          "candidateDisplayName": "Minor Improvements",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "status-quo",
+          "candidateDisplayName": "Status Quo",
+          "rank": 3
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "Heidi",
+      "voterDisplayName": "Heidi",
+      "confirmation": "f88fd252-c170-4927-8ab8-b8e1a49800dd",
+      "rankings": [
+        {
+          "candidateOriginalName": "radical-changes",
+          "candidateDisplayName": "Radical Changes",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "minor-improvements",
+          "candidateDisplayName": "Minor Improvements",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "status-quo",
+          "candidateDisplayName": "Status Quo",
+          "rank": 3
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "Ivy",
+      "voterDisplayName": "Ivy",
+      "confirmation": "a971633e-db3f-4c3f-8d14-f4c9516b5c93",
+      "rankings": [
+        {
+          "candidateOriginalName": "radical-changes",
+          "candidateDisplayName": "Radical Changes",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "minor-improvements",
+          "candidateDisplayName": "Minor Improvements",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "status-quo",
+          "candidateDisplayName": "Status Quo",
+          "rank": 3
+        }
+      ]
+    },
+    {
+      "voterOriginalName": "Judy",
+      "voterDisplayName": "Judy",
+      "confirmation": "0bee5954-167e-4798-a7ba-946e63b32aff",
+      "rankings": [
+        {
+          "candidateOriginalName": "radical-changes",
+          "candidateDisplayName": "Radical Changes",
+          "rank": 1
+        },
+        {
+          "candidateOriginalName": "minor-improvements",
+          "candidateDisplayName": "Minor Improvements",
+          "rank": 2
+        },
+        {
+          "candidateOriginalName": "status-quo",
+          "candidateDisplayName": "Status Quo",
+          "rank": 3
+        }
+      ]
+    }
+  ]
+}
