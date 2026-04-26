@@ -1,0 +1,127 @@
+#!/usr/bin/env bash
+# Thin shim around the tools/ Kotlin CLI. Auto-rebuilds when sources changed.
+#
+# Usage: scripts/dev <subcommand> [args...]
+#        scripts/dev --rebuild           Force a rebuild even if up to date
+#        scripts/dev --help              Show available subcommands
+#
+# JAVA_HOME resolution (honors `.tool-versions` per asdf/mise convention):
+#   1. If JAVA_HOME already points at a JDK matching the major version in
+#      `.tool-versions`, it's used as-is.
+#   2. Otherwise the shim searches mise/asdf install dirs and standard system
+#      paths for a matching JDK. mise (https://mise.jdx.dev) is recommended for
+#      cross-platform version management — it reads the same `.tool-versions`.
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+
+LAUNCHER_DIR="$PROJECT_DIR/tools/build/install/vote-dev"
+LAUNCHER="$LAUNCHER_DIR/bin/vote-dev"
+SOURCE_DIRS=("$PROJECT_DIR/tools/src" "$PROJECT_DIR/tools/build.gradle.kts")
+
+_jdk_set_if_valid() {
+    local dir="$1"
+    [ -d "$dir" ] || return 1
+    if [ -x "$dir/bin/java" ] || [ -x "$dir/bin/java.exe" ]; then
+        export JAVA_HOME="$dir"
+        return 0
+    fi
+    if [ -d "$dir/Contents/Home" ] && [ -x "$dir/Contents/Home/bin/java" ]; then
+        export JAVA_HOME="$dir/Contents/Home"
+        return 0
+    fi
+    return 1
+}
+
+resolve_java_home() {
+    local tool_versions="$PROJECT_DIR/.tool-versions"
+    [ -f "$tool_versions" ] || return 0
+
+    local java_spec
+    java_spec="$(awk '$1 == "java" { print $2; exit }' "$tool_versions")"
+    [ -n "$java_spec" ] || return 0
+
+    local major
+    major="$(echo "$java_spec" | sed -E 's/^[a-zA-Z]+-?([0-9]+).*/\1/')"
+    [ -n "$major" ] || return 0
+
+    if [ -n "${JAVA_HOME:-}" ] && [ -f "$JAVA_HOME/release" ]; then
+        local current_major
+        current_major="$(grep -E '^JAVA_VERSION=' "$JAVA_HOME/release" 2>/dev/null \
+            | sed -E 's/.*"([0-9]+).*/\1/' | head -n1)"
+        if [ "$current_major" = "$major" ]; then return 0; fi
+    fi
+
+    local user_home="${HOME:-/}"
+    local user_profile="${USERPROFILE:-}"
+    local base_dirs=(
+        "$user_home/.local/share/mise/installs/java"
+        "$user_home/.asdf/installs/java"
+        "$user_home/.jdks"
+        "/c/Program Files/Amazon Corretto"
+        "/c/Program Files/Eclipse Adoptium"
+        "/c/Program Files/Java"
+        "/c/Users/$(whoami 2>/dev/null)/.jdks"
+        "/usr/lib/jvm"
+        "/Library/Java/JavaVirtualMachines"
+    )
+    if [ -n "$user_profile" ]; then
+        local win_profile="/${user_profile//\\//}"
+        win_profile="${win_profile//:/}"
+        base_dirs+=(
+            "$win_profile/.local/share/mise/installs/java"
+            "$win_profile/.jdks"
+        )
+    fi
+
+    local base name
+    for base in "${base_dirs[@]}"; do
+        [ -d "$base" ] || continue
+        while IFS= read -r entry; do
+            name="$(basename "$entry")"
+            case "$name" in
+                "$java_spec" \
+                    | jdk"$major"* \
+                    | jdk-"$major"* \
+                    | corretto-"$major"* \
+                    | corretto-"$major" \
+                    | openjdk-"$major"* \
+                    | temurin-"$major"* \
+                    | "$major".* \
+                    | "$major" )
+                    if _jdk_set_if_valid "$entry"; then return 0; fi
+                    ;;
+            esac
+        done < <(find "$base" -maxdepth 1 -mindepth 1 -type d 2>/dev/null)
+    done
+
+    echo "[scripts/dev] WARNING: Could not find a Java $major JDK." >&2
+    echo "[scripts/dev]   Install mise (https://mise.jdx.dev) or set JAVA_HOME manually." >&2
+    return 0
+}
+
+force_rebuild=false
+if [ "${1:-}" = "--rebuild" ]; then
+    force_rebuild=true
+    shift
+fi
+
+needs_build() {
+    [ "$force_rebuild" = true ] && return 0
+    [ ! -x "$LAUNCHER" ] && return 0
+    if [ -n "$(find "${SOURCE_DIRS[@]}" -newer "$LAUNCHER" -print -quit 2>/dev/null)" ]; then
+        return 0
+    fi
+    return 1
+}
+
+resolve_java_home
+
+if needs_build; then
+    echo "[scripts/dev] Building tools (sources changed or first run)..."
+    (cd "$PROJECT_DIR" && ./gradlew :tools:installDist -q)
+fi
+
+exec "$LAUNCHER" "$@"

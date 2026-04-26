@@ -17,5 +17,6 @@ include(
     ":local",
     ":integration",
     ":schema-diagram",
-    ":documentation"
+    ":documentation",
+    ":tools"
 )
