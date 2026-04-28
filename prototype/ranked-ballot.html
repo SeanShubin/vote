@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ranked Ballot</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg:       #18191b;
+      --surface:  #222426;
+      --surface2: #2a2c2e;
+      --border:   #343638;
+      --border2:  #444648;
+      --text:     #e6e2d8;
+      --muted:    #6e6c66;
+      --accent:   #f2c84b;
+      --danger:   #e05a48;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Manrope', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 48px 20px 80px;
+    }
+
+    .container { max-width: 560px; margin: 0 auto; }
+
+    /* ── Header ────────────────────────────────────────────────────────────── */
+    .header { margin-bottom: 32px; }
+    .header h1 {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 3.2rem;
+      letter-spacing: 0.06em;
+      color: var(--accent);
+      line-height: 1;
+      margin-bottom: 6px;
+    }
+    .header p { font-size: 0.82rem; color: var(--muted); letter-spacing: 0.03em; line-height: 1.6; }
+
+    /* ── Section label ─────────────────────────────────────────────────────── */
+    .section-label {
+      font-size: 0.68rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      color: var(--muted);
+      margin-bottom: 12px;
+    }
+
+    /* ── Arena ─────────────────────────────────────────────────────────────── */
+    .arena-wrap {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 20px;
+      margin-bottom: 28px;
+    }
+
+    /* 3-column grid; chips are tall so the target area is large */
+    .chips {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+
+    .chip {
+      padding: 18px 10px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-family: 'Manrope', sans-serif;
+      font-size: 0.88rem;
+      font-weight: 500;
+      cursor: pointer;
+      text-align: center;
+      line-height: 1.3;
+      transition: background 0.1s, border-color 0.12s, color 0.1s, transform 0.08s;
+    }
+    .chip:hover {
+      background: var(--surface2);
+      border-color: var(--accent);
+      color: var(--accent);
+      transform: translateY(-2px);
+    }
+    .chip:active { transform: translateY(0); }
+
+    /* ── Ranked list ───────────────────────────────────────────────────────── */
+    .ranked-header {
+      display: flex;
+      align-items: baseline;
+      margin-bottom: 10px;
+    }
+    .undo-count { font-size: 0.7rem; color: var(--muted); margin-left: auto; }
+
+    #ranked-list { list-style: none; }
+
+    /* Each row is tall — big target for ↑↓ and × */
+    .ranked-item {
+      position: relative;
+      display: flex;
+      align-items: center;
+      height: 62px;
+      margin-bottom: 5px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      user-select: none;
+      cursor: default;
+      transition: border-color 0.1s;
+    }
+    .ranked-item:focus-visible {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px rgba(242, 200, 75, 0.2);
+    }
+    .ranked-item.dragging { opacity: 0.3; }
+
+    /* Insertion line: drawn as a pseudo-element spanning the full row width,
+       positioned in the middle of the 5px gap between items */
+    .ranked-item.drop-before::before,
+    .ranked-item.drop-after::after {
+      content: '';
+      position: absolute;
+      left: 4px; right: 4px;
+      height: 2px;
+      background: var(--accent);
+      border-radius: 1px;
+      pointer-events: none;
+      z-index: 2;
+    }
+    .ranked-item.drop-before::before { top: -3px; }
+    .ranked-item.drop-after::after   { bottom: -3px; }
+
+    /* Drag handle — wide touch target on the left */
+    .drag-handle {
+      width: 40px;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--border2);
+      cursor: grab;
+      font-size: 1.1rem;
+      flex-shrink: 0;
+      border-radius: 7px 0 0 7px;
+      transition: color 0.1s;
+    }
+    .ranked-item:hover .drag-handle { color: var(--muted); }
+    .drag-handle:active { cursor: grabbing; }
+
+    /* Rank number — Bebas Neue, large, becomes accent on hover */
+    .rank-num {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 1.55rem;
+      letter-spacing: 0.03em;
+      color: var(--muted);
+      width: 40px;
+      text-align: center;
+      flex-shrink: 0;
+      transition: color 0.1s;
+    }
+    .ranked-item:hover .rank-num { color: var(--accent); }
+
+    .ranked-name { flex: 1; font-size: 0.92rem; font-weight: 500; padding: 0 10px; }
+
+    /* Action buttons — tall rows give plenty of height; make buttons wide */
+    .item-btns {
+      display: flex;
+      align-items: center;
+      gap: 3px;
+      padding-right: 10px;
+      flex-shrink: 0;
+    }
+    .item-btn {
+      cursor: pointer;
+      width: 34px;
+      height: 38px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid transparent;
+      border-radius: 5px;
+      background: transparent;
+      color: var(--muted);
+      font-size: 0.85rem;
+      font-family: 'Manrope', sans-serif;
+      transition: background 0.1s, color 0.1s, border-color 0.1s;
+    }
+    .item-btn:hover:not(:disabled) {
+      background: var(--surface2);
+      color: var(--text);
+      border-color: var(--border);
+    }
+    .item-btn:disabled { opacity: 0.2; cursor: default; }
+    .remove-btn:hover:not(:disabled) {
+      background: rgba(224, 90, 72, 0.12);
+      color: var(--danger);
+      border-color: rgba(224, 90, 72, 0.28);
+    }
+
+    /* ── Toolbar ───────────────────────────────────────────────────────────── */
+    .toolbar { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
+
+    .undo-btn {
+      cursor: pointer;
+      padding: 9px 18px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--muted);
+      font-family: 'Manrope', sans-serif;
+      font-size: 0.82rem;
+      font-weight: 500;
+      transition: background 0.1s, color 0.1s, border-color 0.1s;
+    }
+    .undo-btn:hover:not(:disabled) { background: var(--surface2); color: var(--text); border-color: var(--border2); }
+    .undo-btn:disabled { opacity: 0.28; cursor: default; }
+
+    .kbd-hint { font-size: 0.7rem; color: var(--muted); margin-left: auto; letter-spacing: 0.02em; }
+
+    .empty-note { color: var(--muted); font-size: 0.84rem; padding: 16px 2px; }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <div class="header">
+    <h1>Your Ballot</h1>
+    <p>
+      Click a candidate once to add them — first click is first choice.<br>
+      Drag to jump positions · ↑↓ to nudge · × to send back · Ctrl+Z to undo.
+    </p>
+  </div>
+
+  <!-- Arena: disappears once all candidates have been added -->
+  <div id="arena-wrap" class="arena-wrap">
+    <p class="section-label">Candidates — click to rank</p>
+    <div id="chips" class="chips"></div>
+  </div>
+
+  <!-- Ranked list -->
+  <div id="ranked-section">
+    <div class="ranked-header">
+      <span class="section-label">Your ranking</span>
+      <span class="undo-count" id="undo-count"></span>
+    </div>
+    <ul id="ranked-list"></ul>
+    <p id="empty-note" class="empty-note"></p>
+    <div class="toolbar">
+      <button class="undo-btn" id="undo-btn" onclick="undo()" disabled>↩ Undo</button>
+      <span class="kbd-hint">Focus a row · arrow keys to move</span>
+    </div>
+  </div>
+
+</div>
+<script>
+  const CANDIDATES = [
+    'Alice Chen', 'Bob Okafor', 'Carol Santos', 'David Kim',
+    'Eve Nakamura', 'Frank Osei', 'Grace Patel', 'Henry Müller',
+    'Iris Johansson', 'Jack Ferreira', 'Karen Okonkwo', 'Liam Novak'
+  ];
+
+  function shuffle(arr) {
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+
+  let arena = shuffle(CANDIDATES);
+  let ranked = [];
+  let history = [];
+  let draggingIndex = null;
+
+  // ── Render ─────────────────────────────────────────────────────────────────
+
+  function render(focusIndex = null) {
+    const arenaWrap = document.getElementById('arena-wrap');
+    const chipsEl  = document.getElementById('chips');
+
+    arenaWrap.style.display = arena.length > 0 ? '' : 'none';
+    chipsEl.innerHTML = '';
+    arena.forEach(name => {
+      const btn = document.createElement('button');
+      btn.className = 'chip';
+      btn.textContent = name;
+      btn.addEventListener('click', () => clickChip(name));
+      chipsEl.appendChild(btn);
+    });
+
+    const list = document.getElementById('ranked-list');
+    list.innerHTML = '';
+    ranked.forEach((name, i) => {
+      const li = document.createElement('li');
+      li.className = 'ranked-item';
+      li.dataset.index = i;
+      li.tabIndex = 0;
+      li.draggable = true;
+      li.innerHTML = `
+        <span class="drag-handle" title="Drag to reorder">⠿</span>
+        <span class="rank-num">${String(i + 1).padStart(2, '0')}</span>
+        <span class="ranked-name">${escHtml(name)}</span>
+        <span class="item-btns">
+          <button class="item-btn" title="Move up (↑)" onclick="moveItem(event,${i},-1)" ${i === 0 ? 'disabled' : ''}>↑</button>
+          <button class="item-btn" title="Move down (↓)" onclick="moveItem(event,${i},1)" ${i === ranked.length - 1 ? 'disabled' : ''}>↓</button>
+          <button class="item-btn remove-btn" title="Remove — returns to candidates" onclick="removeItem(event,${i})">×</button>
+        </span>
+      `;
+      li.addEventListener('dragstart', onDragStart);
+      li.addEventListener('dragover',  onDragOver);
+      li.addEventListener('dragleave', onDragLeave);
+      li.addEventListener('drop',      onDrop);
+      li.addEventListener('dragend',   onDragEnd);
+      li.addEventListener('keydown',   onKeyDown);
+      list.appendChild(li);
+    });
+
+    document.getElementById('empty-note').textContent =
+      ranked.length === 0 ? 'Click a candidate above to begin' : '';
+
+    document.getElementById('undo-btn').disabled = !history.length;
+    document.getElementById('undo-count').textContent =
+      history.length > 0 ? `${history.length} step${history.length !== 1 ? 's' : ''} undoable` : '';
+
+    if (focusIndex !== null) {
+      requestAnimationFrame(() => {
+        const items = document.querySelectorAll('.ranked-item');
+        if (items[focusIndex]) items[focusIndex].focus();
+      });
+    }
+  }
+
+  // ── Click actions ──────────────────────────────────────────────────────────
+
+  function clickChip(name) {
+    pushHistory();
+    arena = arena.filter(n => n !== name);
+    ranked.push(name);
+    render();
+  }
+
+  // × button: one click to undo the add; name returns to the arena
+  function removeItem(e, i) {
+    e.stopPropagation();
+    pushHistory();
+    const [name] = ranked.splice(i, 1);
+    arena.push(name);
+    render();
+  }
+
+  // ↑↓ buttons: one click = one position; best for moves of 1–2 steps
+  function moveItem(e, i, dir) {
+    e.stopPropagation();
+    const j = i + dir;
+    if (j < 0 || j >= ranked.length) return;
+    pushHistory();
+    [ranked[i], ranked[j]] = [ranked[j], ranked[i]];
+    render(j);
+  }
+
+  // Keyboard: same as ↑↓ buttons, keeps focus on the moving row
+  function onKeyDown(e) {
+    const i = parseInt(this.dataset.index);
+    const dir = e.key === 'ArrowUp' ? -1 : e.key === 'ArrowDown' ? 1 : 0;
+    if (!dir) return;
+    const j = i + dir;
+    if (j < 0 || j >= ranked.length) return;
+    e.preventDefault();
+    pushHistory();
+    [ranked[i], ranked[j]] = [ranked[j], ranked[i]];
+    render(j);
+  }
+
+  // ── Drag and drop: best for large position changes ─────────────────────────
+
+  function onDragStart(e) {
+    draggingIndex = parseInt(this.dataset.index);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', String(draggingIndex));
+    // Delay class so the drag ghost captures the un-dimmed state
+    setTimeout(() => this.classList.add('dragging'), 0);
+  }
+
+  function onDragOver(e) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    const i = parseInt(this.dataset.index);
+    if (i === draggingIndex) return;
+    clearDropIndicators();
+    const rect = this.getBoundingClientRect();
+    this.classList.add(e.clientY < rect.top + rect.height / 2 ? 'drop-before' : 'drop-after');
+  }
+
+  function onDragLeave(e) {
+    if (!this.contains(e.relatedTarget)) {
+      this.classList.remove('drop-before', 'drop-after');
+    }
+  }
+
+  function onDrop(e) {
+    e.preventDefault();
+    const toIndex = parseInt(this.dataset.index);
+    const before  = this.classList.contains('drop-before');
+    clearDropIndicators();
+
+    if (draggingIndex === null || draggingIndex === toIndex) return;
+
+    pushHistory();
+    const from = draggingIndex;
+    const to   = toIndex;
+    draggingIndex = null;
+
+    const item       = ranked.splice(from, 1)[0];
+    // After removal, indices above `from` shift down by 1
+    const adjustedTo = to > from ? to - 1 : to;
+    ranked.splice(before ? adjustedTo : adjustedTo + 1, 0, item);
+    render();
+  }
+
+  function onDragEnd() {
+    clearDropIndicators();
+    document.querySelectorAll('.ranked-item.dragging')
+      .forEach(el => el.classList.remove('dragging'));
+    draggingIndex = null;
+  }
+
+  function clearDropIndicators() {
+    document.querySelectorAll('.ranked-item')
+      .forEach(el => el.classList.remove('drop-before', 'drop-after'));
+  }
+
+  // ── Undo ───────────────────────────────────────────────────────────────────
+
+  function pushHistory() {
+    history.push({ arena: [...arena], ranked: [...ranked] });
+    if (history.length > 50) history.shift();
+  }
+
+  function undo() {
+    if (!history.length) return;
+    const prev = history.pop();
+    arena  = prev.arena;
+    ranked = prev.ranked;
+    render();
+  }
+
+  document.addEventListener('keydown', e => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); undo(); }
+  });
+
+  function escHtml(s) {
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  render();
+</script>
+</body>
+</html>
