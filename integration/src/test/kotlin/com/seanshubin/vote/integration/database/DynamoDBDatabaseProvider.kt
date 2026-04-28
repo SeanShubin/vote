@@ -13,16 +13,18 @@ import com.seanshubin.vote.contract.EventLog
 import com.seanshubin.vote.contract.QueryModel
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
-import org.testcontainers.containers.localstack.LocalStackContainer
-import org.testcontainers.containers.wait.strategy.Wait
+import org.testcontainers.localstack.LocalStackContainer
 import org.testcontainers.utility.DockerImageName
 
 class DynamoDBDatabaseProvider : DatabaseProvider {
     override val name = "DynamoDB"
 
     private val container: LocalStackContainer = LocalStackContainer(
-        DockerImageName.parse("localstack/localstack:latest")
-    ).withServices(LocalStackContainer.Service.DYNAMODB)
+        // Pinned to the LocalStack 4 line (community edition). The :latest tag now
+        // ships LocalStack Pro and exits with code 55 unless LOCALSTACK_AUTH_TOKEN
+        // is set.
+        DockerImageName.parse("localstack/localstack:4")
+    ).withServices("dynamodb")
         .apply {
             start()
             // Wait a bit for DynamoDB to be fully ready
@@ -32,7 +34,7 @@ class DynamoDBDatabaseProvider : DatabaseProvider {
     val dynamoDbClient: DynamoDbClient = runBlocking {
         DynamoDbClient {
             region = "us-east-1"
-            endpointUrl = Url.parse(container.getEndpointOverride(LocalStackContainer.Service.DYNAMODB).toString())
+            endpointUrl = Url.parse(container.endpoint.toString())
             credentialsProvider = StaticCredentialsProvider {
                 accessKeyId = container.accessKey
                 secretAccessKey = container.secretKey

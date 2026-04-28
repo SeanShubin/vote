@@ -8,14 +8,14 @@ import com.seanshubin.vote.contract.CommandModel
 import com.seanshubin.vote.contract.EventLog
 import com.seanshubin.vote.contract.QueryModel
 import kotlinx.serialization.json.Json
-import org.testcontainers.containers.MySQLContainer
+import org.testcontainers.mysql.MySQLContainer
 import java.sql.Connection
 import java.sql.DriverManager
 
 class MySQLDatabaseProvider : DatabaseProvider {
     override val name = "MySQL"
 
-    private val container: MySQLContainer<*> = MySQLContainer("mysql:8.0")
+    private val container: MySQLContainer = MySQLContainer("mysql:8.0")
         .withDatabaseName("vote")
         .withUsername("vote")
         .withPassword("vote")

@@ -19,17 +19,21 @@ dependencies {
     // Test databases
     testImplementation("com.h2database:h2:${project.property("h2.version")}")
     testImplementation("org.testcontainers:testcontainers:${project.property("testcontainers.version")}")
-    testImplementation("org.testcontainers:mysql:${project.property("testcontainers.version")}")
-    testImplementation("org.testcontainers:localstack:${project.property("testcontainers.version")}")
+    testImplementation("org.testcontainers:testcontainers-mysql:${project.property("testcontainers.version")}")
+    testImplementation("org.testcontainers:testcontainers-localstack:${project.property("testcontainers.version")}")
     testImplementation("com.mysql:mysql-connector-j:${project.property("mysql.connector.version")}")
     testImplementation("aws.sdk.kotlin:dynamodb:${project.property("aws.sdk.kotlin.version")}")
 }
 
 tasks.test {
     useJUnitPlatform()
-    // Configure TestContainers to use Colima Docker socket
-    environment("DOCKER_HOST", "unix:///Users/seashubi/.colima/default/docker.sock")
-    environment("TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE", "/var/run/docker.sock")
+    // Docker configuration for TestContainers. Honor explicit overrides if
+    // present, otherwise let testcontainers auto-detect (works with Docker
+    // Desktop on Windows + macOS, and the standard socket on Linux).
+    System.getenv("DOCKER_HOST")?.let { environment("DOCKER_HOST", it) }
+    System.getenv("TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE")?.let {
+        environment("TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE", it)
+    }
 }
 
 java {

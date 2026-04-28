@@ -20,8 +20,8 @@ dependencies {
 
     // For TestContainers
     implementation("org.testcontainers:testcontainers:${project.property("testcontainers.version")}")
-    implementation("org.testcontainers:mysql:${project.property("testcontainers.version")}")
-    implementation("org.testcontainers:localstack:${project.property("testcontainers.version")}")
+    implementation("org.testcontainers:testcontainers-mysql:${project.property("testcontainers.version")}")
+    implementation("org.testcontainers:testcontainers-localstack:${project.property("testcontainers.version")}")
 
     // For JSON serialization
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:${project.property("kotlinx.serialization.version")}")
@@ -58,9 +58,13 @@ tasks.register("generateDocumentation") {
             mainClass.set("com.seanshubin.vote.documentation.MainKt")
             args = listOf(outputDir.absolutePath)
 
-            // Docker configuration for TestContainers
-            environment("DOCKER_HOST", "unix:///Users/seashubi/.colima/default/docker.sock")
-            environment("TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE", "/var/run/docker.sock")
+            // Docker configuration for TestContainers. Honor explicit overrides if
+            // present, otherwise let testcontainers auto-detect (works with Docker
+            // Desktop on Windows + macOS, and the standard socket on Linux).
+            System.getenv("DOCKER_HOST")?.let { environment("DOCKER_HOST", it) }
+            System.getenv("TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE")?.let {
+                environment("TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE", it)
+            }
         }
 
         println("✓ Generated documentation in: ${outputDir.absolutePath}")

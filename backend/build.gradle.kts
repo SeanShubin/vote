@@ -39,8 +39,8 @@ dependencies {
     testImplementation(kotlin("test"))
     testImplementation("org.junit.jupiter:junit-jupiter:${project.property("junit.version")}")
     testImplementation("org.testcontainers:testcontainers:${project.property("testcontainers.version")}")
-    testImplementation("org.testcontainers:mysql:${project.property("testcontainers.version")}")
-    testImplementation("org.testcontainers:localstack:${project.property("testcontainers.version")}")
+    testImplementation("org.testcontainers:testcontainers-mysql:${project.property("testcontainers.version")}")
+    testImplementation("org.testcontainers:testcontainers-localstack:${project.property("testcontainers.version")}")
 }
 
 tasks.test {

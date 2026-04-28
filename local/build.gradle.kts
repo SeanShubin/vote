@@ -10,8 +10,8 @@ dependencies {
 
     // Testcontainers for local DynamoDB and MySQL
     implementation("org.testcontainers:testcontainers:${project.property("testcontainers.version")}")
-    implementation("org.testcontainers:mysql:${project.property("testcontainers.version")}")
-    implementation("org.testcontainers:localstack:${project.property("testcontainers.version")}")
+    implementation("org.testcontainers:testcontainers-mysql:${project.property("testcontainers.version")}")
+    implementation("org.testcontainers:testcontainers-localstack:${project.property("testcontainers.version")}")
 
     // H2 for local development
     implementation("com.h2database:h2:${project.property("h2.version")}")

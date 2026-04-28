@@ -29,3 +29,14 @@ subprojects {
         }
     }
 }
+
+// Stand-in for the analyzeCodeStructure task contributed by
+// com.seanshubin.code.structure. Other modules (notably :documentation) depend on
+// this task by name. Keep this no-op until the plugin can be re-enabled.
+tasks.register("analyzeCodeStructure") {
+    group = "verification"
+    description = "No-op placeholder. Reinstate the com.seanshubin.code.structure plugin to perform real analysis."
+    doLast {
+        logger.info("analyzeCodeStructure: skipped (plugin disabled in this checkout)")
+    }
+}
