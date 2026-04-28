@@ -39,34 +39,33 @@ application {
 }
 
 // Task to generate documentation
-tasks.register("generateDocumentation") {
+tasks.register<JavaExec>("generateDocumentation") {
     description = "Generate sample data documentation (SQL, DynamoDB, Events, HTTP)"
     group = "documentation"
-    dependsOn("compileKotlin")
     dependsOn(":schema-diagram:generateSchemaDiagram")
     dependsOn(":analyzeCodeStructure")
 
     val outputDir = file("../generated/documentation")
 
+    classpath = sourceSets["main"].runtimeClasspath
+    mainClass.set("com.seanshubin.vote.documentation.MainKt")
+    args(outputDir.absolutePath)
+
+    // Docker configuration for TestContainers. Honor explicit overrides if
+    // present, otherwise let testcontainers auto-detect (works with Docker
+    // Desktop on Windows + macOS, and the standard socket on Linux).
+    System.getenv("DOCKER_HOST")?.let { environment("DOCKER_HOST", it) }
+    System.getenv("TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE")?.let {
+        environment("TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE", it)
+    }
+
     outputs.dir(outputDir)
 
-    doLast {
+    doFirst {
         outputDir.mkdirs()
+    }
 
-        javaexec {
-            classpath = sourceSets["main"].runtimeClasspath
-            mainClass.set("com.seanshubin.vote.documentation.MainKt")
-            args = listOf(outputDir.absolutePath)
-
-            // Docker configuration for TestContainers. Honor explicit overrides if
-            // present, otherwise let testcontainers auto-detect (works with Docker
-            // Desktop on Windows + macOS, and the standard socket on Linux).
-            System.getenv("DOCKER_HOST")?.let { environment("DOCKER_HOST", it) }
-            System.getenv("TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE")?.let {
-                environment("TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE", it)
-            }
-        }
-
+    doLast {
         println("✓ Generated documentation in: ${outputDir.absolutePath}")
     }
 }

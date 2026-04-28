@@ -1,8 +1,8 @@
 plugins {
-    kotlin("multiplatform") version "2.0.21" apply false
-    kotlin("plugin.serialization") version "2.0.21" apply false
-    kotlin("plugin.compose") version "2.0.21" apply false
-    id("org.jetbrains.compose") version "1.7.1" apply false
+    kotlin("multiplatform") version "2.2.20" apply false
+    kotlin("plugin.serialization") version "2.2.20" apply false
+    kotlin("plugin.compose") version "2.2.20" apply false
+    id("org.jetbrains.compose") version "1.9.0" apply false
     // TODO restore once code-structure plugin is published for the version this build uses.
     //   The Gradle plugin marker for com.seanshubin.code.structure is not available in
     //   maven-local on this machine; source lives at D:\keep\github\sean\code-structure but

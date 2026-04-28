@@ -1,6 +1,13 @@
+import org.gradle.process.ExecOperations
+import javax.inject.Inject
+
 plugins {
     kotlin("jvm")
     application
+}
+
+interface InjectedExecOps {
+    @get:Inject val execOps: ExecOperations
 }
 
 dependencies {
@@ -25,6 +32,8 @@ tasks.register("generateSchemaDiagram") {
 
     val schemaFile = file("../backend/src/main/resources/database/schema.sql")
     val outputDir = file("../generated/schema-diagram")
+    val runtimeClasspath = sourceSets["main"].runtimeClasspath
+    val execOps = project.objects.newInstance<InjectedExecOps>().execOps
 
     inputs.file(schemaFile)
     outputs.dir(outputDir)
@@ -37,8 +46,8 @@ tasks.register("generateSchemaDiagram") {
         outputDir.mkdirs()
 
         // First pass: generate .dot and .mmd files
-        javaexec {
-            classpath = sourceSets["main"].runtimeClasspath
+        execOps.javaexec {
+            classpath = runtimeClasspath
             mainClass.set("com.seanshubin.vote.schema.MainKt")
             args = listOf(
                 schemaFile.absolutePath,
@@ -52,7 +61,7 @@ tasks.register("generateSchemaDiagram") {
 
         if (dotFile.exists()) {
             try {
-                exec {
+                execOps.exec {
                     commandLine("dot", "-Tsvg", dotFile.absolutePath, "-o", svgFile.absolutePath)
                     isIgnoreExitValue = true
                 }
@@ -60,8 +69,8 @@ tasks.register("generateSchemaDiagram") {
                     println("✓ Generated SVG diagram: ${svgFile.absolutePath}")
 
                     // Second pass: regenerate HTML with embedded SVG
-                    javaexec {
-                        classpath = sourceSets["main"].runtimeClasspath
+                    execOps.javaexec {
+                        classpath = runtimeClasspath
                         mainClass.set("com.seanshubin.vote.schema.MainKt")
                         args = listOf(
                             schemaFile.absolutePath,
