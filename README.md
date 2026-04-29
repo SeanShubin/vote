@@ -180,6 +180,46 @@ mysql -h localhost -u vote -p vote  # password: vote
 ./gradlew :backend:test
 ```
 
+## Deployment
+
+The project deploys to **pairwisevote.com** entirely on AWS free tier:
+
+- Frontend → S3 + CloudFront (Compose for Web SPA)
+- Backend → Lambda (Java 21 with SnapStart) behind API Gateway HTTP API at `api.pairwisevote.com`
+- Storage → DynamoDB single-table (`vote_data` + `vote_event_log`)
+- Cert → ACM (one cert covering apex + `www` + `api`)
+- Email → SES (planned)
+- IaC → CloudFormation/SAM (`deploy/template.yaml`)
+- CI/CD → GitHub Actions via OIDC, no long-lived AWS keys
+
+### One-time AWS bootstrap
+
+Idempotent script — creates the GitHub OIDC identity provider, the
+`github-actions-deploy` IAM role, the deploy-artifacts S3 bucket, and
+sets the `AWS_ACCOUNT_ID` GitHub secret (if `gh` CLI is installed):
+
+```bash
+deploy/bootstrap.sh
+```
+
+### Continuous deploy
+
+Every push to `master` triggers `.github/workflows/deploy.yml`, which:
+
+1. Builds the backend shadow JAR (`./gradlew :backend:shadowJar`)
+2. Builds the frontend bundle with `api.base.url=https://api.pairwisevote.com`
+3. `aws cloudformation package` uploads the JAR + rewrites template references
+4. `aws cloudformation deploy` applies the stack
+5. `aws s3 sync` the frontend, then a CloudFront invalidation
+6. Smoke-tests `https://api.pairwisevote.com/health`
+
+First deploy is ~5-10 min (cert validation + CloudFront propagation).
+Subsequent deploys ~2-3 min.
+
+See **[deploy/README.md](deploy/README.md)** for stack details and
+**[deploy/MONITORING.md](deploy/MONITORING.md)** for where to watch
+progress (CFN console, Actions logs, ACM, Route 53, Lambda, etc.).
+
 ## Architecture
 
 ### Three-Layer Design
@@ -296,13 +336,15 @@ vote/
 ├── backend/                         # Jetty server, repository implementations
 │   └── src/main/kotlin/
 │       ├── dependencies/            # ApplicationDependencies (wiring)
-│       ├── http/                    # SimpleHttpHandler (HTTP routing)
+│       ├── http/                    # RequestRouter + Jetty adapter
+│       ├── lambda/                  # AWS Lambda adapter (production runtime)
 │       ├── integration/             # ProductionIntegrations (I/O boundaries)
 │       ├── repository/              # InMemory, MySQL, DynamoDB implementations
 │       └── service/                 # ServiceImpl (business logic)
 ├── contract/                        # Interfaces (QueryModel, CommandModel, Service)
 ├── domain/                          # Domain models (User, Election, Ballot, Events)
-├── scripts/                         # Database setup and inspection scripts
+├── deploy/                          # CloudFormation templates + GitHub Actions workflow
+├── scripts/                         # Unified `scripts/dev` CLI (bash + PowerShell shims)
 └── docs/
     ├── api-to-database-flow.md      # Complete data flow trace
     ├── architectural-insight.md     # Design philosophy
