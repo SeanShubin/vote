@@ -1,16 +1,13 @@
-name: Deploy frontend
+name: Deploy
 
 on:
   push:
     branches: [master, main]
-    paths:
-      - 'frontend/**'
-      - 'domain/**'
-      - 'contract/**'
-      - 'gradle.properties'
-      - 'build.gradle.kts'
-      - 'deploy/template.yaml'
-      - '.github/workflows/deploy-frontend.yml'
+    paths-ignore:
+      - '**.md'
+      - '.gitignore'
+      - 'docs/**'
+      - 'documentation/**'
   workflow_dispatch:
 
 permissions:
@@ -18,12 +15,13 @@ permissions:
   contents: read
 
 concurrency:
-  group: deploy-frontend
+  group: deploy
   cancel-in-progress: false
 
 env:
   AWS_REGION: us-east-1
   STACK_NAME: pairwisevote-frontend
+  BOOTSTRAP_STACK: pairwisevote-bootstrap
   DOMAIN_NAME: pairwisevote.com
 
 jobs:
@@ -47,31 +45,46 @@ jobs:
           role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions-deploy
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Resolve hosted zone ID
-        id: zone
-        run: |
-          ZONE_ID=$(aws route53 list-hosted-zones-by-name \
-            --dns-name "${DOMAIN_NAME}." \
-            --query 'HostedZones[0].Id' --output text | cut -d'/' -f3)
-          echo "id=${ZONE_ID}" >> "$GITHUB_OUTPUT"
+      - name: Build backend shadow JAR
+        run: ./gradlew :backend:shadowJar
 
-      - name: Deploy CloudFormation stack
-        run: |
-          aws cloudformation deploy \
-            --template-file deploy/template.yaml \
-            --stack-name "$STACK_NAME" \
-            --parameter-overrides \
-                DomainName="$DOMAIN_NAME" \
-                HostedZoneId="${{ steps.zone.outputs.id }}" \
-            --capabilities CAPABILITY_IAM \
-            --no-fail-on-empty-changeset
-
-      - name: Build frontend
+      - name: Build frontend production bundle
         run: |
           ./gradlew :frontend:assemble \
             -Papi.base.url=https://api.${DOMAIN_NAME}
 
-      - name: Sync to S3
+      - name: Resolve bootstrap outputs (zone + artifacts bucket)
+        id: meta
+        run: |
+          ZONE_ID=$(aws route53 list-hosted-zones-by-name \
+            --dns-name "${DOMAIN_NAME}." \
+            --query 'HostedZones[0].Id' --output text | cut -d'/' -f3)
+          ARTIFACTS_BUCKET=$(aws cloudformation describe-stacks \
+            --stack-name "$BOOTSTRAP_STACK" \
+            --query 'Stacks[0].Outputs[?OutputKey==`DeployArtifactsBucket`].OutputValue' \
+            --output text)
+          echo "zone_id=$ZONE_ID" >> "$GITHUB_OUTPUT"
+          echo "artifacts_bucket=$ARTIFACTS_BUCKET" >> "$GITHUB_OUTPUT"
+
+      - name: Package CloudFormation (uploads JAR, rewrites CodeUri)
+        run: |
+          aws cloudformation package \
+            --template-file deploy/template.yaml \
+            --s3-bucket "${{ steps.meta.outputs.artifacts_bucket }}" \
+            --output-template-file /tmp/packaged-template.yaml
+
+      - name: Deploy CloudFormation stack
+        run: |
+          aws cloudformation deploy \
+            --template-file /tmp/packaged-template.yaml \
+            --stack-name "$STACK_NAME" \
+            --parameter-overrides \
+                DomainName="$DOMAIN_NAME" \
+                HostedZoneId="${{ steps.meta.outputs.zone_id }}" \
+            --capabilities CAPABILITY_IAM CAPABILITY_AUTO_EXPAND \
+            --no-fail-on-empty-changeset
+
+      - name: Sync frontend to S3
         run: |
           BUCKET=$(aws cloudformation describe-stacks \
             --stack-name "$STACK_NAME" \
@@ -91,3 +104,19 @@ jobs:
           aws cloudfront create-invalidation \
             --distribution-id "$DIST" \
             --paths "/*"
+
+      - name: Smoke-test backend
+        run: |
+          # Lambda first invocation may take ~10s for SnapStart-restored runtime;
+          # warm it up and then assert it returns the placeholder JSON.
+          for i in 1 2 3 4 5; do
+            sleep 5
+            BODY=$(curl -fsSL --max-time 30 "https://api.${DOMAIN_NAME}/health" || true)
+            echo "Attempt $i: $BODY"
+            if echo "$BODY" | grep -q '"status"'; then
+              echo "Backend healthy."
+              exit 0
+            fi
+          done
+          echo "Backend smoke test failed."
+          exit 1

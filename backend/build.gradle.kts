@@ -2,6 +2,7 @@ plugins {
     kotlin("jvm")
     kotlin("plugin.serialization")
     application
+    id("com.gradleup.shadow") version "9.0.0"
 }
 
 dependencies {
@@ -27,6 +28,10 @@ dependencies {
 
     // JWT/Auth
     implementation("com.auth0:java-jwt:4.4.0")
+
+    // AWS Lambda runtime (used when packaged as a Lambda fat JAR)
+    implementation("com.amazonaws:aws-lambda-java-core:1.2.3")
+    implementation("com.amazonaws:aws-lambda-java-events:3.15.0")
 
     // Email
     implementation("javax.mail:mail:1.4.7")
@@ -55,4 +60,11 @@ java {
 
 application {
     mainClass.set("com.seanshubin.vote.backend.app.MainKt")
+}
+
+tasks.shadowJar {
+    archiveBaseName.set("vote-backend-lambda")
+    archiveClassifier.set("")
+    archiveVersion.set("")
+    mergeServiceFiles()
 }

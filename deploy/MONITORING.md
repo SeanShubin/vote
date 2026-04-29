@@ -24,11 +24,14 @@ Both sides have signal.
 | What | Where |
 |---|---|
 | Live workflow logs | [github.com/SeanShubin/vote/actions](https://github.com/SeanShubin/vote/actions) — click the running job, expand each step |
-| Frontend CFN stack progress | [CloudFormation → pairwisevote-frontend](https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks) → Events tab |
-| ACM cert issuance | [Certificate Manager (us-east-1)](https://us-east-1.console.aws.amazon.com/acm/home?region=us-east-1#/certificates/list) — `Pending validation` → `Issued` automatically |
-| Route 53 records | [Route 53 → pairwisevote.com](https://us-east-1.console.aws.amazon.com/route53/v2/hostedzones) — cert validation CNAMEs + alias A/AAAA records appear |
-| S3 bucket | [S3 → pairwisevote.com-frontend](https://us-east-1.console.aws.amazon.com/s3/buckets) |
-| CloudFront distribution | [CloudFront → Distributions](https://us-east-1.console.aws.amazon.com/cloudfront/v4/home#/distributions) — `Deploying` → `Enabled` (propagation is the long pole) |
+| Frontend+backend CFN stack | [CloudFormation → pairwisevote-frontend](https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks) → Events tab |
+| ACM cert issuance | [Certificate Manager (us-east-1)](https://us-east-1.console.aws.amazon.com/acm/home?region=us-east-1#/certificates/list) — covers `pairwisevote.com`, `www.pairwisevote.com`, `api.pairwisevote.com` |
+| Route 53 records | [Route 53 → pairwisevote.com](https://us-east-1.console.aws.amazon.com/route53/v2/hostedzones) |
+| S3 frontend bucket | [S3 → pairwisevote.com-frontend](https://us-east-1.console.aws.amazon.com/s3/buckets) |
+| CloudFront distribution | [CloudFront → Distributions](https://us-east-1.console.aws.amazon.com/cloudfront/v4/home#/distributions) |
+| Lambda function | [Lambda → pairwisevote-frontend-backend](https://us-east-1.console.aws.amazon.com/lambda/home?region=us-east-1#/functions) — Monitoring tab for invocations, Configuration → SnapStart |
+| API Gateway | [API Gateway → HTTP APIs](https://us-east-1.console.aws.amazon.com/apigateway/main/apis?region=us-east-1) — Custom domain names → `api.pairwisevote.com` |
+| Lambda logs | [CloudWatch → Log groups](https://us-east-1.console.aws.amazon.com/cloudwatch/home?region=us-east-1#logsV2:log-groups) — `/aws/lambda/pairwisevote-frontend-backend` |
 
 **The CFN Events tab is the single best "is it working" view** — it
 ticks through each resource as CFN creates it, and any failure shows
@@ -38,9 +41,10 @@ the exact reason inline.
 
 | What | Where |
 |---|---|
-| The site | https://pairwisevote.com |
-| DNS check | `nslookup pairwisevote.com` (PowerShell) — should return CloudFront IPs |
-| Cert check | browser lock icon, or `openssl s_client -connect pairwisevote.com:443 -servername pairwisevote.com` |
+| Frontend | https://pairwisevote.com |
+| Backend health | `curl https://api.pairwisevote.com/health` |
+| DNS | `nslookup pairwisevote.com` (CloudFront), `nslookup api.pairwisevote.com` (APIGW) |
+| Cert | browser lock icon, or `openssl s_client -connect pairwisevote.com:443 -servername pairwisevote.com` |
 
 ## Single-terminal tail
 

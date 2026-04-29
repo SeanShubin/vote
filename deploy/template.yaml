@@ -21,17 +21,23 @@ Resources:
         IgnorePublicAcls: true
         RestrictPublicBuckets: true
 
+  # Single ACM cert covering the apex, www, and the api subdomain. Used by
+  # both CloudFront (frontend) and API Gateway custom domain (backend) — same
+  # us-east-1 region, so one cert serves both.
   FrontendCertificate:
     Type: AWS::CertificateManager::Certificate
     Properties:
       DomainName: !Ref DomainName
       SubjectAlternativeNames:
         - !Sub "www.${DomainName}"
+        - !Sub "api.${DomainName}"
       ValidationMethod: DNS
       DomainValidationOptions:
         - DomainName: !Ref DomainName
           HostedZoneId: !Ref HostedZoneId
         - DomainName: !Sub "www.${DomainName}"
+          HostedZoneId: !Ref HostedZoneId
+        - DomainName: !Sub "api.${DomainName}"
           HostedZoneId: !Ref HostedZoneId
 
   FrontendOriginAccessControl:
@@ -139,6 +145,89 @@ Resources:
         DNSName: !GetAtt FrontendDistribution.DomainName
         HostedZoneId: Z2FDTNDATAQYW2
 
+  # ============================================================
+  # Backend: Lambda + HTTP API + api.pairwisevote.com
+  # ============================================================
+
+  BackendApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      StageName: $default
+      CorsConfiguration:
+        AllowMethods: [GET, POST, PUT, DELETE, OPTIONS]
+        AllowHeaders: [Content-Type, Authorization]
+        AllowOrigins:
+          - !Sub "https://${DomainName}"
+          - !Sub "https://www.${DomainName}"
+        MaxAge: 3600
+
+  BackendFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "${AWS::StackName}-backend"
+      # CFN `package` rewrites this local path to s3://... at deploy time.
+      CodeUri: ../backend/build/libs/vote-backend-lambda.jar
+      Handler: com.seanshubin.vote.backend.lambda.LambdaHandler::handleRequest
+      Runtime: java21
+      Architectures:
+        - arm64
+      MemorySize: 1024
+      Timeout: 30
+      # SnapStart restores a snapshot of the initialized JVM on cold start —
+      # cuts cold starts from seconds to ~300-500ms. Free for Java 21.
+      SnapStart:
+        ApplyOn: PublishedVersions
+      AutoPublishAlias: live
+      Events:
+        Proxy:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref BackendApi
+            Method: ANY
+            Path: /{proxy+}
+        Root:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref BackendApi
+            Method: ANY
+            Path: /
+
+  ApiDomain:
+    Type: AWS::ApiGatewayV2::DomainName
+    Properties:
+      DomainName: !Sub "api.${DomainName}"
+      DomainNameConfigurations:
+        - CertificateArn: !Ref FrontendCertificate
+          EndpointType: REGIONAL
+          SecurityPolicy: TLS_1_2
+
+  ApiMapping:
+    Type: AWS::ApiGatewayV2::ApiMapping
+    Properties:
+      DomainName: !Ref ApiDomain
+      ApiId: !Ref BackendApi
+      Stage: !Ref BackendApi.Stage
+
+  ApiARecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      Name: !Sub "api.${DomainName}"
+      Type: A
+      AliasTarget:
+        DNSName: !GetAtt ApiDomain.RegionalDomainName
+        HostedZoneId: !GetAtt ApiDomain.RegionalHostedZoneId
+
+  ApiAaaaRecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      Name: !Sub "api.${DomainName}"
+      Type: AAAA
+      AliasTarget:
+        DNSName: !GetAtt ApiDomain.RegionalDomainName
+        HostedZoneId: !GetAtt ApiDomain.RegionalHostedZoneId
+
 Outputs:
   BucketName:
     Value: !Ref FrontendBucket
@@ -152,3 +241,7 @@ Outputs:
     Value: !GetAtt FrontendDistribution.DomainName
     Export:
       Name: !Sub "${AWS::StackName}-DistributionDomainName"
+  BackendApiEndpoint:
+    Value: !Sub "https://${BackendApi}.execute-api.${AWS::Region}.amazonaws.com"
+  BackendCustomDomain:
+    Value: !Sub "https://api.${DomainName}"

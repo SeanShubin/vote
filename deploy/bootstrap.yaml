@@ -64,6 +64,11 @@ Resources:
         - arn:aws:iam::aws:policy/CloudFrontFullAccess
         - arn:aws:iam::aws:policy/AWSCertificateManagerFullAccess
         - arn:aws:iam::aws:policy/AmazonRoute53FullAccess
+        - arn:aws:iam::aws:policy/AWSLambda_FullAccess
+        - arn:aws:iam::aws:policy/AmazonAPIGatewayAdministrator
+        - arn:aws:iam::aws:policy/IAMFullAccess
+        - arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess
+        - arn:aws:iam::aws:policy/CloudWatchLogsFullAccess
       Policies:
         - PolicyName: PassRoleSelf
           PolicyDocument:
@@ -75,11 +80,25 @@ Resources:
                 Action: iam:PassRole
                 Resource: !Sub "arn:aws:iam::${AWS::AccountId}:role/pairwisevote-*"
 
+  # S3 bucket where CI uploads packaged Lambda artifacts. CFN's `package`
+  # command rewrites local CodeUri references to s3://... pointers in this bucket.
+  DeployArtifactsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "pairwisevote-deploy-artifacts-${AWS::AccountId}"
+      LifecycleConfiguration:
+        Rules:
+          - Id: ExpireOldArtifacts
+            Status: Enabled
+            ExpirationInDays: 30
+
 Outputs:
   DeployRoleArn:
     Value: !GetAtt DeployRole.Arn
   AccountId:
     Value: !Ref AWS::AccountId
+  DeployArtifactsBucket:
+    Value: !Ref DeployArtifactsBucket
   GitHubSecretCommand:
     Description: Run this to set the GitHub secret (requires `gh` CLI).
     Value: !Sub "gh secret set AWS_ACCOUNT_ID --body ${AWS::AccountId} --repo ${GitHubRepo}"
