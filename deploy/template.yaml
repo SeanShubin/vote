@@ -146,8 +146,56 @@ Resources:
         HostedZoneId: Z2FDTNDATAQYW2
 
   # ============================================================
-  # Backend: Lambda + HTTP API + api.pairwisevote.com
+  # Backend: DynamoDB + Lambda + HTTP API + api.pairwisevote.com
   # ============================================================
+
+  # Hard-coded table names (vote_data, vote_event_log) match the constants
+  # in DynamoDbSingleTableSchema.kt — keeps the code simple, locks the stack
+  # to one deploy per account/region.
+  MainTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: vote_data
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+        - AttributeName: GSI1PK
+          AttributeType: S
+        - AttributeName: GSI1SK
+          AttributeType: S
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: email-index
+          KeySchema:
+            - AttributeName: GSI1PK
+              KeyType: HASH
+            - AttributeName: GSI1SK
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+
+  EventLogTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: vote_event_log
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: event_id
+          AttributeType: N
+      KeySchema:
+        - AttributeName: event_id
+          KeyType: HASH
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
 
   BackendApi:
     Type: AWS::Serverless::HttpApi
@@ -178,6 +226,11 @@ Resources:
       SnapStart:
         ApplyOn: PublishedVersions
       AutoPublishAlias: live
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref MainTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref EventLogTable
       Events:
         Proxy:
           Type: HttpApi

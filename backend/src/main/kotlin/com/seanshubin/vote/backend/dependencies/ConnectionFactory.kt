@@ -30,13 +30,18 @@ class ConnectionFactory(
             is DatabaseConfig.DynamoDB -> {
                 DynamoDbClient {
                     region = config.region
-                    endpointUrl = Url.parse(config.endpoint)
-                    credentialsProvider = StaticCredentialsProvider(
-                        Credentials(
-                            accessKeyId = "dummy",
-                            secretAccessKey = "dummy"
+                    if (config.endpoint != null) {
+                        // Local dev (DynamoDB Local container) — explicit endpoint + dummy creds.
+                        endpointUrl = Url.parse(config.endpoint)
+                        credentialsProvider = StaticCredentialsProvider(
+                            Credentials(
+                                accessKeyId = "dummy",
+                                secretAccessKey = "dummy"
+                            )
                         )
-                    )
+                    }
+                    // null endpoint: SDK uses the default AWS endpoint and the
+                    // default credentials chain (Lambda IAM role, EC2 IMDS, etc.).
                 }
             }
             else -> null

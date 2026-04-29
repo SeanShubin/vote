@@ -32,6 +32,7 @@ Both sides have signal.
 | Lambda function | [Lambda → pairwisevote-frontend-backend](https://us-east-1.console.aws.amazon.com/lambda/home?region=us-east-1#/functions) — Monitoring tab for invocations, Configuration → SnapStart |
 | API Gateway | [API Gateway → HTTP APIs](https://us-east-1.console.aws.amazon.com/apigateway/main/apis?region=us-east-1) — Custom domain names → `api.pairwisevote.com` |
 | Lambda logs | [CloudWatch → Log groups](https://us-east-1.console.aws.amazon.com/cloudwatch/home?region=us-east-1#logsV2:log-groups) — `/aws/lambda/pairwisevote-frontend-backend` |
+| DynamoDB tables | [DynamoDB → Tables](https://us-east-1.console.aws.amazon.com/dynamodbv2/home?region=us-east-1#tables) — `vote_data` (single-table) + `vote_event_log` (event sourcing) |
 
 **The CFN Events tab is the single best "is it working" view** — it
 ticks through each resource as CFN creates it, and any failure shows
