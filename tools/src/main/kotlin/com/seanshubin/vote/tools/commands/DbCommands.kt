@@ -196,7 +196,10 @@ class DbSetupDynamodb : CliktCommand(name = "db-setup-dynamodb") {
         }
 
         println("Waiting for DynamoDB Local to be ready...")
-        val ready = Procs.waitUntil(timeoutSeconds = 30) { Procs.isPortOpen(DYNAMODB_PORT) }
+        val ready = Procs.waitUntil(timeoutSeconds = 30) {
+            runBlocking { DynamoTables.awaitReady() }
+            true
+        }
         if (!ready) Output.error("DynamoDB Local did not become ready in time.")
 
         println("Creating single-table schema...")

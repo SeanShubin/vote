@@ -1,6 +1,7 @@
 package com.seanshubin.vote.tools.commands
 
 import aws.sdk.kotlin.services.dynamodb.createTable
+import aws.sdk.kotlin.services.dynamodb.listTables
 import aws.sdk.kotlin.services.dynamodb.model.AttributeDefinition
 import aws.sdk.kotlin.services.dynamodb.model.BillingMode
 import aws.sdk.kotlin.services.dynamodb.model.GlobalSecondaryIndex
@@ -13,6 +14,15 @@ import aws.sdk.kotlin.services.dynamodb.model.ScalarAttributeType
 import com.seanshubin.vote.tools.lib.DynamoClient
 
 object DynamoTables {
+
+    // Probes the SDK round-trip, not just the TCP socket — Docker port-forwarding
+    // accepts connections before the inner Java process has bound its listener,
+    // which causes CreateTable to race against a half-initialized server.
+    suspend fun awaitReady() {
+        DynamoClient.create().use { client ->
+            client.listTables { }
+        }
+    }
 
     suspend fun ensureCreated() {
         DynamoClient.create().use { client ->
