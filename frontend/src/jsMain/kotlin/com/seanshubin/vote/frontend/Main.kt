@@ -5,7 +5,7 @@ import com.seanshubin.vote.contract.ApiClient
 import org.jetbrains.compose.web.renderComposable
 
 fun main() {
-    val integrations = ProductionFrontendIntegrations()
+    val integrations = ProductionFrontendIntegrations(BuildConfig.API_BASE_URL)
 
     renderComposable(rootElementId = "root") {
         VoteApp(integrations.apiClient)

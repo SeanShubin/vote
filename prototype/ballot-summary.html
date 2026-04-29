@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ballot Summary — Schulze</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg:      #18191b;
+      --surface: #222426;
+      --surf2:   #2a2c2e;
+      --border:  #343638;
+      --bord2:   #444648;
+      --text:    #e6e2d8;
+      --muted:   #6e6c66;
+      --accent:  #f2c84b;
+      --danger:  #e05a48;
+      --green:   #6cbf66;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Manrope', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 48px 20px 80px;
+    }
+
+    .container { max-width: 1240px; margin: 0 auto; }
+
+    .header { margin-bottom: 32px; }
+    .header h1 {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 3.2rem;
+      letter-spacing: 0.06em;
+      color: var(--accent);
+      line-height: 1;
+      margin-bottom: 6px;
+    }
+    .header p { font-size: 0.82rem; color: var(--muted); line-height: 1.6; }
+
+    .label {
+      font-size: 0.68rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      color: var(--muted);
+      margin-bottom: 12px;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+      gap: 28px;
+      align-items: start;
+    }
+    @media (max-width: 980px) { .layout { grid-template-columns: 1fr; } }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 20px;
+    }
+    .card + .card { margin-top: 20px; }
+
+    /* ── Results ────────────────────────────────────────────── */
+    #results-list { list-style: none; }
+
+    /* height(50) + margin-bottom(6) = ROW_H(56) — must match JS */
+    .result-item {
+      position: relative;
+      height: 50px;
+      margin-bottom: 6px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      cursor: pointer;
+      overflow: hidden;
+      will-change: transform;
+      transition: border-color 0.12s;
+    }
+    .result-item:last-child { margin-bottom: 0; }
+    .result-item:hover { border-color: var(--bord2); }
+
+    .result-bar {
+      position: absolute;
+      left: 0; top: 0;
+      height: 100%;
+      background: rgba(242,200,75,0.10);
+      border-right: 1px solid rgba(242,200,75,0.18);
+      transition: width 0.28s cubic-bezier(.2,.7,.2,1);
+      z-index: 0;
+    }
+
+    .result-content {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      grid-template-columns: 50px 1fr auto;
+      align-items: center;
+      gap: 12px;
+      padding: 0 14px 0 4px;
+      height: 100%;
+    }
+
+    .result-rank {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 1.5rem;
+      letter-spacing: 0.03em;
+      color: var(--muted);
+      text-align: center;
+    }
+    .result-item.is-first .result-rank { color: var(--accent); }
+    .result-item.is-tied .result-rank::after {
+      content: 'T';
+      font-size: 0.55em;
+      vertical-align: super;
+      margin-left: 1px;
+      color: var(--muted);
+    }
+
+    .result-name { font-size: 0.95rem; font-weight: 500; }
+
+    .result-meta {
+      font-family: 'Manrope', sans-serif;
+      font-size: 0.7rem;
+      color: var(--muted);
+      letter-spacing: 0.04em;
+      text-align: right;
+    }
+    .result-meta .w { color: var(--green); font-weight: 600; }
+    .result-meta .l { color: var(--danger); }
+    .result-meta .t { color: var(--accent); }
+
+    .result-item.is-selected {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 1px rgba(242,200,75,0.3);
+    }
+    .result-item.is-selected .result-bar { background: rgba(242,200,75,0.18); }
+
+    /* ── Pairwise matrix ────────────────────────────────────── */
+    .matrix-wrap { overflow-x: auto; margin-top: 6px; }
+    table.matrix {
+      border-collapse: collapse;
+      font-family: 'Manrope', sans-serif;
+      width: 100%;
+    }
+    .matrix th, .matrix td {
+      padding: 8px 6px;
+      text-align: center;
+      font-size: 0.78rem;
+      font-weight: 500;
+      border: 1px solid var(--border);
+      transition: background 0.12s, color 0.12s;
+    }
+    .matrix thead th, .matrix tbody th {
+      background: var(--bg);
+      color: var(--muted);
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      font-size: 0.74rem;
+    }
+    .matrix tbody th { text-align: left; padding-left: 10px; }
+    .matrix td.diag { background: var(--bg); color: var(--bord2); }
+    .matrix td.win  { background: rgba(108,191,102,0.16); color: #c8e8b8; }
+    .matrix td.loss { background: rgba(224,90,72,0.12);   color: #f0b8b0; }
+    .matrix td.tie  { background: rgba(242,200,75,0.12);  color: var(--accent); }
+    .matrix tr.row-selected th,
+    .matrix tr.row-selected td,
+    .matrix .col-selected {
+      box-shadow: inset 0 0 0 2px rgba(242,200,75,0.4);
+    }
+
+    .matrix-legend {
+      display: flex;
+      gap: 14px;
+      margin-top: 10px;
+      font-size: 0.7rem;
+      color: var(--muted);
+    }
+    .matrix-legend span::before {
+      content: '';
+      display: inline-block;
+      width: 10px; height: 10px;
+      margin-right: 5px;
+      border-radius: 2px;
+      vertical-align: middle;
+    }
+    .matrix-legend .lg-w::before { background: rgba(108,191,102,0.45); }
+    .matrix-legend .lg-l::before { background: rgba(224,90,72,0.40); }
+    .matrix-legend .lg-t::before { background: rgba(242,200,75,0.45); }
+
+    /* ── Ballots ────────────────────────────────────────────── */
+    .ballots-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    .ballots-count {
+      font-size: 0.78rem;
+      color: var(--muted);
+      margin-right: auto;
+    }
+    .ballots-count strong { color: var(--text); font-weight: 600; }
+
+    .toolbar-btn {
+      cursor: pointer;
+      padding: 7px 14px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      color: var(--muted);
+      font-family: 'Manrope', sans-serif;
+      font-size: 0.74rem;
+      font-weight: 500;
+      letter-spacing: 0.04em;
+      transition: background 0.1s, color 0.1s, border-color 0.1s;
+    }
+    .toolbar-btn:hover { background: var(--surf2); color: var(--text); border-color: var(--bord2); }
+
+    .ballot-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+    @media (max-width: 580px) { .ballot-grid { grid-template-columns: 1fr; } }
+
+    .ballot {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      column-gap: 10px;
+      row-gap: 4px;
+      align-items: center;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 8px 10px;
+      cursor: pointer;
+      transition: opacity 0.18s, border-color 0.12s, background 0.1s;
+    }
+    .ballot:hover { background: var(--surf2); border-color: var(--bord2); }
+    .ballot.is-off { opacity: 0.34; }
+
+    .ballot-toggle {
+      grid-row: 1 / 3;
+      width: 28px;
+      height: 16px;
+      background: var(--surf2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      position: relative;
+      flex-shrink: 0;
+      transition: background 0.18s, border-color 0.18s;
+    }
+    .ballot-toggle::after {
+      content: '';
+      position: absolute;
+      top: 1px; left: 1px;
+      width: 12px; height: 12px;
+      background: var(--muted);
+      border-radius: 50%;
+      transition: transform 0.18s, background 0.18s;
+    }
+    .ballot:not(.is-off) .ballot-toggle {
+      background: rgba(108,191,102,0.15);
+      border-color: rgba(108,191,102,0.4);
+    }
+    .ballot:not(.is-off) .ballot-toggle::after {
+      transform: translateX(12px);
+      background: var(--green);
+    }
+
+    .ballot-name {
+      font-size: 0.74rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      color: var(--muted);
+    }
+    .ballot-ranking {
+      grid-column: 2;
+      font-size: 0.78rem;
+      line-height: 1.3;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      align-items: center;
+    }
+    .ballot-ranking .pip {
+      padding: 1px 6px;
+      border-radius: 3px;
+      background: var(--surf2);
+      border: 1px solid var(--border);
+      font-size: 0.72rem;
+    }
+    .ballot-ranking .pip.is-highlighted {
+      background: rgba(242,200,75,0.18);
+      border-color: rgba(242,200,75,0.5);
+      color: var(--accent);
+    }
+    .ballot-ranking .arrow { color: var(--bord2); font-size: 0.7rem; }
+
+    .hint {
+      font-size: 0.7rem;
+      color: var(--muted);
+      margin-top: 14px;
+      line-height: 1.55;
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <h1>Vote Summary</h1>
+    <p>Schulze method (beatpaths) · click a candidate to highlight them in the matrix and ballots · click a ballot to toggle it on/off and watch the order shift</p>
+  </div>
+
+  <div class="layout">
+    <div>
+      <section class="card">
+        <p class="label">Final ranking</p>
+        <ol id="results-list"></ol>
+        <p class="hint">Bar = pairwise wins via strongest paths (out of <span id="rivals">4</span> rivals). Tied candidates share a rank — the next rank skips, Olympic-style. <span id="cycle-note"></span></p>
+      </section>
+
+      <section class="card">
+        <p class="label">Pairwise preferences <span style="color:var(--muted); font-weight:400; text-transform:none; letter-spacing:0; margin-left:8px; font-size:0.72rem;">cell = ballots ranking row over column</span></p>
+        <div class="matrix-wrap"><table class="matrix" id="matrix"></table></div>
+        <div class="matrix-legend">
+          <span class="lg-w">row beats column</span>
+          <span class="lg-l">row loses to column</span>
+          <span class="lg-t">tie</span>
+        </div>
+      </section>
+    </div>
+
+    <section class="card">
+      <div class="ballots-toolbar">
+        <span class="ballots-count"><strong id="active-count">0</strong> of <span id="total-count">0</span> ballots active</span>
+        <button class="toolbar-btn" onclick="setAll(true)">All</button>
+        <button class="toolbar-btn" onclick="setAll(false)">None</button>
+      </div>
+      <p class="label">Ballots — click a card to toggle</p>
+      <div id="ballot-grid" class="ballot-grid"></div>
+    </section>
+  </div>
+</div>
+
+<script>
+  // Canonical Schulze example used by scenario-data/05-schulze-example-from-wikipedia.json.
+  // 45 voters across 8 ranking patterns. Has a Condorcet cycle at the top — Schulze breaks it cleanly.
+  const CANDIDATES = ['Alpha', 'Beta', 'Charlie', 'Delta', 'Echo'];
+
+  const PATTERNS = [
+    { count: 5, ranking: ['Alpha',   'Charlie', 'Beta',    'Echo',    'Delta'  ] },
+    { count: 5, ranking: ['Alpha',   'Delta',   'Echo',    'Charlie', 'Beta'   ] },
+    { count: 8, ranking: ['Beta',    'Echo',    'Delta',   'Alpha',   'Charlie'] },
+    { count: 3, ranking: ['Charlie', 'Alpha',   'Beta',    'Echo',    'Delta'  ] },
+    { count: 7, ranking: ['Charlie', 'Alpha',   'Echo',    'Beta',    'Delta'  ] },
+    { count: 2, ranking: ['Charlie', 'Beta',    'Alpha',   'Delta',   'Echo'   ] },
+    { count: 7, ranking: ['Delta',   'Charlie', 'Echo',    'Beta',    'Alpha'  ] },
+    { count: 8, ranking: ['Echo',    'Beta',    'Alpha',   'Delta',   'Charlie'] }
+  ];
+
+  const BALLOTS = (() => {
+    const out = [];
+    let id = 1;
+    for (const p of PATTERNS) {
+      for (let i = 0; i < p.count; i++) {
+        out.push({
+          id: id,
+          name: `Voter ${String(id).padStart(2, '0')}`,
+          ranking: p.ranking
+        });
+        id++;
+      }
+    }
+    return out;
+  })();
+
+  // Must match CSS: result-item height (50) + margin-bottom (6)
+  const ROW_H = 56;
+
+  let active   = new Set(BALLOTS.map(b => b.id));
+  let selected = null;        // currently-highlighted candidate name
+  let prevOrder = null;       // previous result order, for FLIP
+
+  // ── Schulze tally ─────────────────────────────────────────────────────────
+  // 1. Build pairwise matrix: pref[i][j] = # active ballots ranking i over j.
+  //    Unranked candidates are treated as tied at the bottom (rank Infinity).
+  // 2. Strongest paths via Floyd-Warshall: bottleneck (min weight on the path).
+  // 3. Repeatedly extract the "undefeated" set: i is undefeated among the
+  //    remaining iff sp[i][j] >= sp[j][i] for every remaining j. This matches
+  //    Preference.kt::isUndefeated / groupByPlace.
+  // 4. Competition ranks: ties skip the next rank (Place.adjustForTies).
+  function computeSchulze() {
+    const N = CANDIDATES.length;
+    const pref = Array.from({ length: N }, () => new Array(N).fill(0));
+
+    for (const b of BALLOTS) {
+      if (!active.has(b.id)) continue;
+      const rankOf = {};
+      b.ranking.forEach((name, i) => { rankOf[name] = i + 1; });
+      for (let i = 0; i < N; i++) {
+        for (let j = 0; j < N; j++) {
+          if (i === j) continue;
+          const ri = rankOf[CANDIDATES[i]] ?? Infinity;
+          const rj = rankOf[CANDIDATES[j]] ?? Infinity;
+          if (ri < rj) pref[i][j]++;
+        }
+      }
+    }
+
+    const sp = pref.map(row => row.slice());
+    for (let k = 0; k < N; k++) {
+      for (let i = 0; i < N; i++) {
+        for (let j = 0; j < N; j++) {
+          if (i === j || i === k || j === k) continue;
+          const through = Math.min(sp[i][k], sp[k][j]);
+          if (through > sp[i][j]) sp[i][j] = through;
+        }
+      }
+    }
+
+    // Detect any direct Condorcet cycle in the active ballots — interesting
+    // because this is the case where Schulze diverges from naïve majority rule.
+    let hadCycle = false;
+    for (let i = 0; i < N && !hadCycle; i++) {
+      for (let j = i + 1; j < N && !hadCycle; j++) {
+        for (let k = j + 1; k < N && !hadCycle; k++) {
+          const ij = pref[i][j] > pref[j][i];
+          const jk = pref[j][k] > pref[k][j];
+          const ki = pref[k][i] > pref[i][k];
+          const ji = pref[j][i] > pref[i][j];
+          const kj = pref[k][j] > pref[j][k];
+          const ik = pref[i][k] > pref[k][i];
+          if ((ij && jk && ki) || (ji && kj && ik)) hadCycle = true;
+        }
+      }
+    }
+
+    const groups = [];
+    const remaining = new Set();
+    for (let i = 0; i < N; i++) remaining.add(i);
+    while (remaining.size > 0) {
+      const rem = [...remaining];
+      const undefeated = rem.filter(i =>
+        rem.every(j => i === j || sp[i][j] >= sp[j][i])
+      );
+      const group = (undefeated.length ? undefeated : rem)
+        .slice().sort((a, b) => CANDIDATES[a].localeCompare(CANDIDATES[b]));
+      groups.push(group);
+      group.forEach(i => remaining.delete(i));
+    }
+
+    const places = [];
+    let cumulative = 0;
+    groups.forEach(group => {
+      const rank   = cumulative + 1;
+      const tied   = group.length > 1;
+      group.forEach(idx => {
+        // Pairwise summary used for the bar/meta in the result list.
+        let wins = 0, losses = 0, ties = 0;
+        for (let j = 0; j < N; j++) {
+          if (idx === j) continue;
+          if      (sp[idx][j] >  sp[j][idx]) wins++;
+          else if (sp[idx][j] <  sp[j][idx]) losses++;
+          else                                ties++;
+        }
+        places.push({ name: CANDIDATES[idx], idx, rank, tied, wins, losses, ties });
+      });
+      cumulative += group.length;
+    });
+
+    return { pref, sp, places, hadCycle, n: N };
+  }
+
+  // ── Render results with FLIP animation ────────────────────────────────────
+  function renderResults(result) {
+    const N = result.n;
+    const before = {};
+    if (prevOrder) prevOrder.forEach((name, i) => { before[name] = i; });
+
+    const list = document.getElementById('results-list');
+    list.innerHTML = '';
+    result.places.forEach((p, i) => {
+      const li = document.createElement('li');
+      li.className = 'result-item'
+        + (i === 0 ? ' is-first' : '')
+        + (p.tied ? ' is-tied' : '')
+        + (p.name === selected ? ' is-selected' : '');
+      li.dataset.name = p.name;
+      const widthPct = N > 1 ? (p.wins / (N - 1)) * 100 : 0;
+      const meta = [];
+      if (p.wins)   meta.push(`<span class="w">${p.wins} W</span>`);
+      if (p.ties)   meta.push(`<span class="t">${p.ties} T</span>`);
+      if (p.losses) meta.push(`<span class="l">${p.losses} L</span>`);
+      li.innerHTML = `
+        <span class="result-bar" style="width: ${widthPct}%"></span>
+        <span class="result-content">
+          <span class="result-rank">${String(p.rank).padStart(2, '0')}</span>
+          <span class="result-name">${escHtml(p.name)}</span>
+          <span class="result-meta">${meta.join(' · ')}</span>
+        </span>
+      `;
+      li.addEventListener('click', () => selectCandidate(p.name));
+      list.appendChild(li);
+    });
+
+    if (prevOrder) {
+      const after = {};
+      result.places.forEach((p, i) => { after[p.name] = i; });
+      const items = document.querySelectorAll('.result-item');
+      items.forEach(el => {
+        const n = el.dataset.name;
+        if (before[n] == null) return;
+        const dy = (before[n] - after[n]) * ROW_H;
+        if (Math.abs(dy) < 1) return;
+        el.style.transition = 'none';
+        el.style.transform  = `translateY(${dy}px)`;
+      });
+      list.offsetHeight; // force reflow
+      items.forEach(el => {
+        el.style.transition = 'transform 0.28s cubic-bezier(.2,.7,.2,1)';
+        el.style.transform  = '';
+      });
+    }
+
+    prevOrder = result.places.map(p => p.name);
+
+    document.getElementById('rivals').textContent = String(N - 1);
+    document.getElementById('cycle-note').textContent = result.hadCycle
+      ? 'A Condorcet cycle is present — Schulze breaks it via the strongest beatpath.'
+      : '';
+  }
+
+  // ── Render pairwise matrix ────────────────────────────────────────────────
+  function renderMatrix(result) {
+    const N = result.n;
+    const t = document.getElementById('matrix');
+    let html = '<thead><tr><th></th>';
+    for (let j = 0; j < N; j++) {
+      html += `<th data-col="${j}">${escHtml(CANDIDATES[j])}</th>`;
+    }
+    html += '</tr></thead><tbody>';
+    for (let i = 0; i < N; i++) {
+      html += `<tr data-row="${i}"><th>${escHtml(CANDIDATES[i])}</th>`;
+      for (let j = 0; j < N; j++) {
+        if (i === j) {
+          html += `<td class="diag" data-col="${j}">—</td>`;
+        } else {
+          const a = result.pref[i][j], b = result.pref[j][i];
+          const cls = a > b ? 'win' : a < b ? 'loss' : 'tie';
+          html += `<td class="${cls}" data-col="${j}">${a}</td>`;
+        }
+      }
+      html += '</tr>';
+    }
+    html += '</tbody>';
+    t.innerHTML = html;
+
+    t.querySelectorAll('th[data-col], tbody th').forEach(el => {
+      el.style.cursor = 'pointer';
+    });
+    t.querySelectorAll('tbody tr').forEach(tr => {
+      const idx = parseInt(tr.dataset.row);
+      tr.querySelector('th').addEventListener('click', () => selectCandidate(CANDIDATES[idx]));
+    });
+    t.querySelectorAll('thead th[data-col]').forEach(th => {
+      const idx = parseInt(th.dataset.col);
+      th.addEventListener('click', () => selectCandidate(CANDIDATES[idx]));
+    });
+    applyMatrixSelection();
+  }
+
+  function applyMatrixSelection() {
+    const t = document.getElementById('matrix');
+    const idx = selected == null ? -1 : CANDIDATES.indexOf(selected);
+    t.querySelectorAll('tr').forEach(tr => tr.classList.remove('row-selected'));
+    t.querySelectorAll('.col-selected').forEach(el => el.classList.remove('col-selected'));
+    if (idx < 0) return;
+    const tr = t.querySelector(`tbody tr[data-row="${idx}"]`);
+    if (tr) tr.classList.add('row-selected');
+    t.querySelectorAll(`[data-col="${idx}"]`).forEach(el => el.classList.add('col-selected'));
+  }
+
+  // ── Render ballots ────────────────────────────────────────────────────────
+  function renderBallots() {
+    const grid = document.getElementById('ballot-grid');
+    grid.innerHTML = '';
+    BALLOTS.forEach(b => {
+      const div = document.createElement('div');
+      div.className = 'ballot' + (active.has(b.id) ? '' : ' is-off');
+      div.dataset.id = b.id;
+      const pips = b.ranking.map((n, i) => `
+        <span class="pip${n === selected ? ' is-highlighted' : ''}" data-name="${escAttr(n)}">${escHtml(n)}</span>
+        ${i < b.ranking.length - 1 ? '<span class="arrow">›</span>' : ''}
+      `).join('');
+      div.innerHTML = `
+        <span class="ballot-toggle"></span>
+        <span class="ballot-name">${escHtml(b.name)}</span>
+        <span class="ballot-ranking">${pips}</span>
+      `;
+      div.addEventListener('click', () => toggleBallot(b.id));
+      grid.appendChild(div);
+    });
+    updateCounts();
+  }
+
+  function updateBallotStates() {
+    document.querySelectorAll('.ballot').forEach(el => {
+      const id = parseInt(el.dataset.id);
+      el.classList.toggle('is-off', !active.has(id));
+    });
+    updateCounts();
+  }
+
+  function updateCounts() {
+    document.getElementById('active-count').textContent = active.size;
+    document.getElementById('total-count').textContent  = BALLOTS.length;
+  }
+
+  // ── Actions ───────────────────────────────────────────────────────────────
+  function recompute() {
+    const result = computeSchulze();
+    renderResults(result);
+    renderMatrix(result);
+  }
+
+  function toggleBallot(id) {
+    if (active.has(id)) active.delete(id);
+    else                active.add(id);
+    updateBallotStates();
+    recompute();
+  }
+
+  function setAll(on) {
+    if (on) BALLOTS.forEach(b => active.add(b.id));
+    else    active.clear();
+    updateBallotStates();
+    recompute();
+  }
+
+  function selectCandidate(name) {
+    selected = (selected === name) ? null : name;
+    document.querySelectorAll('.result-item').forEach(el => {
+      el.classList.toggle('is-selected', el.dataset.name === selected);
+    });
+    document.querySelectorAll('.ballot-ranking .pip').forEach(el => {
+      el.classList.toggle('is-highlighted', el.dataset.name === selected);
+    });
+    applyMatrixSelection();
+  }
+
+  // ── Utilities ─────────────────────────────────────────────────────────────
+  function escHtml(s) {
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+  function escAttr(s) {
+    return escHtml(s).replace(/"/g, '&quot;');
+  }
+
+  renderBallots();
+  recompute();
+</script>
+</body>
+</html>

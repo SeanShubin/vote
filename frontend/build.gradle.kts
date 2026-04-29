@@ -43,9 +43,40 @@ kotlin {
     }
 }
 
-// Cache busting for frontend.js
-tasks.register("addCacheBusting") {
+// Generates BuildConfig.kt with the API base URL from gradle.properties.
+// Override with `-Papi.base.url=https://api.pairwisevote.com` for production builds.
+val generatedSrcDir = layout.buildDirectory.dir("generated/buildConfig/jsMain/kotlin")
+
+val generateBuildConfig by tasks.registering {
+    val apiBaseUrl = (project.findProperty("api.base.url") as? String) ?: "http://localhost:8080"
+    val outputDir = generatedSrcDir
+    inputs.property("apiBaseUrl", apiBaseUrl)
+    outputs.dir(outputDir)
+    doLast {
+        val pkgDir = outputDir.get().asFile.resolve("com/seanshubin/vote/frontend")
+        pkgDir.mkdirs()
+        pkgDir.resolve("BuildConfig.kt").writeText(
+            """
+            |package com.seanshubin.vote.frontend
+            |
+            |internal object BuildConfig {
+            |    const val API_BASE_URL: String = "$apiBaseUrl"
+            |}
+            |
+            """.trimMargin()
+        )
+    }
+}
+
+kotlin.sourceSets.named("jsMain") {
+    kotlin.srcDir(generateBuildConfig)
+}
+
+// Cache busting for frontend.js. Runs after jsBrowserDistribution has assembled
+// the dist directory, so the modified index.html survives the bundle copy.
+val addCacheBusting by tasks.registering {
     description = "Add cache busting query parameter to frontend.js reference"
+    dependsOn("jsBrowserDistribution")
 
     val htmlSource = file("src/jsMain/resources/index.html")
     val htmlDest = file("build/dist/js/productionExecutable/index.html")
@@ -65,12 +96,6 @@ tasks.register("addCacheBusting") {
     }
 }
 
-// Run after webpack builds the production bundle
-tasks.named("jsBrowserProductionWebpack") {
-    finalizedBy("addCacheBusting")
-}
-
-// Also run after the build task to ensure it runs in incremental builds
-tasks.named("build") {
-    finalizedBy("addCacheBusting")
+tasks.named("assemble") {
+    dependsOn(addCacheBusting)
 }

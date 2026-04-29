@@ -1,0 +1,85 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: |
+  One-time bootstrap for pairwisevote.com CI/CD. Creates the GitHub OIDC
+  identity provider and an IAM role that GitHub Actions assumes via OIDC to
+  deploy the frontend (and later, the backend) stack.
+
+Parameters:
+  GitHubRepo:
+    Type: String
+    Default: SeanShubin/vote
+    Description: GitHub repository in OWNER/REPO form.
+  RoleName:
+    Type: String
+    Default: github-actions-deploy
+  CreateOidcProvider:
+    Type: String
+    AllowedValues: ['true', 'false']
+    Default: 'false'
+    Description: |
+      Create the GitHub OIDC identity provider. The provider is a single
+      per-account resource shared across all repos, so set to `false` if it
+      already exists. The bootstrap script auto-detects this.
+
+Conditions:
+  ShouldCreateOidcProvider: !Equals [!Ref CreateOidcProvider, 'true']
+
+Resources:
+  GitHubOidcProvider:
+    Type: AWS::IAM::OIDCProvider
+    Condition: ShouldCreateOidcProvider
+    Properties:
+      Url: https://token.actions.githubusercontent.com
+      ClientIdList:
+        - sts.amazonaws.com
+      # Thumbprints are no longer validated when the URL is github's known
+      # OIDC issuer; AWS verifies via library-of-trusted-CAs. Listing one keeps
+      # CFN happy.
+      ThumbprintList:
+        - 6938fd4d98bab03faadb97b34396831e3780aea1
+
+  DeployRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Ref RoleName
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              # Always reference the well-known ARN — works whether the
+              # provider was created by this stack or already existed.
+              Federated: !Sub "arn:aws:iam::${AWS::AccountId}:oidc-provider/token.actions.githubusercontent.com"
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                token.actions.githubusercontent.com:aud: sts.amazonaws.com
+              StringLike:
+                token.actions.githubusercontent.com:sub: !Sub "repo:${GitHubRepo}:*"
+      # Pragmatic v1 policy: broad AWS-managed permissions on the services
+      # the deploy touches. Scope down once the system is settled.
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AWSCloudFormationFullAccess
+        - arn:aws:iam::aws:policy/AmazonS3FullAccess
+        - arn:aws:iam::aws:policy/CloudFrontFullAccess
+        - arn:aws:iam::aws:policy/AWSCertificateManagerFullAccess
+        - arn:aws:iam::aws:policy/AmazonRoute53FullAccess
+      Policies:
+        - PolicyName: PassRoleSelf
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              # Required when CFN later provisions a Lambda execution role and
+              # has to attach it. Scoped to roles named with the project prefix.
+              - Effect: Allow
+                Action: iam:PassRole
+                Resource: !Sub "arn:aws:iam::${AWS::AccountId}:role/pairwisevote-*"
+
+Outputs:
+  DeployRoleArn:
+    Value: !GetAtt DeployRole.Arn
+  AccountId:
+    Value: !Ref AWS::AccountId
+  GitHubSecretCommand:
+    Description: Run this to set the GitHub secret (requires `gh` CLI).
+    Value: !Sub "gh secret set AWS_ACCOUNT_ID --body ${AWS::AccountId} --repo ${GitHubRepo}"

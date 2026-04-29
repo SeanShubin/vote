@@ -11,7 +11,7 @@ import org.w3c.fetch.Response
 import kotlin.js.json
 
 class HttpApiClient(
-    private val baseUrl: String = "http://localhost:8080"
+    private val baseUrl: String
 ) : ApiClient {
     private val json = Json { ignoreUnknownKeys = true }
 

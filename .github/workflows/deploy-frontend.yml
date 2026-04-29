@@ -1,0 +1,93 @@
+name: Deploy frontend
+
+on:
+  push:
+    branches: [master, main]
+    paths:
+      - 'frontend/**'
+      - 'domain/**'
+      - 'contract/**'
+      - 'gradle.properties'
+      - 'build.gradle.kts'
+      - 'deploy/template.yaml'
+      - '.github/workflows/deploy-frontend.yml'
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: deploy-frontend
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: us-east-1
+  STACK_NAME: pairwisevote-frontend
+  DOMAIN_NAME: pairwisevote.com
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: corretto
+          java-version: 21
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions-deploy
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Resolve hosted zone ID
+        id: zone
+        run: |
+          ZONE_ID=$(aws route53 list-hosted-zones-by-name \
+            --dns-name "${DOMAIN_NAME}." \
+            --query 'HostedZones[0].Id' --output text | cut -d'/' -f3)
+          echo "id=${ZONE_ID}" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy CloudFormation stack
+        run: |
+          aws cloudformation deploy \
+            --template-file deploy/template.yaml \
+            --stack-name "$STACK_NAME" \
+            --parameter-overrides \
+                DomainName="$DOMAIN_NAME" \
+                HostedZoneId="${{ steps.zone.outputs.id }}" \
+            --capabilities CAPABILITY_IAM \
+            --no-fail-on-empty-changeset
+
+      - name: Build frontend
+        run: |
+          ./gradlew :frontend:assemble \
+            -Papi.base.url=https://api.${DOMAIN_NAME}
+
+      - name: Sync to S3
+        run: |
+          BUCKET=$(aws cloudformation describe-stacks \
+            --stack-name "$STACK_NAME" \
+            --query 'Stacks[0].Outputs[?OutputKey==`BucketName`].OutputValue' \
+            --output text)
+          aws s3 sync \
+            frontend/build/dist/js/productionExecutable/ \
+            "s3://${BUCKET}/" \
+            --delete
+
+      - name: Invalidate CloudFront
+        run: |
+          DIST=$(aws cloudformation describe-stacks \
+            --stack-name "$STACK_NAME" \
+            --query 'Stacks[0].Outputs[?OutputKey==`DistributionId`].OutputValue' \
+            --output text)
+          aws cloudfront create-invalidation \
+            --distribution-id "$DIST" \
+            --paths "/*"
