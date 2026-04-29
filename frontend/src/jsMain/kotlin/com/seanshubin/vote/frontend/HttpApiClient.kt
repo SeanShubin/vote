@@ -8,10 +8,14 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.w3c.fetch.RequestInit
 import org.w3c.fetch.Response
+import kotlin.js.Promise
 import kotlin.js.json
 
 class HttpApiClient(
-    private val baseUrl: String
+    private val baseUrl: String,
+    // Injectable for wire-format tests; defaults to the browser's window.fetch.
+    private val fetch: (String, RequestInit) -> Promise<Response> =
+        { url, init -> window.fetch(url, init) },
 ) : ApiClient {
     private val json = Json { ignoreUnknownKeys = true }
 
@@ -64,7 +68,8 @@ class HttpApiClient(
     }
 
     override suspend fun castBallot(authToken: String, electionName: String, rankings: List<Ranking>): String {
-        val request = CastBallotRequest(electionName, rankings)
+        val voterName = extractUserName(authToken)
+        val request = CastBallotRequest(voterName, rankings)
         return postWithAuth("/election/${encodeURIComponent(electionName)}/ballot", request, authToken)
     }
 
@@ -165,10 +170,6 @@ class HttpApiClient(
         } else {
             json.decodeFromString(text)
         }
-    }
-
-    private fun fetch(url: String, init: RequestInit): kotlin.js.Promise<Response> {
-        return window.fetch(url, init)
     }
 
     private fun encodeURIComponent(str: String): String {

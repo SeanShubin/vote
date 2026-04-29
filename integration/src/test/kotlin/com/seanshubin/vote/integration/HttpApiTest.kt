@@ -547,6 +547,30 @@ class HttpApiTest {
         assertEquals(200, response.statusCode())
     }
 
+    // The "what" (request body voterName) must match the "who" (auth token).
+    // No proxy/delegation is supported; without this check, any logged-in
+    // eligible voter could submit ballots on behalf of any other eligible voter.
+    @Test
+    fun `cast ballot rejects voterName that does not match auth token`() {
+        val aliceTokens = tester.registerUserExpectSuccess("alice")
+        tester.registerUserExpectSuccess("bob")
+        tester.createElection("Lang", aliceTokens.accessToken)
+        tester.setCandidates("Lang", listOf("A", "B"), aliceTokens.accessToken)
+        tester.setEligibleVoters("Lang", listOf("alice", "bob"), aliceTokens.accessToken)
+        tester.launchElection("Lang", true, aliceTokens.accessToken)
+
+        // Alice's token + voterName=bob in body — must be rejected.
+        val response = tester.castBallot("Lang",
+            """{"voterName":"bob","rankings":[{"candidateName":"A","rank":1}]}""",
+            aliceTokens.accessToken)
+
+        assertEquals(401, response.statusCode())
+        assertTrue(
+            response.body().contains("alice") && response.body().contains("bob"),
+            "Error should name both the actor and the claimed voter; got: ${response.body()}"
+        )
+    }
+
     @Test
     fun `get ballot returns rankings`() {
         val aliceTokens = tester.registerUserExpectSuccess("alice")

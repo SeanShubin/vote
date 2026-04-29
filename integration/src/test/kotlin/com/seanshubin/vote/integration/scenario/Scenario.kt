@@ -192,8 +192,8 @@ object Scenario {
         )
 
         // Bob edits his ballot (allowed because allowEdit=true)
-        langElection.updateRankings(
-            "bob",
+        bob.castBallot(
+            langElection,
             "Rust" to 1,
             "Kotlin" to 2,
             "Go" to 3,

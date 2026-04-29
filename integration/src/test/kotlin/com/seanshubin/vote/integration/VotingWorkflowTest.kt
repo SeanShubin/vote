@@ -269,7 +269,7 @@ class VotingWorkflowTest {
         val initialRankings = testContext.database.listRankings("bob", "Programming Language")
         assertEquals("Kotlin", initialRankings.first { it.rank == 1 }.candidateName)
 
-        election.updateRankings("bob", "Rust" to 1, "Kotlin" to 2, "Go" to 3)
+        bob.castBallot(election, "Rust" to 1, "Kotlin" to 2, "Go" to 3)
 
         val updatedRankings = testContext.database.listRankings("bob", "Programming Language")
         assertEquals("Rust", updatedRankings.first { it.rank == 1 }.candidateName)

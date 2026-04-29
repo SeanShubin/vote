@@ -385,6 +385,15 @@ class ServiceImpl(
         val validElectionName = Validation.validateElectionName(electionName)
         val validRankings = Validation.validateRankings(rankings)
 
+        // Identity check: the body's voterName ("what") must match the token's userName ("who").
+        // No proxy/delegation is supported today; if it ever is, gate it on an explicit permission.
+        if (validVoterName != accessToken.userName) {
+            throw ServiceException(
+                ServiceException.Category.UNAUTHORIZED,
+                "Cannot cast ballot as $validVoterName when authenticated as ${accessToken.userName}"
+            )
+        }
+
         val election = queryModel.searchElectionByName(validElectionName)
             ?: throw ServiceException(ServiceException.Category.NOT_FOUND, "Election not found: $validElectionName")
 
