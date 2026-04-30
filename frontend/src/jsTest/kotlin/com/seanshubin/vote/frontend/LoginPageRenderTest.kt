@@ -47,7 +47,7 @@ class LoginPageRenderTest {
             renderComposable(rootElementId = testId) {
                 LoginPage(
                     apiClient = fakeClient,
-                    onLoginSuccess = { token, userName ->
+                    onLoginSuccess = { token, userName, _ ->
                         loginSuccessCalled = true
                         capturedToken = token
                         capturedUserName = userName

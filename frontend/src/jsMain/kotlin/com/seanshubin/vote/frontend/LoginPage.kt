@@ -2,15 +2,18 @@ package com.seanshubin.vote.frontend
 
 import androidx.compose.runtime.*
 import com.seanshubin.vote.contract.ApiClient
+import com.seanshubin.vote.domain.Role
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import org.jetbrains.compose.web.attributes.*
 import org.jetbrains.compose.web.dom.*
 
 @Composable
 fun LoginPage(
     apiClient: ApiClient,
-    onLoginSuccess: (String, String) -> Unit,
+    onLoginSuccess: (authToken: String, userName: String, role: Role) -> Unit,
     onNavigateToRegister: () -> Unit,
     coroutineScope: CoroutineScope = rememberCoroutineScope()
 ) {
@@ -26,8 +29,9 @@ fun LoginPage(
             coroutineScope.launch {
                 try {
                     val tokens = apiClient.authenticate(userName, password)
-                    val tokenJson = """{"userName":"$userName","role":"USER"}"""
-                    onLoginSuccess(tokenJson, userName)
+                    // Use the real access token (with its actual role) — not a hand-crafted USER stub.
+                    val tokenJson = Json.encodeToString(tokens.accessToken)
+                    onLoginSuccess(tokenJson, tokens.accessToken.userName, tokens.accessToken.role)
                 } catch (e: Exception) {
                     apiClient.logErrorToServer(e)
                     errorMessage = e.message ?: "Login failed"

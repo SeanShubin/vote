@@ -2,6 +2,7 @@ package com.seanshubin.vote.frontend
 
 import androidx.compose.runtime.*
 import com.seanshubin.vote.contract.ApiClient
+import com.seanshubin.vote.domain.Role
 import org.jetbrains.compose.web.renderComposable
 
 fun main() {
@@ -17,34 +18,39 @@ fun VoteApp(apiClient: ApiClient) {
     var currentPage by remember { mutableStateOf<Page>(Page.Login) }
     var authToken by remember { mutableStateOf<String?>(null) }
     var userName by remember { mutableStateOf<String?>(null) }
+    var role by remember { mutableStateOf<Role?>(null) }
 
     when (currentPage) {
         is Page.Login -> LoginPage(
             apiClient = apiClient,
-            onLoginSuccess = { token, user ->
+            onLoginSuccess = { token, user, userRole ->
                 authToken = token
                 userName = user
+                role = userRole
                 currentPage = Page.Home
             },
             onNavigateToRegister = { currentPage = Page.Register }
         )
         is Page.Register -> RegisterPage(
             apiClient = apiClient,
-            onLoginSuccess = { token, user ->
+            onLoginSuccess = { token, user, userRole ->
                 authToken = token
                 userName = user
+                role = userRole
                 currentPage = Page.Home
             },
             onNavigateToLogin = { currentPage = Page.Login }
         )
         is Page.Home -> HomePage(
             userName = userName ?: "Unknown",
+            role = role,
             authToken = authToken ?: "",
             onNavigateToCreateElection = { currentPage = Page.CreateElection },
             onNavigateToElections = { currentPage = Page.Elections },
             onLogout = {
                 authToken = null
                 userName = null
+                role = null
                 currentPage = Page.Login
             }
         )

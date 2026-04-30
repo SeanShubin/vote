@@ -32,7 +32,7 @@ class RegisterPageRenderTest {
             renderComposable(rootElementId = testId) {
                 RegisterPage(
                     apiClient = fakeClient,
-                    onLoginSuccess = { token, userName ->
+                    onLoginSuccess = { token, userName, _ ->
                         loginSuccessCalled = true
                         capturedToken = token
                         capturedUserName = userName

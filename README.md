@@ -12,6 +12,20 @@ This project implements a Condorcet voting system (ranked-choice with pairwise c
 
 **Key architectural insight**: All three backends expose the same `QueryModel` interface using natural keys (election names, voter names), hiding implementation details (SQL joins, DynamoDB composite keys, etc.). This lets developers write tests and admin tools against a simple relational model while production uses optimized storage patterns.
 
+## Origin
+
+This project is a rewrite and consolidation of three earlier projects:
+
+- **[condorcet-backend](https://github.com/SeanShubin/condorcet-backend)** — Kotlin/JVM backend. Rewritten as the `:backend` module here, with shared code lifted into the multiplatform `:contract` and `:domain` modules.
+- **[condorcet-frontend](https://github.com/SeanShubin/condorcet-frontend)** — React 17 SPA. Rebuilt from scratch as Compose for Web in `:frontend`.
+- **[condorcet-deploy](https://github.com/SeanShubin/condorcet-deploy)** — deployment infra. Replaced by SAM templates in `deploy/` and the GitHub Actions workflow.
+
+Migration history and the rewrite plan are tracked in [`ai/`](ai/) — see
+`ai/00-constraint-summary.md` for the consolidation goal and
+`ai/02-current-state.md` for a snapshot of each origin project at the start
+of the rewrite. AI assistants working on this codebase should consult those
+documents when comparing behavior to the predecessors.
+
 ## For New Engineers
 
 ### Entry Points
