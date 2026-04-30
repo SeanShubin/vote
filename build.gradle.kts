@@ -30,13 +30,30 @@ subprojects {
     }
 }
 
-// Stand-in for the analyzeCodeStructure task contributed by
-// com.seanshubin.code.structure. Other modules (notably :documentation) depend on
-// this task by name. Keep this no-op until the plugin can be re-enabled.
-tasks.register("analyzeCodeStructure") {
+// Code-structure analysis: invoked as a plain executable JAR pulled from
+// Maven Central, rather than through the (Windows-port-blocked) Gradle plugin.
+// Source: https://github.com/SeanShubin/code-structure
+val codeStructureClasspath: Configuration = configurations.create("codeStructureClasspath")
+
+dependencies {
+    codeStructureClasspath("com.seanshubin.code.structure:code-structure-console:1.1.2")
+}
+
+tasks.register<JavaExec>("analyzeCodeStructure") {
     group = "verification"
-    description = "No-op placeholder. Reinstate the com.seanshubin.code.structure plugin to perform real analysis."
-    doLast {
-        logger.info("analyzeCodeStructure: skipped (plugin disabled in this checkout)")
+    description = "Analyze dependency structure (cycles, naming, layering) — see generated/code-structure/."
+    classpath = codeStructureClasspath
+    mainClass.set("com.seanshubin.code.structure.console.EntryPoint")
+    workingDir = rootDir
+    // Reads code-structure-config.json from the working directory; outputs to generated/code-structure/.
+    outputs.dir(layout.projectDirectory.dir("generated/code-structure"))
+    inputs.file(layout.projectDirectory.file("code-structure-config.json"))
+
+    // The analyzer reads compiled .class files. Make sure all JVM modules
+    // are built before scanning. (Frontend's pure-JS target is naturally
+    // skipped since it produces no .class output.)
+    subprojects.forEach { sub ->
+        sub.tasks.findByName("classes")?.let { dependsOn(it) }
+        sub.tasks.findByName("jvmMainClasses")?.let { dependsOn(it) }
     }
 }

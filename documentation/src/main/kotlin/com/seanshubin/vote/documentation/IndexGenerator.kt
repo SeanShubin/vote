@@ -63,7 +63,7 @@ class IndexGenerator {
         appendLine("        <div class=\"link-description\">Domain events with full HTTP request/response details</div>")
         appendLine("      </a>")
 
-        appendLine("      <a href=\"../code-structure/browse/index.html\" class=\"link-card code-structure\">")
+        appendLine("      <a href=\"../code-structure/browse/_index.html\" class=\"link-card code-structure\">")
         appendLine("        <div class=\"link-icon\">🔍</div>")
         appendLine("        <div class=\"link-title\">Code Structure Analysis</div>")
         appendLine("        <div class=\"link-description\">Dependency analysis, cycle detection, and package hierarchy</div>")
