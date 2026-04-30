@@ -53,6 +53,16 @@ jobs:
           ./gradlew :frontend:assemble \
             -Papi.base.url=https://api.${DOMAIN_NAME}
 
+      - name: Install graphviz (for schema diagram SVG rendering)
+        run: sudo apt-get update && sudo apt-get install -y graphviz
+
+      - name: Generate code-structure + documentation reports
+        # Transitively runs :analyzeCodeStructure and :schema-diagram:generateSchemaDiagram.
+        # Failing this step blocks the deploy — analyzer's maximumAllowedErrorCount=0
+        # is the build gate against cycles + ancestor/descendant violations.
+        # Reports are still uploaded below (if: always()) when this fails.
+        run: ./gradlew :documentation:generateDocumentation
+
       - name: Resolve bootstrap outputs (zone + artifacts bucket)
         id: meta
         run: |
@@ -120,3 +130,12 @@ jobs:
           done
           echo "Backend smoke test failed."
           exit 1
+
+      - name: Upload generated reports
+        if: always()  # capture partial reports even when an earlier step failed
+        uses: actions/upload-artifact@v4
+        with:
+          name: generated-reports-${{ github.run_number }}
+          path: generated/
+          retention-days: 14
+          if-no-files-found: warn
