@@ -57,3 +57,47 @@ tasks.register<JavaExec>("analyzeCodeStructure") {
         sub.tasks.findByName("jvmMainClasses")?.let { dependsOn(it) }
     }
 }
+
+// ── Markdown table padding ─────────────────────────────────────────────────
+// Algorithm and CLI live in :tools (vote-dev pad-tables). These root tasks are
+// thin Gradle entry points; the pre-commit hook calls the same CLI.
+val toolsRuntime: Configuration = configurations.create("toolsRuntime") {
+    isCanBeResolved = true
+    isCanBeConsumed = false
+}
+dependencies {
+    toolsRuntime(project(":tools"))
+}
+
+fun padTablesExec(taskName: String, vararg cliArgs: String) =
+    tasks.register<JavaExec>(taskName) {
+        classpath = toolsRuntime
+        mainClass.set("com.seanshubin.vote.tools.app.MainKt")
+        args = listOf("pad-tables") + cliArgs.toList()
+    }
+
+padTablesExec("padMarkdownTables", "--root", rootDir.absolutePath).configure {
+    group = "documentation"
+    description = "Rewrites .md files in place so markdown tables have aligned columns."
+}
+
+padTablesExec("checkMarkdownTables", "--check", "--root", rootDir.absolutePath).configure {
+    group = "verification"
+    description = "Lists .md files whose tables are not column-aligned. Non-zero exit if any."
+}
+
+tasks.register("installGitHooks") {
+    group = "documentation"
+    description = "Installs the pre-commit hook that pads markdown tables on commit."
+    val hookSource = rootDir.resolve("scripts/git-hooks/pre-commit")
+    val hookTarget = rootDir.resolve(".git/hooks/pre-commit")
+    inputs.file(hookSource)
+    outputs.file(hookTarget)
+    dependsOn(":tools:installDist")
+    doLast {
+        hookTarget.parentFile.mkdirs()
+        hookSource.copyTo(hookTarget, overwrite = true)
+        hookTarget.setExecutable(true)
+        logger.lifecycle("Installed pre-commit hook at ${hookTarget.relativeTo(rootDir)}")
+    }
+}

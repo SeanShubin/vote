@@ -91,12 +91,12 @@ After establishing the problem is solvable, ask for implementation:
 
 ### Key Differences
 
-| Defeatist Framing | Correct Framing |
-|------------------|-----------------|
-| "Fundamental limitation" | "Current behavior without error reporting" |
+| Defeatist Framing                   | Correct Framing                                 |
+| ----------------------------------- | ----------------------------------------------- |
+| "Fundamental limitation"            | "Current behavior without error reporting"      |
 | "Cannot capture client-side errors" | "Doesn't capture errors yet, can add reporting" |
-| "You need browser console" | "We can centralize all errors in backend logs" |
-| Implies unsolvable | Identifies solution space |
+| "You need browser console"          | "We can centralize all errors in backend logs"  |
+| Implies unsolvable                  | Identifies solution space                       |
 
 ## General Principles
 
@@ -108,14 +108,14 @@ When someone says "fundamental limitation," ask:
 
 **Examples:**
 
-| Claim | Actually Fundamental? | Why/Why Not |
-|-------|----------------------|-------------|
-| "Can't send data when network is down" | YES | Physics - no medium for transmission |
-| "Can't log client errors server-side" | NO | Can design client to report errors |
-| "Can't sort in less than O(n log n) comparisons" | YES | Mathematics - proven lower bound |
-| "Can't scale this database" | NO | Design limitation, not fundamental |
-| "Can't make this code testable" | NO | Design choice, can refactor with DI |
-| "Light speed limits latency" | YES | Physics - fundamental constant |
+| Claim                                            | Actually Fundamental? | Why/Why Not                          |
+| ------------------------------------------------ | --------------------- | ------------------------------------ |
+| "Can't send data when network is down"           | YES                   | Physics - no medium for transmission |
+| "Can't log client errors server-side"            | NO                    | Can design client to report errors   |
+| "Can't sort in less than O(n log n) comparisons" | YES                   | Mathematics - proven lower bound     |
+| "Can't scale this database"                      | NO                    | Design limitation, not fundamental   |
+| "Can't make this code testable"                  | NO                    | Design choice, can refactor with DI  |
+| "Light speed limits latency"                     | YES                   | Physics - fundamental constant       |
 
 ### 2. Distinguish Implementation from Constraint
 

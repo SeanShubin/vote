@@ -9,30 +9,30 @@ pre-filled for `SeanShubin/vote` in account `964638509728`, region
 Run once per AWS account. Provisions the GitHub OIDC provider and the
 `github-actions-deploy` IAM role.
 
-| What | Where |
-|---|---|
-| Terminal output | the shell you ran it from |
+| What                   | Where                                                                                                                                                               |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Terminal output        | the shell you ran it from                                                                                                                                           |
 | Bootstrap stack events | [CloudFormation → pairwisevote-bootstrap](https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks) → click the stack → **Events** tab |
-| Resulting IAM role | [IAM → Roles → github-actions-deploy](https://us-east-1.console.aws.amazon.com/iam/home#/roles/details/github-actions-deploy) |
-| GitHub secret | [github.com/SeanShubin/vote/settings/secrets/actions](https://github.com/SeanShubin/vote/settings/secrets/actions) — verify `AWS_ACCOUNT_ID` exists |
+| Resulting IAM role     | [IAM → Roles → github-actions-deploy](https://us-east-1.console.aws.amazon.com/iam/home#/roles/details/github-actions-deploy)                                       |
+| GitHub secret          | [github.com/SeanShubin/vote/settings/secrets/actions](https://github.com/SeanShubin/vote/settings/secrets/actions) — verify `AWS_ACCOUNT_ID` exists                 |
 
 ## Phase 2 — first push to `master` (~5-10 minutes)
 
 The deploy workflow runs in GitHub but provisions resources in AWS.
 Both sides have signal.
 
-| What | Where |
-|---|---|
-| Live workflow logs | [github.com/SeanShubin/vote/actions](https://github.com/SeanShubin/vote/actions) — click the running job, expand each step |
-| Frontend+backend CFN stack | [CloudFormation → pairwisevote-frontend](https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks) → Events tab |
-| ACM cert issuance | [Certificate Manager (us-east-1)](https://us-east-1.console.aws.amazon.com/acm/home?region=us-east-1#/certificates/list) — covers `pairwisevote.com`, `www.pairwisevote.com`, `api.pairwisevote.com` |
-| Route 53 records | [Route 53 → pairwisevote.com](https://us-east-1.console.aws.amazon.com/route53/v2/hostedzones) |
-| S3 frontend bucket | [S3 → pairwisevote.com-frontend](https://us-east-1.console.aws.amazon.com/s3/buckets) |
-| CloudFront distribution | [CloudFront → Distributions](https://us-east-1.console.aws.amazon.com/cloudfront/v4/home#/distributions) |
-| Lambda function | [Lambda → pairwisevote-frontend-backend](https://us-east-1.console.aws.amazon.com/lambda/home?region=us-east-1#/functions) — Monitoring tab for invocations, Configuration → SnapStart |
-| API Gateway | [API Gateway → HTTP APIs](https://us-east-1.console.aws.amazon.com/apigateway/main/apis?region=us-east-1) — Custom domain names → `api.pairwisevote.com` |
-| Lambda logs | [CloudWatch → Log groups](https://us-east-1.console.aws.amazon.com/cloudwatch/home?region=us-east-1#logsV2:log-groups) — `/aws/lambda/pairwisevote-frontend-backend` |
-| DynamoDB tables | [DynamoDB → Tables](https://us-east-1.console.aws.amazon.com/dynamodbv2/home?region=us-east-1#tables) — `vote_data` (single-table) + `vote_event_log` (event sourcing) |
+| What                       | Where                                                                                                                                                                                                |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Live workflow logs         | [github.com/SeanShubin/vote/actions](https://github.com/SeanShubin/vote/actions) — click the running job, expand each step                                                                           |
+| Frontend+backend CFN stack | [CloudFormation → pairwisevote-frontend](https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks) → Events tab                                                         |
+| ACM cert issuance          | [Certificate Manager (us-east-1)](https://us-east-1.console.aws.amazon.com/acm/home?region=us-east-1#/certificates/list) — covers `pairwisevote.com`, `www.pairwisevote.com`, `api.pairwisevote.com` |
+| Route 53 records           | [Route 53 → pairwisevote.com](https://us-east-1.console.aws.amazon.com/route53/v2/hostedzones)                                                                                                       |
+| S3 frontend bucket         | [S3 → pairwisevote.com-frontend](https://us-east-1.console.aws.amazon.com/s3/buckets)                                                                                                                |
+| CloudFront distribution    | [CloudFront → Distributions](https://us-east-1.console.aws.amazon.com/cloudfront/v4/home#/distributions)                                                                                             |
+| Lambda function            | [Lambda → pairwisevote-frontend-backend](https://us-east-1.console.aws.amazon.com/lambda/home?region=us-east-1#/functions) — Monitoring tab for invocations, Configuration → SnapStart               |
+| API Gateway                | [API Gateway → HTTP APIs](https://us-east-1.console.aws.amazon.com/apigateway/main/apis?region=us-east-1) — Custom domain names → `api.pairwisevote.com`                                             |
+| Lambda logs                | [CloudWatch → Log groups](https://us-east-1.console.aws.amazon.com/cloudwatch/home?region=us-east-1#logsV2:log-groups) — `/aws/lambda/pairwisevote-frontend-backend`                                 |
+| DynamoDB tables            | [DynamoDB → Tables](https://us-east-1.console.aws.amazon.com/dynamodbv2/home?region=us-east-1#tables) — `vote_data` (single-table) + `vote_event_log` (event sourcing)                               |
 
 **The CFN Events tab is the single best "is it working" view** — it
 ticks through each resource as CFN creates it, and any failure shows
@@ -40,12 +40,12 @@ the exact reason inline.
 
 ## Phase 3 — live site
 
-| What | Where |
-|---|---|
-| Frontend | https://pairwisevote.com |
-| Backend health | `curl https://api.pairwisevote.com/health` |
-| DNS | `nslookup pairwisevote.com` (CloudFront), `nslookup api.pairwisevote.com` (APIGW) |
-| Cert | browser lock icon, or `openssl s_client -connect pairwisevote.com:443 -servername pairwisevote.com` |
+| What           | Where                                                                                               |
+| -------------- | --------------------------------------------------------------------------------------------------- |
+| Frontend       | https://pairwisevote.com                                                                            |
+| Backend health | `curl https://api.pairwisevote.com/health`                                                          |
+| DNS            | `nslookup pairwisevote.com` (CloudFront), `nslookup api.pairwisevote.com` (APIGW)                   |
+| Cert           | browser lock icon, or `openssl s_client -connect pairwisevote.com:443 -servername pairwisevote.com` |
 
 ## Production logs and alerts
 
@@ -60,12 +60,12 @@ Backend logs are JSON-encoded by logback's `LogstashEncoder` and
 forwarded structured by Lambda's `LogFormat: JSON` setting. Use
 **Logs Insights field queries** rather than grep.
 
-| What | Where |
-|---|---|
-| Log group | [`/aws/lambda/pairwisevote-frontend-backend`](https://us-east-1.console.aws.amazon.com/cloudwatch/home?region=us-east-1#logsV2:log-groups/log-group/$252Faws$252Flambda$252Fpairwisevote-frontend-backend) — retention is 1 day, deliberately short |
-| Logs Insights | [console](https://us-east-1.console.aws.amazon.com/cloudwatch/home?region=us-east-1#logsV2:logs-insights) — pick the log group, then run a query (examples below) |
-| Alarms | [CloudWatch → Alarms](https://us-east-1.console.aws.amazon.com/cloudwatch/home?region=us-east-1#alarmsV2:) — `pairwisevote-frontend-client-errors` and `pairwisevote-frontend-backend-errors` |
-| SNS topic | [SNS → Topics](https://us-east-1.console.aws.amazon.com/sns/v3/home?region=us-east-1#/topics) — `pairwisevote-frontend-alerts` |
+| What          | Where                                                                                                                                                                                                                                               |
+| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Log group     | [`/aws/lambda/pairwisevote-frontend-backend`](https://us-east-1.console.aws.amazon.com/cloudwatch/home?region=us-east-1#logsV2:log-groups/log-group/$252Faws$252Flambda$252Fpairwisevote-frontend-backend) — retention is 1 day, deliberately short |
+| Logs Insights | [console](https://us-east-1.console.aws.amazon.com/cloudwatch/home?region=us-east-1#logsV2:logs-insights) — pick the log group, then run a query (examples below)                                                                                   |
+| Alarms        | [CloudWatch → Alarms](https://us-east-1.console.aws.amazon.com/cloudwatch/home?region=us-east-1#alarmsV2:) — `pairwisevote-frontend-client-errors` and `pairwisevote-frontend-backend-errors`                                                       |
+| SNS topic     | [SNS → Topics](https://us-east-1.console.aws.amazon.com/sns/v3/home?region=us-east-1#/topics) — `pairwisevote-frontend-alerts`                                                                                                                      |
 
 ### Useful Logs Insights queries
 
@@ -127,13 +127,13 @@ lives in the `vote_data` single table keyed by PK (entity) and SK
 
 ### Key prefix reference
 
-| PK              | SK                | What |
-|---|---|---|
-| `USER#alice`    | `METADATA`        | a registered user |
-| `ELECTION#Foo`  | `METADATA`        | election metadata |
-| `ELECTION#Foo`  | `CANDIDATE#Kotlin`| a candidate in election Foo |
-| `ELECTION#Foo`  | `VOTER#bob`       | bob is eligible to vote in Foo |
-| `ELECTION#Foo`  | `BALLOT#bob`      | bob's cast ballot in Foo |
+| PK             | SK                 | What                           |
+| -------------- | ------------------ | ------------------------------ |
+| `USER#alice`   | `METADATA`         | a registered user              |
+| `ELECTION#Foo` | `METADATA`         | election metadata              |
+| `ELECTION#Foo` | `CANDIDATE#Kotlin` | a candidate in election Foo    |
+| `ELECTION#Foo` | `VOTER#bob`        | bob is eligible to vote in Foo |
+| `ELECTION#Foo` | `BALLOT#bob`       | bob's cast ballot in Foo       |
 
 (Source of truth: `backend/.../repository/DynamoDbSingleTableSchema.kt`.)
 
@@ -240,9 +240,9 @@ gh auth login   # GitHub.com → HTTPS → browser login
 
 Useful commands:
 
-| Command | Effect |
-|---|---|
-| `gh secret set AWS_ACCOUNT_ID --body 964638509728 --repo SeanShubin/vote` | set the GitHub secret |
-| `gh run watch` | tail the latest workflow run |
-| `gh run list --workflow=deploy.yml` | list recent deploy runs |
-| `gh run view <run-id> --log-failed` | print only the failing step's log |
+| Command                                                                   | Effect                            |
+| ------------------------------------------------------------------------- | --------------------------------- |
+| `gh secret set AWS_ACCOUNT_ID --body 964638509728 --repo SeanShubin/vote` | set the GitHub secret             |
+| `gh run watch`                                                            | tail the latest workflow run      |
+| `gh run list --workflow=deploy.yml`                                       | list recent deploy runs           |
+| `gh run view <run-id> --log-failed`                                       | print only the failing step's log |

@@ -106,12 +106,12 @@ See [code-structure documentation](https://github.com/SeanShubin/code-structure)
 
 Both tools follow the same philosophy:
 
-| Aspect | schema-diagram | code-structure |
-|--------|---------------|----------------|
-| **Input** | `schema.sql` | Compiled `.class` files |
-| **Analyzes** | Table relationships | Code dependencies |
-| **Detects** | Foreign key relationships | Cycles, vertical deps |
-| **Output** | ER diagrams (GraphViz, Mermaid, HTML) | Dependency graphs, metrics |
-| **Cannot Drift** | ✅ Generated from actual schema | ✅ Analyzes actual bytecode |
+| Aspect           | schema-diagram                        | code-structure             |
+| ---------------- | ------------------------------------- | -------------------------- |
+| **Input**        | `schema.sql`                          | Compiled `.class` files    |
+| **Analyzes**     | Table relationships                   | Code dependencies          |
+| **Detects**      | Foreign key relationships             | Cycles, vertical deps      |
+| **Output**       | ER diagrams (GraphViz, Mermaid, HTML) | Dependency graphs, metrics |
+| **Cannot Drift** | ✅ Generated from actual schema        | ✅ Analyzes actual bytecode |
 
 Both ensure documentation cannot become stale because they analyze the actual source of truth (schema file or compiled code) rather than relying on manually-maintained documentation.

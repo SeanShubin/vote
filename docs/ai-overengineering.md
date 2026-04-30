@@ -346,14 +346,14 @@ If all answers are "no," don't add it.
 
 This failure mode is different from the "fundamental limitations" case study:
 
-| Aspect | Challenging Assumptions | Over-Engineering |
-|--------|------------------------|------------------|
-| **Failure type** | False limitation claim | Added unrequested complexity |
-| **Root cause** | Overgeneralization, defeatism | Pattern matching, helpfulness bias |
-| **User impact** | Prevented solution | Made solution more complex |
-| **How detected** | User challenged "can't" claim | User noticed mismatch between description and output |
-| **Fix** | Implement the "impossible" feature | Remove the unwanted sophistication |
-| **Lesson** | Question "fundamental" claims | Question unexplained features |
+| Aspect           | Challenging Assumptions            | Over-Engineering                                     |
+| ---------------- | ---------------------------------- | ---------------------------------------------------- |
+| **Failure type** | False limitation claim             | Added unrequested complexity                         |
+| **Root cause**   | Overgeneralization, defeatism      | Pattern matching, helpfulness bias                   |
+| **User impact**  | Prevented solution                 | Made solution more complex                           |
+| **How detected** | User challenged "can't" claim      | User noticed mismatch between description and output |
+| **Fix**          | Implement the "impossible" feature | Remove the unwanted sophistication                   |
+| **Lesson**       | Question "fundamental" claims      | Question unexplained features                        |
 
 Both represent AI failure modes that humans need to recognize and challenge.
 

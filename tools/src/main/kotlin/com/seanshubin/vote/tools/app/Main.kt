@@ -36,6 +36,7 @@ import com.seanshubin.vote.tools.commands.LaunchKeepDynamodb
 import com.seanshubin.vote.tools.commands.LaunchKeepMysql
 import com.seanshubin.vote.tools.commands.LaunchScenarioDynamodb
 import com.seanshubin.vote.tools.commands.LaunchScenarioMysql
+import com.seanshubin.vote.tools.commands.PadTables
 import com.seanshubin.vote.tools.commands.PurgeDynamodb
 import com.seanshubin.vote.tools.commands.PurgeMysql
 import com.seanshubin.vote.tools.commands.RollLogs
@@ -92,6 +93,7 @@ fun main(args: Array<String>) {
             InspectDynamodbRawAll(),
             InspectDynamodbRawKeys(),
             ConvertScenarios(),
+            PadTables(),
             LaunchScenarioMysql(),
             LaunchScenarioDynamodb(),
             SetupTestBallot(),

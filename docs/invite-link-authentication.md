@@ -28,14 +28,14 @@ Instead of registering with a password, users receive a one-time invite link fro
 
 ## Security Properties
 
-| Property | Analysis |
-|---|---|
-| Admin impersonation | Blocked — the invite is one-time-use and the secret URL is generated after it is consumed, so the admin never has it |
-| Ballot secrecy | Preserved — an admin cannot cast a vote as an invited user because they do not know the user's secret URL |
-| Secret URL exposure | Risk — the URL can appear in browser history, bookmarks, or server logs; HTTPS is mandatory and the URL should not be logged |
-| Link theft | If the secret URL is observed or guessed, the holder can authenticate as the user; mitigated by using a cryptographically random token of sufficient length |
-| Account recovery | No self-service recovery; a locked-out user requires the admin to revoke the old account and issue a fresh invite |
-| Invite forwarding | An invite link can be claimed by anyone who receives it before the intended recipient; admins should treat invite URLs as sensitive until claimed |
+| Property            | Analysis                                                                                                                                                    |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Admin impersonation | Blocked — the invite is one-time-use and the secret URL is generated after it is consumed, so the admin never has it                                        |
+| Ballot secrecy      | Preserved — an admin cannot cast a vote as an invited user because they do not know the user's secret URL                                                   |
+| Secret URL exposure | Risk — the URL can appear in browser history, bookmarks, or server logs; HTTPS is mandatory and the URL should not be logged                                |
+| Link theft          | If the secret URL is observed or guessed, the holder can authenticate as the user; mitigated by using a cryptographically random token of sufficient length |
+| Account recovery    | No self-service recovery; a locked-out user requires the admin to revoke the old account and issue a fresh invite                                           |
+| Invite forwarding   | An invite link can be claimed by anyone who receives it before the intended recipient; admins should treat invite URLs as sensitive until claimed           |
 
 ## Tradeoffs vs. Password Authentication
 

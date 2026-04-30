@@ -1,0 +1,27 @@
+#!/bin/sh
+# Pads markdown tables in any staged .md files and re-stages them.
+# Installed by `./gradlew installGitHooks`. Source of truth is
+# scripts/git-hooks/pre-commit; do not edit .git/hooks/pre-commit directly.
+#
+# Limitation: if you have unstaged edits to a .md file that is also staged,
+# those unstaged edits will be folded into the commit (the formatter operates
+# on the working-tree file, and `git add` then stages everything).
+# If that's not what you want, stash unstaged changes first.
+#
+# Bypass with: git commit --no-verify
+set -e
+
+repo_root=$(git rev-parse --show-toplevel)
+cd "$repo_root"
+
+files=$(git diff --name-only --cached --diff-filter=ACM | grep -E '\.md$' || true)
+[ -z "$files" ] && exit 0
+
+bin="./tools/build/install/vote-dev/bin/vote-dev"
+if [ ! -x "$bin" ] && [ ! -f "$bin.bat" ]; then
+    echo "pre-commit: building :tools:installDist (one-time)..."
+    ./gradlew --quiet :tools:installDist
+fi
+
+echo "$files" | xargs "$bin" pad-tables --
+echo "$files" | xargs git add

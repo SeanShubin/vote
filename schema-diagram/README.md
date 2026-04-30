@@ -132,10 +132,10 @@ See `ai/schema-diagram-proposal.md` for the complete design rationale.
 
 ## Comparison to Manual Documentation
 
-| Approach | Can Drift? | Format Options | Maintenance |
-|----------|-----------|---------------|-------------|
-| Manual ER diagram in docs/ | ✗ Yes | 1 format | Manual updates required |
-| Generated from schema.sql | ✓ No | 3 formats | Automatic on build |
+| Approach                   | Can Drift? | Format Options | Maintenance             |
+| -------------------------- | ---------- | -------------- | ----------------------- |
+| Manual ER diagram in docs/ | ✗ Yes      | 1 format       | Manual updates required |
+| Generated from schema.sql  | ✓ No       | 3 formats      | Automatic on build      |
 
 By generating from the actual schema file, the diagrams are always current and require zero maintenance effort.
 

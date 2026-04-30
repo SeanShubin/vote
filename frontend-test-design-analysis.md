@@ -103,13 +103,13 @@ This test:
 
 ## Comparison: Our Tests vs React Testing Library
 
-| Aspect | React Testing Library | Our Tests | Impact |
-|--------|---------------------|-----------|--------|
-| **Element queries** | By role, label, placeholder | By CSS selector, type attribute | **Medium** - More brittle to structure changes |
-| **Event dispatch** | High-level user actions | Low-level DOM events | **Low** - Necessary for Compose for Web |
-| **Button identification** | By visible text/label | By position (buttons[0]) | **High** - Very brittle |
-| **Input identification** | By placeholder/label | By type attribute | **Medium** - Fairly brittle |
-| **Verification** | Mock API at boundary | Fake API at boundary | **Same** - Both good |
+| Aspect                    | React Testing Library       | Our Tests                       | Impact                                         |
+| ------------------------- | --------------------------- | ------------------------------- | ---------------------------------------------- |
+| **Element queries**       | By role, label, placeholder | By CSS selector, type attribute | **Medium** - More brittle to structure changes |
+| **Event dispatch**        | High-level user actions     | Low-level DOM events            | **Low** - Necessary for Compose for Web        |
+| **Button identification** | By visible text/label       | By position (buttons[0])        | **High** - Very brittle                        |
+| **Input identification**  | By placeholder/label        | By type attribute               | **Medium** - Fairly brittle                    |
+| **Verification**          | Mock API at boundary        | Fake API at boundary            | **Same** - Both good                           |
 
 ## What Makes Tests Brittle
 

@@ -136,12 +136,12 @@ Compose for Web uses Kotlin coroutines with a custom dispatcher that apparently 
 
 ## Comparison Table
 
-| Aspect | React Testing Library | Compose for Web (Current) |
-|--------|----------------------|---------------------------|
-| **DOM events trigger handlers?** | ✅ Yes | ✅ Yes |
-| **Event handlers execute synchronously?** | ✅ Yes | ✅ Yes |
-| **Async work in handlers?** | ✅ Promises work | ❌ Coroutines don't work |
-| **Why async works/fails?** | Uses browser Promise queue | Uses Compose coroutine dispatcher (not running in tests) |
+| Aspect                                    | React Testing Library      | Compose for Web (Current)                                |
+| ----------------------------------------- | -------------------------- | -------------------------------------------------------- |
+| **DOM events trigger handlers?**          | ✅ Yes                      | ✅ Yes                                                    |
+| **Event handlers execute synchronously?** | ✅ Yes                      | ✅ Yes                                                    |
+| **Async work in handlers?**               | ✅ Promises work            | ❌ Coroutines don't work                                  |
+| **Why async works/fails?**                | Uses browser Promise queue | Uses Compose coroutine dispatcher (not running in tests) |
 
 ---
 
@@ -337,12 +337,12 @@ This is fundamentally different from "UI testing is impossible" - it's "UI testi
 
 ## Comparison to React Testing
 
-| Aspect | React | Compose for Web |
-|--------|-------|-----------------|
-| Events work in tests? | ✅ | ✅ |
-| Handlers execute? | ✅ | ✅ |
-| Async in handlers? | ✅ (Promises) | ⚠️ (Coroutines need special handling) |
-| Test complexity | Low | Medium (must understand coroutines) |
+| Aspect                | React        | Compose for Web                       |
+| --------------------- | ------------ | ------------------------------------- |
+| Events work in tests? | ✅            | ✅                                     |
+| Handlers execute?     | ✅            | ✅                                     |
+| Async in handlers?    | ✅ (Promises) | ⚠️ (Coroutines need special handling) |
+| Test complexity       | Low          | Medium (must understand coroutines)   |
 
 The gap is **much smaller** than initially believed. It's not "impossible to test" - it's "requires understanding Compose coroutines."
 

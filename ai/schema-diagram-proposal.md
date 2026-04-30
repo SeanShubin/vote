@@ -196,14 +196,14 @@ erDiagram
 
 ## Comparison to code-structure
 
-| Aspect | code-structure | schema-diagram |
-|--------|---------------|----------------|
-| **Input** | Compiled bytecode (.class files) | schema.sql (source file) |
-| **Analyzes** | Package dependencies | Table relationships (foreign keys) |
-| **Extraction** | ASM bytecode reader | SQL parser (regex or library) |
-| **Output** | Dependency graph (cycles detected) | ER diagram (relationships shown) |
-| **Build Integration** | Gradle task reads .class files | Gradle task reads schema.sql |
-| **Cannot Be Stale** | ✅ Reads actual compiled code | ✅ Reads actual schema file |
+| Aspect                | code-structure                     | schema-diagram                     |
+| --------------------- | ---------------------------------- | ---------------------------------- |
+| **Input**             | Compiled bytecode (.class files)   | schema.sql (source file)           |
+| **Analyzes**          | Package dependencies               | Table relationships (foreign keys) |
+| **Extraction**        | ASM bytecode reader                | SQL parser (regex or library)      |
+| **Output**            | Dependency graph (cycles detected) | ER diagram (relationships shown)   |
+| **Build Integration** | Gradle task reads .class files     | Gradle task reads schema.sql       |
+| **Cannot Be Stale**   | ✅ Reads actual compiled code       | ✅ Reads actual schema file         |
 
 ## Benefits
 

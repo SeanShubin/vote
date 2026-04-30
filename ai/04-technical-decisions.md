@@ -527,17 +527,17 @@ class ElectionViewModel(private val api: ApiClient) {
 
 ## Summary of Recommendations
 
-| Decision | Recommendation | Priority |
-|----------|---------------|----------|
-| Event Log | DynamoDB with Streams | High |
-| DynamoDB Design | Multi-Table | High |
-| Build System | Gradle (Kotlin DSL) | High |
-| Local Database | DynamoDB Local + Optional H2 | Medium |
-| AWS Compute | ECS Fargate | High |
-| Frontend State | StateFlow + ViewModels | Medium |
-| API Design | REST (preserve current) | High |
-| Dependency Injection | Manual Composition | High |
-| Token Storage | LocalStorage (MVP) → HttpOnly Cookies (future) | Low |
-| Deployment | AWS CDK (Kotlin) | High |
+| Decision             | Recommendation                                 | Priority |
+| -------------------- | ---------------------------------------------- | -------- |
+| Event Log            | DynamoDB with Streams                          | High     |
+| DynamoDB Design      | Multi-Table                                    | High     |
+| Build System         | Gradle (Kotlin DSL)                            | High     |
+| Local Database       | DynamoDB Local + Optional H2                   | Medium   |
+| AWS Compute          | ECS Fargate                                    | High     |
+| Frontend State       | StateFlow + ViewModels                         | Medium   |
+| API Design           | REST (preserve current)                        | High     |
+| Dependency Injection | Manual Composition                             | High     |
+| Token Storage        | LocalStorage (MVP) → HttpOnly Cookies (future) | Low      |
+| Deployment           | AWS CDK (Kotlin)                               | High     |
 
 All high-priority decisions should be confirmed before starting implementation.

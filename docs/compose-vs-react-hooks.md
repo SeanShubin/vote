@@ -507,14 +507,14 @@ function UserSearch() {
 
 **Side-by-Side Comparison:**
 
-| Aspect | Compose for Web | React Hooks |
-|--------|----------------|-------------|
-| **Lines of code** | ~35 lines | ~50 lines |
-| **Cleanup boilerplate** | None (automatic) | 2 manual cleanups required |
-| **Race condition handling** | Automatic | Manual `cancelled` flag |
-| **Dependency tracking** | Automatic via keys | Manual arrays `[searchQuery]`, `[debouncedQuery]` |
-| **Error handling** | try/catch (idiomatic) | Promise .then/.catch chains |
-| **State updates** | Direct mutation | Setter functions |
+| Aspect                      | Compose for Web       | React Hooks                                       |
+| --------------------------- | --------------------- | ------------------------------------------------- |
+| **Lines of code**           | ~35 lines             | ~50 lines                                         |
+| **Cleanup boilerplate**     | None (automatic)      | 2 manual cleanups required                        |
+| **Race condition handling** | Automatic             | Manual `cancelled` flag                           |
+| **Dependency tracking**     | Automatic via keys    | Manual arrays `[searchQuery]`, `[debouncedQuery]` |
+| **Error handling**          | try/catch (idiomatic) | Promise .then/.catch chains                       |
+| **State updates**           | Direct mutation       | Setter functions                                  |
 
 ---
 

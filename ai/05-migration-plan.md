@@ -457,15 +457,15 @@ This document outlines the step-by-step process to migrate from three separate p
 
 ## Timeline Summary
 
-| Phase | Duration | Milestone |
-|-------|----------|-----------|
-| Phase 1: Foundation | Weeks 1-2 | Shared code compiles |
-| Phase 2: Backend | Weeks 3-5 | Backend tests pass |
-| Phase 3: Frontend | Weeks 6-8 | Frontend feature-complete |
-| Phase 4: Local Dev | Week 9 | Single-command local startup |
-| Phase 5: Deployment | Weeks 10-11 | Deployed to AWS |
-| Phase 6: Testing | Week 12 | Regression test passes |
-| Phase 7: Docs | Week 13 | Project complete |
+| Phase               | Duration    | Milestone                    |
+| ------------------- | ----------- | ---------------------------- |
+| Phase 1: Foundation | Weeks 1-2   | Shared code compiles         |
+| Phase 2: Backend    | Weeks 3-5   | Backend tests pass           |
+| Phase 3: Frontend   | Weeks 6-8   | Frontend feature-complete    |
+| Phase 4: Local Dev  | Week 9      | Single-command local startup |
+| Phase 5: Deployment | Weeks 10-11 | Deployed to AWS              |
+| Phase 6: Testing    | Week 12     | Regression test passes       |
+| Phase 7: Docs       | Week 13     | Project complete             |
 
 **Total**: ~13 weeks (3 months)
 

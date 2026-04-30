@@ -365,13 +365,13 @@ fun `new endpoint returns expected status and structure`() {
 
 ## Coverage Summary
 
-| Test Type | Purpose | Integration Level | Coverage | Tests |
-|-----------|---------|-------------------|----------|-------|
-| **Business Logic** | Verify features exist and work | None (all fakes) | Complete | 20 |
-| **HTTP Boundary** | Verify API contract | HTTP + InMemory | Complete | 48 |
-| **Database** | Verify backend compatibility | Real databases | Happy path | 3 |
-| **Frontend** | Verify UI works | Browser + HTTP | Planned | 0 |
-| **Total** | | | | **71** |
+| Test Type          | Purpose                        | Integration Level | Coverage   | Tests  |
+| ------------------ | ------------------------------ | ----------------- | ---------- | ------ |
+| **Business Logic** | Verify features exist and work | None (all fakes)  | Complete   | 20     |
+| **HTTP Boundary**  | Verify API contract            | HTTP + InMemory   | Complete   | 48     |
+| **Database**       | Verify backend compatibility   | Real databases    | Happy path | 3      |
+| **Frontend**       | Verify UI works                | Browser + HTTP    | Planned    | 0      |
+| **Total**          |                                |                   |            | **71** |
 
 This strategy ensures:
 - ✅ Features work correctly (product managers can verify via business logic tests)

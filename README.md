@@ -278,13 +278,13 @@ Tests, admin tools, and debugging all work with this relational projection, maki
 
 ### Database Backend Comparison
 
-| Aspect | InMemory | MySQL | DynamoDB Single-Table |
-|--------|----------|-------|----------------------|
-| **Storage** | `Map<String, Entity>` in memory | Relational tables with FKs | 2 tables: `vote_data` + `vote_event_log` |
-| **Keys** | Natural keys (names) | Natural key PKs: `user(name)`, `election(name)` | Composite: `PK=ENTITY#id`, `SK=SUBENTITY#id` |
-| **Relationships** | In-memory references | Foreign keys | Partition key grouping |
-| **Queries** | HashMap lookups | SQL SELECT with JOINs | Query with `begins_with` on SK |
-| **Use Case** | Testing, no dependencies | Educational, relational comparison | Production, idiomatic NoSQL |
+| Aspect            | InMemory                        | MySQL                                           | DynamoDB Single-Table                        |
+| ----------------- | ------------------------------- | ----------------------------------------------- | -------------------------------------------- |
+| **Storage**       | `Map<String, Entity>` in memory | Relational tables with FKs                      | 2 tables: `vote_data` + `vote_event_log`     |
+| **Keys**          | Natural keys (names)            | Natural key PKs: `user(name)`, `election(name)` | Composite: `PK=ENTITY#id`, `SK=SUBENTITY#id` |
+| **Relationships** | In-memory references            | Foreign keys                                    | Partition key grouping                       |
+| **Queries**       | HashMap lookups                 | SQL SELECT with JOINs                           | Query with `begins_with` on SK               |
+| **Use Case**      | Testing, no dependencies        | Educational, relational comparison              | Production, idiomatic NoSQL                  |
 
 ## Data Flow: API Call → Database
 

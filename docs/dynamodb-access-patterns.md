@@ -165,18 +165,18 @@ These operations are for administrative/debugging purposes and don't need to be 
 
 Assuming 1000 users, 10 elections, average 50 votes per election:
 
-| Operation | Estimated Requests/Day | Priority |
-|-----------|----------------------|----------|
-| authenticate | 3000 (3/user/day) | CRITICAL |
-| getBallot | 500 (users checking) | CRITICAL |
-| listElections | 2000 (browsing) | HIGH |
-| listCandidates | 1500 (viewing details) | HIGH |
-| castBallot | 500 (once per user per election) | CRITICAL |
-| tally | 100 (calculated frequently) | HIGH |
-| listEligibility | 50 (admin) | MEDIUM |
-| register | 10 (new users) | HIGH (but low volume) |
-| setCandidates | 10 (election setup) | MEDIUM |
-| setEligibleVoters | 10 (election setup) | MEDIUM |
+| Operation         | Estimated Requests/Day           | Priority              |
+| ----------------- | -------------------------------- | --------------------- |
+| authenticate      | 3000 (3/user/day)                | CRITICAL              |
+| getBallot         | 500 (users checking)             | CRITICAL              |
+| listElections     | 2000 (browsing)                  | HIGH                  |
+| listCandidates    | 1500 (viewing details)           | HIGH                  |
+| castBallot        | 500 (once per user per election) | CRITICAL              |
+| tally             | 100 (calculated frequently)      | HIGH                  |
+| listEligibility   | 50 (admin)                       | MEDIUM                |
+| register          | 10 (new users)                   | HIGH (but low volume) |
+| setCandidates     | 10 (election setup)              | MEDIUM                |
+| setEligibleVoters | 10 (election setup)              | MEDIUM                |
 
 **Conclusion**: Design must optimize for:
 1. User lookups (by username and email)
