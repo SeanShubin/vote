@@ -1,10 +1,11 @@
 package com.seanshubin.vote.documentation
 
+import com.seanshubin.vote.backend.auth.JwtCipher
+import com.seanshubin.vote.backend.auth.TokenEncoder
 import com.seanshubin.vote.backend.dependencies.ApplicationDependencies
 import com.seanshubin.vote.backend.dependencies.DatabaseConfig
 import com.seanshubin.vote.contract.AccessToken
 import com.seanshubin.vote.integration.fake.TestIntegrations
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.net.URI
 import java.net.http.HttpClient
@@ -24,7 +25,9 @@ data class HttpExchange(
 class HttpRecorder(private val documentationRecorder: DocumentationRecorder? = null) {
     private val exchanges = mutableListOf<HttpExchange>()
     private val json = Json { ignoreUnknownKeys = true; prettyPrint = true }
-    private val compactJson = Json { ignoreUnknownKeys = true; prettyPrint = false }  // For headers
+    // Same dev secret used by ApplicationRunner — required for the in-process
+    // server to verify JWTs we mint here.
+    private val tokenEncoder = TokenEncoder(JwtCipher("dev-jwt-secret-DO-NOT-USE-IN-PROD"))
     private lateinit var runner: com.seanshubin.vote.backend.dependencies.ApplicationRunner
     private lateinit var httpClient: HttpClient
     private val port = 19876
@@ -72,7 +75,7 @@ class HttpRecorder(private val documentationRecorder: DocumentationRecorder? = n
         val request = HttpRequest.newBuilder()
             .uri(URI.create("$baseUrl$path"))
             .GET()
-            .apply { token?.let { header("Authorization", "Bearer ${compactJson.encodeToString(it)}") } }
+            .apply { token?.let { header("Authorization", "Bearer ${tokenEncoder.encodeAccessToken(it)}") } }
             .build()
         return sendAndRecord("GET", path, request)
     }
@@ -81,7 +84,7 @@ class HttpRecorder(private val documentationRecorder: DocumentationRecorder? = n
         val request = HttpRequest.newBuilder()
             .uri(URI.create("$baseUrl$path"))
             .header("Content-Type", "application/json")
-            .apply { token?.let { header("Authorization", "Bearer ${compactJson.encodeToString(it)}") } }
+            .apply { token?.let { header("Authorization", "Bearer ${tokenEncoder.encodeAccessToken(it)}") } }
             .POST(HttpRequest.BodyPublishers.ofString(body))
             .build()
         return sendAndRecord("POST", path, request, body)
@@ -91,7 +94,7 @@ class HttpRecorder(private val documentationRecorder: DocumentationRecorder? = n
         val request = HttpRequest.newBuilder()
             .uri(URI.create("$baseUrl$path"))
             .header("Content-Type", "application/json")
-            .header("Authorization", "Bearer ${compactJson.encodeToString(token)}")
+            .header("Authorization", "Bearer ${tokenEncoder.encodeAccessToken(token)}")
             .PUT(HttpRequest.BodyPublishers.ofString(body))
             .build()
         return sendAndRecord("PUT", path, request, body)
@@ -100,7 +103,7 @@ class HttpRecorder(private val documentationRecorder: DocumentationRecorder? = n
     fun delete(path: String, token: AccessToken): HttpResponse<String> {
         val request = HttpRequest.newBuilder()
             .uri(URI.create("$baseUrl$path"))
-            .header("Authorization", "Bearer ${compactJson.encodeToString(token)}")
+            .header("Authorization", "Bearer ${tokenEncoder.encodeAccessToken(token)}")
             .DELETE()
             .build()
         return sendAndRecord("DELETE", path, request)

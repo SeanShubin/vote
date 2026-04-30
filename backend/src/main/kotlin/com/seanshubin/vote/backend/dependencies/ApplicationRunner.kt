@@ -4,9 +4,9 @@ import aws.sdk.kotlin.services.dynamodb.DynamoDbClient
 import com.seanshubin.vote.backend.auth.CookieConfig
 import com.seanshubin.vote.backend.auth.JwtCipher
 import com.seanshubin.vote.backend.auth.TokenEncoder
-import com.seanshubin.vote.backend.http.RequestRouter
 import com.seanshubin.vote.backend.http.SetCookie
-import com.seanshubin.vote.backend.http.SimpleHttpHandler
+import com.seanshubin.vote.backend.router.RequestRouter
+import com.seanshubin.vote.backend.router.SimpleHttpHandler
 import com.seanshubin.vote.backend.service.ServiceImpl
 import com.seanshubin.vote.contract.Integrations
 import kotlinx.serialization.json.Json

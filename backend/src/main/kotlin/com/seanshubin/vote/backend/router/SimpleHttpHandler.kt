@@ -1,5 +1,6 @@
-package com.seanshubin.vote.backend.http
+package com.seanshubin.vote.backend.router
 
+import com.seanshubin.vote.backend.http.HttpRequest
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
 import org.eclipse.jetty.server.Request
@@ -7,8 +8,9 @@ import org.eclipse.jetty.server.handler.AbstractHandler
 
 /**
  * Jetty servlet adapter — translates between Jetty servlet types and the
- * runtime-agnostic [HttpRequest] / [HttpResponse] handled by [RequestRouter].
- * The Lambda handler is the parallel adapter for API Gateway events.
+ * runtime-agnostic [HttpRequest] / [com.seanshubin.vote.backend.http.HttpResponse]
+ * handled by [RequestRouter]. The Lambda handler is the parallel adapter for
+ * API Gateway events.
  */
 class SimpleHttpHandler(
     private val router: RequestRouter,

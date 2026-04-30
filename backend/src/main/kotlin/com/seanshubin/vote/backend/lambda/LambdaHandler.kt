@@ -12,7 +12,7 @@ import com.seanshubin.vote.backend.dependencies.ConnectionFactory
 import com.seanshubin.vote.backend.dependencies.DatabaseConfig
 import com.seanshubin.vote.backend.dependencies.RepositoryFactory
 import com.seanshubin.vote.backend.http.HttpRequest
-import com.seanshubin.vote.backend.http.RequestRouter
+import com.seanshubin.vote.backend.router.RequestRouter
 import com.seanshubin.vote.backend.http.SetCookie
 import com.seanshubin.vote.backend.integration.ProductionIntegrations
 import com.seanshubin.vote.backend.service.ServiceImpl

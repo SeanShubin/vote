@@ -25,7 +25,11 @@ class HttpRecordingBackend(
         val request = RegisterRequest(name, email, password)
         val body = json.encodeToString(request)
         val response = recorder.post("/register", body)
-        return json.decodeFromString<Tokens>(response.body()).accessToken
+        // Wire response is now AuthResponse (signed JWT + claims). The recorder
+        // mints its own JWTs from this AccessToken when calling protected endpoints,
+        // so we discard the JWT and rebuild the claims object here.
+        val auth = json.decodeFromString<AuthResponse>(response.body())
+        return AccessToken(auth.userName, auth.role)
     }
 
     override fun changePassword(token: AccessToken, userName: String, newPassword: String) {
@@ -200,22 +204,24 @@ class HttpRecordingBackend(
     }
 
     override fun refresh(refreshToken: RefreshToken): Tokens {
-        val body = json.encodeToString(refreshToken)
-        val response = recorder.post("/refresh", body)
-        return json.decodeFromString<Tokens>(response.body())
+        // Refresh tokens now ride in an HttpOnly cookie set by /register or /authenticate;
+        // there's no JSON body shape that carries one. Documentation scenarios don't
+        // exercise refresh, so this path is unimplemented here.
+        throw UnsupportedOperationException("refresh not supported in HttpRecordingBackend")
     }
 
     override fun authenticateWithToken(accessToken: AccessToken): Tokens {
-        val body = json.encodeToString(accessToken)
-        val response = recorder.post("/authenticate-with-token", body)
-        return json.decodeFromString<Tokens>(response.body())
+        throw UnsupportedOperationException("authenticateWithToken not supported in HttpRecordingBackend")
     }
 
     override fun authenticate(nameOrEmail: String, password: String): Tokens {
         val request = AuthenticateRequest(nameOrEmail, password)
         val body = json.encodeToString(request)
         val response = recorder.post("/authenticate", body)
-        return json.decodeFromString<Tokens>(response.body())
+        // Wire is AuthResponse (no refresh token in body — it's set via Set-Cookie).
+        // The recorder doesn't follow cookies, so we surface a stub RefreshToken.
+        val auth = json.decodeFromString<AuthResponse>(response.body())
+        return Tokens(AccessToken(auth.userName, auth.role), RefreshToken(auth.userName))
     }
 
     override fun updateElection(token: AccessToken, electionName: String, updates: ElectionUpdates) {
