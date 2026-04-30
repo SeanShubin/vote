@@ -100,6 +100,13 @@ Resources:
                   - secretsmanager:TagResource
                   - secretsmanager:RestoreSecret
                 Resource: !Sub "arn:aws:secretsmanager:*:${AWS::AccountId}:secret:pairwisevote-*"
+              # GetRandomPassword has no resource-level scoping — AWS requires "*".
+              # CloudFormation calls this action when materializing GenerateSecretString
+              # (here: when creating JwtSecret with an auto-generated password).
+              - Effect: Allow
+                Action:
+                  - secretsmanager:GetRandomPassword
+                Resource: "*"
 
   # S3 bucket where CI uploads packaged Lambda artifacts. CFN's `package`
   # command rewrites local CodeUri references to s3://... pointers in this bucket.
