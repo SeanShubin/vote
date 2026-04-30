@@ -68,11 +68,11 @@ Resources:
         - arn:aws:iam::aws:policy/AmazonAPIGatewayAdministrator
         - arn:aws:iam::aws:policy/IAMFullAccess
         - arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess
-        - arn:aws:iam::aws:policy/CloudWatchLogsFullAccess
-        # CloudWatchFullAccess covers metric filters + alarms (separate API surface
-        # from logs). AmazonSNSFullAccess for the alert topic + email subscription.
+        # CloudWatchFullAccess (the legacy v1) is the broadest single policy
+        # we need: cloudwatch:* (metrics+alarms), logs:*, sns:* — one policy
+        # covers what would otherwise be three. We're at the 10-managed-
+        # policies-per-role IAM quota; consolidating here keeps headroom.
         - arn:aws:iam::aws:policy/CloudWatchFullAccess
-        - arn:aws:iam::aws:policy/AmazonSNSFullAccess
       Policies:
         - PolicyName: PassRoleSelf
           PolicyDocument:
