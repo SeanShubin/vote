@@ -106,12 +106,19 @@ Resources:
             # AWS-managed AllViewerExceptHostHeader — forwards cookies, auth,
             # query strings; lets API Gateway use its own Host header.
             OriginRequestPolicyId: b689b0a8-53d0-40ab-baf2-68738e2966ac
-        # SPA fallback: serve index.html for missing paths so client-side routing works.
+        # SPA fallback for client-side routing (bookmarks, deep links, refresh
+        # on /elections/Foo): when the user hits a path that isn't an actual
+        # asset in S3, S3 returns 403 (the OAC bucket policy grants only
+        # s3:GetObject — no ListBucket — so missing objects look like access
+        # denials). We rewrite that to /index.html with 200 so the SPA can
+        # parse the path itself.
+        #
+        # Note: CustomErrorResponses are distribution-level, so we deliberately
+        # do NOT include a 404 rule here. API Gateway legitimately returns 404
+        # for not-found resources (e.g. GET /api/election/Bogus), and rewriting
+        # those to index.html would break the JSON contract on the wire.
         CustomErrorResponses:
           - ErrorCode: 403
-            ResponseCode: 200
-            ResponsePagePath: /index.html
-          - ErrorCode: 404
             ResponseCode: 200
             ResponsePagePath: /index.html
 
