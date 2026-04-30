@@ -69,6 +69,10 @@ Resources:
         - arn:aws:iam::aws:policy/IAMFullAccess
         - arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess
         - arn:aws:iam::aws:policy/CloudWatchLogsFullAccess
+        # CloudWatchFullAccess covers metric filters + alarms (separate API surface
+        # from logs). AmazonSNSFullAccess for the alert topic + email subscription.
+        - arn:aws:iam::aws:policy/CloudWatchFullAccess
+        - arn:aws:iam::aws:policy/AmazonSNSFullAccess
       Policies:
         - PolicyName: PassRoleSelf
           PolicyDocument:
