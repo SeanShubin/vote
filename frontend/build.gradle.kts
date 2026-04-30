@@ -89,14 +89,16 @@ val addCacheBusting by tasks.registering {
     doLast {
         val buildTimestamp = System.currentTimeMillis()
         val html = htmlSource.readText()
+        // Absolute paths (leading slash) are required so deep-URL refreshes
+        // resolve assets against the SPA root, not the deep path's parent.
         val modifiedHtml = html
             .replace(
-                """<script src="frontend.js"></script>""",
-                """<script src="frontend.js?v=$buildTimestamp"></script>"""
+                """<script src="/frontend.js"></script>""",
+                """<script src="/frontend.js?v=$buildTimestamp"></script>"""
             )
             .replace(
-                """<link rel="stylesheet" href="styles.css">""",
-                """<link rel="stylesheet" href="styles.css?v=$buildTimestamp">"""
+                """<link rel="stylesheet" href="/styles.css">""",
+                """<link rel="stylesheet" href="/styles.css?v=$buildTimestamp">"""
             )
         htmlDest.writeText(modifiedHtml)
         println("✓ Cache busting added: frontend.js?v=$buildTimestamp + styles.css?v=$buildTimestamp")

@@ -4,10 +4,16 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Vote - Condorcet Voting System</title>
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
     <div id="root"></div>
-    <script src="frontend.js"></script>
+    <!--
+      Absolute (leading-slash) paths are required for SPA routing to work
+      on deep URLs. With a relative `frontend.js`, the browser at
+      /admin/raw-tables would resolve it to /admin/frontend.js, miss in S3,
+      hit the 403→/index.html SPA fallback, and try to execute HTML as JS.
+    -->
+    <script src="/frontend.js"></script>
 </body>
 </html>
