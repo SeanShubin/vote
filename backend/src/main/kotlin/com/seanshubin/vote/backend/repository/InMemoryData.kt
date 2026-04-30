@@ -66,7 +66,7 @@ class InMemoryData {
             whenCast = whenCast
         )
 
-        fun toRevealedBallot() = RevealedBallot(
+        fun toRevealedBallot() = Ballot.Revealed(
             voterName = voterName,
             electionName = electionName,
             rankings = rankings,

@@ -3,8 +3,8 @@ package com.seanshubin.vote.domain
 import com.seanshubin.vote.domain.Preference.Companion.places
 import com.seanshubin.vote.domain.Preference.Companion.strongestPaths
 import com.seanshubin.vote.domain.Ranking.Companion.prefers
-import com.seanshubin.vote.domain.RevealedBallot.Companion.effectiveRankings
-import com.seanshubin.vote.domain.RevealedBallot.Companion.matchRankingsOrderToCandidates
+import com.seanshubin.vote.domain.Ballot.Revealed.Companion.effectiveRankings
+import com.seanshubin.vote.domain.Ballot.Revealed.Companion.matchRankingsOrderToCandidates
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -23,7 +23,7 @@ data class Tally(
             electionName: String,
             secretBallot: Boolean,
             candidates: List<String>,
-            ballots: List<RevealedBallot>
+            ballots: List<Ballot.Revealed>
         ): Tally {
             val initialTally = BallotCounter(electionName, secretBallot, candidates, ballots).countBallots()
             val candidatesSortedByPlaceThenAlpha = initialTally.places.map { it.candidateName }
@@ -46,7 +46,7 @@ data class Tally(
             val electionName: String,
             val secretBallot: Boolean,
             val candidates: List<String>,
-            val rawBallots: List<RevealedBallot>
+            val rawBallots: List<Ballot.Revealed>
         ) {
             fun countBallots(): Tally {
                 val emptyPreferences = createEmptyPreferences()

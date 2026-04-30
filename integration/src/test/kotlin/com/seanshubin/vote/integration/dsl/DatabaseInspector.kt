@@ -48,7 +48,7 @@ class DatabaseInspector(private val queryModel: QueryModel) {
     fun listEligibleVoters(electionName: String): List<String> =
         queryModel.listVotersForElection(electionName)
 
-    fun listBallots(electionName: String): List<RevealedBallot> =
+    fun listBallots(electionName: String): List<Ballot.Revealed> =
         queryModel.listBallots(electionName)
 
     fun listRankings(voterName: String, electionName: String): List<Ranking> =
