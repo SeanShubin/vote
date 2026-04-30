@@ -150,17 +150,25 @@ class DynamoToRelational(
     }
 
     private fun projectEventLog(): TableData {
-        val columns = listOf("event_id", "authority (-> users.name)", "event_type", "event_data", "created_at")
-        // eventsToSync(0) returns every event since the beginning of time.
-        val rows = eventLog.eventsToSync(0).map { envelope ->
-            listOf<String?>(
-                envelope.eventId.toString(),
-                envelope.authority,
-                envelope.event::class.simpleName,
-                envelope.event.toString(),
-                envelope.whenHappened.toString(),
-            )
-        }
+        val columns = listOf("event_id", "created_at", "authority (-> users.name)", "event_type", "event_data")
+        // eventsToSync(0) returns every event since the beginning of time. The
+        // EventLog interface doesn't promise ordering, so sort explicitly here.
+        // event_id is the canonical strict order (atomic counter, no ties), so
+        // sorting by it gives true chronological order even when two events
+        // share the same wall-clock millisecond. Descending so the most recent
+        // events sit at the top — that's what an admin investigating an issue
+        // typically wants to see first.
+        val rows = eventLog.eventsToSync(0)
+            .sortedByDescending { it.eventId }
+            .map { envelope ->
+                listOf<String?>(
+                    envelope.eventId.toString(),
+                    envelope.whenHappened.toString(),
+                    envelope.authority,
+                    envelope.event::class.simpleName,
+                    envelope.event.toString(),
+                )
+            }
         return TableData(EVENT_LOG, columns, rows)
     }
 

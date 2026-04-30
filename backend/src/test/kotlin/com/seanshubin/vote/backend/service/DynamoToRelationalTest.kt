@@ -142,30 +142,37 @@ class DynamoToRelationalTest {
     }
 
     @Test
-    fun `event_log projection emits one row per event with simple event_type name`() {
+    fun `event_log projection sorts most-recent-first and uses simple event_type names`() {
+        // Feed events in shuffled order to verify the projection sorts by event_id.
         val events = listOf(
-            EventEnvelope(
-                eventId = 1L,
-                whenHappened = Instant.fromEpochMilliseconds(100),
-                authority = "alice",
-                event = DomainEvent.UserRegistered("alice", "a@x.com", "s", "h", Role.OWNER),
-            ),
             EventEnvelope(
                 eventId = 2L,
                 whenHappened = Instant.fromEpochMilliseconds(200),
                 authority = "alice",
                 event = DomainEvent.ElectionCreated("alice", "E1"),
             ),
+            EventEnvelope(
+                eventId = 1L,
+                whenHappened = Instant.fromEpochMilliseconds(100),
+                authority = "alice",
+                event = DomainEvent.UserRegistered("alice", "a@x.com", "s", "h", Role.OWNER),
+            ),
         )
         val sut = DynamoToRelational(stubQueryModel(), stubEventLog(events))
 
         val data = sut.project(DynamoToRelational.EVENT_LOG)
 
+        // Columns: event_id | created_at | authority | event_type | event_data
+        assertEquals(
+            listOf("event_id", "created_at", "authority (-> users.name)", "event_type", "event_data"),
+            data.columnNames,
+        )
         assertEquals(2, data.rows.size)
-        assertEquals("1", data.rows[0][0])
-        assertEquals("alice", data.rows[0][1])
-        assertEquals("UserRegistered", data.rows[0][2])
-        assertEquals("ElectionCreated", data.rows[1][2])
+        // Descending by event_id — newest first.
+        assertEquals("2", data.rows[0][0])
+        assertEquals("ElectionCreated", data.rows[0][3])
+        assertEquals("1", data.rows[1][0])
+        assertEquals("UserRegistered", data.rows[1][3])
     }
 
     @Test
