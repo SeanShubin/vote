@@ -1,8 +1,12 @@
 package com.seanshubin.vote.integration
 
+import com.seanshubin.vote.backend.auth.JwtCipher
+import com.seanshubin.vote.backend.auth.TokenEncoder
 import com.seanshubin.vote.backend.dependencies.ApplicationDependencies
 import com.seanshubin.vote.backend.dependencies.DatabaseConfig
 import com.seanshubin.vote.contract.AccessToken
+import com.seanshubin.vote.contract.AuthResponse
+import com.seanshubin.vote.contract.RefreshToken
 import com.seanshubin.vote.contract.Tokens
 import com.seanshubin.vote.domain.Role
 import com.seanshubin.vote.integration.fake.TestIntegrations
@@ -30,6 +34,12 @@ class HttpApiTester(private val port: Int = 9876) : AutoCloseable {
     private val httpClient: HttpClient
     private val json = Json { ignoreUnknownKeys = true }
     private val baseUrl = "http://localhost:$port"
+
+    // Sign tokens with the same secret the embedded server uses (the dev fallback
+    // in ApplicationRunner). Tests pass AccessToken values around as session
+    // handles; these get JWT-signed before going on the wire.
+    private val tokenEncoder = TokenEncoder(JwtCipher("dev-jwt-secret-DO-NOT-USE-IN-PROD"))
+    fun bearerJwt(token: AccessToken): String = tokenEncoder.encodeAccessToken(token)
 
     init {
         val integrations = TestIntegrations()
@@ -70,7 +80,7 @@ class HttpApiTester(private val port: Int = 9876) : AutoCloseable {
         val request = HttpRequest.newBuilder()
             .uri(URI.create("$baseUrl$path"))
             .GET()
-            .apply { token?.let { header("Authorization", "Bearer ${json.encodeToString(it)}") } }
+            .apply { token?.let { header("Authorization", "Bearer ${bearerJwt(it)}") } }
             .build()
         return httpClient.send(request, HttpResponse.BodyHandlers.ofString())
     }
@@ -79,7 +89,7 @@ class HttpApiTester(private val port: Int = 9876) : AutoCloseable {
         val request = HttpRequest.newBuilder()
             .uri(URI.create("$baseUrl$path"))
             .header("Content-Type", "application/json")
-            .apply { token?.let { header("Authorization", "Bearer ${json.encodeToString(it)}") } }
+            .apply { token?.let { header("Authorization", "Bearer ${bearerJwt(it)}") } }
             .POST(HttpRequest.BodyPublishers.ofString(body))
             .build()
         return httpClient.send(request, HttpResponse.BodyHandlers.ofString())
@@ -89,7 +99,7 @@ class HttpApiTester(private val port: Int = 9876) : AutoCloseable {
         val request = HttpRequest.newBuilder()
             .uri(URI.create("$baseUrl$path"))
             .header("Content-Type", "application/json")
-            .header("Authorization", "Bearer ${json.encodeToString(token)}")
+            .header("Authorization", "Bearer ${bearerJwt(token)}")
             .PUT(HttpRequest.BodyPublishers.ofString(body))
             .build()
         return httpClient.send(request, HttpResponse.BodyHandlers.ofString())
@@ -98,7 +108,7 @@ class HttpApiTester(private val port: Int = 9876) : AutoCloseable {
     private fun delete(path: String, token: AccessToken): HttpResponse<String> {
         val request = HttpRequest.newBuilder()
             .uri(URI.create("$baseUrl$path"))
-            .header("Authorization", "Bearer ${json.encodeToString(token)}")
+            .header("Authorization", "Bearer ${bearerJwt(token)}")
             .DELETE()
             .build()
         return httpClient.send(request, HttpResponse.BodyHandlers.ofString())
@@ -118,7 +128,16 @@ class HttpApiTester(private val port: Int = 9876) : AutoCloseable {
     fun registerUserExpectSuccess(userName: String, email: String = "$userName@example.com", password: String = "password"): Tokens {
         val response = registerUser(userName, email, password)
         assertEquals(200, response.statusCode())
-        return json.decodeFromString<Tokens>(response.body())
+        return parseAuthResponse(response.body())
+    }
+
+    /** Convert the new wire-level AuthResponse back into the legacy Tokens shape tests expect. */
+    private fun parseAuthResponse(body: String): Tokens {
+        val auth = json.decodeFromString<AuthResponse>(body)
+        return Tokens(
+            accessToken = AccessToken(auth.userName, auth.role),
+            refreshToken = RefreshToken(auth.userName),
+        )
     }
 
     fun authenticateUser(nameOrEmail: String, password: String): HttpResponse<String> {
@@ -219,9 +238,19 @@ class HttpApiTester(private val port: Int = 9876) : AutoCloseable {
         get("/election/$electionName/tally", token)
 
     // Token Management
-    fun refreshToken(refreshToken: com.seanshubin.vote.contract.RefreshToken): HttpResponse<String> {
-        val body = json.encodeToString(refreshToken)
-        return post("/refresh", body)
+    /**
+     * POST /refresh with the refresh token in a Cookie header (no body).
+     * Tests use this to verify the cookie-based refresh path; the JWT is
+     * signed locally with the same secret the embedded server uses.
+     */
+    fun refreshUsingCookie(userName: String): HttpResponse<String> {
+        val refreshJwt = tokenEncoder.encodeRefreshToken(RefreshToken(userName))
+        val request = HttpRequest.newBuilder()
+            .uri(URI.create("$baseUrl/refresh"))
+            .header("Cookie", "Refresh=$refreshJwt")
+            .POST(HttpRequest.BodyPublishers.ofString(""))
+            .build()
+        return httpClient.send(request, HttpResponse.BodyHandlers.ofString())
     }
 
     // System Operations
@@ -292,9 +321,9 @@ class HttpApiTest {
         val response = tester.registerUser("alice", "alice@example.com", "pass")
 
         assertEquals(200, response.statusCode())
-        val tokens = tester.decodeJson(response, Tokens.serializer())
-        assertNotNull(tokens.accessToken)
-        assertEquals("alice", tokens.accessToken.userName)
+        val auth = tester.decodeJson(response, AuthResponse.serializer())
+        assertNotNull(auth.accessToken)
+        assertEquals("alice", auth.userName)
     }
 
     @Test
@@ -313,8 +342,8 @@ class HttpApiTest {
         val response = tester.authenticateUser("alice", "secret123")
 
         assertEquals(200, response.statusCode())
-        val tokens = tester.decodeJson(response, Tokens.serializer())
-        assertEquals("alice", tokens.accessToken.userName)
+        val auth = tester.decodeJson(response, AuthResponse.serializer())
+        assertEquals("alice", auth.userName)
     }
 
     @Test
@@ -626,7 +655,7 @@ class HttpApiTest {
         val json = Json { ignoreUnknownKeys = true }
         val request = HttpRequest.newBuilder()
             .uri(URI.create("http://localhost:9876$invalidPath"))
-            .header("Authorization", "Bearer ${json.encodeToString(tokens.accessToken)}")
+            .header("Authorization", "Bearer ${tester.bearerJwt(tokens.accessToken)}")
             .GET()
             .build()
         val response = HttpClient.newBuilder().build().send(request, HttpResponse.BodyHandlers.ofString())
@@ -657,13 +686,13 @@ class HttpApiTest {
 
     @Test
     fun `refresh token returns new tokens`() {
-        val tokens = tester.registerUserExpectSuccess("alice")
+        tester.registerUserExpectSuccess("alice")
 
-        val response = tester.refreshToken(tokens.refreshToken)
+        val response = tester.refreshUsingCookie("alice")
 
         assertEquals(200, response.statusCode())
-        val newTokens = tester.decodeJson(response, Tokens.serializer())
-        assertEquals("alice", newTokens.accessToken.userName)
+        val auth = tester.decodeJson(response, AuthResponse.serializer())
+        assertEquals("alice", auth.userName)
     }
 
     @Test

@@ -1,8 +1,6 @@
 package com.seanshubin.vote.frontend
 
-import com.seanshubin.vote.contract.AccessToken
-import com.seanshubin.vote.contract.RefreshToken
-import com.seanshubin.vote.contract.Tokens
+import com.seanshubin.vote.contract.AuthResponse
 import com.seanshubin.vote.domain.*
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -13,19 +11,16 @@ class FakeApiClientTest {
     @Test
     fun registerCapturesCallAndReturnsConfiguredResult() = runTest {
         val fakeClient = FakeApiClient()
-        val expectedTokens = Tokens(
-            AccessToken("alice", Role.USER),
-            RefreshToken("alice")
-        )
-        fakeClient.registerResult = Result.success(expectedTokens)
+        val expectedAuth = AuthResponse("token-alice", "alice", Role.USER)
+        fakeClient.registerResult = Result.success(expectedAuth)
 
-        val tokens = fakeClient.register("alice", "alice@example.com", "password123")
+        val auth = fakeClient.register("alice", "alice@example.com", "password123")
 
         assertEquals(1, fakeClient.registerCalls.size)
         assertEquals("alice", fakeClient.registerCalls[0].userName)
         assertEquals("alice@example.com", fakeClient.registerCalls[0].email)
         assertEquals("password123", fakeClient.registerCalls[0].password)
-        assertEquals(expectedTokens, tokens)
+        assertEquals(expectedAuth, auth)
     }
 
     @Test
@@ -44,18 +39,15 @@ class FakeApiClientTest {
     @Test
     fun authenticateCapturesCallAndReturnsConfiguredResult() = runTest {
         val fakeClient = FakeApiClient()
-        val expectedTokens = Tokens(
-            AccessToken("alice", Role.USER),
-            RefreshToken("alice")
-        )
-        fakeClient.authenticateResult = Result.success(expectedTokens)
+        val expectedAuth = AuthResponse("token-alice", "alice", Role.USER)
+        fakeClient.authenticateResult = Result.success(expectedAuth)
 
-        val tokens = fakeClient.authenticate("alice", "password123")
+        val auth = fakeClient.authenticate("alice", "password123")
 
         assertEquals(1, fakeClient.authenticateCalls.size)
         assertEquals("alice", fakeClient.authenticateCalls[0].userName)
         assertEquals("password123", fakeClient.authenticateCalls[0].password)
-        assertEquals(expectedTokens, tokens)
+        assertEquals(expectedAuth, auth)
     }
 
     @Test
@@ -217,7 +209,7 @@ class FakeApiClientTest {
     fun multipleCallsAccumulateInHistory() = runTest {
         val fakeClient = FakeApiClient()
         fakeClient.authenticateResult = Result.success(
-            Tokens(AccessToken("alice", Role.USER), RefreshToken("alice"))
+            AuthResponse("token-alice", "alice", Role.USER)
         )
 
         fakeClient.authenticate("alice", "pass1")

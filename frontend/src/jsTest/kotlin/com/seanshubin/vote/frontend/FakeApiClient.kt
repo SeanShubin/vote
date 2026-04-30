@@ -1,7 +1,7 @@
 package com.seanshubin.vote.frontend
 
 import com.seanshubin.vote.contract.ApiClient
-import com.seanshubin.vote.contract.Tokens
+import com.seanshubin.vote.contract.AuthResponse
 import com.seanshubin.vote.domain.ElectionSummary
 import com.seanshubin.vote.domain.Ranking
 import com.seanshubin.vote.domain.Tally
@@ -20,8 +20,11 @@ class FakeApiClient : ApiClient {
     val getTallyCalls = mutableListOf<GetTallyCall>()
     val loggedErrors = mutableListOf<Throwable>()
 
-    var registerResult: Result<Tokens> = Result.failure(Exception("Register not configured"))
-    var authenticateResult: Result<Tokens> = Result.failure(Exception("Authenticate not configured"))
+    var registerResult: Result<AuthResponse> = Result.failure(Exception("Register not configured"))
+    var authenticateResult: Result<AuthResponse> = Result.failure(Exception("Authenticate not configured"))
+    var refreshResult: Result<AuthResponse?> = Result.success(null)
+    val refreshCalls = mutableListOf<Unit>()
+    val logoutCalls = mutableListOf<Unit>()
     var listElectionsResult: Result<List<ElectionSummary>> = Result.success(emptyList())
     var createElectionResult: Result<String> = Result.success("")
     var getElectionResult: Result<ElectionSummary> = Result.failure(Exception("Get election not configured"))
@@ -32,14 +35,23 @@ class FakeApiClient : ApiClient {
     var castBallotResult: Result<String> = Result.success("ballot-confirmation-123")
     var getTallyResult: Result<Tally> = Result.failure(Exception("Get tally not configured"))
 
-    override suspend fun register(userName: String, email: String, password: String): Tokens {
+    override suspend fun register(userName: String, email: String, password: String): AuthResponse {
         registerCalls.add(RegisterCall(userName, email, password))
         return registerResult.getOrThrow()
     }
 
-    override suspend fun authenticate(userName: String, password: String): Tokens {
+    override suspend fun authenticate(userName: String, password: String): AuthResponse {
         authenticateCalls.add(AuthenticateCall(userName, password))
         return authenticateResult.getOrThrow()
+    }
+
+    override suspend fun refresh(): AuthResponse? {
+        refreshCalls.add(Unit)
+        return refreshResult.getOrThrow()
+    }
+
+    override suspend fun logout() {
+        logoutCalls.add(Unit)
     }
 
     override suspend fun listElections(authToken: String): List<ElectionSummary> {

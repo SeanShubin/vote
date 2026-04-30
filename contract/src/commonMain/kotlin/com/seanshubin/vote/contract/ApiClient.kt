@@ -5,8 +5,19 @@ import com.seanshubin.vote.domain.Ranking
 import com.seanshubin.vote.domain.Tally
 
 interface ApiClient {
-    suspend fun register(userName: String, email: String, password: String): Tokens
-    suspend fun authenticate(userName: String, password: String): Tokens
+    suspend fun register(userName: String, email: String, password: String): AuthResponse
+    suspend fun authenticate(userName: String, password: String): AuthResponse
+
+    /**
+     * Trade the refresh-token cookie (set by a prior register/authenticate)
+     * for fresh tokens. Returns null if the browser has no valid cookie —
+     * the caller should show the login screen in that case.
+     */
+    suspend fun refresh(): AuthResponse?
+
+    /** Clear the refresh cookie server-side. Idempotent. */
+    suspend fun logout()
+
     suspend fun listElections(authToken: String): List<ElectionSummary>
     suspend fun createElection(authToken: String, electionName: String): String
     suspend fun getElection(authToken: String, electionName: String): ElectionSummary

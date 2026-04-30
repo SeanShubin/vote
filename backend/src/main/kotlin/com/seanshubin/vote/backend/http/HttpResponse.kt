@@ -9,4 +9,5 @@ data class HttpResponse(
     val status: Int,
     val body: String,
     val contentType: String = "application/json",
+    val setCookies: List<SetCookie> = emptyList(),
 )

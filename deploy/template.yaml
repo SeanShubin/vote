@@ -25,23 +25,21 @@ Resources:
         IgnorePublicAcls: true
         RestrictPublicBuckets: true
 
-  # Single ACM cert covering the apex, www, and the api subdomain. Used by
-  # both CloudFront (frontend) and API Gateway custom domain (backend) — same
-  # us-east-1 region, so one cert serves both.
+  # ACM cert covering the apex and www. CloudFront proxies /api/... to API
+  # Gateway, so the SPA + API live on the same origin and the api subdomain
+  # is not used (CloudFront talks to API Gateway via its built-in
+  # *.execute-api.amazonaws.com hostname, which doesn't need our cert).
   FrontendCertificate:
     Type: AWS::CertificateManager::Certificate
     Properties:
       DomainName: !Ref DomainName
       SubjectAlternativeNames:
         - !Sub "www.${DomainName}"
-        - !Sub "api.${DomainName}"
       ValidationMethod: DNS
       DomainValidationOptions:
         - DomainName: !Ref DomainName
           HostedZoneId: !Ref HostedZoneId
         - DomainName: !Sub "www.${DomainName}"
-          HostedZoneId: !Ref HostedZoneId
-        - DomainName: !Sub "api.${DomainName}"
           HostedZoneId: !Ref HostedZoneId
 
   FrontendOriginAccessControl:
@@ -55,6 +53,7 @@ Resources:
 
   FrontendDistribution:
     Type: AWS::CloudFront::Distribution
+    DependsOn: BackendApi
     Properties:
       DistributionConfig:
         Aliases:
@@ -75,6 +74,14 @@ Resources:
             S3OriginConfig:
               OriginAccessIdentity: ""
             OriginAccessControlId: !GetAtt FrontendOriginAccessControl.Id
+          # API Gateway origin reached via the auto-generated execute-api hostname.
+          # CloudFront's AllViewerExceptHostHeader policy ensures API Gateway gets
+          # its own Host header (not pairwisevote.com), which it requires.
+          - Id: ApiOrigin
+            DomainName: !Sub "${BackendApi}.execute-api.${AWS::Region}.amazonaws.com"
+            CustomOriginConfig:
+              OriginProtocolPolicy: https-only
+              OriginSSLProtocols: [TLSv1.2]
         DefaultCacheBehavior:
           TargetOriginId: S3Origin
           ViewerProtocolPolicy: redirect-to-https
@@ -83,6 +90,22 @@ Resources:
           Compress: true
           # AWS-managed CachingOptimized policy
           CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
+        CacheBehaviors:
+          # /api requests proxy to API Gateway with no caching, full cookie/auth
+          # forwarding. Browser sees a single origin (pairwisevote.com), so
+          # cookies + Authorization headers travel as same-origin — no CORS,
+          # no cross-site cookie issues.
+          - PathPattern: /api/*
+            TargetOriginId: ApiOrigin
+            ViewerProtocolPolicy: redirect-to-https
+            AllowedMethods: [GET, HEAD, OPTIONS, PUT, POST, PATCH, DELETE]
+            CachedMethods: [GET, HEAD]
+            Compress: true
+            # AWS-managed CachingDisabled
+            CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad
+            # AWS-managed AllViewerExceptHostHeader — forwards cookies, auth,
+            # query strings; lets API Gateway use its own Host header.
+            OriginRequestPolicyId: b689b0a8-53d0-40ab-baf2-68738e2966ac
         # SPA fallback: serve index.html for missing paths so client-side routing works.
         CustomErrorResponses:
           - ErrorCode: 403
@@ -150,8 +173,22 @@ Resources:
         HostedZoneId: Z2FDTNDATAQYW2
 
   # ============================================================
-  # Backend: DynamoDB + Lambda + HTTP API + api.pairwisevote.com
+  # Backend: DynamoDB + Lambda + HTTP API
   # ============================================================
+  # The SPA reaches the API at https://pairwisevote.com/api/... via the
+  # CloudFront /api/* behavior above. No api.pairwisevote.com subdomain.
+
+  # JWT signing secret — generated once at stack creation, never visible in
+  # CFN parameters or console. Lambda receives it via env-var dynamic reference
+  # at deploy time; no runtime SecretsManager IAM permission needed.
+  JwtSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub "${AWS::StackName}-jwt-secret"
+      Description: HMAC256 secret for access + refresh JWTs
+      GenerateSecretString:
+        ExcludePunctuation: true
+        PasswordLength: 64
 
   # Hard-coded table names (vote_data, vote_event_log) match the constants
   # in DynamoDbSingleTableSchema.kt — keeps the code simple, locks the stack
@@ -249,6 +286,11 @@ Resources:
         LogFormat: JSON
         ApplicationLogLevel: INFO
         SystemLogLevel: WARN
+      Environment:
+        Variables:
+          # Resolved at deploy time — value is baked into the Lambda config
+          # but never appears in CFN parameters or template output.
+          JWT_SECRET: !Sub "{{resolve:secretsmanager:${JwtSecret}:SecretString}}"
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref MainTable
@@ -267,42 +309,6 @@ Resources:
             ApiId: !Ref BackendApi
             Method: ANY
             Path: /
-
-  ApiDomain:
-    Type: AWS::ApiGatewayV2::DomainName
-    Properties:
-      DomainName: !Sub "api.${DomainName}"
-      DomainNameConfigurations:
-        - CertificateArn: !Ref FrontendCertificate
-          EndpointType: REGIONAL
-          SecurityPolicy: TLS_1_2
-
-  ApiMapping:
-    Type: AWS::ApiGatewayV2::ApiMapping
-    Properties:
-      DomainName: !Ref ApiDomain
-      ApiId: !Ref BackendApi
-      Stage: !Ref BackendApi.Stage
-
-  ApiARecord:
-    Type: AWS::Route53::RecordSet
-    Properties:
-      HostedZoneId: !Ref HostedZoneId
-      Name: !Sub "api.${DomainName}"
-      Type: A
-      AliasTarget:
-        DNSName: !GetAtt ApiDomain.RegionalDomainName
-        HostedZoneId: !GetAtt ApiDomain.RegionalHostedZoneId
-
-  ApiAaaaRecord:
-    Type: AWS::Route53::RecordSet
-    Properties:
-      HostedZoneId: !Ref HostedZoneId
-      Name: !Sub "api.${DomainName}"
-      Type: AAAA
-      AliasTarget:
-        DNSName: !GetAtt ApiDomain.RegionalDomainName
-        HostedZoneId: !GetAtt ApiDomain.RegionalHostedZoneId
 
   # ============================================================
   # Alerts: SNS topic, email subscription, two alarms
@@ -388,5 +394,5 @@ Outputs:
       Name: !Sub "${AWS::StackName}-DistributionDomainName"
   BackendApiEndpoint:
     Value: !Sub "https://${BackendApi}.execute-api.${AWS::Region}.amazonaws.com"
-  BackendCustomDomain:
-    Value: !Sub "https://api.${DomainName}"
+  BackendThroughCloudFront:
+    Value: !Sub "https://${DomainName}/api"

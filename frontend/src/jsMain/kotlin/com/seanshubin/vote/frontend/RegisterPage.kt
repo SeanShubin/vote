@@ -5,8 +5,6 @@ import com.seanshubin.vote.contract.ApiClient
 import com.seanshubin.vote.domain.Role
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
 import org.jetbrains.compose.web.attributes.*
 import org.jetbrains.compose.web.dom.*
 
@@ -29,11 +27,8 @@ fun RegisterPage(
             errorMessage = null
             coroutineScope.launch {
                 try {
-                    val tokens = apiClient.register(userName, email, password)
-                    // Use the real access token. New users default to USER, but the very
-                    // first user becomes OWNER — this captures whatever the server actually assigned.
-                    val tokenJson = Json.encodeToString(tokens.accessToken)
-                    onLoginSuccess(tokenJson, tokens.accessToken.userName, tokens.accessToken.role)
+                    val auth = apiClient.register(userName, email, password)
+                    onLoginSuccess(auth.accessToken, auth.userName, auth.role)
                 } catch (e: Exception) {
                     apiClient.logErrorToServer(e)
                     errorMessage = e.message ?: "Registration failed"

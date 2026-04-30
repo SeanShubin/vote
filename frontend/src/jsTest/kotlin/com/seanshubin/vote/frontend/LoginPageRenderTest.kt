@@ -1,8 +1,6 @@
 package com.seanshubin.vote.frontend
 
-import com.seanshubin.vote.contract.AccessToken
-import com.seanshubin.vote.contract.RefreshToken
-import com.seanshubin.vote.contract.Tokens
+import com.seanshubin.vote.contract.AuthResponse
 import com.seanshubin.vote.domain.Role
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
@@ -59,8 +57,8 @@ class LoginPageRenderTest {
         }
 
         // Setup methods - configure fake behavior
-        fun setupAuthenticateSuccess(tokens: Tokens) {
-            fakeClient.authenticateResult = Result.success(tokens)
+        fun setupAuthenticateSuccess(auth: AuthResponse) {
+            fakeClient.authenticateResult = Result.success(auth)
         }
 
         fun setupAuthenticateFailure(error: Exception) {
@@ -122,8 +120,8 @@ class LoginPageRenderTest {
     fun loginPageEnterKeyInPasswordFieldTriggersAuthentication() = runTest {
         LoginPageTester(this).use { tester ->
             // given
-            val expectedTokens = Tokens(AccessToken("alice", Role.USER), RefreshToken("alice"))
-            tester.setupAuthenticateSuccess(expectedTokens)
+            val expectedAuth = AuthResponse("token-alice", "alice", Role.USER)
+            tester.setupAuthenticateSuccess(expectedAuth)
 
             // when
             tester.enterCredentials("alice", "password123")
@@ -140,8 +138,8 @@ class LoginPageRenderTest {
     fun loginPageEnterKeyInUsernameFieldTriggersAuthentication() = runTest {
         LoginPageTester(this).use { tester ->
             // given
-            val expectedTokens = Tokens(AccessToken("bob", Role.USER), RefreshToken("bob"))
-            tester.setupAuthenticateSuccess(expectedTokens)
+            val expectedAuth = AuthResponse("token-bob", "bob", Role.USER)
+            tester.setupAuthenticateSuccess(expectedAuth)
 
             // when
             tester.enterCredentials("bob", "securepass")
@@ -158,8 +156,8 @@ class LoginPageRenderTest {
     fun loginButtonClickTriggersAuthentication() = runTest {
         LoginPageTester(this).use { tester ->
             // given
-            val expectedTokens = Tokens(AccessToken("charlie", Role.USER), RefreshToken("charlie"))
-            tester.setupAuthenticateSuccess(expectedTokens)
+            val expectedAuth = AuthResponse("token-charlie", "charlie", Role.USER)
+            tester.setupAuthenticateSuccess(expectedAuth)
 
             // when
             tester.enterCredentials("charlie", "mypassword")
@@ -176,8 +174,8 @@ class LoginPageRenderTest {
     fun loginSuccessCallbackInvokedWithCorrectToken() = runTest {
         LoginPageTester(this).use { tester ->
             // given
-            val expectedTokens = Tokens(AccessToken("dave", Role.OWNER), RefreshToken("dave"))
-            tester.setupAuthenticateSuccess(expectedTokens)
+            val expectedAuth = AuthResponse("token-dave", "dave", Role.OWNER)
+            tester.setupAuthenticateSuccess(expectedAuth)
 
             // when
             tester.enterCredentials("dave", "password")

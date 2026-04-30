@@ -1,20 +1,23 @@
 package com.seanshubin.vote.backend.http
 
+import com.seanshubin.vote.backend.auth.CookieConfig
+import com.seanshubin.vote.backend.auth.TokenEncoder
 import com.seanshubin.vote.backend.service.ServiceException
 import com.seanshubin.vote.contract.AccessToken
 import com.seanshubin.vote.contract.AddElectionRequest
+import com.seanshubin.vote.contract.AuthResponse
 import com.seanshubin.vote.contract.AuthenticateRequest
 import com.seanshubin.vote.contract.CastBallotRequest
 import com.seanshubin.vote.contract.ChangePasswordRequest
 import com.seanshubin.vote.contract.ClientErrorRequest
 import com.seanshubin.vote.contract.ErrorResponse
 import com.seanshubin.vote.contract.LaunchElectionRequest
-import com.seanshubin.vote.contract.RefreshToken
 import com.seanshubin.vote.contract.RegisterRequest
 import com.seanshubin.vote.contract.Service
 import com.seanshubin.vote.contract.SetCandidatesRequest
 import com.seanshubin.vote.contract.SetEligibleVotersRequest
 import com.seanshubin.vote.contract.SetRoleRequest
+import com.seanshubin.vote.contract.Tokens
 import com.seanshubin.vote.domain.ElectionUpdates
 import com.seanshubin.vote.domain.Role
 import com.seanshubin.vote.domain.UserUpdates
@@ -27,10 +30,16 @@ import org.slf4j.LoggerFactory
  * No knowledge of Jetty, Lambda, or any specific runtime. The Jetty
  * [SimpleHttpHandler] and the Lambda handler are both thin adapters that
  * delegate here.
+ *
+ * Auth model: access tokens are signed JWTs in the Authorization header;
+ * refresh tokens are signed JWTs in an HttpOnly cookie. Verification on
+ * every request rejects tampered/expired tokens.
  */
 class RequestRouter(
     private val service: Service,
     private val json: Json,
+    private val tokenEncoder: TokenEncoder,
+    private val refreshCookie: CookieConfig,
 ) {
     private val log = LoggerFactory.getLogger(RequestRouter::class.java)
 
@@ -41,8 +50,14 @@ class RequestRouter(
             return HttpResponse(200, "")
         }
 
+        // CloudFront proxies /api/... → API Gateway → Lambda. Frontend always
+        // sends /api-prefixed paths; backend handles them either with or
+        // without the prefix (so direct Jetty calls in tests/dev still work).
+        val normalized = req.target.removePrefix("/api").ifEmpty { "/" }
+        val normalizedReq = if (normalized == req.target) req else req.withTarget(normalized)
+
         return try {
-            dispatch(req)
+            dispatch(normalizedReq)
         } catch (e: IllegalArgumentException) {
             log.warn("Bad request: ${req.method} ${req.target} - ${e.message}", e)
             errorResponse(400, e.message ?: "Bad request")
@@ -72,6 +87,7 @@ class RequestRouter(
             target == "/register" && method == "POST" -> handleRegister(req)
             target == "/authenticate" && method == "POST" -> handleAuthenticate(req)
             target == "/refresh" && method == "POST" -> handleRefresh(req)
+            target == "/logout" && method == "POST" -> handleLogout()
             target == "/users" && method == "GET" -> handleListUsers(req)
             target == "/users/count" && method == "GET" -> handleUserCount(req)
             target.matches(Regex("/user/[^/]+")) && method == "GET" -> handleGetUser(req)
@@ -108,14 +124,19 @@ class RequestRouter(
     private fun errorResponse(status: Int, message: String): HttpResponse =
         HttpResponse(status, json.encodeToString(ErrorResponse(message)))
 
+    /** Verify and decode the bearer JWT; reject if missing/expired/tampered. */
     private fun extractAccessToken(req: HttpRequest): AccessToken {
         val authHeader = req.header("Authorization")
             ?: throw ServiceException(ServiceException.Category.UNAUTHORIZED, "Missing Authorization header")
         if (!authHeader.startsWith("Bearer ")) {
             throw ServiceException(ServiceException.Category.UNAUTHORIZED, "Invalid Authorization header format")
         }
-        val tokenJson = authHeader.substring(7)
-        return json.decodeFromString<AccessToken>(tokenJson)
+        val jwt = authHeader.substring(7)
+        return tokenEncoder.decodeAccessToken(jwt)
+            ?: throw ServiceException(
+                ServiceException.Category.UNAUTHORIZED,
+                "Access token invalid or expired"
+            )
     }
 
     private fun extractUserName(target: String): String {
@@ -131,6 +152,31 @@ class RequestRouter(
     private fun extractVoterOrUserName(target: String): String {
         val parts = target.split("/")
         return java.net.URLDecoder.decode(parts[4], "UTF-8")
+    }
+
+    /** Build a 200 response carrying [tokens] as both an AuthResponse body and a refresh-token cookie. */
+    private fun authSuccess(tokens: Tokens): HttpResponse {
+        val accessJwt = tokenEncoder.encodeAccessToken(tokens.accessToken)
+        val refreshJwt = tokenEncoder.encodeRefreshToken(tokens.refreshToken)
+        val body = AuthResponse(
+            accessToken = accessJwt,
+            userName = tokens.accessToken.userName,
+            role = tokens.accessToken.role,
+        )
+        return HttpResponse(
+            status = 200,
+            body = json.encodeToString(body),
+            setCookies = listOf(refreshCookie.makeSetCookie(refreshJwt)),
+        )
+    }
+
+    /** Reads RFC-6265 cookie header; returns the value of [name] or null. */
+    private fun readCookie(req: HttpRequest, name: String): String? {
+        val header = req.header("Cookie") ?: return null
+        return header.split(";")
+            .map { it.trim() }
+            .firstOrNull { it.startsWith("$name=") }
+            ?.substringAfter("=")
     }
 
     private fun handleHealth(): HttpResponse {
@@ -162,7 +208,7 @@ class RequestRouter(
             email = registerRequest.email,
             password = registerRequest.password,
         )
-        return HttpResponse(200, json.encodeToString(tokens))
+        return authSuccess(tokens)
     }
 
     private fun handleAuthenticate(req: HttpRequest): HttpResponse {
@@ -171,13 +217,32 @@ class RequestRouter(
             nameOrEmail = authRequest.nameOrEmail,
             password = authRequest.password,
         )
-        return HttpResponse(200, json.encodeToString(tokens))
+        return authSuccess(tokens)
     }
 
+    /**
+     * Trade a refresh-cookie JWT for fresh access + refresh tokens.
+     * Stateless: the JWT signature is the only credential — no server-side store.
+     */
     private fun handleRefresh(req: HttpRequest): HttpResponse {
-        val refreshToken = json.decodeFromString<RefreshToken>(req.body)
+        val refreshJwt = readCookie(req, refreshCookie.name)
+            ?: throw ServiceException(ServiceException.Category.UNAUTHORIZED, "Missing refresh cookie")
+        val refreshToken = tokenEncoder.decodeRefreshToken(refreshJwt)
+            ?: throw ServiceException(
+                ServiceException.Category.UNAUTHORIZED,
+                "Refresh token invalid or expired"
+            )
         val tokens = service.refresh(refreshToken)
-        return HttpResponse(200, json.encodeToString(tokens))
+        return authSuccess(tokens)
+    }
+
+    /** Clears the refresh cookie. Stateless model — no server-side revocation. */
+    private fun handleLogout(): HttpResponse {
+        return HttpResponse(
+            status = 200,
+            body = json.encodeToString(mapOf("status" to "logged out")),
+            setCookies = listOf(refreshCookie.makeClearCookie()),
+        )
     }
 
     private fun handleListUsers(req: HttpRequest): HttpResponse {
@@ -343,9 +408,6 @@ class RequestRouter(
             electionName,
             castBallotRequest.rankings,
         )
-        // Return the confirmation as a JSON string literal so ApiClient.castBallot's
-        // declared `String` return type deserializes cleanly. (Returning an object
-        // here was the source of the "Unexpected JSON token at offset 0" error.)
         return HttpResponse(200, json.encodeToString(confirmation))
     }
 

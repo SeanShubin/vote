@@ -3,6 +3,8 @@ package com.seanshubin.vote.frontend
 import androidx.compose.runtime.*
 import com.seanshubin.vote.contract.ApiClient
 import com.seanshubin.vote.domain.Role
+import kotlinx.coroutines.launch
+import org.jetbrains.compose.web.dom.*
 import org.jetbrains.compose.web.renderComposable
 
 fun main() {
@@ -15,12 +17,34 @@ fun main() {
 
 @Composable
 fun VoteApp(apiClient: ApiClient) {
-    var currentPage by remember { mutableStateOf<Page>(Page.Login) }
+    var currentPage by remember { mutableStateOf<Page>(Page.Loading) }
     var authToken by remember { mutableStateOf<String?>(null) }
     var userName by remember { mutableStateOf<String?>(null) }
     var role by remember { mutableStateOf<Role?>(null) }
+    val scope = rememberCoroutineScope()
+
+    // Bootstrap session from the refresh cookie. If the browser has a valid
+    // Refresh cookie we land on Home; otherwise the server returns 401 (null)
+    // and we drop to the Login screen.
+    LaunchedEffect(Unit) {
+        try {
+            val auth = apiClient.refresh()
+            if (auth != null) {
+                authToken = auth.accessToken
+                userName = auth.userName
+                role = auth.role
+                currentPage = Page.Home
+            } else {
+                currentPage = Page.Login
+            }
+        } catch (e: Exception) {
+            apiClient.logErrorToServer(e)
+            currentPage = Page.Login
+        }
+    }
 
     when (currentPage) {
+        is Page.Loading -> LoadingPage()
         is Page.Login -> LoginPage(
             apiClient = apiClient,
             onLoginSuccess = { token, user, userRole ->
@@ -48,10 +72,17 @@ fun VoteApp(apiClient: ApiClient) {
             onNavigateToCreateElection = { currentPage = Page.CreateElection },
             onNavigateToElections = { currentPage = Page.Elections },
             onLogout = {
-                authToken = null
-                userName = null
-                role = null
-                currentPage = Page.Login
+                scope.launch {
+                    try {
+                        apiClient.logout()
+                    } catch (e: Exception) {
+                        apiClient.logErrorToServer(e)
+                    }
+                    authToken = null
+                    userName = null
+                    role = null
+                    currentPage = Page.Login
+                }
             }
         )
         is Page.CreateElection -> CreateElectionPage(
@@ -82,7 +113,15 @@ fun VoteApp(apiClient: ApiClient) {
     }
 }
 
+@Composable
+private fun LoadingPage() {
+    Div({ classes("container") }) {
+        P { Text("Loading...") }
+    }
+}
+
 sealed class Page {
+    object Loading : Page()
     object Login : Page()
     object Register : Page()
     object Home : Page()

@@ -1,9 +1,7 @@
 package com.seanshubin.vote.backend.http
 
-import com.seanshubin.vote.contract.Service
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
-import kotlinx.serialization.json.Json
 import org.eclipse.jetty.server.Request
 import org.eclipse.jetty.server.handler.AbstractHandler
 
@@ -13,10 +11,8 @@ import org.eclipse.jetty.server.handler.AbstractHandler
  * The Lambda handler is the parallel adapter for API Gateway events.
  */
 class SimpleHttpHandler(
-    service: Service,
-    json: Json,
+    private val router: RequestRouter,
 ) : AbstractHandler() {
-    private val router = RequestRouter(service, json)
 
     override fun handle(
         target: String,
@@ -27,10 +23,12 @@ class SimpleHttpHandler(
         baseRequest.isHandled = true
 
         // CORS for local dev (frontend on :3000 calling backend on :8080).
-        // Production CORS is configured at API Gateway level (see deploy/template.yaml).
+        // Production has the SPA + API on the same origin via CloudFront, so
+        // these headers are belt-and-suspenders for dev only.
         response.setHeader("Access-Control-Allow-Origin", "http://localhost:3000")
         response.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
         response.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization")
+        response.setHeader("Access-Control-Allow-Credentials", "true")
         response.setHeader("Access-Control-Max-Age", "3600")
 
         val headers = request.headerNames.toList().associateWith { request.getHeader(it) }
@@ -48,6 +46,10 @@ class SimpleHttpHandler(
         response.contentType = httpResponse.contentType
         response.characterEncoding = "UTF-8"
         response.status = httpResponse.status
+        // Set-Cookie can repeat; addHeader (not setHeader) preserves multiple values.
+        for (cookie in httpResponse.setCookies) {
+            response.addHeader("Set-Cookie", cookie.render())
+        }
         response.writer.write(httpResponse.body)
     }
 }

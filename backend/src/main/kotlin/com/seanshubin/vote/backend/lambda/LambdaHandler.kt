@@ -4,12 +4,16 @@ import com.amazonaws.services.lambda.runtime.Context
 import com.amazonaws.services.lambda.runtime.RequestHandler
 import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPEvent
 import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPResponse
+import com.seanshubin.vote.backend.auth.CookieConfig
+import com.seanshubin.vote.backend.auth.JwtCipher
+import com.seanshubin.vote.backend.auth.TokenEncoder
 import com.seanshubin.vote.backend.dependencies.Configuration
 import com.seanshubin.vote.backend.dependencies.ConnectionFactory
 import com.seanshubin.vote.backend.dependencies.DatabaseConfig
 import com.seanshubin.vote.backend.dependencies.RepositoryFactory
 import com.seanshubin.vote.backend.http.HttpRequest
 import com.seanshubin.vote.backend.http.RequestRouter
+import com.seanshubin.vote.backend.http.SetCookie
 import com.seanshubin.vote.backend.integration.ProductionIntegrations
 import com.seanshubin.vote.backend.service.ServiceImpl
 import kotlinx.serialization.json.Json
@@ -22,22 +26,41 @@ import kotlinx.serialization.json.Json
  * The router is built once in the static initializer so SnapStart's
  * checkpoint captures fully-initialized state. Subsequent invocations
  * (cold-restored or warm) reuse the same instance.
+ *
+ * Path layout: CloudFront proxies `/api/...` to API Gateway, so the
+ * path we receive is `/api/health`, `/api/election/Foo`, etc. We strip
+ * the `/api` prefix before routing so the router stays runtime-agnostic.
  */
 class LambdaHandler : RequestHandler<APIGatewayV2HTTPEvent, APIGatewayV2HTTPResponse> {
 
     override fun handleRequest(event: APIGatewayV2HTTPEvent, context: Context): APIGatewayV2HTTPResponse {
+        // APIGW HTTP API v2 puts cookies in `event.cookies` rather than
+        // a Cookie header. Reassemble into the standard header so RequestRouter's
+        // cookie reader works the same as in the Jetty path.
+        val headers = (event.headers ?: emptyMap()).toMutableMap()
+        event.cookies?.takeIf { it.isNotEmpty() }?.let { cookies ->
+            headers["Cookie"] = cookies.joinToString("; ")
+        }
+
+        // Path arrives as /api/health (CloudFront → APIGW → Lambda) — RequestRouter
+        // strips the /api prefix uniformly for both Lambda and Jetty entry points.
         val request = HttpRequest(
             method = event.requestContext?.http?.method ?: "GET",
             target = event.rawPath ?: "/",
-            rawHeaders = event.headers ?: emptyMap(),
+            rawHeaders = headers,
             body = event.body ?: "",
         )
         val response = router.route(request)
-        return APIGatewayV2HTTPResponse.builder()
+
+        val builder = APIGatewayV2HTTPResponse.builder()
             .withStatusCode(response.status)
             .withHeaders(mapOf("Content-Type" to response.contentType))
             .withBody(response.body)
-            .build()
+
+        if (response.setCookies.isNotEmpty()) {
+            builder.withCookies(response.setCookies.map(SetCookie::render))
+        }
+        return builder.build()
     }
 
     companion object {
@@ -64,7 +87,23 @@ class LambdaHandler : RequestHandler<APIGatewayV2HTTPEvent, APIGatewayV2HTTPResp
                 commandModel = repositories.commandModel,
                 queryModel = repositories.queryModel,
             )
-            return RequestRouter(service, json)
+
+            // JWT secret comes from Lambda env (SecretsManager-backed). The
+            // env-var fallback exists only to allow the static init to complete
+            // when the secret isn't present — the resulting tokens won't verify
+            // correctly and that's intentional.
+            val jwtSecret = System.getenv("JWT_SECRET")
+                ?: error("JWT_SECRET env var is required")
+            val cipher = JwtCipher(jwtSecret)
+            val tokenEncoder = TokenEncoder(cipher)
+            val cookieConfig = CookieConfig(
+                domain = System.getenv("COOKIE_DOMAIN"), // e.g. ".pairwisevote.com"
+                secure = true,
+                sameSite = SetCookie.SameSite.Lax,
+                path = "/api",
+            )
+
+            return RequestRouter(service, json, tokenEncoder, cookieConfig)
         }
     }
 }

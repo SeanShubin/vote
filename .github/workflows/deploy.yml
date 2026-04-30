@@ -51,7 +51,7 @@ jobs:
       - name: Build frontend production bundle
         run: |
           ./gradlew :frontend:assemble \
-            -Papi.base.url=https://api.${DOMAIN_NAME}
+            -Papi.base.url=/api
 
       - name: Install graphviz (for schema diagram SVG rendering)
         run: sudo apt-get update && sudo apt-get install -y graphviz
@@ -119,9 +119,10 @@ jobs:
         run: |
           # Lambda first invocation may take ~10s for SnapStart-restored runtime;
           # warm it up and then assert it returns the placeholder JSON.
+          # Backend is reached through CloudFront /api/* (not a separate api subdomain).
           for i in 1 2 3 4 5; do
             sleep 5
-            BODY=$(curl -fsSL --max-time 30 "https://api.${DOMAIN_NAME}/health" || true)
+            BODY=$(curl -fsSL --max-time 30 "https://${DOMAIN_NAME}/api/health" || true)
             echo "Attempt $i: $BODY"
             if echo "$BODY" | grep -q '"status"'; then
               echo "Backend healthy."

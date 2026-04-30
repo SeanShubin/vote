@@ -1,8 +1,6 @@
 package com.seanshubin.vote.frontend
 
-import com.seanshubin.vote.contract.AccessToken
-import com.seanshubin.vote.contract.RefreshToken
-import com.seanshubin.vote.contract.Tokens
+import com.seanshubin.vote.contract.AuthResponse
 import com.seanshubin.vote.domain.*
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -13,18 +11,15 @@ class FrontendBehaviorTest {
     @Test
     fun loginPageAuthenticatesUserWithCredentials() = runTest {
         val fakeClient = FakeApiClient()
-        val expectedTokens = Tokens(
-            AccessToken("alice", Role.USER),
-            RefreshToken("alice")
-        )
-        fakeClient.authenticateResult = Result.success(expectedTokens)
+        val expectedAuth = AuthResponse("token-alice", "alice", Role.USER)
+        fakeClient.authenticateResult = Result.success(expectedAuth)
 
-        val tokens = fakeClient.authenticate("alice", "password123")
+        val auth = fakeClient.authenticate("alice", "password123")
 
         assertEquals(1, fakeClient.authenticateCalls.size)
         assertEquals("alice", fakeClient.authenticateCalls[0].userName)
         assertEquals("password123", fakeClient.authenticateCalls[0].password)
-        assertEquals(expectedTokens, tokens)
+        assertEquals(expectedAuth, auth)
     }
 
     @Test
@@ -44,19 +39,16 @@ class FrontendBehaviorTest {
     @Test
     fun registerPageCreatesNewUserAccount() = runTest {
         val fakeClient = FakeApiClient()
-        val expectedTokens = Tokens(
-            AccessToken("bob", Role.USER),
-            RefreshToken("bob")
-        )
-        fakeClient.registerResult = Result.success(expectedTokens)
+        val expectedAuth = AuthResponse("token-bob", "bob", Role.USER)
+        fakeClient.registerResult = Result.success(expectedAuth)
 
-        val tokens = fakeClient.register("bob", "bob@example.com", "securepass")
+        val auth = fakeClient.register("bob", "bob@example.com", "securepass")
 
         assertEquals(1, fakeClient.registerCalls.size)
         assertEquals("bob", fakeClient.registerCalls[0].userName)
         assertEquals("bob@example.com", fakeClient.registerCalls[0].email)
         assertEquals("securepass", fakeClient.registerCalls[0].password)
-        assertEquals(expectedTokens, tokens)
+        assertEquals(expectedAuth, auth)
     }
 
     @Test
@@ -291,7 +283,7 @@ class FrontendBehaviorTest {
     fun completeWorkflowFromRegistrationToViewingResults() = runTest {
         val fakeClient = FakeApiClient()
         fakeClient.registerResult = Result.success(
-            Tokens(AccessToken("alice", Role.OWNER), RefreshToken("alice"))
+            AuthResponse("token-alice", "alice", Role.OWNER)
         )
         fakeClient.createElectionResult = Result.success("Best Language")
         fakeClient.getElectionResult = Result.success(

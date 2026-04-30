@@ -13,4 +13,8 @@ class HttpRequest(
     /** Case-insensitive header lookup. */
     fun header(name: String): String? =
         rawHeaders.entries.firstOrNull { it.key.equals(name, ignoreCase = true) }?.value
+
+    /** Copy with a different target (used when the router strips a path prefix). */
+    fun withTarget(newTarget: String): HttpRequest =
+        HttpRequest(method, newTarget, rawHeaders, body)
 }

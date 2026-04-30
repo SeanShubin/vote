@@ -6,6 +6,8 @@ import kotlinx.browser.window
 import kotlinx.coroutines.await
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import org.w3c.fetch.RequestCredentials
 import org.w3c.fetch.RequestInit
 import org.w3c.fetch.Response
 import kotlin.js.Promise
@@ -19,14 +21,44 @@ class HttpApiClient(
 ) : ApiClient {
     private val json = Json { ignoreUnknownKeys = true }
 
-    override suspend fun register(userName: String, email: String, password: String): Tokens {
+    // RequestCredentials.INCLUDE didn't resolve in this Kotlin/JS version —
+    // the underlying wire value is just the string "include", which is what
+    // the browser's fetch API expects.
+    private val credentialsInclude: RequestCredentials = "include".unsafeCast<RequestCredentials>()
+
+    override suspend fun register(userName: String, email: String, password: String): AuthResponse {
         val request = RegisterRequest(userName, email, password)
-        return post<RegisterRequest, Tokens>("/register", request)
+        return post<RegisterRequest, AuthResponse>("/register", request)
     }
 
-    override suspend fun authenticate(userName: String, password: String): Tokens {
+    override suspend fun authenticate(userName: String, password: String): AuthResponse {
         val request = AuthenticateRequest(userName, password)
-        return post<AuthenticateRequest, Tokens>("/authenticate", request)
+        return post<AuthenticateRequest, AuthResponse>("/authenticate", request)
+    }
+
+    /**
+     * The browser auto-attaches the HttpOnly Refresh cookie. If the cookie
+     * is missing/invalid/expired, the server returns 401 and we return null
+     * so the caller can show the login screen.
+     */
+    override suspend fun refresh(): AuthResponse? {
+        val response = fetch("$baseUrl/refresh", RequestInit(
+            method = "POST",
+            headers = json("Content-Type" to "application/json"),
+            credentials = credentialsInclude,
+            body = "",
+        )).await()
+        if (response.status.toInt() == 401) return null
+        return handleResponse(response)
+    }
+
+    override suspend fun logout() {
+        fetch("$baseUrl/logout", RequestInit(
+            method = "POST",
+            headers = json("Content-Type" to "application/json"),
+            credentials = credentialsInclude,
+            body = "",
+        )).await()
     }
 
     override suspend fun listElections(authToken: String): List<ElectionSummary> {
@@ -106,6 +138,9 @@ class HttpApiClient(
             headers = json(
                 "Content-Type" to "application/json"
             ),
+            // Server may return Set-Cookie (for refresh token) — credentials:include
+            // is required on register/authenticate so the browser stores the cookie.
+            credentials = credentialsInclude,
             body = json.encodeToString(body)
         )).await()
         return handleResponse(response)
@@ -122,6 +157,7 @@ class HttpApiClient(
                 "Content-Type" to "application/json",
                 "Authorization" to "Bearer $authToken"
             ),
+            credentials = credentialsInclude,
             body = json.encodeToString(body)
         )).await()
         return handleResponse(response)
@@ -138,6 +174,7 @@ class HttpApiClient(
                 "Content-Type" to "application/json",
                 "Authorization" to "Bearer $authToken"
             ),
+            credentials = credentialsInclude,
             body = json.encodeToString(body)
         )).await()
         return handleResponse(response)
@@ -148,7 +185,8 @@ class HttpApiClient(
             method = "GET",
             headers = json(
                 "Authorization" to "Bearer $authToken"
-            )
+            ),
+            credentials = credentialsInclude,
         )).await()
         return handleResponse(response)
     }
@@ -176,10 +214,20 @@ class HttpApiClient(
         return js("encodeURIComponent")(str) as String
     }
 
-    private fun extractUserName(authToken: String): String {
-        val tokenData = json.decodeFromString<kotlinx.serialization.json.JsonObject>(authToken)
-        return tokenData["userName"]?.toString()?.removeSurrounding("\"")
-            ?: throw IllegalArgumentException("Invalid auth token")
+    /**
+     * Extract the userName claim from a signed JWT's payload. The signature
+     * is verified server-side; clients can read claims without a secret.
+     */
+    private fun extractUserName(jwt: String): String {
+        val parts = jwt.split(".")
+        require(parts.size == 3) { "Invalid JWT (expected 3 segments, got ${parts.size})" }
+        // base64url → base64 (regular)
+        val b64 = parts[1].replace('-', '+').replace('_', '/')
+        val padded = b64 + "=".repeat((4 - b64.length % 4) % 4)
+        val decoded = js("atob")(padded) as String
+        val obj = json.decodeFromString<JsonObject>(decoded)
+        return obj["userName"]?.toString()?.removeSurrounding("\"")
+            ?: throw IllegalArgumentException("JWT missing userName claim")
     }
 }
 

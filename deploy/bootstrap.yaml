@@ -83,6 +83,23 @@ Resources:
               - Effect: Allow
                 Action: iam:PassRole
                 Resource: !Sub "arn:aws:iam::${AWS::AccountId}:role/pairwisevote-*"
+        # SecretsManager perms scoped to project-prefixed secrets. Inline
+        # policies don't count toward the 10-managed-policies-per-role IAM
+        # quota — useful here since we're already at 10 managed policies.
+        - PolicyName: SecretsManagerProjectScope
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - secretsmanager:CreateSecret
+                  - secretsmanager:UpdateSecret
+                  - secretsmanager:DeleteSecret
+                  - secretsmanager:DescribeSecret
+                  - secretsmanager:GetSecretValue
+                  - secretsmanager:TagResource
+                  - secretsmanager:RestoreSecret
+                Resource: !Sub "arn:aws:secretsmanager:*:${AWS::AccountId}:secret:pairwisevote-*"
 
   # S3 bucket where CI uploads packaged Lambda artifacts. CFN's `package`
   # command rewrites local CodeUri references to s3://... pointers in this bucket.

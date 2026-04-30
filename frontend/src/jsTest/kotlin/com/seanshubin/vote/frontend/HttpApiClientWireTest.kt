@@ -21,7 +21,10 @@ class HttpApiClientWireTest {
 
     private data class Captured(val url: String, val method: String?, val body: String)
 
-    private val aliceToken: String = """{"userName":"alice","role":"USER"}"""
+    // Stub JWT whose middle (payload) segment base64url-decodes to {"userName":"alice"}.
+    // HttpApiClient.extractUserName reads the unverified payload — server-side verification
+    // is the real defense. Header and signature segments aren't inspected in these tests.
+    private val aliceToken: String = "header.eyJ1c2VyTmFtZSI6ImFsaWNlIn0.signature"
 
     private fun client(captured: MutableList<Captured>, responseBody: String): HttpApiClient {
         val fakeFetch: (String, RequestInit) -> Promise<Response> = { url, init ->
@@ -75,9 +78,9 @@ class HttpApiClientWireTest {
     @Test
     fun registerSerializesAllFields() = runTest {
         val captured = mutableListOf<Captured>()
-        val tokensJson = """{"accessToken":{"userName":"alice","role":"USER"},"refreshToken":{"userName":"alice"}}"""
+        val authJson = """{"accessToken":"header.eyJ1c2VyTmFtZSI6ImFsaWNlIn0.signature","userName":"alice","role":"USER"}"""
 
-        client(captured, tokensJson).register("alice", "alice@example.com", "secret")
+        client(captured, authJson).register("alice", "alice@example.com", "secret")
 
         val body = Json.parseToJsonElement(captured[0].body) as JsonObject
         assertEquals(JsonPrimitive("alice"), body["userName"])

@@ -1,8 +1,6 @@
 package com.seanshubin.vote.frontend
 
-import com.seanshubin.vote.contract.AccessToken
-import com.seanshubin.vote.contract.RefreshToken
-import com.seanshubin.vote.contract.Tokens
+import com.seanshubin.vote.contract.AuthResponse
 import com.seanshubin.vote.domain.Role
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
@@ -44,8 +42,8 @@ class RegisterPageRenderTest {
         }
 
         // Setup methods
-        fun setupRegisterSuccess(tokens: Tokens) {
-            fakeClient.registerResult = Result.success(tokens)
+        fun setupRegisterSuccess(auth: AuthResponse) {
+            fakeClient.registerResult = Result.success(auth)
         }
 
         fun setupRegisterFailure(error: Exception) {
@@ -111,8 +109,8 @@ class RegisterPageRenderTest {
     fun registerPageEnterKeyInPasswordFieldTriggersRegistration() = runTest {
         RegisterPageTester(this).use { tester ->
             // given
-            val expectedTokens = Tokens(AccessToken("alice", Role.USER), RefreshToken("alice"))
-            tester.setupRegisterSuccess(expectedTokens)
+            val expectedAuth = AuthResponse("token-alice", "alice", Role.USER)
+            tester.setupRegisterSuccess(expectedAuth)
 
             // when
             tester.enterRegistrationInfo("alice", "alice@example.com", "password123")
@@ -130,8 +128,8 @@ class RegisterPageRenderTest {
     fun registerPageEnterKeyInEmailFieldTriggersRegistration() = runTest {
         RegisterPageTester(this).use { tester ->
             // given
-            val expectedTokens = Tokens(AccessToken("bob", Role.USER), RefreshToken("bob"))
-            tester.setupRegisterSuccess(expectedTokens)
+            val expectedAuth = AuthResponse("token-bob", "bob", Role.USER)
+            tester.setupRegisterSuccess(expectedAuth)
 
             // when
             tester.enterRegistrationInfo("bob", "bob@example.com", "securepass")
@@ -149,8 +147,8 @@ class RegisterPageRenderTest {
     fun registerButtonClickTriggersRegistration() = runTest {
         RegisterPageTester(this).use { tester ->
             // given
-            val expectedTokens = Tokens(AccessToken("charlie", Role.USER), RefreshToken("charlie"))
-            tester.setupRegisterSuccess(expectedTokens)
+            val expectedAuth = AuthResponse("token-charlie", "charlie", Role.USER)
+            tester.setupRegisterSuccess(expectedAuth)
 
             // when
             tester.enterRegistrationInfo("charlie", "charlie@example.com", "mypassword")
@@ -168,8 +166,8 @@ class RegisterPageRenderTest {
     fun registerSuccessCallbackInvokedWithCorrectToken() = runTest {
         RegisterPageTester(this).use { tester ->
             // given
-            val expectedTokens = Tokens(AccessToken("dave", Role.USER), RefreshToken("dave"))
-            tester.setupRegisterSuccess(expectedTokens)
+            val expectedAuth = AuthResponse("token-dave", "dave", Role.USER)
+            tester.setupRegisterSuccess(expectedAuth)
 
             // when
             tester.enterRegistrationInfo("dave", "dave@example.com", "password")
