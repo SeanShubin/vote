@@ -72,10 +72,12 @@ kotlin.sourceSets.named("jsMain") {
     kotlin.srcDir(generateBuildConfig)
 }
 
-// Cache busting for frontend.js. Runs after jsBrowserDistribution has assembled
-// the dist directory, so the modified index.html survives the bundle copy.
+// Cache busting for frontend.js + styles.css. Runs after jsBrowserDistribution
+// has assembled the dist directory, so the modified index.html survives the
+// bundle copy. Both assets get the same timestamp so they update in lockstep —
+// otherwise users see new JS rendering against a stale cached CSS.
 val addCacheBusting by tasks.registering {
-    description = "Add cache busting query parameter to frontend.js reference"
+    description = "Add cache busting query parameters to frontend.js and styles.css references"
     dependsOn("jsBrowserDistribution")
 
     val htmlSource = file("src/jsMain/resources/index.html")
@@ -87,12 +89,17 @@ val addCacheBusting by tasks.registering {
     doLast {
         val buildTimestamp = System.currentTimeMillis()
         val html = htmlSource.readText()
-        val modifiedHtml = html.replace(
-            """<script src="frontend.js"></script>""",
-            """<script src="frontend.js?v=$buildTimestamp"></script>"""
-        )
+        val modifiedHtml = html
+            .replace(
+                """<script src="frontend.js"></script>""",
+                """<script src="frontend.js?v=$buildTimestamp"></script>"""
+            )
+            .replace(
+                """<link rel="stylesheet" href="styles.css">""",
+                """<link rel="stylesheet" href="styles.css?v=$buildTimestamp">"""
+            )
         htmlDest.writeText(modifiedHtml)
-        println("✓ Cache busting added: frontend.js?v=$buildTimestamp")
+        println("✓ Cache busting added: frontend.js?v=$buildTimestamp + styles.css?v=$buildTimestamp")
     }
 }
 
