@@ -47,6 +47,77 @@ the exact reason inline.
 | DNS | `nslookup pairwisevote.com` (CloudFront), `nslookup api.pairwisevote.com` (APIGW) |
 | Cert | browser lock icon, or `openssl s_client -connect pairwisevote.com:443 -servername pairwisevote.com` |
 
+## Production logs and alerts
+
+### Where errors land
+
+Frontend exceptions are caught in UI handlers and shipped via
+`apiClient.logErrorToServer(e)` → `POST /log-client-error` →
+`RequestRouter.handleLogClientError` (logs at ERROR with the
+literal prefix `CLIENT ERROR:`) → stdout → CloudWatch.
+
+Backend logs are JSON-encoded by logback's `LogstashEncoder` and
+forwarded structured by Lambda's `LogFormat: JSON` setting. Use
+**Logs Insights field queries** rather than grep.
+
+| What | Where |
+|---|---|
+| Log group | [`/aws/lambda/pairwisevote-frontend-backend`](https://us-east-1.console.aws.amazon.com/cloudwatch/home?region=us-east-1#logsV2:log-groups/log-group/$252Faws$252Flambda$252Fpairwisevote-frontend-backend) — retention is 1 day, deliberately short |
+| Logs Insights | [console](https://us-east-1.console.aws.amazon.com/cloudwatch/home?region=us-east-1#logsV2:logs-insights) — pick the log group, then run a query (examples below) |
+| Alarms | [CloudWatch → Alarms](https://us-east-1.console.aws.amazon.com/cloudwatch/home?region=us-east-1#alarmsV2:) — `pairwisevote-frontend-client-errors` and `pairwisevote-frontend-backend-errors` |
+| SNS topic | [SNS → Topics](https://us-east-1.console.aws.amazon.com/sns/v3/home?region=us-east-1#/topics) — `pairwisevote-frontend-alerts` |
+
+### Useful Logs Insights queries
+
+```
+# All client-reported errors with timestamps and URLs
+fields @timestamp, message
+| filter message like /CLIENT ERROR:/
+| sort @timestamp desc
+| limit 50
+
+# Backend exceptions only (JSON layout exposes level field)
+fields @timestamp, level, logger_name, message, stack_trace
+| filter level = "ERROR"
+| sort @timestamp desc
+| limit 50
+
+# Slow handlers — find requests that took > 500ms
+fields @timestamp, message, @duration
+| filter @duration > 500
+| sort @duration desc
+```
+
+### Alerts
+
+Two CloudWatch alarms fire to an SNS topic that emails
+`seanshubin@gmail.com`:
+
+- **`pairwisevote-frontend-client-errors`** — any line containing
+  `CLIENT ERROR:` in the last 5 minutes.
+- **`pairwisevote-frontend-backend-errors`** — Lambda's built-in
+  `Errors` metric (uncaught exceptions / non-2xx Lambda invocations)
+  in the last 5 minutes.
+
+**First-deploy gotcha**: SNS sends a confirmation email when the
+subscription is first created. Click the link in that email or
+notifications stay in `PendingConfirmation` and never arrive.
+
+### On-demand log purge
+
+Retention=1 day means yesterday's logs age out automatically. To
+wipe everything *right now* (e.g., before reproducing a clean
+test scenario):
+
+```bash
+aws logs delete-log-group \
+    --log-group-name /aws/lambda/pairwisevote-frontend-backend \
+    --region us-east-1
+```
+
+Lambda recreates the group on next invocation; CFN reconciles the
+retention policy on next deploy.
+
 ## Single-terminal tail
 
 ```bash
@@ -87,5 +158,5 @@ Useful commands:
 |---|---|
 | `gh secret set AWS_ACCOUNT_ID --body 964638509728 --repo SeanShubin/vote` | set the GitHub secret |
 | `gh run watch` | tail the latest workflow run |
-| `gh run list --workflow=deploy-frontend.yml` | list recent deploy runs |
+| `gh run list --workflow=deploy.yml` | list recent deploy runs |
 | `gh run view <run-id> --log-failed` | print only the failing step's log |

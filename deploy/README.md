@@ -36,6 +36,21 @@ deploys run.
 First run takes ~5-10 minutes (cert validation + CloudFront propagation).
 Subsequent deploys are ~2-3 minutes.
 
+## Pre-deploy step (only once, after pulling the monitoring changes)
+
+The Lambda log group is now managed by CFN with explicit retention. The
+previously auto-created log group must be deleted once so CFN can
+adopt the name without a conflict on next deploy:
+
+```bash
+aws logs delete-log-group \
+    --log-group-name /aws/lambda/pairwisevote-frontend-backend \
+    --region us-east-1
+```
+
+After CFN creates the new (managed) log group on next deploy, retention
+is set to 1 day. Subsequent deploys are no-ops.
+
 ## One-time AWS bootstrap
 
 Run the bootstrap script from a shell with AWS admin credentials configured:

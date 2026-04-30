@@ -9,6 +9,10 @@ Parameters:
   HostedZoneId:
     Type: AWS::Route53::HostedZone::Id
     Description: Route 53 hosted zone for DomainName.
+  AlertEmail:
+    Type: String
+    Default: seanshubin@gmail.com
+    Description: Email to receive ops alerts (Lambda errors, CLIENT ERROR log lines).
 
 Resources:
   FrontendBucket:
@@ -209,6 +213,17 @@ Resources:
           - !Sub "https://www.${DomainName}"
         MaxAge: 3600
 
+  # Explicit log group with short retention. Old-version logs are not useful here;
+  # 1-day retention costs nothing and avoids accumulation. To wipe right now,
+  # delete the group manually — Lambda recreates it on next invocation.
+  BackendLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${AWS::StackName}-backend"
+      RetentionInDays: 1
+
   BackendFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -226,6 +241,14 @@ Resources:
       SnapStart:
         ApplyOn: PublishedVersions
       AutoPublishAlias: live
+      LoggingConfig:
+        LogGroup: !Ref BackendLogGroup
+        # Lambda parses each stdout line as JSON and forwards as structured
+        # events to CloudWatch — unlocks Logs Insights field queries.
+        # Our app already emits JSON via logback's LogstashEncoder.
+        LogFormat: JSON
+        ApplicationLogLevel: INFO
+        SystemLogLevel: WARN
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref MainTable
@@ -280,6 +303,75 @@ Resources:
       AliasTarget:
         DNSName: !GetAtt ApiDomain.RegionalDomainName
         HostedZoneId: !GetAtt ApiDomain.RegionalHostedZoneId
+
+  # ============================================================
+  # Alerts: SNS topic, email subscription, two alarms
+  # ============================================================
+
+  AlertTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub "${AWS::StackName}-alerts"
+      DisplayName: pairwisevote alerts
+
+  # First deploy creates a "PendingConfirmation" subscription — AWS sends a
+  # confirmation email; the recipient must click the link before notifications
+  # start flowing. Idempotent: re-deploys leave a confirmed sub alone.
+  AlertEmailSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      TopicArn: !Ref AlertTopic
+      Protocol: email
+      Endpoint: !Ref AlertEmail
+
+  ClientErrorMetricFilter:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref BackendLogGroup
+      # Substring match in the JSON message body. Logback writes the line
+      # produced by RequestRouter.handleLogClientError, which starts with
+      # "CLIENT ERROR:". Match-pattern syntax is not regex; quotes = literal.
+      FilterPattern: '"CLIENT ERROR:"'
+      MetricTransformations:
+        - MetricNamespace: pairwisevote
+          MetricName: ClientErrors
+          MetricValue: "1"
+          DefaultValue: 0
+
+  ClientErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "${AWS::StackName}-client-errors"
+      AlarmDescription: One or more frontend exceptions reported in the last 5 minutes
+      Namespace: pairwisevote
+      MetricName: ClientErrors
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 0
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref AlertTopic
+
+  BackendErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "${AWS::StackName}-backend-errors"
+      AlarmDescription: Lambda function returned errors in the last 5 minutes
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref BackendFunction
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 0
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref AlertTopic
 
 Outputs:
   BucketName:

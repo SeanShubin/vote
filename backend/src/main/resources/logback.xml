@@ -1,24 +1,23 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration>
-    <!-- Console appender for stdout (captured by log files) -->
+    <!--
+        JSON-formatted stdout. In Lambda this gets captured by the runtime and
+        forwarded to CloudWatch Logs as structured events that Logs Insights
+        can query by field. Local dev sees JSON too — pipe through `jq` if you
+        want it pretty.
+    -->
     <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
-        <encoder>
-            <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+            <includeMdcKeyName>true</includeMdcKeyName>
         </encoder>
     </appender>
 
-    <!-- Root logger -->
     <root level="INFO">
         <appender-ref ref="STDOUT" />
     </root>
 
-    <!-- Application logger with more detail -->
     <logger name="com.seanshubin.vote" level="DEBUG" />
-
-    <!-- Log AWS SDK at INFO to reduce noise -->
     <logger name="aws" level="INFO" />
     <logger name="software.amazon" level="INFO" />
-
-    <!-- Log Jetty at INFO -->
     <logger name="org.eclipse.jetty" level="INFO" />
 </configuration>

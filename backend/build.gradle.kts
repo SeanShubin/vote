@@ -39,6 +39,8 @@ dependencies {
     // Logging
     implementation("ch.qos.logback:logback-classic:1.4.14")
     implementation("org.slf4j:slf4j-api:2.0.9")
+    // Structured JSON layout for CloudWatch Logs Insights field queries.
+    implementation("net.logstash.logback:logstash-logback-encoder:8.0")
 
     // Testing
     testImplementation(kotlin("test"))
