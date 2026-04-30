@@ -4,7 +4,8 @@ import com.seanshubin.vote.backend.crypto.RealPasswordUtil
 import com.seanshubin.vote.contract.*
 
 class ProductionIntegrations(
-    override val commandLineArgs: Array<String>
+    override val commandLineArgs: Array<String>,
+    override val emailSender: EmailSender = ConsoleEmailSender,
 ) : Integrations {
     override val emitLine: (String) -> Unit = { line -> println(line) }
     override val clock: Clock = SystemClock

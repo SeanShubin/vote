@@ -17,7 +17,7 @@ class FrontendBehaviorTest {
         val auth = fakeClient.authenticate("alice", "password123")
 
         assertEquals(1, fakeClient.authenticateCalls.size)
-        assertEquals("alice", fakeClient.authenticateCalls[0].userName)
+        assertEquals("alice", fakeClient.authenticateCalls[0].nameOrEmail)
         assertEquals("password123", fakeClient.authenticateCalls[0].password)
         assertEquals(expectedAuth, auth)
     }

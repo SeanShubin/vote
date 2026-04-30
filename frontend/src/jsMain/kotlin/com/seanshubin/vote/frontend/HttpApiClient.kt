@@ -31,8 +31,8 @@ class HttpApiClient(
         return post<RegisterRequest, AuthResponse>("/register", request)
     }
 
-    override suspend fun authenticate(userName: String, password: String): AuthResponse {
-        val request = AuthenticateRequest(userName, password)
+    override suspend fun authenticate(nameOrEmail: String, password: String): AuthResponse {
+        val request = AuthenticateRequest(nameOrEmail, password)
         return post<AuthenticateRequest, AuthResponse>("/authenticate", request)
     }
 
@@ -59,6 +59,20 @@ class HttpApiClient(
             credentials = credentialsInclude,
             body = "",
         )).await()
+    }
+
+    override suspend fun requestPasswordReset(nameOrEmail: String) {
+        post<PasswordResetRequestRequest, Unit>(
+            "/password-reset-request",
+            PasswordResetRequestRequest(nameOrEmail),
+        )
+    }
+
+    override suspend fun resetPassword(resetToken: String, newPassword: String) {
+        post<PasswordResetRequest, Unit>(
+            "/password-reset",
+            PasswordResetRequest(resetToken, newPassword),
+        )
     }
 
     override suspend fun listElections(authToken: String): List<ElectionSummary> {

@@ -12,6 +12,13 @@ logs/
 downloaded
 secrets
 local-config
+# Secret hygiene — never let a stray .env / credentials file land in git.
+.env
+.env.*
+*.pem
+*.key
+credentials.json
+aws-credentials
 *~
 *#
 .#*

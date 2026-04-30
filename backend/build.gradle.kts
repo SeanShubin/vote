@@ -26,6 +26,9 @@ dependencies {
     // Database - DynamoDB
     implementation("aws.sdk.kotlin:dynamodb:${project.property("aws.sdk.kotlin.version")}")
 
+    // Email - AWS SES (Lambda role uses ses:SendEmail; no SMTP credentials needed)
+    implementation("aws.sdk.kotlin:ses:${project.property("aws.sdk.kotlin.version")}")
+
     // JWT/Auth
     implementation("com.auth0:java-jwt:4.4.0")
 

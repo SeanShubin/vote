@@ -145,6 +145,20 @@ class HttpApiTester(private val port: Int = 9876) : AutoCloseable {
         return post("/authenticate", body)
     }
 
+    fun requestPasswordReset(nameOrEmail: String): HttpResponse<String> {
+        val body = """{"nameOrEmail":"$nameOrEmail"}"""
+        return post("/password-reset-request", body)
+    }
+
+    fun resetPassword(resetToken: String, newPassword: String): HttpResponse<String> {
+        val body = """{"resetToken":"$resetToken","newPassword":"$newPassword"}"""
+        return post("/password-reset", body)
+    }
+
+    /** Mint a reset token for tests that need to bypass the email step. */
+    fun mintResetToken(userName: String): String =
+        tokenEncoder.encodeResetToken(userName)
+
     // User Management
     fun listUsers(token: AccessToken): HttpResponse<String> = get("/users", token)
 
@@ -334,12 +348,23 @@ class HttpApiTest {
     }
 
     @Test
-    fun `register with duplicate username returns error`() {
+    fun `register with duplicate username returns 409 with honest message`() {
         tester.registerUserExpectSuccess("alice")
         val response = tester.registerUser("alice", "alice2@example.com", "pass")
 
-        assertTrue(response.statusCode() in listOf(400, 409))
-        assertTrue(response.body().contains("error"))
+        assertEquals(409, response.statusCode())
+        assertTrue(response.body().contains("User name already exists"),
+            "Expected 'User name already exists' in body: ${response.body()}")
+    }
+
+    @Test
+    fun `register with duplicate email returns 409 with honest message`() {
+        tester.registerUserExpectSuccess("alice", email = "shared@example.com")
+        val response = tester.registerUser("bob", "shared@example.com", "pass")
+
+        assertEquals(409, response.statusCode())
+        assertTrue(response.body().contains("Email already exists"),
+            "Expected 'Email already exists' in body: ${response.body()}")
     }
 
     @Test
@@ -354,12 +379,98 @@ class HttpApiTest {
     }
 
     @Test
-    fun `authenticate with wrong password returns error`() {
+    fun `authenticate with wrong password returns 401 with honest message`() {
         tester.registerUserExpectSuccess("alice", password = "secret123")
 
         val response = tester.authenticateUser("alice", "wrong")
 
-        assertTrue(response.statusCode() in listOf(400, 401))
+        assertEquals(401, response.statusCode())
+        assertTrue(response.body().contains("Wrong password"),
+            "Expected 'Wrong password' in body: ${response.body()}")
+    }
+
+    @Test
+    fun `authenticate with unknown user returns 404 with honest message`() {
+        tester.registerUserExpectSuccess("alice", password = "secret123")
+
+        val response = tester.authenticateUser("bob", "secret123")
+
+        assertEquals(404, response.statusCode())
+        assertTrue(response.body().contains("No user found"),
+            "Expected 'No user found' in body: ${response.body()}")
+    }
+
+    @Test
+    fun `authenticate by email also works`() {
+        tester.registerUserExpectSuccess("alice", email = "alice@example.com", password = "secret123")
+
+        val response = tester.authenticateUser("alice@example.com", "secret123")
+
+        assertEquals(200, response.statusCode())
+    }
+
+    @Test
+    fun `password reset request returns 200 for known user`() {
+        tester.registerUserExpectSuccess("alice")
+
+        val response = tester.requestPasswordReset("alice")
+
+        assertEquals(200, response.statusCode())
+    }
+
+    @Test
+    fun `password reset request returns 404 with honest message for unknown user`() {
+        tester.registerUserExpectSuccess("alice")
+
+        val response = tester.requestPasswordReset("nobody")
+
+        assertEquals(404, response.statusCode())
+        assertTrue(response.body().contains("No user found"),
+            "Expected 'No user found' in body: ${response.body()}")
+    }
+
+    @Test
+    fun `password reset with valid token sets new password`() {
+        tester.registerUserExpectSuccess("alice", password = "old-password")
+        val resetToken = tester.mintResetToken("alice")
+
+        val resetResponse = tester.resetPassword(resetToken, "new-password")
+        assertEquals(200, resetResponse.statusCode())
+
+        // Old password no longer works.
+        val oldPwResponse = tester.authenticateUser("alice", "old-password")
+        assertEquals(401, oldPwResponse.statusCode())
+
+        // New password works.
+        val newPwResponse = tester.authenticateUser("alice", "new-password")
+        assertEquals(200, newPwResponse.statusCode())
+    }
+
+    @Test
+    fun `password reset with bogus token returns 401`() {
+        tester.registerUserExpectSuccess("alice", password = "old-password")
+
+        val response = tester.resetPassword("not-a-real-jwt", "new-password")
+
+        assertEquals(401, response.statusCode())
+        assertTrue(response.body().contains("invalid"),
+            "Expected 'invalid' in body: ${response.body()}")
+    }
+
+    @Test
+    fun `access token cannot be replayed as reset token (purpose claim guards)`() {
+        // Belt-and-suspenders: even if an attacker steals a valid access token
+        // (e.g. via XSS), they must not be able to use it as a password-reset
+        // token. The "purpose=reset" claim on reset tokens prevents that.
+        val tokens = tester.registerUserExpectSuccess("alice", password = "secret")
+        val accessJwt = tester.bearerJwt(tokens.accessToken)
+
+        val response = tester.resetPassword(accessJwt, "hijacked")
+
+        assertEquals(401, response.statusCode())
+        // And the password really wasn't changed.
+        val auth = tester.authenticateUser("alice", "secret")
+        assertEquals(200, auth.statusCode())
     }
 
     @Test

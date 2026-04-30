@@ -1,5 +1,6 @@
 package com.seanshubin.vote.backend.service
 
+import com.seanshubin.vote.backend.auth.TokenEncoder
 import com.seanshubin.vote.backend.validation.Validation
 import com.seanshubin.vote.contract.*
 import com.seanshubin.vote.domain.*
@@ -10,11 +11,14 @@ class ServiceImpl(
     private val commandModel: CommandModel,
     private val queryModel: QueryModel,
     private val rawTableScanner: RawTableScanner,
+    private val tokenEncoder: TokenEncoder,
+    private val frontendBaseUrl: String,
 ) : Service {
     private val clock = integrations.clock
     private val uniqueIdGenerator = integrations.uniqueIdGenerator
     private val notifications = integrations.notifications
     private val passwordUtil = integrations.passwordUtil
+    private val emailSender = integrations.emailSender
     private val relationalProjection = DynamoToRelational(queryModel, eventLog)
 
     override fun synchronize() {
@@ -123,8 +127,21 @@ class ServiceImpl(
         val validEmail = Validation.validateEmail(email)
         val validPassword = Validation.validatePassword(password)
 
-        require(queryModel.searchUserByName(validUserName) == null) { "User name already exists: $validUserName" }
-        require(queryModel.searchUserByEmail(validEmail) == null) { "Email already exists: $validEmail" }
+        // CONFLICT (409) — the request is well-formed but the resource already
+        // exists. Telling the user *which* field collides is intentional: the
+        // user explicitly asked for honest errors over enumeration-resistance.
+        if (queryModel.searchUserByName(validUserName) != null) {
+            throw ServiceException(
+                ServiceException.Category.CONFLICT,
+                "User name already exists: $validUserName"
+            )
+        }
+        if (queryModel.searchUserByEmail(validEmail) != null) {
+            throw ServiceException(
+                ServiceException.Category.CONFLICT,
+                "Email already exists: $validEmail"
+            )
+        }
 
         val role = if (queryModel.userCount() == 0) Role.OWNER else Role.USER
         val saltAndHash = passwordUtil.createSaltAndHash(validPassword)
@@ -144,11 +161,21 @@ class ServiceImpl(
 
     override fun authenticate(nameOrEmail: String, password: String): Tokens {
         val validNameOrEmail = Validation.validateNameOrEmail(nameOrEmail)
+        // Try as username first, then email — login accepts either form.
+        // Distinguishing "no such user" (NOT_FOUND) from "wrong password"
+        // (UNAUTHORIZED) is intentional honesty per the user's preference.
         val user = queryModel.searchUserByName(validNameOrEmail)
-            ?: queryModel.findUserByEmail(validNameOrEmail)
+            ?: queryModel.searchUserByEmail(validNameOrEmail)
+            ?: throw ServiceException(
+                ServiceException.Category.NOT_FOUND,
+                "No user found with username or email: $validNameOrEmail"
+            )
 
-        require(passwordUtil.passwordMatches(password, user.salt, user.hash)) {
-            "Invalid password for user: $validNameOrEmail"
+        if (!passwordUtil.passwordMatches(password, user.salt, user.hash)) {
+            throw ServiceException(
+                ServiceException.Category.UNAUTHORIZED,
+                "Wrong password for user: ${user.name}"
+            )
         }
 
         val accessToken = AccessToken(user.name, user.role)
@@ -493,6 +520,57 @@ class ServiceImpl(
 
     override fun sendLoginLinkByEmail(email: String, baseUri: String) {
         notifications.sendMailEvent(email, "Login link")
+    }
+
+    override fun requestPasswordReset(nameOrEmail: String) {
+        val validNameOrEmail = Validation.validateNameOrEmail(nameOrEmail)
+        // Same lookup pattern as authenticate(): match by username first, then email.
+        val user = queryModel.searchUserByName(validNameOrEmail)
+            ?: queryModel.searchUserByEmail(validNameOrEmail)
+            ?: throw ServiceException(
+                ServiceException.Category.NOT_FOUND,
+                "No user found with username or email: $validNameOrEmail"
+            )
+
+        val resetToken = tokenEncoder.encodeResetToken(user.name)
+        val resetUrl = "$frontendBaseUrl/reset-password?token=$resetToken"
+        val body = """
+            Hello ${user.name},
+
+            Use the link below to set a new password. The link expires in 1 hour.
+
+            $resetUrl
+
+            If you didn't request this, you can ignore this email — your password
+            won't change unless someone follows the link.
+        """.trimIndent()
+        emailSender.send(user.email, "Reset your password", body)
+        notifications.sendMailEvent(user.email, "Reset your password")
+    }
+
+    override fun resetPassword(resetToken: String, newPassword: String) {
+        val userName = tokenEncoder.decodeResetToken(resetToken)
+            ?: throw ServiceException(
+                ServiceException.Category.UNAUTHORIZED,
+                "Reset token is missing, expired, or invalid"
+            )
+        val user = queryModel.searchUserByName(userName)
+            ?: throw ServiceException(
+                ServiceException.Category.NOT_FOUND,
+                "User no longer exists: $userName"
+            )
+
+        val validPassword = Validation.validatePassword(newPassword)
+        val saltAndHash = passwordUtil.createSaltAndHash(validPassword)
+        // The reset itself is the authority for the password-change event —
+        // there's no logged-in actor at this point. Authority "system" plus the
+        // token's userName claim is the closest honest representation.
+        eventLog.appendEvent(
+            "system",
+            clock.now(),
+            DomainEvent.UserPasswordChanged(user.name, saltAndHash.salt, saltAndHash.hash),
+        )
+        synchronize()
     }
 
     // Permission checking helpers

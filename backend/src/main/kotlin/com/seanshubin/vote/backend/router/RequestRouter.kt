@@ -14,6 +14,8 @@ import com.seanshubin.vote.contract.ChangePasswordRequest
 import com.seanshubin.vote.contract.ClientErrorRequest
 import com.seanshubin.vote.contract.ErrorResponse
 import com.seanshubin.vote.contract.LaunchElectionRequest
+import com.seanshubin.vote.contract.PasswordResetRequest
+import com.seanshubin.vote.contract.PasswordResetRequestRequest
 import com.seanshubin.vote.contract.RegisterRequest
 import com.seanshubin.vote.contract.Service
 import com.seanshubin.vote.contract.SetCandidatesRequest
@@ -90,6 +92,8 @@ class RequestRouter(
             target == "/authenticate" && method == "POST" -> handleAuthenticate(req)
             target == "/refresh" && method == "POST" -> handleRefresh(req)
             target == "/logout" && method == "POST" -> handleLogout()
+            target == "/password-reset-request" && method == "POST" -> handleRequestPasswordReset(req)
+            target == "/password-reset" && method == "POST" -> handleResetPassword(req)
             target == "/users" && method == "GET" -> handleListUsers(req)
             target == "/users/count" && method == "GET" -> handleUserCount(req)
             target.matches(Regex("/user/[^/]+")) && method == "GET" -> handleGetUser(req)
@@ -248,6 +252,20 @@ class RequestRouter(
             body = json.encodeToString(mapOf("status" to "logged out")),
             setCookies = listOf(refreshCookie.makeClearCookie()),
         )
+    }
+
+    /** Unauthenticated — anyone can ask for a reset email; the email itself proves identity. */
+    private fun handleRequestPasswordReset(req: HttpRequest): HttpResponse {
+        val request = json.decodeFromString<PasswordResetRequestRequest>(req.body)
+        service.requestPasswordReset(request.nameOrEmail)
+        return HttpResponse(200, json.encodeToString(mapOf("status" to "reset email sent")))
+    }
+
+    /** Unauthenticated — the reset token IS the credential. Bearer auth is irrelevant here. */
+    private fun handleResetPassword(req: HttpRequest): HttpResponse {
+        val request = json.decodeFromString<PasswordResetRequest>(req.body)
+        service.resetPassword(request.resetToken, request.newPassword)
+        return HttpResponse(200, json.encodeToString(mapOf("status" to "password reset")))
     }
 
     private fun handleListUsers(req: HttpRequest): HttpResponse {

@@ -67,7 +67,7 @@ class LoginPageRenderTest {
 
         // Action methods - interact with the UI
         fun enterCredentials(userName: String, password: String) {
-            ComposeTestHelper.setInputByPlaceholder(testId, "Username", userName)
+            ComposeTestHelper.setInputByPlaceholder(testId, "Username or email", userName)
             ComposeTestHelper.setInputByPlaceholder(testId, "Password", password)
         }
 
@@ -77,7 +77,7 @@ class LoginPageRenderTest {
         }
 
         fun pressEnterInUsernameField() {
-            ComposeTestHelper.pressEnterInInput(testId, "Username")
+            ComposeTestHelper.pressEnterInInput(testId, "Username or email")
             testScope.advanceUntilIdle()
         }
 
@@ -97,7 +97,7 @@ class LoginPageRenderTest {
 
         fun wasNavigateToRegisterCalled() = navigateToRegisterCalled
 
-        fun usernameInputExists() = ComposeTestHelper.inputExistsByPlaceholder(testId, "Username")
+        fun usernameInputExists() = ComposeTestHelper.inputExistsByPlaceholder(testId, "Username or email")
 
         fun passwordInputExists() = ComposeTestHelper.inputExistsByPlaceholder(testId, "Password")
 
@@ -129,7 +129,7 @@ class LoginPageRenderTest {
 
             // then
             assertEquals(1, tester.authenticateCalls().size)
-            assertEquals("alice", tester.authenticateCalls()[0].userName)
+            assertEquals("alice", tester.authenticateCalls()[0].nameOrEmail)
             assertEquals("password123", tester.authenticateCalls()[0].password)
         }
     }
@@ -147,7 +147,7 @@ class LoginPageRenderTest {
 
             // then
             assertEquals(1, tester.authenticateCalls().size)
-            assertEquals("bob", tester.authenticateCalls()[0].userName)
+            assertEquals("bob", tester.authenticateCalls()[0].nameOrEmail)
             assertEquals("securepass", tester.authenticateCalls()[0].password)
         }
     }
@@ -165,7 +165,7 @@ class LoginPageRenderTest {
 
             // then
             assertEquals(1, tester.authenticateCalls().size)
-            assertEquals("charlie", tester.authenticateCalls()[0].userName)
+            assertEquals("charlie", tester.authenticateCalls()[0].nameOrEmail)
             assertEquals("mypassword", tester.authenticateCalls()[0].password)
         }
     }

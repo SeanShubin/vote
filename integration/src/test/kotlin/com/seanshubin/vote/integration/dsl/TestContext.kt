@@ -1,5 +1,7 @@
 package com.seanshubin.vote.integration.dsl
 
+import com.seanshubin.vote.backend.auth.JwtCipher
+import com.seanshubin.vote.backend.auth.TokenEncoder
 import com.seanshubin.vote.backend.repository.InMemoryCommandModel
 import com.seanshubin.vote.backend.repository.InMemoryData
 import com.seanshubin.vote.backend.repository.InMemoryEventLog
@@ -27,9 +29,21 @@ class TestContext(
     private val commandModel = provider?.commandModel ?: defaultCommandModel
     private val queryModel = provider?.queryModel ?: defaultQueryModel
 
+    // Match the dev secret used by ApplicationRunner so tokens issued in tests
+    // round-trip via the same TokenEncoder the production wiring uses.
+    private val tokenEncoder = TokenEncoder(JwtCipher("dev-jwt-secret-DO-NOT-USE-IN-PROD"))
+
     // Backend abstraction - can be direct service calls or HTTP calls
     val backend: ScenarioBackend = backend ?: DirectServiceBackend(
-        ServiceImpl(integrations, eventLog, commandModel, queryModel, InMemoryRawTableScanner())
+        ServiceImpl(
+            integrations,
+            eventLog,
+            commandModel,
+            queryModel,
+            InMemoryRawTableScanner(),
+            tokenEncoder,
+            "http://test.example.com",
+        )
     )
 
     // Test helpers

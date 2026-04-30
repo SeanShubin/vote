@@ -42,4 +42,21 @@ interface Service {
     fun getBallot(accessToken: AccessToken, voterName: String, electionName: String): BallotSummary?
     fun changePassword(accessToken: AccessToken, userName: String, password: String)
     fun sendLoginLinkByEmail(email: String, baseUri: String)
+
+    /**
+     * Send a password reset email. Looks up the user by username or email and
+     * emails them a reset link with a short-lived signed token.
+     *
+     * Throws ServiceException(NOT_FOUND) when no matching user exists — the
+     * user explicitly chose honest errors over enumeration-resistance.
+     */
+    fun requestPasswordReset(nameOrEmail: String)
+
+    /**
+     * Consume a reset token (from the email link) to set a new password.
+     * Throws ServiceException(UNAUTHORIZED) for a missing/expired/tampered
+     * token. Throws ServiceException(NOT_FOUND) if the user has been
+     * removed since the token was issued.
+     */
+    fun resetPassword(resetToken: String, newPassword: String)
 }

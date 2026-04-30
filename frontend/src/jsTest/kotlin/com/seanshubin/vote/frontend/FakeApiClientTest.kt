@@ -45,7 +45,7 @@ class FakeApiClientTest {
         val auth = fakeClient.authenticate("alice", "password123")
 
         assertEquals(1, fakeClient.authenticateCalls.size)
-        assertEquals("alice", fakeClient.authenticateCalls[0].userName)
+        assertEquals("alice", fakeClient.authenticateCalls[0].nameOrEmail)
         assertEquals("password123", fakeClient.authenticateCalls[0].password)
         assertEquals(expectedAuth, auth)
     }
@@ -217,8 +217,8 @@ class FakeApiClientTest {
         fakeClient.authenticate("charlie", "pass3")
 
         assertEquals(3, fakeClient.authenticateCalls.size)
-        assertEquals("alice", fakeClient.authenticateCalls[0].userName)
-        assertEquals("bob", fakeClient.authenticateCalls[1].userName)
-        assertEquals("charlie", fakeClient.authenticateCalls[2].userName)
+        assertEquals("alice", fakeClient.authenticateCalls[0].nameOrEmail)
+        assertEquals("bob", fakeClient.authenticateCalls[1].nameOrEmail)
+        assertEquals("charlie", fakeClient.authenticateCalls[2].nameOrEmail)
     }
 }

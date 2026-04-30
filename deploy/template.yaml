@@ -13,6 +13,15 @@ Parameters:
     Type: String
     Default: seanshubin@gmail.com
     Description: Email to receive ops alerts (Lambda errors, CLIENT ERROR log lines).
+  EmailFromAddress:
+    Type: String
+    Default: noreply@pairwisevote.com
+    Description: |
+      Sender for password-reset emails. MUST be a verified identity in AWS SES
+      before deploy. Verify via: AWS Console → SES → Verified identities. While
+      SES is in sandbox mode, you also need to verify each *recipient* address —
+      request "production access" from the SES console (free, ~1 day) before
+      sending to arbitrary user emails.
 
 Resources:
   FrontendBucket:
@@ -298,11 +307,25 @@ Resources:
           # Resolved at deploy time — value is baked into the Lambda config
           # but never appears in CFN parameters or template output.
           JWT_SECRET: !Sub "{{resolve:secretsmanager:${JwtSecret}:SecretString}}"
+          # Frontend origin for reset-link URLs in password-reset emails.
+          # The SPA serves /reset-password via CloudFront's SPA fallback.
+          FRONTEND_BASE_URL: !Sub "https://${DomainName}"
+          # SES sender — must be a verified identity in this region.
+          EMAIL_FROM_ADDRESS: !Ref EmailFromAddress
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref MainTable
         - DynamoDBCrudPolicy:
             TableName: !Ref EventLogTable
+        # Send password-reset emails. Scoped to this account's verified
+        # identities — SES enforces additionally that the From address must
+        # be verified before SendEmail succeeds at all.
+        - Statement:
+            - Effect: Allow
+              Action:
+                - ses:SendEmail
+                - ses:SendRawEmail
+              Resource: !Sub "arn:aws:ses:${AWS::Region}:${AWS::AccountId}:identity/*"
       Events:
         Proxy:
           Type: HttpApi

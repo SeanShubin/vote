@@ -14,6 +14,7 @@ class TokenEncoder(
     private val cipher: JwtCipher,
     private val accessTokenDuration: Duration = Duration.ofMinutes(10),
     private val refreshTokenDuration: Duration = Duration.ofDays(30),
+    private val resetTokenDuration: Duration = Duration.ofHours(1),
 ) {
     fun encodeAccessToken(token: AccessToken): String =
         cipher.encode(
@@ -39,5 +40,24 @@ class TokenEncoder(
         val claims = cipher.decode(jwt) ?: return null
         val userName = claims["userName"] ?: return null
         return RefreshToken(userName)
+    }
+
+    /**
+     * Reset tokens carry a `purpose=reset` claim and a short TTL (1h).
+     * The purpose claim guarantees a leaked access or refresh token can't
+     * be replayed against the password-reset endpoint.
+     */
+    fun encodeResetToken(userName: String): String =
+        cipher.encode(
+            mapOf("userName" to userName, "purpose" to "reset"),
+            resetTokenDuration,
+        )
+
+    /** Returns the userName the token was minted for, or null if invalid/expired/wrong-purpose. */
+    fun decodeResetToken(jwt: String?): String? {
+        if (jwt.isNullOrBlank()) return null
+        val claims = cipher.decode(jwt) ?: return null
+        if (claims["purpose"] != "reset") return null
+        return claims["userName"]
     }
 }

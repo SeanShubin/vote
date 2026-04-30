@@ -7,4 +7,5 @@ interface Integrations {
     val uniqueIdGenerator: UniqueIdGenerator
     val notifications: Notifications
     val passwordUtil: PasswordUtil
+    val emailSender: EmailSender
 }

@@ -26,6 +26,10 @@ class FakeApiClient : ApiClient {
     var refreshResult: Result<AuthResponse?> = Result.success(null)
     val refreshCalls = mutableListOf<Unit>()
     val logoutCalls = mutableListOf<Unit>()
+    var requestPasswordResetResult: Result<Unit> = Result.success(Unit)
+    var resetPasswordResult: Result<Unit> = Result.success(Unit)
+    val requestPasswordResetCalls = mutableListOf<String>()
+    val resetPasswordCalls = mutableListOf<ResetPasswordCall>()
     var listElectionsResult: Result<List<ElectionSummary>> = Result.success(emptyList())
     var createElectionResult: Result<String> = Result.success("")
     var getElectionResult: Result<ElectionSummary> = Result.failure(Exception("Get election not configured"))
@@ -49,8 +53,8 @@ class FakeApiClient : ApiClient {
         return registerResult.getOrThrow()
     }
 
-    override suspend fun authenticate(userName: String, password: String): AuthResponse {
-        authenticateCalls.add(AuthenticateCall(userName, password))
+    override suspend fun authenticate(nameOrEmail: String, password: String): AuthResponse {
+        authenticateCalls.add(AuthenticateCall(nameOrEmail, password))
         return authenticateResult.getOrThrow()
     }
 
@@ -61,6 +65,16 @@ class FakeApiClient : ApiClient {
 
     override suspend fun logout() {
         logoutCalls.add(Unit)
+    }
+
+    override suspend fun requestPasswordReset(nameOrEmail: String) {
+        requestPasswordResetCalls.add(nameOrEmail)
+        requestPasswordResetResult.getOrThrow()
+    }
+
+    override suspend fun resetPassword(resetToken: String, newPassword: String) {
+        resetPasswordCalls.add(ResetPasswordCall(resetToken, newPassword))
+        resetPasswordResult.getOrThrow()
     }
 
     override suspend fun listElections(authToken: String): List<ElectionSummary> {
@@ -133,7 +147,7 @@ class FakeApiClient : ApiClient {
     }
 
     data class RegisterCall(val userName: String, val email: String, val password: String)
-    data class AuthenticateCall(val userName: String, val password: String)
+    data class AuthenticateCall(val nameOrEmail: String, val password: String)
     data class ListElectionsCall(val authToken: String)
     data class CreateElectionCall(val authToken: String, val electionName: String)
     data class GetElectionCall(val authToken: String, val electionName: String)
@@ -144,4 +158,5 @@ class FakeApiClient : ApiClient {
     data class CastBallotCall(val authToken: String, val electionName: String, val rankings: List<Ranking>)
     data class GetTallyCall(val authToken: String, val electionName: String)
     data class TableDataCall(val authToken: String, val tableName: String)
+    data class ResetPasswordCall(val resetToken: String, val newPassword: String)
 }

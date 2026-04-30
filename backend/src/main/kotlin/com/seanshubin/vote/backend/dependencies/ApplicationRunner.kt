@@ -48,22 +48,27 @@ class ApplicationRunner(
         val repositories = repositoryFactory.createRepositories(sqlConnection, dynamoDbClient)
         this.repositories = repositories
 
+        // Local-dev defaults: secure=false (HTTP), no domain (single-host),
+        // path=/ (no /api prefix in Jetty since dev runs the backend directly).
+        // The frontend runs on a separate port (3000) but the email link is
+        // pasted into the browser, so localhost:3000 is the right reset target.
+        val jwtSecret = System.getenv("JWT_SECRET") ?: "dev-jwt-secret-DO-NOT-USE-IN-PROD"
+        val tokenEncoder = TokenEncoder(JwtCipher(jwtSecret))
+        val frontendBaseUrl = System.getenv("FRONTEND_BASE_URL") ?: "http://localhost:3000"
+        val cookieConfig = CookieConfig(
+            secure = false,
+            sameSite = SetCookie.SameSite.Lax,
+            path = "/",
+        )
+
         val service = ServiceImpl(
             integrations = integrations,
             eventLog = repositories.eventLog,
             commandModel = repositories.commandModel,
             queryModel = repositories.queryModel,
             rawTableScanner = repositories.rawTableScanner,
-        )
-
-        // Local-dev defaults: secure=false (HTTP), no domain (single-host),
-        // path=/ (no /api prefix in Jetty since dev runs the backend directly).
-        val jwtSecret = System.getenv("JWT_SECRET") ?: "dev-jwt-secret-DO-NOT-USE-IN-PROD"
-        val tokenEncoder = TokenEncoder(JwtCipher(jwtSecret))
-        val cookieConfig = CookieConfig(
-            secure = false,
-            sameSite = SetCookie.SameSite.Lax,
-            path = "/",
+            tokenEncoder = tokenEncoder,
+            frontendBaseUrl = frontendBaseUrl,
         )
 
         val router = RequestRouter(service, json, tokenEncoder, cookieConfig)

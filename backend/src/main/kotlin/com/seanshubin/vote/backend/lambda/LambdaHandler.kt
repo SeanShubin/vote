@@ -15,6 +15,7 @@ import com.seanshubin.vote.backend.http.HttpRequest
 import com.seanshubin.vote.backend.router.RequestRouter
 import com.seanshubin.vote.backend.http.SetCookie
 import com.seanshubin.vote.backend.integration.ProductionIntegrations
+import com.seanshubin.vote.backend.integration.SesEmailSender
 import com.seanshubin.vote.backend.service.ServiceImpl
 import kotlinx.serialization.json.Json
 
@@ -72,7 +73,13 @@ class LambdaHandler : RequestHandler<APIGatewayV2HTTPEvent, APIGatewayV2HTTPResp
                 port = 0,
                 databaseConfig = DatabaseConfig.DynamoDB(endpoint = null, region = region),
             )
-            val integrations = ProductionIntegrations(emptyArray())
+            // Production sends real emails via SES. Sender address is verified
+            // out-of-band in the SES console; the Lambda role grants ses:SendEmail.
+            val sesRegion = System.getenv("AWS_REGION") ?: "us-east-1"
+            val emailFromAddress = System.getenv("EMAIL_FROM_ADDRESS")
+                ?: error("EMAIL_FROM_ADDRESS env var is required")
+            val emailSender = SesEmailSender(sesRegion, emailFromAddress)
+            val integrations = ProductionIntegrations(emptyArray(), emailSender)
             val json = Json { prettyPrint = true }
             val connectionFactory = ConnectionFactory(configuration)
             val repositoryFactory = RepositoryFactory(integrations, configuration, json)
@@ -80,14 +87,6 @@ class LambdaHandler : RequestHandler<APIGatewayV2HTTPEvent, APIGatewayV2HTTPResp
             val sqlConnection = connectionFactory.createSqlConnection()
             val dynamoDbClient = connectionFactory.createDynamoDbClient()
             val repositories = repositoryFactory.createRepositories(sqlConnection, dynamoDbClient)
-
-            val service = ServiceImpl(
-                integrations = integrations,
-                eventLog = repositories.eventLog,
-                commandModel = repositories.commandModel,
-                queryModel = repositories.queryModel,
-                rawTableScanner = repositories.rawTableScanner,
-            )
 
             // JWT secret comes from Lambda env (SecretsManager-backed). The
             // env-var fallback exists only to allow the static init to complete
@@ -102,6 +101,21 @@ class LambdaHandler : RequestHandler<APIGatewayV2HTTPEvent, APIGatewayV2HTTPResp
                 secure = true,
                 sameSite = SetCookie.SameSite.Lax,
                 path = "/api",
+            )
+
+            // Reset emails embed this URL: https://${FRONTEND_BASE_URL}/reset-password?token=...
+            // CFN sets it to https://pairwisevote.com (the SPA origin behind CloudFront).
+            val frontendBaseUrl = System.getenv("FRONTEND_BASE_URL")
+                ?: error("FRONTEND_BASE_URL env var is required")
+
+            val service = ServiceImpl(
+                integrations = integrations,
+                eventLog = repositories.eventLog,
+                commandModel = repositories.commandModel,
+                queryModel = repositories.queryModel,
+                rawTableScanner = repositories.rawTableScanner,
+                tokenEncoder = tokenEncoder,
+                frontendBaseUrl = frontendBaseUrl,
             )
 
             return RequestRouter(service, json, tokenEncoder, cookieConfig)

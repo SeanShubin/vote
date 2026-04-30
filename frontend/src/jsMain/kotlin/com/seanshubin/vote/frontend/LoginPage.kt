@@ -13,9 +13,10 @@ fun LoginPage(
     apiClient: ApiClient,
     onLoginSuccess: (authToken: String, userName: String, role: Role) -> Unit,
     onNavigateToRegister: () -> Unit,
+    onNavigateToForgotPassword: () -> Unit = {},
     coroutineScope: CoroutineScope = rememberCoroutineScope()
 ) {
-    var userName by remember { mutableStateOf("") }
+    var nameOrEmail by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var isLoading by remember { mutableStateOf(false) }
@@ -26,7 +27,7 @@ fun LoginPage(
             errorMessage = null
             coroutineScope.launch {
                 try {
-                    val auth = apiClient.authenticate(userName, password)
+                    val auth = apiClient.authenticate(nameOrEmail, password)
                     onLoginSuccess(auth.accessToken, auth.userName, auth.role)
                 } catch (e: Exception) {
                     apiClient.logErrorToServer(e)
@@ -60,12 +61,17 @@ fun LoginPage(
                 handleLogin()
             }
         }) {
+            // Backend's authenticate() tries the value as a username first, then
+            // falls back to email — so users can log in either way. The HTML name
+            // and autocomplete tokens stay "username" so the browser/password
+            // manager keys saved credentials by that stable identifier even if
+            // the UI label changes.
             Input(InputType.Text) {
                 attr("name", "username")
                 attr("autocomplete", "username")
-                placeholder("Username")
-                value(userName)
-                onInput { userName = it.value }
+                placeholder("Username or email")
+                value(nameOrEmail)
+                onInput { nameOrEmail = it.value }
                 onKeyDown { event ->
                     if (event.key == "Enter") {
                         handleLogin()
@@ -100,6 +106,13 @@ fun LoginPage(
                 onClick { onNavigateToRegister() }
             }) {
                 Text("Register")
+            }
+
+            Button({
+                attr("type", "button")
+                onClick { onNavigateToForgotPassword() }
+            }) {
+                Text("Forgot password?")
             }
         }
     }

@@ -1,5 +1,7 @@
 package com.seanshubin.vote.integration
 
+import com.seanshubin.vote.backend.auth.JwtCipher
+import com.seanshubin.vote.backend.auth.TokenEncoder
 import com.seanshubin.vote.backend.repository.InMemoryRawTableScanner
 import com.seanshubin.vote.backend.service.ServiceImpl
 import com.seanshubin.vote.integration.database.DatabaseProvider
@@ -47,6 +49,8 @@ class ScenarioCompatibilityTest {
             provider.commandModel,
             provider.queryModel,
             InMemoryRawTableScanner(),
+            TokenEncoder(JwtCipher("dev-jwt-secret-DO-NOT-USE-IN-PROD")),
+            "http://test.example.com",
         )
 
         val backend = DirectServiceBackend(service)

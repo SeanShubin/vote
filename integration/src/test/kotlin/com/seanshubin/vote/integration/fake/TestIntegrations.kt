@@ -9,7 +9,8 @@ class TestIntegrations(
     override val clock: Clock = FakeClock(),
     override val uniqueIdGenerator: UniqueIdGenerator = SequentialIdGenerator(),
     override val notifications: Notifications = FakeNotifications(),
-    override val passwordUtil: PasswordUtil = FakePasswordUtil()
+    override val passwordUtil: PasswordUtil = FakePasswordUtil(),
+    override val emailSender: EmailSender = FakeEmailSender(),
 ) : Integrations {
     override val emitLine: (String) -> Unit = { line -> emitLineCapture.add(line) }
 
@@ -25,6 +26,9 @@ class TestIntegrations(
 
     val fakePasswordUtil: FakePasswordUtil
         get() = passwordUtil as FakePasswordUtil
+
+    val fakeEmailSender: FakeEmailSender
+        get() = emailSender as FakeEmailSender
 
     val emittedLines: List<String>
         get() = emitLineCapture

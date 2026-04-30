@@ -20,6 +20,13 @@ sealed class Page {
     object Elections : Page()
     object RawTables : Page()
     object DebugTables : Page()
+    object PasswordResetRequest : Page()
+    /**
+     * Target of the email reset link. Carries the reset token that came back
+     * in the URL's `?token=` query string — the page presents new-password
+     * input and submits both to the backend.
+     */
+    data class PasswordReset(val resetToken: String) : Page()
     data class ElectionDetail(val electionName: String) : Page()
 }
 
@@ -39,6 +46,10 @@ fun pageToPath(page: Page): String = when (page) {
     is Page.ElectionDetail -> "/elections/${encodeUriComponent(page.electionName)}"
     is Page.RawTables -> "/admin/raw-tables"
     is Page.DebugTables -> "/admin/debug-tables"
+    is Page.PasswordResetRequest -> "/password-reset-request"
+    // Token belongs in the path's query string — that's the standard place
+    // for one-time link parameters and matches what email clients render.
+    is Page.PasswordReset -> "/reset-password?token=${encodeUriComponent(page.resetToken)}"
 }
 
 /**
@@ -51,7 +62,11 @@ fun pageToPath(page: Page): String = when (page) {
  * `/elections/{name}` so creating-a-new-election doesn't get misread as
  * "view election named 'new'".
  */
-fun pathToPage(path: String): Page {
+fun pathToPage(pathWithQuery: String): Page {
+    // Split path from query so the path matchers don't have to know about ?token=...
+    val queryStart = pathWithQuery.indexOf('?')
+    val path = if (queryStart >= 0) pathWithQuery.substring(0, queryStart) else pathWithQuery
+    val query = if (queryStart >= 0) pathWithQuery.substring(queryStart + 1) else ""
     val normalized = path.trimEnd('/').ifEmpty { "/" }
     return when {
         normalized == "/" -> Page.Home
@@ -65,8 +80,20 @@ fun pathToPage(path: String): Page {
         }
         normalized == "/admin/raw-tables" -> Page.RawTables
         normalized == "/admin/debug-tables" -> Page.DebugTables
+        normalized == "/password-reset-request" -> Page.PasswordResetRequest
+        // Reset link from the email; missing/empty token shouldn't crash —
+        // the reset page will surface a clear error to the user.
+        normalized == "/reset-password" -> Page.PasswordReset(parseQueryParam(query, "token") ?: "")
         else -> Page.Home
     }
+}
+
+private fun parseQueryParam(query: String, name: String): String? {
+    if (query.isEmpty()) return null
+    return query.split("&")
+        .map { it.split("=", limit = 2) }
+        .firstOrNull { it.size == 2 && it[0] == name }
+        ?.let { decodeUriComponent(it[1]) }
 }
 
 /**
@@ -108,7 +135,7 @@ class Router internal constructor(initialPath: String) {
 
     /** Called by the popstate listener when the user hits Back/Forward. */
     internal fun handlePopState() {
-        currentPage = pathToPage(window.location.pathname)
+        currentPage = pathToPage(window.location.pathname + window.location.search)
     }
 }
 
@@ -119,7 +146,9 @@ class Router internal constructor(initialPath: String) {
  */
 @Composable
 fun rememberRouter(): Router {
-    val router = remember { Router(initialPath = window.location.pathname) }
+    val router = remember {
+        Router(initialPath = window.location.pathname + window.location.search)
+    }
     DisposableEffect(router) {
         val listener: (Event) -> Unit = { router.handlePopState() }
         window.addEventListener("popstate", listener)
@@ -129,7 +158,11 @@ fun rememberRouter(): Router {
 }
 
 /** Pages that don't require authentication. Anything else bounces to /login on auth fail. */
-fun isPublicPage(page: Page): Boolean = page is Page.Login || page is Page.Register
+fun isPublicPage(page: Page): Boolean =
+    page is Page.Login ||
+        page is Page.Register ||
+        page is Page.PasswordResetRequest ||
+        page is Page.PasswordReset
 
 private fun encodeUriComponent(s: String): String =
     js("encodeURIComponent")(s) as String

@@ -67,7 +67,8 @@ fun VoteApp(apiClient: ApiClient) {
                 role = userRole
                 router.replace(Page.Home)
             },
-            onNavigateToRegister = { router.navigate(Page.Register) }
+            onNavigateToRegister = { router.navigate(Page.Register) },
+            onNavigateToForgotPassword = { router.navigate(Page.PasswordResetRequest) }
         )
         is Page.Register -> RegisterPage(
             apiClient = apiClient,
@@ -145,6 +146,17 @@ fun VoteApp(apiClient: ApiClient) {
                 onBack = { router.navigate(Page.Home) },
             )
         }
+        is Page.PasswordResetRequest -> PasswordResetRequestPage(
+            apiClient = apiClient,
+            onNavigateToLogin = { router.navigate(Page.Login) },
+        )
+        is Page.PasswordReset -> PasswordResetPage(
+            apiClient = apiClient,
+            resetToken = page.resetToken,
+            // Successful reset → go to Login so user can sign in fresh.
+            onResetComplete = { router.replace(Page.Login) },
+            onNavigateToLogin = { router.navigate(Page.Login) },
+        )
     }
 }
 
