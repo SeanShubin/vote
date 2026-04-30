@@ -32,6 +32,6 @@ java {
 }
 
 application {
-    mainClass.set("com.seanshubin.vote.tools.MainKt")
+    mainClass.set("com.seanshubin.vote.tools.app.MainKt")
     applicationName = "vote-dev"
 }

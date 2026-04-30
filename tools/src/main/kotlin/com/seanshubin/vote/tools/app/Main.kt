@@ -1,4 +1,4 @@
-package com.seanshubin.vote.tools
+package com.seanshubin.vote.tools.app
 
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.main
