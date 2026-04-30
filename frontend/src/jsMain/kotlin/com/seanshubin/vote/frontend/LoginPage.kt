@@ -47,8 +47,22 @@ fun LoginPage(
             }
         }
 
-        Div({ classes("form") }) {
+        // Wrapping in <form> + giving each field a name + autocomplete value is
+        // what browsers and password managers (1Password, Bitwarden, browser
+        // built-ins) need to offer fill-saved-credentials and save-on-success.
+        // current-password tells managers "fill the saved one" — distinct from
+        // RegisterPage's new-password ("the user is creating a credential").
+        Form(attrs = {
+            classes("form")
+            attr("autocomplete", "on")
+            onSubmit { event ->
+                event.preventDefault()
+                handleLogin()
+            }
+        }) {
             Input(InputType.Text) {
+                attr("name", "username")
+                attr("autocomplete", "username")
                 placeholder("Username")
                 value(userName)
                 onInput { userName = it.value }
@@ -60,6 +74,8 @@ fun LoginPage(
             }
 
             Input(InputType.Password) {
+                attr("name", "password")
+                attr("autocomplete", "current-password")
                 placeholder("Password")
                 value(password)
                 onInput { password = it.value }
@@ -70,13 +86,17 @@ fun LoginPage(
                 }
             }
 
+            // type=submit so Enter / button-click triggers the form's onSubmit,
+            // which is the path password managers watch for "save credential?".
             Button({
-                onClick { handleLogin() }
+                attr("type", "submit")
             }) {
                 Text(if (isLoading) "Logging in..." else "Login")
             }
 
+            // type=button so this doesn't accidentally submit the form.
             Button({
+                attr("type", "button")
                 onClick { onNavigateToRegister() }
             }) {
                 Text("Register")

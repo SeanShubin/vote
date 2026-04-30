@@ -48,8 +48,20 @@ fun RegisterPage(
             }
         }
 
-        Div({ classes("form") }) {
+        // new-password (vs LoginPage's current-password) tells password managers
+        // the user is creating a credential — triggers strong-password
+        // suggestions and the "save new credential?" prompt on success.
+        Form(attrs = {
+            classes("form")
+            attr("autocomplete", "on")
+            onSubmit { event ->
+                event.preventDefault()
+                handleRegister()
+            }
+        }) {
             Input(InputType.Text) {
+                attr("name", "username")
+                attr("autocomplete", "username")
                 placeholder("Username")
                 value(userName)
                 onInput { userName = it.value }
@@ -61,6 +73,8 @@ fun RegisterPage(
             }
 
             Input(InputType.Email) {
+                attr("name", "email")
+                attr("autocomplete", "email")
                 placeholder("Email")
                 value(email)
                 onInput { email = it.value }
@@ -72,6 +86,8 @@ fun RegisterPage(
             }
 
             Input(InputType.Password) {
+                attr("name", "password")
+                attr("autocomplete", "new-password")
                 placeholder("Password")
                 value(password)
                 onInput { password = it.value }
@@ -83,12 +99,13 @@ fun RegisterPage(
             }
 
             Button({
-                onClick { handleRegister() }
+                attr("type", "submit")
             }) {
                 Text(if (isLoading) "Registering..." else "Register")
             }
 
             Button({
+                attr("type", "button")
                 onClick { onNavigateToLogin() }
             }) {
                 Text("Back to Login")
