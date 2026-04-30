@@ -71,6 +71,8 @@ fun VoteApp(apiClient: ApiClient) {
             authToken = authToken ?: "",
             onNavigateToCreateElection = { currentPage = Page.CreateElection },
             onNavigateToElections = { currentPage = Page.Elections },
+            onNavigateToRawTables = { currentPage = Page.RawTables },
+            onNavigateToDebugTables = { currentPage = Page.DebugTables },
             onLogout = {
                 scope.launch {
                     try {
@@ -110,6 +112,28 @@ fun VoteApp(apiClient: ApiClient) {
                 onBack = { currentPage = Page.Elections }
             )
         }
+        is Page.RawTables -> {
+            val token = authToken ?: ""
+            TablesPage(
+                title = "Raw Tables",
+                emptyMessage = "No raw tables (this backend has no physical tables to expose).",
+                loadNames = { apiClient.listTables(token) },
+                loadData = { name -> apiClient.tableData(token, name) },
+                onError = { apiClient.logErrorToServer(it) },
+                onBack = { currentPage = Page.Home },
+            )
+        }
+        is Page.DebugTables -> {
+            val token = authToken ?: ""
+            TablesPage(
+                title = "Debug Tables",
+                emptyMessage = "No debug tables available.",
+                loadNames = { apiClient.listDebugTables(token) },
+                loadData = { name -> apiClient.debugTableData(token, name) },
+                onError = { apiClient.logErrorToServer(it) },
+                onBack = { currentPage = Page.Home },
+            )
+        }
     }
 }
 
@@ -127,5 +151,7 @@ sealed class Page {
     object Home : Page()
     object CreateElection : Page()
     object Elections : Page()
+    object RawTables : Page()
+    object DebugTables : Page()
     data class ElectionDetail(val electionName: String) : Page()
 }

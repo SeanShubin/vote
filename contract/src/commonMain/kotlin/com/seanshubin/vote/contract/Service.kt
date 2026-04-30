@@ -23,6 +23,7 @@ interface Service {
     fun deleteElection(accessToken: AccessToken, electionName: String)
     fun listElections(accessToken: AccessToken): List<ElectionSummary>
     fun listTables(accessToken: AccessToken): List<String>
+    fun listDebugTables(accessToken: AccessToken): List<String>
     fun userCount(accessToken: AccessToken): Int
     fun electionCount(accessToken: AccessToken): Int
     fun tableCount(accessToken: AccessToken): Int

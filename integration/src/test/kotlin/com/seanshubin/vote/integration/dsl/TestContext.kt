@@ -4,6 +4,7 @@ import com.seanshubin.vote.backend.repository.InMemoryCommandModel
 import com.seanshubin.vote.backend.repository.InMemoryData
 import com.seanshubin.vote.backend.repository.InMemoryEventLog
 import com.seanshubin.vote.backend.repository.InMemoryQueryModel
+import com.seanshubin.vote.backend.repository.InMemoryRawTableScanner
 import com.seanshubin.vote.backend.service.ServiceImpl
 import com.seanshubin.vote.integration.database.DatabaseProvider
 import com.seanshubin.vote.integration.fake.TestIntegrations
@@ -28,7 +29,7 @@ class TestContext(
 
     // Backend abstraction - can be direct service calls or HTTP calls
     val backend: ScenarioBackend = backend ?: DirectServiceBackend(
-        ServiceImpl(integrations, eventLog, commandModel, queryModel)
+        ServiceImpl(integrations, eventLog, commandModel, queryModel, InMemoryRawTableScanner())
     )
 
     // Test helpers

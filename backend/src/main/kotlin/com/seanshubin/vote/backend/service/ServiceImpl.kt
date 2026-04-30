@@ -8,12 +8,14 @@ class ServiceImpl(
     private val integrations: Integrations,
     private val eventLog: EventLog,
     private val commandModel: CommandModel,
-    private val queryModel: QueryModel
+    private val queryModel: QueryModel,
+    private val rawTableScanner: RawTableScanner,
 ) : Service {
     private val clock = integrations.clock
     private val uniqueIdGenerator = integrations.uniqueIdGenerator
     private val notifications = integrations.notifications
     private val passwordUtil = integrations.passwordUtil
+    private val relationalProjection = DynamoToRelational(queryModel, eventLog)
 
     override fun synchronize() {
         // Synchronize events from EventLog to CommandModel
@@ -320,7 +322,13 @@ class ServiceImpl(
     }
 
     override fun listTables(accessToken: AccessToken): List<String> {
-        return emptyList() // Debug endpoint
+        requirePermission(accessToken, Permission.VIEW_SECRETS)
+        return rawTableScanner.listRawTableNames()
+    }
+
+    override fun listDebugTables(accessToken: AccessToken): List<String> {
+        requirePermission(accessToken, Permission.VIEW_SECRETS)
+        return relationalProjection.listDebugTableNames()
     }
 
     override fun userCount(accessToken: AccessToken): Int {
@@ -340,15 +348,18 @@ class ServiceImpl(
     }
 
     override fun tableData(accessToken: AccessToken, tableName: String): TableData {
-        return TableData(tableName, emptyList(), emptyList()) // Debug endpoint
+        requirePermission(accessToken, Permission.VIEW_SECRETS)
+        return rawTableScanner.scanRawTable(tableName)
     }
 
     override fun debugTableData(accessToken: AccessToken, tableName: String): TableData {
-        return TableData(tableName, emptyList(), emptyList()) // Debug endpoint
+        requirePermission(accessToken, Permission.VIEW_SECRETS)
+        return relationalProjection.project(tableName)
     }
 
     override fun eventData(accessToken: AccessToken): TableData {
-        return TableData("events", emptyList(), emptyList()) // Debug endpoint
+        requirePermission(accessToken, Permission.VIEW_SECRETS)
+        return relationalProjection.project(DynamoToRelational.EVENT_LOG)
     }
 
     override fun setCandidates(accessToken: AccessToken, electionName: String, candidateNames: List<String>) {

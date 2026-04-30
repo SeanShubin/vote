@@ -4,6 +4,7 @@ import com.seanshubin.vote.contract.ApiClient
 import com.seanshubin.vote.contract.AuthResponse
 import com.seanshubin.vote.domain.ElectionSummary
 import com.seanshubin.vote.domain.Ranking
+import com.seanshubin.vote.domain.TableData
 import com.seanshubin.vote.domain.Tally
 
 class FakeApiClient : ApiClient {
@@ -34,6 +35,14 @@ class FakeApiClient : ApiClient {
     var launchElectionResult: Result<Unit> = Result.success(Unit)
     var castBallotResult: Result<String> = Result.success("ballot-confirmation-123")
     var getTallyResult: Result<Tally> = Result.failure(Exception("Get tally not configured"))
+    var listTablesResult: Result<List<String>> = Result.success(emptyList())
+    var tableDataResult: Result<TableData> = Result.success(TableData("", emptyList(), emptyList()))
+    var listDebugTablesResult: Result<List<String>> = Result.success(emptyList())
+    var debugTableDataResult: Result<TableData> = Result.success(TableData("", emptyList(), emptyList()))
+    val listTablesCalls = mutableListOf<String>()
+    val tableDataCalls = mutableListOf<TableDataCall>()
+    val listDebugTablesCalls = mutableListOf<String>()
+    val debugTableDataCalls = mutableListOf<TableDataCall>()
 
     override suspend fun register(userName: String, email: String, password: String): AuthResponse {
         registerCalls.add(RegisterCall(userName, email, password))
@@ -99,6 +108,26 @@ class FakeApiClient : ApiClient {
         return getTallyResult.getOrThrow()
     }
 
+    override suspend fun listTables(authToken: String): List<String> {
+        listTablesCalls.add(authToken)
+        return listTablesResult.getOrThrow()
+    }
+
+    override suspend fun tableData(authToken: String, tableName: String): TableData {
+        tableDataCalls.add(TableDataCall(authToken, tableName))
+        return tableDataResult.getOrThrow()
+    }
+
+    override suspend fun listDebugTables(authToken: String): List<String> {
+        listDebugTablesCalls.add(authToken)
+        return listDebugTablesResult.getOrThrow()
+    }
+
+    override suspend fun debugTableData(authToken: String, tableName: String): TableData {
+        debugTableDataCalls.add(TableDataCall(authToken, tableName))
+        return debugTableDataResult.getOrThrow()
+    }
+
     override fun logErrorToServer(error: Throwable) {
         loggedErrors.add(error)
     }
@@ -114,4 +143,5 @@ class FakeApiClient : ApiClient {
     data class LaunchElectionCall(val authToken: String, val electionName: String)
     data class CastBallotCall(val authToken: String, val electionName: String, val rankings: List<Ranking>)
     data class GetTallyCall(val authToken: String, val electionName: String)
+    data class TableDataCall(val authToken: String, val tableName: String)
 }

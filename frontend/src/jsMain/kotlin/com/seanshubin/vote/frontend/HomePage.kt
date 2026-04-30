@@ -11,6 +11,8 @@ fun HomePage(
     authToken: String,
     onNavigateToCreateElection: () -> Unit,
     onNavigateToElections: () -> Unit,
+    onNavigateToRawTables: () -> Unit,
+    onNavigateToDebugTables: () -> Unit,
     onLogout: () -> Unit
 ) {
     Div({ classes("container") }) {
@@ -33,6 +35,22 @@ fun HomePage(
                 onClick { onNavigateToElections() }
             }) {
                 Text("View Elections")
+            }
+
+            // AUDITOR+ get the admin data browser. The role gate here is a UX
+            // shortcut — the backend re-checks VIEW_SECRETS on every request.
+            if (role != null && role >= Role.AUDITOR) {
+                Button({
+                    onClick { onNavigateToRawTables() }
+                }) {
+                    Text("Raw Tables")
+                }
+
+                Button({
+                    onClick { onNavigateToDebugTables() }
+                }) {
+                    Text("Debug Tables")
+                }
             }
 
             Button({

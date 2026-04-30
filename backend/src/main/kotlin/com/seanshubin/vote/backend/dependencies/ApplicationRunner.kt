@@ -52,7 +52,8 @@ class ApplicationRunner(
             integrations = integrations,
             eventLog = repositories.eventLog,
             commandModel = repositories.commandModel,
-            queryModel = repositories.queryModel
+            queryModel = repositories.queryModel,
+            rawTableScanner = repositories.rawTableScanner,
         )
 
         // Local-dev defaults: secure=false (HTTP), no domain (single-host),

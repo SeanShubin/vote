@@ -22,14 +22,15 @@ class RepositoryFactory(
                 val sharedData = InMemoryData()
                 val commandModel = InMemoryCommandModel(sharedData)
                 val queryModel = InMemoryQueryModel(sharedData)
-                RepositorySet(eventLog, commandModel, queryModel)
+                RepositorySet(eventLog, commandModel, queryModel, InMemoryRawTableScanner())
             }
             is DatabaseConfig.MySql -> {
                 val queryLoader = QueryLoaderFromResource()
                 val eventLog = MySqlEventLog(sqlConnection!!, queryLoader, json)
                 val commandModel = MySqlCommandModel(sqlConnection, queryLoader, json)
                 val queryModel = MySqlQueryModel(sqlConnection, queryLoader, json)
-                RepositorySet(eventLog, commandModel, queryModel)
+                // MySQL backend has no admin raw view in this iteration.
+                RepositorySet(eventLog, commandModel, queryModel, InMemoryRawTableScanner())
             }
             is DatabaseConfig.DynamoDB -> {
                 runBlocking {
@@ -44,7 +45,8 @@ class RepositoryFactory(
                 val eventLog = DynamoDbEventLog(dynamoDbClient!!, json)
                 val commandModel = DynamoDbSingleTableCommandModel(dynamoDbClient, json)
                 val queryModel = DynamoDbSingleTableQueryModel(dynamoDbClient, json)
-                RepositorySet(eventLog, commandModel, queryModel)
+                val rawScanner = DynamoDbRawTableScanner(dynamoDbClient)
+                RepositorySet(eventLog, commandModel, queryModel, rawScanner)
             }
         }
     }

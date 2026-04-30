@@ -1,5 +1,6 @@
 package com.seanshubin.vote.integration
 
+import com.seanshubin.vote.backend.repository.InMemoryRawTableScanner
 import com.seanshubin.vote.backend.service.ServiceImpl
 import com.seanshubin.vote.integration.database.DatabaseProvider
 import com.seanshubin.vote.integration.database.DynamoDBDatabaseProvider
@@ -44,7 +45,8 @@ class ScenarioCompatibilityTest {
             integrations,
             provider.eventLog,
             provider.commandModel,
-            provider.queryModel
+            provider.queryModel,
+            InMemoryRawTableScanner(),
         )
 
         val backend = DirectServiceBackend(service)

@@ -274,6 +274,13 @@ class HttpApiTester(private val port: Int = 9876) : AutoCloseable {
 
     fun getTableData(tableName: String, token: AccessToken): HttpResponse<String> = get("/table/$tableName", token)
 
+    fun listDebugTables(token: AccessToken): HttpResponse<String> = get("/debug-tables", token)
+
+    fun getDebugTableData(tableName: String, token: AccessToken): HttpResponse<String> =
+        get("/debug-table/$tableName", token)
+
+    fun getEventData(token: AccessToken): HttpResponse<String> = get("/events", token)
+
     fun getPermissionsForRole(role: String): HttpResponse<String> = get("/permissions/$role")
 
     // Utilities
@@ -825,6 +832,70 @@ class HttpApiTest {
 
         assertEquals(200, response.statusCode())
         assertTrue(response.body().contains("["))
+    }
+
+    @Test
+    fun `list debug tables returns the eight schema names for AUDITOR-or-higher`() {
+        // First registered user becomes OWNER, which inherits VIEW_SECRETS.
+        val aliceTokens = tester.registerUserExpectSuccess("alice")
+
+        val response = tester.listDebugTables(aliceTokens.accessToken)
+
+        assertEquals(200, response.statusCode())
+        val body = response.body()
+        listOf("users", "elections", "candidates", "eligible_voters",
+               "ballots", "rankings", "sync_state", "event_log").forEach { name ->
+            assertTrue(body.contains("\"$name\""), "Expected debug table '$name' in: $body")
+        }
+    }
+
+    @Test
+    fun `debug table data projects users into rows`() {
+        val aliceTokens = tester.registerUserExpectSuccess("alice")
+        tester.registerUserExpectSuccess("bob")
+
+        val response = tester.getDebugTableData("users", aliceTokens.accessToken)
+
+        assertEquals(200, response.statusCode())
+        val body = response.body()
+        // Server uses pretty-printed JSON, so match key:value with optional whitespace.
+        assertTrue(Regex("\"name\"\\s*:\\s*\"users\"").containsMatchIn(body),
+            "Expected table name 'users' in: $body")
+        assertTrue(body.contains("alice"), "Expected user alice in: $body")
+        assertTrue(body.contains("bob"), "Expected user bob in: $body")
+    }
+
+    @Test
+    fun `events endpoint returns event_log projection`() {
+        val aliceTokens = tester.registerUserExpectSuccess("alice")
+
+        val response = tester.getEventData(aliceTokens.accessToken)
+
+        assertEquals(200, response.statusCode())
+        val body = response.body()
+        assertTrue(Regex("\"name\"\\s*:\\s*\"event_log\"").containsMatchIn(body),
+            "Expected event_log in: $body")
+        assertTrue(body.contains("UserRegistered"), "Expected UserRegistered event in: $body")
+    }
+
+    @Test
+    fun `debug endpoints reject non-AUDITOR users with 401`() {
+        // First user becomes OWNER; second is plain USER (no VIEW_SECRETS).
+        tester.registerUserExpectSuccess("alice")
+        val bobTokens = tester.registerUserExpectSuccess("bob")
+
+        val listResp = tester.listDebugTables(bobTokens.accessToken)
+        val dataResp = tester.getDebugTableData("users", bobTokens.accessToken)
+        val rawListResp = tester.listTables(bobTokens.accessToken)
+        val rawDataResp = tester.getTableData("vote_data", bobTokens.accessToken)
+        val eventsResp = tester.getEventData(bobTokens.accessToken)
+
+        // ServiceException(UNAUTHORIZED) maps to HTTP 401 in RequestRouter.
+        assertEquals(401, listResp.statusCode(), "listDebugTables should be 401 for USER")
+        assertEquals(401, dataResp.statusCode(), "debugTableData should be 401 for USER")
+        assertEquals(401, rawListResp.statusCode(), "listTables should be 401 for USER")
+        assertEquals(401, rawDataResp.statusCode(), "tableData should be 401 for USER")
+        assertEquals(401, eventsResp.statusCode(), "eventData should be 401 for USER")
     }
 
     @Test

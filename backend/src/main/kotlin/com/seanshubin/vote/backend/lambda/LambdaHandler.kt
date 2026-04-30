@@ -86,6 +86,7 @@ class LambdaHandler : RequestHandler<APIGatewayV2HTTPEvent, APIGatewayV2HTTPResp
                 eventLog = repositories.eventLog,
                 commandModel = repositories.commandModel,
                 queryModel = repositories.queryModel,
+                rawTableScanner = repositories.rawTableScanner,
             )
 
             // JWT secret comes from Lambda env (SecretsManager-backed). The

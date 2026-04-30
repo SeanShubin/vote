@@ -109,6 +109,22 @@ class HttpApiClient(
         return getWithAuth("/election/${encodeURIComponent(electionName)}/tally", authToken)
     }
 
+    override suspend fun listTables(authToken: String): List<String> {
+        return getWithAuth("/tables", authToken)
+    }
+
+    override suspend fun tableData(authToken: String, tableName: String): TableData {
+        return getWithAuth("/table/${encodeURIComponent(tableName)}", authToken)
+    }
+
+    override suspend fun listDebugTables(authToken: String): List<String> {
+        return getWithAuth("/debug-tables", authToken)
+    }
+
+    override suspend fun debugTableData(authToken: String, tableName: String): TableData {
+        return getWithAuth("/debug-table/${encodeURIComponent(tableName)}", authToken)
+    }
+
     override fun logErrorToServer(error: Throwable) {
         try {
             val errorRequest = ClientErrorRequest(

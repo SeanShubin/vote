@@ -2,6 +2,7 @@ package com.seanshubin.vote.contract
 
 import com.seanshubin.vote.domain.ElectionSummary
 import com.seanshubin.vote.domain.Ranking
+import com.seanshubin.vote.domain.TableData
 import com.seanshubin.vote.domain.Tally
 
 interface ApiClient {
@@ -27,5 +28,18 @@ interface ApiClient {
     suspend fun launchElection(authToken: String, electionName: String)
     suspend fun castBallot(authToken: String, electionName: String, rankings: List<Ranking>): String
     suspend fun getTally(authToken: String, electionName: String): Tally
+
+    /** Admin: physical DynamoDB table names (vote_data, vote_event_log). Empty for InMemory. */
+    suspend fun listTables(authToken: String): List<String>
+
+    /** Admin: raw rows of a physical DynamoDB table. */
+    suspend fun tableData(authToken: String, tableName: String): TableData
+
+    /** Admin: virtual relational table names projected from DynamoDB items. */
+    suspend fun listDebugTables(authToken: String): List<String>
+
+    /** Admin: relational projection of one virtual table (users, elections, ballots, ...). */
+    suspend fun debugTableData(authToken: String, tableName: String): TableData
+
     fun logErrorToServer(error: Throwable)
 }

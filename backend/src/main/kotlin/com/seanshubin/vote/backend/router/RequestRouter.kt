@@ -101,7 +101,10 @@ class RequestRouter(
             target == "/tables" && method == "GET" -> handleListTables(req)
             target == "/tables/count" && method == "GET" -> handleTableCount(req)
             target == "/events/count" && method == "GET" -> handleEventCount(req)
+            target == "/events" && method == "GET" -> handleEventData(req)
             target.matches(Regex("/table/[^/]+")) && method == "GET" -> handleTableData(req)
+            target == "/debug-tables" && method == "GET" -> handleListDebugTables(req)
+            target.matches(Regex("/debug-table/[^/]+")) && method == "GET" -> handleDebugTableData(req)
             target == "/election" && method == "POST" -> handleAddElection(req)
             target == "/elections" && method == "GET" -> handleListElections(req)
             target == "/elections/count" && method == "GET" -> handleElectionCount(req)
@@ -326,6 +329,25 @@ class RequestRouter(
         val accessToken = extractAccessToken(req)
         val tableName = java.net.URLDecoder.decode(req.target.split("/").last(), "UTF-8")
         val tableData = service.tableData(accessToken, tableName)
+        return HttpResponse(200, json.encodeToString(tableData))
+    }
+
+    private fun handleListDebugTables(req: HttpRequest): HttpResponse {
+        val accessToken = extractAccessToken(req)
+        val tables = service.listDebugTables(accessToken)
+        return HttpResponse(200, json.encodeToString(tables))
+    }
+
+    private fun handleDebugTableData(req: HttpRequest): HttpResponse {
+        val accessToken = extractAccessToken(req)
+        val tableName = java.net.URLDecoder.decode(req.target.split("/").last(), "UTF-8")
+        val tableData = service.debugTableData(accessToken, tableName)
+        return HttpResponse(200, json.encodeToString(tableData))
+    }
+
+    private fun handleEventData(req: HttpRequest): HttpResponse {
+        val accessToken = extractAccessToken(req)
+        val tableData = service.eventData(accessToken)
         return HttpResponse(200, json.encodeToString(tableData))
     }
 
