@@ -56,7 +56,7 @@ fun TablesPage(
         }
     }
 
-    Div({ classes("container") }) {
+    Div({ classes("admin-container") }) {
         H1 { Text(title) }
 
         errorMessage?.let { msg ->
