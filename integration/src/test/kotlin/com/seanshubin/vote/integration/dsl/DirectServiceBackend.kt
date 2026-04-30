@@ -53,8 +53,8 @@ class DirectServiceBackend(private val service: Service) : ScenarioBackend {
         service.deleteElection(token, electionName)
     }
 
-    override fun castBallot(token: AccessToken, voterName: String, electionName: String, rankings: List<Ranking>) {
-        service.castBallot(token, voterName, electionName, rankings)
+    override fun castBallot(token: AccessToken, voterName: String, electionName: String, rankings: List<Ranking>): String {
+        return service.castBallot(token, voterName, electionName, rankings)
     }
 
     override fun getBallot(token: AccessToken, voterName: String, electionName: String): BallotSummary? {

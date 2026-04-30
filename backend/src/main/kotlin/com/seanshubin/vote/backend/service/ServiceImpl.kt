@@ -377,7 +377,7 @@ class ServiceImpl(
         voterName: String,
         electionName: String,
         rankings: List<Ranking>
-    ) {
+    ): String {
         // VALIDATION SECTION
         requirePermission(accessToken, Permission.VOTE)
 
@@ -414,6 +414,7 @@ class ServiceImpl(
             DomainEvent.BallotCast(validVoterName, validElectionName, validRankings, confirmation, whenCast)
         )
         synchronize()
+        return confirmation
     }
 
     override fun listRankings(accessToken: AccessToken, voterName: String, electionName: String): List<Ranking> {

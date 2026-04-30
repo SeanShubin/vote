@@ -545,6 +545,14 @@ class HttpApiTest {
             bobTokens.accessToken)
 
         assertEquals(200, response.statusCode())
+        // The body must be a JSON string literal (the confirmation ID), not an object.
+        // Returning {"status":"..."} here was the source of the frontend's
+        // "Unexpected JSON token at offset 0" deserialization crash.
+        val body = response.body()
+        assertTrue(
+            body.startsWith("\"") && body.endsWith("\"") && body.length > 2,
+            "cast ballot response should be a JSON string literal (the confirmation ID), got: $body"
+        )
     }
 
     // The "what" (request body voterName) must match the "who" (auth token).

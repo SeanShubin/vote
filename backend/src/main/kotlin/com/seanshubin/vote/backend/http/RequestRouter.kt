@@ -337,13 +337,16 @@ class RequestRouter(
         val accessToken = extractAccessToken(req)
         val electionName = extractElectionName(req.target)
         val castBallotRequest = json.decodeFromString<CastBallotRequest>(req.body)
-        service.castBallot(
+        val confirmation = service.castBallot(
             accessToken,
             castBallotRequest.voterName,
             electionName,
             castBallotRequest.rankings,
         )
-        return HttpResponse(200, json.encodeToString(mapOf("status" to "ballot cast")))
+        // Return the confirmation as a JSON string literal so ApiClient.castBallot's
+        // declared `String` return type deserializes cleanly. (Returning an object
+        // here was the source of the "Unexpected JSON token at offset 0" error.)
+        return HttpResponse(200, json.encodeToString(confirmation))
     }
 
     private fun handleGetBallot(req: HttpRequest): HttpResponse {

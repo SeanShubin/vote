@@ -86,11 +86,12 @@ class HttpRecordingBackend(
         recorder.delete("/election/$encodedName", token)
     }
 
-    override fun castBallot(token: AccessToken, voterName: String, electionName: String, rankings: List<Ranking>) {
+    override fun castBallot(token: AccessToken, voterName: String, electionName: String, rankings: List<Ranking>): String {
         val request = CastBallotRequest(voterName, rankings)
         val body = json.encodeToString(request)
         val encodedName = URLEncoder.encode(electionName, StandardCharsets.UTF_8)
-        recorder.post("/election/$encodedName/ballot", body, token)
+        val response = recorder.post("/election/$encodedName/ballot", body, token)
+        return json.decodeFromString<String>(response.body())
     }
 
     override fun getBallot(token: AccessToken, voterName: String, electionName: String): BallotSummary? {

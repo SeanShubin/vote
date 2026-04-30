@@ -24,7 +24,7 @@ interface ScenarioBackend {
     fun deleteElection(token: AccessToken, electionName: String)
 
     // Ballot operations
-    fun castBallot(token: AccessToken, voterName: String, electionName: String, rankings: List<Ranking>)
+    fun castBallot(token: AccessToken, voterName: String, electionName: String, rankings: List<Ranking>): String
     fun getBallot(token: AccessToken, voterName: String, electionName: String): BallotSummary?
 
     // Query operations
