@@ -118,6 +118,92 @@ aws logs delete-log-group \
 Lambda recreates the group on next invocation; CFN reconciles the
 retention policy on next deploy.
 
+## Inspecting application state
+
+The architectural premise of the project is that **natural keys make
+debugging obvious** — and the production tables follow that. Most state
+lives in the `vote_data` single table keyed by PK (entity) and SK
+(sub-entity or metadata). `vote_event_log` is the append-only audit trail.
+
+### Key prefix reference
+
+| PK              | SK                | What |
+|---|---|---|
+| `USER#alice`    | `METADATA`        | a registered user |
+| `ELECTION#Foo`  | `METADATA`        | election metadata |
+| `ELECTION#Foo`  | `CANDIDATE#Kotlin`| a candidate in election Foo |
+| `ELECTION#Foo`  | `VOTER#bob`       | bob is eligible to vote in Foo |
+| `ELECTION#Foo`  | `BALLOT#bob`      | bob's cast ballot in Foo |
+
+(Source of truth: `backend/.../repository/DynamoDbSingleTableSchema.kt`.)
+
+### Console UI (good for ad-hoc browsing)
+
+[DynamoDB → Tables → vote_data → Explore table items](https://us-east-1.console.aws.amazon.com/dynamodbv2/home?region=us-east-1#item-explorer?initialTagKey=&maximize=true&table=vote_data)
+— filter by Partition key (`PK = ELECTION#Foo`) to see everything in
+one election; "begins with" on Sort key (`SK begins with BALLOT#`) to
+narrow further. Same for `vote_event_log` to scroll the event stream.
+
+### AWS CLI (good for scripts and copy-paste debugging)
+
+```bash
+# Did alice register?
+aws dynamodb get-item --table-name vote_data --region us-east-1 \
+    --key '{"PK":{"S":"USER#alice"},"SK":{"S":"METADATA"}}'
+
+# Everything in election "Foo" (candidates, voters, ballots, metadata)
+aws dynamodb query --table-name vote_data --region us-east-1 \
+    --key-condition-expression "PK = :pk" \
+    --expression-attribute-values '{":pk":{"S":"ELECTION#Foo"}}'
+
+# Just the cast ballots in "Foo"
+aws dynamodb query --table-name vote_data --region us-east-1 \
+    --key-condition-expression "PK = :pk AND begins_with(SK, :sk)" \
+    --expression-attribute-values '{":pk":{"S":"ELECTION#Foo"},":sk":{"S":"BALLOT#"}}'
+
+# All registered users
+aws dynamodb scan --table-name vote_data --region us-east-1 \
+    --filter-expression "begins_with(PK, :p) AND SK = :s" \
+    --expression-attribute-values '{":p":{"S":"USER#"},":s":{"S":"METADATA"}}'
+
+# Tail the latest 20 domain events
+aws dynamodb scan --table-name vote_event_log --region us-east-1 --max-items 20
+```
+
+PowerShell quoting tip: replace single-quotes around JSON with backticks
+or use `--cli-input-json file://...` to avoid shell escape pain.
+
+### Two-views debugging (project's documented strategy)
+
+Per `docs/debugging-workflow.md`, when something looks wrong:
+
+1. **Relational projection first** — query the conceptual model (what
+   does the API say? what does `getUser` return?). Tells you **what** is wrong.
+2. **Raw storage second** — direct `vote_data` query. Tells you **how**
+   it's stored, exposing projection-vs-storage divergence.
+
+The CLI snippets above are the raw-storage view. The relational view
+in production is `curl https://api.pairwisevote.com/...` for whatever
+endpoint covers the question.
+
+## Lambda runtime metrics
+
+[Lambda → pairwisevote-frontend-backend → Monitor tab](https://us-east-1.console.aws.amazon.com/lambda/home?region=us-east-1#/functions/pairwisevote-frontend-backend?tab=monitoring)
+shows invocations, duration, errors, throttles, concurrent executions,
+and **SnapStart restore times** (the cold-start cost we care about).
+Most useful at-a-glance metric: the `Duration` chart's p50 vs p99.
+
+## Cost monitoring
+
+[Billing → Bills](https://us-east-1.console.aws.amazon.com/billing/home#/bills) —
+the entire stack should be **$0** at friend-group scale. Anything
+non-zero AWS line item that isn't Route 53 hosted zone (~$0.50/mo) is
+a misconfiguration signal.
+
+For active monitoring, set a [zero-spend budget alert](https://us-east-1.console.aws.amazon.com/billing/home#/budgets/create?budgetType=COST_BUDGET)
+($1/month threshold, email to seanshubin@gmail.com). Free, fires once if
+you ever leave the free tier.
+
 ## Single-terminal tail
 
 ```bash
