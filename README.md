@@ -374,6 +374,7 @@ vote/
 - **[docs/api-to-database-flow.md](docs/api-to-database-flow.md)** - Start here! Traces complete path from HTTP request to raw database storage
 - **[docs/architectural-insight.md](docs/architectural-insight.md)** - Why relational projection layer + optimized storage
 - **[docs/debugging-workflow.md](docs/debugging-workflow.md)** - How to debug using relational projection vs raw storage
+- **[docs/style-guide.md](docs/style-guide.md)** - UI conventions: aesthetic vs detailed pages, when to use each
 - **[schema-diagram/README.md](schema-diagram/README.md)** - Auto-generated schema diagrams (GraphViz, Mermaid, HTML)
 
 ### For Operators
