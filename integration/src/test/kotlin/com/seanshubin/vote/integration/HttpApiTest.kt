@@ -34,6 +34,7 @@ class HttpApiTester(private val port: Int = 9876) : AutoCloseable {
     private val httpClient: HttpClient
     private val json = Json { ignoreUnknownKeys = true }
     private val baseUrl = "http://localhost:$port"
+    val integrations: TestIntegrations
 
     // Sign tokens with the same secret the embedded server uses (the dev fallback
     // in ApplicationRunner). Tests pass AccessToken values around as session
@@ -42,7 +43,7 @@ class HttpApiTester(private val port: Int = 9876) : AutoCloseable {
     fun bearerJwt(token: AccessToken): String = tokenEncoder.encodeAccessToken(token)
 
     init {
-        val integrations = TestIntegrations()
+        integrations = TestIntegrations()
         val configuration = com.seanshubin.vote.backend.dependencies.Configuration(
             port = port,
             databaseConfig = DatabaseConfig.InMemory
@@ -175,6 +176,8 @@ class HttpApiTester(private val port: Int = 9876) : AutoCloseable {
     }
 
     fun deleteUser(userName: String, token: AccessToken): HttpResponse<String> = delete("/user/$userName", token)
+
+    fun wipeTestUsers(token: AccessToken): HttpResponse<String> = delete("/admin/test-users", token)
 
     // Elections
     fun createElection(electionName: String, token: AccessToken): HttpResponse<String> {
