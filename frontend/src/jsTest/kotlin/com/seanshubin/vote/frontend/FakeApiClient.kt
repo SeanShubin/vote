@@ -4,8 +4,10 @@ import com.seanshubin.vote.contract.ApiClient
 import com.seanshubin.vote.contract.AuthResponse
 import com.seanshubin.vote.domain.ElectionSummary
 import com.seanshubin.vote.domain.Ranking
+import com.seanshubin.vote.domain.Role
 import com.seanshubin.vote.domain.TableData
 import com.seanshubin.vote.domain.Tally
+import com.seanshubin.vote.domain.UserNameRole
 
 class FakeApiClient : ApiClient {
     val registerCalls = mutableListOf<RegisterCall>()
@@ -47,6 +49,12 @@ class FakeApiClient : ApiClient {
     val tableDataCalls = mutableListOf<String>()
     val listDebugTablesCalls = mutableListOf<Unit>()
     val debugTableDataCalls = mutableListOf<String>()
+    var listUsersResult: Result<List<UserNameRole>> = Result.success(emptyList())
+    var setRoleResult: Result<Unit> = Result.success(Unit)
+    var removeUserResult: Result<Unit> = Result.success(Unit)
+    val listUsersCalls = mutableListOf<Unit>()
+    val setRoleCalls = mutableListOf<SetRoleCall>()
+    val removeUserCalls = mutableListOf<String>()
 
     override suspend fun register(userName: String, email: String, password: String): AuthResponse {
         registerCalls.add(RegisterCall(userName, email, password))
@@ -142,6 +150,21 @@ class FakeApiClient : ApiClient {
         return debugTableDataResult.getOrThrow()
     }
 
+    override suspend fun listUsers(): List<UserNameRole> {
+        listUsersCalls.add(Unit)
+        return listUsersResult.getOrThrow()
+    }
+
+    override suspend fun setRole(userName: String, role: Role) {
+        setRoleCalls.add(SetRoleCall(userName, role))
+        setRoleResult.getOrThrow()
+    }
+
+    override suspend fun removeUser(userName: String) {
+        removeUserCalls.add(userName)
+        removeUserResult.getOrThrow()
+    }
+
     override fun logErrorToServer(error: Throwable) {
         loggedErrors.add(error)
     }
@@ -152,4 +175,5 @@ class FakeApiClient : ApiClient {
     data class SetEligibleVotersCall(val electionName: String, val voters: List<String>)
     data class CastBallotCall(val electionName: String, val rankings: List<Ranking>)
     data class ResetPasswordCall(val resetToken: String, val newPassword: String)
+    data class SetRoleCall(val userName: String, val role: Role)
 }

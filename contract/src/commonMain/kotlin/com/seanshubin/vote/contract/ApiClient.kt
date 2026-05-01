@@ -2,8 +2,10 @@ package com.seanshubin.vote.contract
 
 import com.seanshubin.vote.domain.ElectionSummary
 import com.seanshubin.vote.domain.Ranking
+import com.seanshubin.vote.domain.Role
 import com.seanshubin.vote.domain.TableData
 import com.seanshubin.vote.domain.Tally
+import com.seanshubin.vote.domain.UserNameRole
 
 /**
  * The API client owns its own auth state. Callers (UI pages) don't pass an
@@ -45,6 +47,22 @@ interface ApiClient {
     suspend fun launchElection(electionName: String)
     suspend fun castBallot(electionName: String, rankings: List<Ranking>): String
     suspend fun getTally(electionName: String): Tally
+
+    /**
+     * Admin: list all users with each one's current role and the roles the
+     * caller is allowed to assign. The backend computes [UserNameRole.allowedRoles]
+     * from the caller's authority — the UI can bind dropdowns directly to it.
+     */
+    suspend fun listUsers(): List<UserNameRole>
+
+    /**
+     * Admin: change a user's role. Promoting another user to OWNER triggers
+     * an atomic ownership transfer (the caller is demoted to AUDITOR).
+     */
+    suspend fun setRole(userName: String, role: Role)
+
+    /** Admin: remove a user. Only allowed against users with strictly lesser roles. */
+    suspend fun removeUser(userName: String)
 
     /** Admin: physical DynamoDB table names (vote_data, vote_event_log). Empty for InMemory. */
     suspend fun listTables(): List<String>

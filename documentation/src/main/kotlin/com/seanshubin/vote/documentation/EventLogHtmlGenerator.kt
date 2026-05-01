@@ -84,6 +84,10 @@ class EventLogHtmlGenerator(private val eventLog: EventLog) {
             <div class="detail-row"><span class="label">User:</span> ${event.userName}</div>
             <div class="detail-row"><span class="label">New Role:</span> ${event.newRole}</div>
         """.trimIndent()
+        is DomainEvent.OwnershipTransferred -> """
+            <div class="detail-row"><span class="label">From:</span> ${event.fromUserName}</div>
+            <div class="detail-row"><span class="label">To:</span> ${event.toUserName}</div>
+        """.trimIndent()
         is DomainEvent.UserRemoved -> """
             <div class="detail-row"><span class="label">User:</span> ${event.userName}</div>
         """.trimIndent()

@@ -70,6 +70,9 @@ class ScenarioHtmlGenerator(private val eventLog: EventLog) {
         is DomainEvent.UserRoleChanged ->
             "<strong>${event.userName}</strong> role changed to <strong>${event.newRole}</strong>"
 
+        is DomainEvent.OwnershipTransferred ->
+            "Ownership transferred from <strong>${event.fromUserName}</strong> to <strong>${event.toUserName}</strong>"
+
         is DomainEvent.UserPasswordChanged ->
             "<strong>${event.userName}</strong> changed password"
 

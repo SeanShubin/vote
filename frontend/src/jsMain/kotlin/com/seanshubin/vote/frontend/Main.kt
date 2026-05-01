@@ -85,6 +85,7 @@ fun VoteApp(apiClient: ApiClient) {
             onNavigateToElections = { router.navigate(Page.Elections) },
             onNavigateToRawTables = { router.navigate(Page.RawTables) },
             onNavigateToDebugTables = { router.navigate(Page.DebugTables) },
+            onNavigateToUserManagement = { router.navigate(Page.UserManagement) },
             onLogout = {
                 scope.launch {
                     try {
@@ -131,6 +132,15 @@ fun VoteApp(apiClient: ApiClient) {
             loadNames = { apiClient.listDebugTables() },
             loadData = { name -> apiClient.debugTableData(name) },
             onError = { apiClient.logErrorToServer(it) },
+            onBack = { router.navigate(Page.Home) },
+        )
+        is Page.UserManagement -> UserManagementPage(
+            apiClient = apiClient,
+            currentUserName = userName ?: "",
+            onSelfRoleChanged = { auth ->
+                userName = auth.userName
+                role = auth.role
+            },
             onBack = { router.navigate(Page.Home) },
         )
         is Page.PasswordResetRequest -> PasswordResetRequestPage(

@@ -21,6 +21,7 @@ class RouterTest {
         assertEquals("/elections/Lang", pageToPath(Page.ElectionDetail("Lang")))
         assertEquals("/admin/raw-tables", pageToPath(Page.RawTables))
         assertEquals("/admin/debug-tables", pageToPath(Page.DebugTables))
+        assertEquals("/admin/users", pageToPath(Page.UserManagement))
     }
 
     @Test
@@ -33,6 +34,7 @@ class RouterTest {
         assertEquals(Page.ElectionDetail("Lang"), pathToPage("/elections/Lang"))
         assertEquals(Page.RawTables, pathToPage("/admin/raw-tables"))
         assertEquals(Page.DebugTables, pathToPage("/admin/debug-tables"))
+        assertEquals(Page.UserManagement, pathToPage("/admin/users"))
     }
 
     @Test
@@ -75,5 +77,6 @@ class RouterTest {
         assertEquals(false, isPublicPage(Page.CreateElection))
         assertEquals(false, isPublicPage(Page.RawTables))
         assertEquals(false, isPublicPage(Page.DebugTables))
+        assertEquals(false, isPublicPage(Page.UserManagement))
     }
 }

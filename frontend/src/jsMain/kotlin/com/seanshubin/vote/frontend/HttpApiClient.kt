@@ -152,6 +152,25 @@ class HttpApiClient(
     override suspend fun getTally(electionName: String): Tally =
         getWithAuth("/election/${encodeURIComponent(electionName)}/tally")
 
+    override suspend fun listUsers(): List<UserNameRole> =
+        getWithAuth("/users")
+
+    override suspend fun setRole(userName: String, role: Role) {
+        val request = SetRoleRequest(role)
+        putWithAuth<SetRoleRequest, Unit>("/user/${encodeURIComponent(userName)}/role", request)
+    }
+
+    override suspend fun removeUser(userName: String) {
+        val response = fetchWithAutoRefresh("/user/${encodeURIComponent(userName)}") { token ->
+            RequestInit(
+                method = "DELETE",
+                headers = json("Authorization" to "Bearer $token"),
+                credentials = credentialsInclude,
+            )
+        }
+        handleResponse<Unit>(response)
+    }
+
     override suspend fun listTables(): List<String> =
         getWithAuth("/tables")
 

@@ -12,6 +12,7 @@ fun HomePage(
     onNavigateToElections: () -> Unit,
     onNavigateToRawTables: () -> Unit,
     onNavigateToDebugTables: () -> Unit,
+    onNavigateToUserManagement: () -> Unit,
     onLogout: () -> Unit
 ) {
     Div({ classes("container") }) {
@@ -34,6 +35,16 @@ fun HomePage(
                 onClick { onNavigateToElections() }
             }) {
                 Text("View Elections")
+            }
+
+            // ADMIN+ get user management. UX shortcut — the backend re-checks
+            // MANAGE_USERS on every request.
+            if (role != null && role >= Role.ADMIN) {
+                Button({
+                    onClick { onNavigateToUserManagement() }
+                }) {
+                    Text("Manage Users")
+                }
             }
 
             // AUDITOR+ get the admin data browser. The role gate here is a UX

@@ -115,6 +115,8 @@ class EventLogHtmlGeneratorWithHttp(private val recorder: DocumentationRecorder)
             "<strong>${event.name}</strong> registered with role <strong>${event.role}</strong>"
         is DomainEvent.UserRoleChanged ->
             "<strong>${event.userName}</strong> role changed to <strong>${event.newRole}</strong>"
+        is DomainEvent.OwnershipTransferred ->
+            "Ownership transferred from <strong>${event.fromUserName}</strong> to <strong>${event.toUserName}</strong>"
         is DomainEvent.UserPasswordChanged ->
             "<strong>${event.userName}</strong> changed password"
         is DomainEvent.UserEmailChanged ->
@@ -178,6 +180,10 @@ class EventLogHtmlGeneratorWithHttp(private val recorder: DocumentationRecorder)
         is DomainEvent.UserRoleChanged -> """
             <div class="detail-row"><span class="label">User:</span> ${event.userName}</div>
             <div class="detail-row"><span class="label">New Role:</span> ${event.newRole}</div>
+        """.trimIndent()
+        is DomainEvent.OwnershipTransferred -> """
+            <div class="detail-row"><span class="label">From:</span> ${event.fromUserName}</div>
+            <div class="detail-row"><span class="label">To:</span> ${event.toUserName}</div>
         """.trimIndent()
         is DomainEvent.UserRemoved -> """
             <div class="detail-row"><span class="label">User:</span> ${event.userName}</div>
