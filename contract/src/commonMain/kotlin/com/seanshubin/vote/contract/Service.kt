@@ -13,7 +13,7 @@ interface Service {
     fun setRole(accessToken: AccessToken, userName: String, role: Role)
     fun removeUser(accessToken: AccessToken, userName: String)
     fun listUsers(accessToken: AccessToken): List<UserNameRole>
-    fun addElection(accessToken: AccessToken, userName: String, electionName: String)
+    fun addElection(accessToken: AccessToken, userName: String, electionName: String, description: String)
     fun updateUser(accessToken: AccessToken, userName: String, userUpdates: UserUpdates)
     fun getUser(accessToken: AccessToken, userName: String): UserNameEmail
     fun getElection(accessToken: AccessToken, electionName: String): ElectionDetail

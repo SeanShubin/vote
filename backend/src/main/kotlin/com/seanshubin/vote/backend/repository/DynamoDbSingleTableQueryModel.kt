@@ -325,6 +325,8 @@ class DynamoDbSingleTableQueryModel(
         return ElectionSummary(
             electionName = item["election_name"]?.asS() ?: error("Missing election_name"),
             ownerName = item["owner_name"]?.asS() ?: error("Missing owner_name"),
+            // Older items may not have a description attribute — default to "".
+            description = item["description"]?.asS() ?: "",
         )
     }
 

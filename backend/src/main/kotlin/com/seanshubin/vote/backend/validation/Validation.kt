@@ -34,6 +34,20 @@ object Validation {
         return trimmed.replace(whitespacePattern, " ")
     }
 
+    /**
+     * Description is optional — empty string means "no description". Allows
+     * longer text than the name (which is a single-line label) since the
+     * description is a free-form blurb for voters. Whitespace is preserved
+     * apart from trimming the outer edges so paragraph breaks survive.
+     */
+    fun validateElectionDescription(description: String): String {
+        val trimmed = description.trim()
+        require(trimmed.length <= 2000) {
+            "Election description must not be more than 2000 characters long, was ${trimmed.length}"
+        }
+        return trimmed
+    }
+
     fun validateCandidateName(candidateName: String): String {
         val trimmed = candidateName.trim()
         require(trimmed.isNotEmpty()) { "Candidate name must not be empty" }

@@ -363,7 +363,12 @@ class RequestRouter(
     private fun handleAddElection(req: HttpRequest): HttpResponse {
         val accessToken = extractAccessToken(req)
         val addElectionRequest = json.decodeFromString<AddElectionRequest>(req.body)
-        service.addElection(accessToken, addElectionRequest.userName, addElectionRequest.electionName)
+        service.addElection(
+            accessToken,
+            addElectionRequest.userName,
+            addElectionRequest.electionName,
+            addElectionRequest.description,
+        )
         return HttpResponse(200, json.encodeToString(mapOf("status" to "election created")))
     }
 

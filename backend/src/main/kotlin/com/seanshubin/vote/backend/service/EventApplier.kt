@@ -54,7 +54,7 @@ class EventApplier(
                 commandModel.setEmail(authority, event.userName, event.newEmail)
             }
             is DomainEvent.ElectionCreated -> {
-                commandModel.addElection(authority, event.ownerName, event.electionName)
+                commandModel.addElection(authority, event.ownerName, event.electionName, event.description)
             }
             is DomainEvent.ElectionDeleted -> {
                 commandModel.deleteElection(authority, event.electionName)

@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS elections (
     election_name VARCHAR(255) PRIMARY KEY,
     owner_name VARCHAR(255) NOT NULL,
+    description TEXT NOT NULL,
     FOREIGN KEY (owner_name) REFERENCES users(name) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

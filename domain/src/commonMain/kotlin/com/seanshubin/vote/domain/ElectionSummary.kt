@@ -6,11 +6,13 @@ import kotlinx.serialization.Serializable
 data class ElectionSummary(
     val ownerName: String,
     val electionName: String,
+    val description: String = "",
 ) {
     fun toElectionDetail(candidateCount: Int, ballotCount: Int): ElectionDetail =
         ElectionDetail(
             ownerName = ownerName,
             electionName = electionName,
+            description = description,
             candidateCount = candidateCount,
             ballotCount = ballotCount,
         )

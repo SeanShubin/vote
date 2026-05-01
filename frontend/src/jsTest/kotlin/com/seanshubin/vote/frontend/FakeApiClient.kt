@@ -14,7 +14,7 @@ class FakeApiClient : ApiClient {
     val registerCalls = mutableListOf<RegisterCall>()
     val authenticateCalls = mutableListOf<AuthenticateCall>()
     val listElectionsCalls = mutableListOf<Unit>()
-    val createElectionCalls = mutableListOf<String>()
+    val createElectionCalls = mutableListOf<CreateElectionCall>()
     val getElectionCalls = mutableListOf<String>()
     val setCandidatesCalls = mutableListOf<SetCandidatesCall>()
     val listCandidatesCalls = mutableListOf<String>()
@@ -89,8 +89,8 @@ class FakeApiClient : ApiClient {
         return listElectionsResult.getOrThrow()
     }
 
-    override suspend fun createElection(electionName: String): String {
-        createElectionCalls.add(electionName)
+    override suspend fun createElection(electionName: String, description: String): String {
+        createElectionCalls.add(CreateElectionCall(electionName, description))
         return createElectionResult.getOrThrow()
     }
 
@@ -164,6 +164,7 @@ class FakeApiClient : ApiClient {
     }
 
     data class RegisterCall(val userName: String, val email: String, val password: String)
+    data class CreateElectionCall(val electionName: String, val description: String)
     data class AuthenticateCall(val nameOrEmail: String, val password: String)
     data class SetCandidatesCall(val electionName: String, val candidates: List<String>)
     data class CastBallotCall(val electionName: String, val rankings: List<Ranking>)

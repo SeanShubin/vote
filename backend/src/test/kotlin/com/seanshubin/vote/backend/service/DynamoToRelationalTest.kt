@@ -45,6 +45,7 @@ class DynamoToRelationalTest {
                 ElectionSummary(
                     electionName = "Lang",
                     ownerName = "alice",
+                    description = "favorite language poll",
                 ),
             ),
         )
@@ -53,7 +54,9 @@ class DynamoToRelationalTest {
         val data = sut.project(DynamoToRelational.ELECTIONS)
 
         assertEquals("owner_name (-> users.name)", data.columnNames[1])
+        assertEquals("description", data.columnNames[2])
         assertEquals("alice", data.rows[0][1])
+        assertEquals("favorite language poll", data.rows[0][2])
     }
 
     @Test

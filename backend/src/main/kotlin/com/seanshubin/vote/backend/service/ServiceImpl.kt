@@ -186,12 +186,13 @@ class ServiceImpl(
         }
     }
 
-    override fun addElection(accessToken: AccessToken, userName: String, electionName: String) {
+    override fun addElection(accessToken: AccessToken, userName: String, electionName: String, description: String) {
         // VALIDATION SECTION
         requirePermission(accessToken, Permission.USE_APPLICATION)
 
         val validUserName = Validation.validateUserName(userName)
         val validElectionName = Validation.validateElectionName(electionName)
+        val validDescription = Validation.validateElectionDescription(description)
 
         // Ensure user exists
         queryModel.searchUserByName(validUserName)
@@ -206,7 +207,7 @@ class ServiceImpl(
         eventLog.appendEvent(
             accessToken.userName,
             clock.now(),
-            DomainEvent.ElectionCreated(validUserName, validElectionName)
+            DomainEvent.ElectionCreated(validUserName, validElectionName, validDescription)
         )
         synchronize()
     }

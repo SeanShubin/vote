@@ -225,7 +225,7 @@ class DynamoDbSingleTableCommandModel(
     }
 
     // Election commands
-    override fun addElection(authority: String, owner: String, electionName: String) {
+    override fun addElection(authority: String, owner: String, electionName: String, description: String) {
         runBlocking {
             dynamoDb.putItem(PutItemRequest {
                 tableName = DynamoDbSingleTableSchema.MAIN_TABLE
@@ -235,6 +235,7 @@ class DynamoDbSingleTableCommandModel(
                     "entity_type" to AttributeValue.S("ELECTION"),
                     "election_name" to AttributeValue.S(electionName),
                     "owner_name" to AttributeValue.S(owner),
+                    "description" to AttributeValue.S(description),
                 )
             })
         }

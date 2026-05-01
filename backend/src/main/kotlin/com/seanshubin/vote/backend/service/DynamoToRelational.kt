@@ -45,11 +45,13 @@ class DynamoToRelational(
         val columns = listOf(
             "election_name",
             "owner_name (-> users.name)",
+            "description",
         )
         val rows = queryModel.listElections().map { e ->
             listOf<String?>(
                 e.electionName,
                 e.ownerName,
+                e.description,
             )
         }
         return TableData(ELECTIONS, columns, rows)

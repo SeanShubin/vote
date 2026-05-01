@@ -67,11 +67,12 @@ class MySqlCommandModel(
         }
     }
 
-    override fun addElection(authority: String, owner: String, electionName: String) {
+    override fun addElection(authority: String, owner: String, electionName: String, description: String) {
         val sql = queryLoader.load("election-insert")
         connection.prepareStatement(sql).use { stmt ->
             stmt.setString(1, electionName)
             stmt.setString(2, owner)
+            stmt.setString(3, description)
             stmt.executeUpdate()
         }
     }

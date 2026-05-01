@@ -320,6 +320,7 @@ class MySqlQueryModel(
         return ElectionSummary(
             electionName = getString("election_name"),
             ownerName = getString("owner_name"),
+            description = getString("description") ?: "",
         )
     }
 }

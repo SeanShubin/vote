@@ -120,6 +120,50 @@ object ComposeTestHelper {
     }
 
     /**
+     * Verifies that a textarea with a specific placeholder exists.
+     */
+    fun textAreaExistsByPlaceholder(containerId: String, placeholder: String): Boolean {
+        val queryFunction = js("""
+            (function(containerId, placeholder) {
+                return document.querySelector('#' + containerId + ' textarea[placeholder="' + placeholder + '"]');
+            })
+        """)
+        return queryFunction(containerId, placeholder) != null
+    }
+
+    /**
+     * Sets a textarea's value by finding it via placeholder text and dispatches the input event.
+     */
+    fun setTextAreaByPlaceholder(
+        containerId: String,
+        placeholder: String,
+        value: String
+    ) {
+        val setFunction = js("""
+            (function(containerId, placeholder, value) {
+                var area = document.querySelector('#' + containerId + ' textarea[placeholder="' + placeholder + '"]');
+                area.value = value;
+                area.dispatchEvent(new Event('input', { bubbles: true }));
+            })
+        """)
+        setFunction(containerId, placeholder, value)
+    }
+
+    /**
+     * Verifies that the test root contains the given text anywhere in its descendants.
+     */
+    fun textExistsInRoot(containerId: String, text: String): Boolean {
+        val queryFunction = js("""
+            (function(containerId, text) {
+                var root = document.getElementById(containerId);
+                if (!root) return false;
+                return root.textContent.indexOf(text) !== -1;
+            })
+        """)
+        return queryFunction(containerId, text) as Boolean
+    }
+
+    /**
      * Creates a test root element and returns an object to manage cleanup.
      * Use with Kotlin's `use {}` block for automatic cleanup:
      *

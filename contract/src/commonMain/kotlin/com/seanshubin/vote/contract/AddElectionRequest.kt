@@ -5,5 +5,6 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class AddElectionRequest(
     val userName: String,
-    val electionName: String
+    val electionName: String,
+    val description: String = "",
 )

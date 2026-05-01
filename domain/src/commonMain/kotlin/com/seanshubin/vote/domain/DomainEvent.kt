@@ -79,7 +79,10 @@ sealed interface DomainEvent {
     @SerialName("ElectionCreated")
     data class ElectionCreated(
         val ownerName: String,
-        val electionName: String
+        val electionName: String,
+        // Default to "" so existing event-log entries (which never had this field)
+        // still deserialize cleanly. New events always include it.
+        val description: String = ""
     ) : DomainEvent
 
     @Serializable

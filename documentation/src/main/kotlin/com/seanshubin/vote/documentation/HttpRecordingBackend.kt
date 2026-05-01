@@ -53,8 +53,8 @@ class HttpRecordingBackend(
         recorder.delete("/user/$targetUserName", token)
     }
 
-    override fun addElection(token: AccessToken, ownerName: String, electionName: String) {
-        val request = AddElectionRequest(ownerName, electionName)
+    override fun addElection(token: AccessToken, ownerName: String, electionName: String, description: String) {
+        val request = AddElectionRequest(ownerName, electionName, description)
         val body = json.encodeToString(request)
         recorder.post("/election", body, token)
     }

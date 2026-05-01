@@ -29,8 +29,8 @@ class DirectServiceBackend(private val service: Service) : ScenarioBackend {
         service.removeUser(token, targetUserName)
     }
 
-    override fun addElection(token: AccessToken, ownerName: String, electionName: String) {
-        service.addElection(token, ownerName, electionName)
+    override fun addElection(token: AccessToken, ownerName: String, electionName: String, description: String) {
+        service.addElection(token, ownerName, electionName, description)
     }
 
     override fun setCandidates(token: AccessToken, electionName: String, candidateNames: List<String>) {

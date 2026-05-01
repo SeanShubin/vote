@@ -40,7 +40,7 @@ interface ApiClient {
     suspend fun resetPassword(resetToken: String, newPassword: String)
 
     suspend fun listElections(): List<ElectionSummary>
-    suspend fun createElection(electionName: String): String
+    suspend fun createElection(electionName: String, description: String = ""): String
     suspend fun getElection(electionName: String): ElectionDetail
     suspend fun setCandidates(electionName: String, candidates: List<String>)
     suspend fun listCandidates(electionName: String): List<String>
