@@ -88,14 +88,6 @@ class ScenarioHtmlGenerator(private val eventLog: EventLog) {
         is DomainEvent.ElectionCreated ->
             "Election created by <strong>${event.ownerName}</strong>"
 
-        is DomainEvent.ElectionUpdated -> {
-            val changes = mutableListOf<String>()
-            event.allowVote?.let { changes.add("voting ${if (it) "enabled" else "disabled"}") }
-            event.allowEdit?.let { changes.add("editing ${if (it) "enabled" else "disabled"}") }
-            event.secretBallot?.let { changes.add("secret ballot ${if (it) "enabled" else "disabled"}") }
-            "Election updated: ${changes.joinToString(", ")}"
-        }
-
         is DomainEvent.ElectionDeleted ->
             "Election deleted"
 
@@ -104,12 +96,6 @@ class ScenarioHtmlGenerator(private val eventLog: EventLog) {
 
         is DomainEvent.CandidatesRemoved ->
             "Removed candidates: ${event.candidateNames.joinToString(", ") { "<strong>$it</strong>" }}"
-
-        is DomainEvent.VotersAdded ->
-            "Added eligible voters: ${event.voterNames.joinToString(", ") { "<strong>$it</strong>" }}"
-
-        is DomainEvent.VotersRemoved ->
-            "Removed eligible voters: ${event.voterNames.joinToString(", ") { "<strong>$it</strong>" }}"
 
         is DomainEvent.BallotCast -> {
             val rankings = event.rankings.sortedBy { it.rank }.take(3)

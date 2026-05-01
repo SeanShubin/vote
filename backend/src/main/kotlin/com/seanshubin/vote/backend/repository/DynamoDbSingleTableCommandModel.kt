@@ -3,7 +3,6 @@ package com.seanshubin.vote.backend.repository
 import aws.sdk.kotlin.services.dynamodb.DynamoDbClient
 import aws.sdk.kotlin.services.dynamodb.model.*
 import com.seanshubin.vote.contract.CommandModel
-import com.seanshubin.vote.domain.ElectionUpdates
 import com.seanshubin.vote.domain.Ranking
 import com.seanshubin.vote.domain.Role
 import kotlinx.coroutines.runBlocking
@@ -175,37 +174,6 @@ class DynamoDbSingleTableCommandModel(
                 })
             }
 
-            // Update eligible voter entries
-            val voterItems = dynamoDb.scan(ScanRequest {
-                tableName = DynamoDbSingleTableSchema.MAIN_TABLE
-                filterExpression = "begins_with(SK, :prefix) AND voter_name = :voter"
-                expressionAttributeValues = mapOf(
-                    ":prefix" to AttributeValue.S(DynamoDbSingleTableSchema.VOTER_PREFIX),
-                    ":voter" to AttributeValue.S(oldUserName)
-                )
-            }).items
-
-            voterItems?.forEach { voterItem ->
-                val pk = voterItem["PK"]?.asS() ?: return@forEach
-                val oldSk = voterItem["SK"]?.asS() ?: return@forEach
-
-                dynamoDb.deleteItem(DeleteItemRequest {
-                    tableName = DynamoDbSingleTableSchema.MAIN_TABLE
-                    key = mapOf(
-                        "PK" to AttributeValue.S(pk),
-                        "SK" to AttributeValue.S(oldSk)
-                    )
-                })
-
-                dynamoDb.putItem(PutItemRequest {
-                    tableName = DynamoDbSingleTableSchema.MAIN_TABLE
-                    item = voterItem.toMutableMap().apply {
-                        this["SK"] = AttributeValue.S(DynamoDbSingleTableSchema.voterSK(newUserName))
-                        this["voter_name"] = AttributeValue.S(newUserName)
-                    }
-                })
-            }
-
             // Update ballot entries
             val ballotItems = dynamoDb.scan(ScanRequest {
                 tableName = DynamoDbSingleTableSchema.MAIN_TABLE
@@ -267,67 +235,7 @@ class DynamoDbSingleTableCommandModel(
                     "entity_type" to AttributeValue.S("ELECTION"),
                     "election_name" to AttributeValue.S(electionName),
                     "owner_name" to AttributeValue.S(owner),
-                    "secret_ballot" to AttributeValue.Bool(false),
-                    "allow_vote" to AttributeValue.Bool(true),
-                    "allow_edit" to AttributeValue.Bool(true)
                 )
-            })
-        }
-    }
-
-    override fun updateElection(authority: String, electionName: String, updates: ElectionUpdates) {
-        val updateExpressions = mutableListOf<String>()
-        val attrValues = mutableMapOf<String, AttributeValue>()
-        val attrNames = mutableMapOf<String, String>()
-
-        updates.newElectionName?.let {
-            updateExpressions.add("#en = :en")
-            attrNames["#en"] = "election_name"
-            attrValues[":en"] = AttributeValue.S(it)
-        }
-        updates.secretBallot?.let {
-            updateExpressions.add("secret_ballot = :sb")
-            attrValues[":sb"] = AttributeValue.Bool(it)
-        }
-        if (updates.clearNoVotingBefore == true) {
-            updateExpressions.add("REMOVE no_voting_before")
-        } else {
-            updates.noVotingBefore?.let {
-                updateExpressions.add("no_voting_before = :nvb")
-                attrValues[":nvb"] = AttributeValue.N(it.toEpochMilliseconds().toString())
-            }
-        }
-        if (updates.clearNoVotingAfter == true) {
-            updateExpressions.add("REMOVE no_voting_after")
-        } else {
-            updates.noVotingAfter?.let {
-                updateExpressions.add("no_voting_after = :nva")
-                attrValues[":nva"] = AttributeValue.N(it.toEpochMilliseconds().toString())
-            }
-        }
-        updates.allowVote?.let {
-            updateExpressions.add("allow_vote = :av")
-            attrValues[":av"] = AttributeValue.Bool(it)
-        }
-        updates.allowEdit?.let {
-            updateExpressions.add("allow_edit = :ae")
-            attrValues[":ae"] = AttributeValue.Bool(it)
-        }
-
-        if (updateExpressions.isEmpty()) return
-
-        runBlocking {
-            dynamoDb.updateItem(UpdateItemRequest {
-                tableName = DynamoDbSingleTableSchema.MAIN_TABLE
-                key = mapOf(
-                    "PK" to AttributeValue.S(DynamoDbSingleTableSchema.electionPK(electionName)),
-                    "SK" to AttributeValue.S(DynamoDbSingleTableSchema.METADATA_SK)
-                )
-                updateExpression = "SET ${updateExpressions.joinToString(", ")}"
-                expressionAttributeValues = attrValues
-                if (attrNames.isNotEmpty()) {
-                    expressionAttributeNames = attrNames
-                }
             })
         }
     }
@@ -343,7 +251,7 @@ class DynamoDbSingleTableCommandModel(
                 )
             })
 
-            // Delete all related items (candidates, voters, ballots)
+            // Delete all related items (candidates, ballots)
             val relatedItems = dynamoDb.query(QueryRequest {
                 tableName = DynamoDbSingleTableSchema.MAIN_TABLE
                 keyConditionExpression = "PK = :pk"
@@ -395,42 +303,6 @@ class DynamoDbSingleTableCommandModel(
                     key = mapOf(
                         "PK" to AttributeValue.S(DynamoDbSingleTableSchema.electionPK(electionName)),
                         "SK" to AttributeValue.S(DynamoDbSingleTableSchema.candidateSK(candidateName))
-                    )
-                })
-            }
-        }
-    }
-
-    // Voter commands
-    override fun addVoters(authority: String, electionName: String, voterNames: List<String>) {
-        if (voterNames.isEmpty()) return
-
-        runBlocking {
-            for (voterName in voterNames) {
-                dynamoDb.putItem(PutItemRequest {
-                    tableName = DynamoDbSingleTableSchema.MAIN_TABLE
-                    item = mapOf(
-                        "PK" to AttributeValue.S(DynamoDbSingleTableSchema.electionPK(electionName)),
-                        "SK" to AttributeValue.S(DynamoDbSingleTableSchema.voterSK(voterName)),
-                        "entity_type" to AttributeValue.S("VOTER"),
-                        "election_name" to AttributeValue.S(electionName),
-                        "voter_name" to AttributeValue.S(voterName)
-                    )
-                })
-            }
-        }
-    }
-
-    override fun removeVoters(authority: String, electionName: String, voterNames: List<String>) {
-        if (voterNames.isEmpty()) return
-
-        runBlocking {
-            for (voterName in voterNames) {
-                dynamoDb.deleteItem(DeleteItemRequest {
-                    tableName = DynamoDbSingleTableSchema.MAIN_TABLE
-                    key = mapOf(
-                        "PK" to AttributeValue.S(DynamoDbSingleTableSchema.electionPK(electionName)),
-                        "SK" to AttributeValue.S(DynamoDbSingleTableSchema.voterSK(voterName))
                     )
                 })
             }

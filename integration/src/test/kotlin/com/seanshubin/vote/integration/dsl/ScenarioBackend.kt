@@ -18,9 +18,6 @@ interface ScenarioBackend {
     // Election operations
     fun addElection(token: AccessToken, ownerName: String, electionName: String)
     fun setCandidates(token: AccessToken, electionName: String, candidateNames: List<String>)
-    fun setEligibleVoters(token: AccessToken, electionName: String, voterNames: List<String>)
-    fun launchElection(token: AccessToken, electionName: String, allowEdit: Boolean)
-    fun finalizeElection(token: AccessToken, electionName: String)
     fun deleteElection(token: AccessToken, electionName: String)
 
     // Ballot operations
@@ -40,8 +37,6 @@ interface ScenarioBackend {
     fun getElection(token: AccessToken, electionName: String): ElectionDetail
     fun electionCount(token: AccessToken): Int
     fun listCandidates(token: AccessToken, electionName: String): List<String>
-    fun listEligibility(token: AccessToken, electionName: String): List<VoterEligibility>
-    fun isEligible(token: AccessToken, userName: String, electionName: String): Boolean
     fun listRankings(token: AccessToken, voterName: String, electionName: String): List<Ranking>
 
     // Admin/diagnostic operations
@@ -55,9 +50,6 @@ interface ScenarioBackend {
     fun refresh(refreshToken: com.seanshubin.vote.contract.RefreshToken): com.seanshubin.vote.contract.Tokens
     fun authenticateWithToken(accessToken: AccessToken): com.seanshubin.vote.contract.Tokens
     fun authenticate(nameOrEmail: String, password: String): com.seanshubin.vote.contract.Tokens
-
-    // Election updates
-    fun updateElection(token: AccessToken, electionName: String, updates: ElectionUpdates)
 
     // Email login
     fun sendLoginLinkByEmail(email: String, baseUri: String)

@@ -173,49 +173,18 @@ class DynamoDbSingleTableQueryModel(
         }
     }
 
-    // Voter queries
-    override fun voterCount(electionName: String): Int {
+    override fun ballotCount(electionName: String): Int {
         return runBlocking {
             val response = dynamoDb.query(QueryRequest {
                 tableName = DynamoDbSingleTableSchema.MAIN_TABLE
                 keyConditionExpression = "PK = :pk AND begins_with(SK, :sk_prefix)"
                 expressionAttributeValues = mapOf(
                     ":pk" to AttributeValue.S(DynamoDbSingleTableSchema.electionPK(electionName)),
-                    ":sk_prefix" to AttributeValue.S(DynamoDbSingleTableSchema.VOTER_PREFIX)
+                    ":sk_prefix" to AttributeValue.S(DynamoDbSingleTableSchema.BALLOT_PREFIX)
                 )
                 select = Select.Count
             })
             response.count ?: 0
-        }
-    }
-
-    override fun listVotersForElection(electionName: String): List<String> {
-        return runBlocking {
-            val response = dynamoDb.query(QueryRequest {
-                tableName = DynamoDbSingleTableSchema.MAIN_TABLE
-                keyConditionExpression = "PK = :pk AND begins_with(SK, :sk_prefix)"
-                expressionAttributeValues = mapOf(
-                    ":pk" to AttributeValue.S(DynamoDbSingleTableSchema.electionPK(electionName)),
-                    ":sk_prefix" to AttributeValue.S(DynamoDbSingleTableSchema.VOTER_PREFIX)
-                )
-            })
-
-            response.items?.mapNotNull { it["voter_name"]?.asS() } ?: emptyList()
-        }
-    }
-
-    override fun listVoterNames(): List<String> {
-        return runBlocking {
-            val response = dynamoDb.scan(ScanRequest {
-                tableName = DynamoDbSingleTableSchema.MAIN_TABLE
-                filterExpression = "begins_with(SK, :prefix)"
-                expressionAttributeValues = mapOf(
-                    ":prefix" to AttributeValue.S(DynamoDbSingleTableSchema.BALLOT_PREFIX)
-                )
-                projectionExpression = "voter_name"
-            })
-
-            response.items?.mapNotNull { it["voter_name"]?.asS() }?.distinct() ?: emptyList()
         }
     }
 
@@ -356,11 +325,6 @@ class DynamoDbSingleTableQueryModel(
         return ElectionSummary(
             electionName = item["election_name"]?.asS() ?: error("Missing election_name"),
             ownerName = item["owner_name"]?.asS() ?: error("Missing owner_name"),
-            secretBallot = item["secret_ballot"]?.asBool() ?: false,
-            noVotingBefore = item["no_voting_before"]?.asN()?.toLong()?.let { Instant.fromEpochMilliseconds(it) },
-            noVotingAfter = item["no_voting_after"]?.asN()?.toLong()?.let { Instant.fromEpochMilliseconds(it) },
-            allowEdit = item["allow_edit"]?.asBool() ?: true,
-            allowVote = item["allow_vote"]?.asBool() ?: true
         )
     }
 

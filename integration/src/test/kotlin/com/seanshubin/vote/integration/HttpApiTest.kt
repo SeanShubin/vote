@@ -212,33 +212,6 @@ class HttpApiTester(private val port: Int = 9876) : AutoCloseable {
         return put("/user/$userName/password", body, token)
     }
 
-    // Election Lifecycle
-    fun launchElection(electionName: String, allowEdit: Boolean, token: AccessToken): HttpResponse<String> {
-        val body = """{"allowEdit":$allowEdit}"""
-        return post("/election/$electionName/launch", body, token)
-    }
-
-    fun finalizeElection(electionName: String, token: AccessToken): HttpResponse<String> {
-        return post("/election/$electionName/finalize", "{}", token)
-    }
-
-    fun updateElection(electionName: String, body: String, token: AccessToken): HttpResponse<String> {
-        return put("/election/$electionName", body, token)
-    }
-
-    // Eligibility
-    fun setEligibleVoters(electionName: String, voterNames: List<String>, token: AccessToken): HttpResponse<String> {
-        val votersJson = voterNames.joinToString(",") { "\"$it\"" }
-        val body = """{"voterNames":[$votersJson]}"""
-        return put("/election/$electionName/eligibility", body, token)
-    }
-
-    fun getElectionEligibility(electionName: String, token: AccessToken): HttpResponse<String> =
-        get("/election/$electionName/eligibility", token)
-
-    fun checkVoterEligibility(electionName: String, voterName: String, token: AccessToken): HttpResponse<String> =
-        get("/election/$electionName/eligibility/$voterName", token)
-
     // Ballots and Rankings
     fun castBallot(electionName: String, body: String, token: AccessToken): HttpResponse<String> {
         return post("/election/$electionName/ballot", body, token)
@@ -636,38 +609,6 @@ class HttpApiTest {
     }
 
     @Test
-    fun `set eligible voters succeeds`() {
-        val tokens = tester.registerUserExpectSuccess("alice")
-        tester.registerUserExpectSuccess("bob")
-        tester.createElection("Test", tokens.accessToken)
-
-        val response = tester.setEligibleVoters("Test", listOf("bob"), tokens.accessToken)
-
-        assertEquals(200, response.statusCode())
-    }
-
-    @Test
-    fun `launch election succeeds`() {
-        val tokens = tester.registerUserExpectSuccess("alice")
-        tester.createElection("Test", tokens.accessToken)
-
-        val response = tester.launchElection("Test", true, tokens.accessToken)
-
-        assertEquals(200, response.statusCode())
-    }
-
-    @Test
-    fun `finalize election succeeds`() {
-        val tokens = tester.registerUserExpectSuccess("alice")
-        tester.createElection("Test", tokens.accessToken)
-        tester.launchElection("Test", false, tokens.accessToken)
-
-        val response = tester.finalizeElection("Test", tokens.accessToken)
-
-        assertEquals(200, response.statusCode())
-    }
-
-    @Test
     fun `delete election succeeds`() {
         val tokens = tester.registerUserExpectSuccess("alice")
         tester.createElection("Test", tokens.accessToken)
@@ -744,8 +685,6 @@ class HttpApiTest {
         val bobTokens = tester.registerUserExpectSuccess("bob")
         tester.createElection("Lang", aliceTokens.accessToken)
         tester.setCandidates("Lang", listOf("A", "B"), aliceTokens.accessToken)
-        tester.setEligibleVoters("Lang", listOf("bob"), aliceTokens.accessToken)
-        tester.launchElection("Lang", true, aliceTokens.accessToken)
 
         val response = tester.castBallot("Lang",
             """{"voterName":"bob","rankings":[{"candidateName":"A","rank":1}]}""",
@@ -771,8 +710,6 @@ class HttpApiTest {
         tester.registerUserExpectSuccess("bob")
         tester.createElection("Lang", aliceTokens.accessToken)
         tester.setCandidates("Lang", listOf("A", "B"), aliceTokens.accessToken)
-        tester.setEligibleVoters("Lang", listOf("alice", "bob"), aliceTokens.accessToken)
-        tester.launchElection("Lang", true, aliceTokens.accessToken)
 
         // Alice's token + voterName=bob in body — must be rejected.
         val response = tester.castBallot("Lang",
@@ -792,8 +729,6 @@ class HttpApiTest {
         val bobTokens = tester.registerUserExpectSuccess("bob")
         tester.createElection("Lang", aliceTokens.accessToken)
         tester.setCandidates("Lang", listOf("A", "B"), aliceTokens.accessToken)
-        tester.setEligibleVoters("Lang", listOf("bob"), aliceTokens.accessToken)
-        tester.launchElection("Lang", true, aliceTokens.accessToken)
         tester.castBallot("Lang",
             """{"voterName":"bob","rankings":[{"candidateName":"A","rank":1}]}""",
             bobTokens.accessToken)
@@ -810,8 +745,6 @@ class HttpApiTest {
         val bobTokens = tester.registerUserExpectSuccess("bob")
         tester.createElection("Lang", aliceTokens.accessToken)
         tester.setCandidates("Lang", listOf("A", "B"), aliceTokens.accessToken)
-        tester.setEligibleVoters("Lang", listOf("bob"), aliceTokens.accessToken)
-        tester.launchElection("Lang", true, aliceTokens.accessToken)
         tester.castBallot("Lang",
             """{"voterName":"bob","rankings":[{"candidateName":"A","rank":1},{"candidateName":"B","rank":2}]}""",
             bobTokens.accessToken)
@@ -871,38 +804,6 @@ class HttpApiTest {
         assertEquals(200, response.statusCode())
         val auth = tester.decodeJson(response, AuthResponse.serializer())
         assertEquals("alice", auth.userName)
-    }
-
-    @Test
-    fun `update election secret ballot succeeds`() {
-        val tokens = tester.registerUserExpectSuccess("alice")
-        tester.createElection("Test", tokens.accessToken)
-
-        val response = tester.updateElection("Test", """{"secretBallot":false}""", tokens.accessToken)
-
-        assertEquals(200, response.statusCode())
-    }
-
-    @Test
-    fun `update election voting time window succeeds`() {
-        val tokens = tester.registerUserExpectSuccess("alice")
-        tester.createElection("Test", tokens.accessToken)
-
-        val response = tester.updateElection("Test",
-            """{"noVotingBefore":"2024-01-01T00:00:00Z","noVotingAfter":"2024-12-31T23:59:59Z"}""",
-            tokens.accessToken)
-
-        assertEquals(200, response.statusCode())
-    }
-
-    @Test
-    fun `update election allowVote and allowEdit succeeds`() {
-        val tokens = tester.registerUserExpectSuccess("alice")
-        tester.createElection("Test", tokens.accessToken)
-
-        val response = tester.updateElection("Test", """{"allowVote":true,"allowEdit":false}""", tokens.accessToken)
-
-        assertEquals(200, response.statusCode())
     }
 
     @Test
@@ -1006,7 +907,7 @@ class HttpApiTest {
     }
 
     @Test
-    fun `list debug tables returns the eight schema names for AUDITOR-or-higher`() {
+    fun `list debug tables returns the seven schema names for AUDITOR-or-higher`() {
         // First registered user becomes OWNER, which inherits VIEW_SECRETS.
         val aliceTokens = tester.registerUserExpectSuccess("alice")
 
@@ -1014,7 +915,7 @@ class HttpApiTest {
 
         assertEquals(200, response.statusCode())
         val body = response.body()
-        listOf("users", "elections", "candidates", "eligible_voters",
+        listOf("users", "elections", "candidates",
                "ballots", "rankings", "sync_state", "event_log").forEach { name ->
             assertTrue(body.contains("\"$name\""), "Expected debug table '$name' in: $body")
         }
@@ -1075,8 +976,6 @@ class HttpApiTest {
         val bobTokens = tester.registerUserExpectSuccess("bob")
         tester.createElection("Lang", aliceTokens.accessToken)
         tester.setCandidates("Lang", listOf("A", "B"), aliceTokens.accessToken)
-        tester.setEligibleVoters("Lang", listOf("bob"), aliceTokens.accessToken)
-        tester.launchElection("Lang", true, aliceTokens.accessToken)
         tester.castBallot("Lang",
             """{"voterName":"bob","rankings":[{"candidateName":"A","rank":1}]}""",
             bobTokens.accessToken)
@@ -1086,49 +985,5 @@ class HttpApiTest {
         assertEquals(200, response.statusCode())
         assertTrue(response.body().contains("candidateName"))
         assertTrue(response.body().contains("rank"))
-    }
-
-    @Test
-    fun `get election eligibility list returns voters`() {
-        val aliceTokens = tester.registerUserExpectSuccess("alice")
-        tester.registerUserExpectSuccess("bob")
-        tester.createElection("Test", aliceTokens.accessToken)
-        tester.setEligibleVoters("Test", listOf("bob"), aliceTokens.accessToken)
-
-        val response = tester.getElectionEligibility("Test", aliceTokens.accessToken)
-
-        assertEquals(200, response.statusCode())
-        assertTrue(response.body().contains("bob"))
-    }
-
-    @Test
-    fun `check voter eligibility returns boolean`() {
-        val aliceTokens = tester.registerUserExpectSuccess("alice")
-        val bobTokens = tester.registerUserExpectSuccess("bob")
-        tester.createElection("Test", aliceTokens.accessToken)
-        tester.setEligibleVoters("Test", listOf("bob"), aliceTokens.accessToken)
-
-        val response = tester.checkVoterEligibility("Test", "bob", bobTokens.accessToken)
-
-        assertEquals(200, response.statusCode())
-        val body = response.body()
-        val eligible = body.substringAfter("\"eligible\":").substringBefore("}").trim().toBoolean()
-        assertEquals(true, eligible)
-    }
-
-    @Test
-    fun `check voter eligibility for ineligible voter returns false`() {
-        val aliceTokens = tester.registerUserExpectSuccess("alice")
-        val bobTokens = tester.registerUserExpectSuccess("bob")
-        tester.registerUserExpectSuccess("charlie")
-        tester.createElection("Test", aliceTokens.accessToken)
-        tester.setEligibleVoters("Test", listOf("bob"), aliceTokens.accessToken)
-
-        val response = tester.checkVoterEligibility("Test", "charlie", bobTokens.accessToken)
-
-        assertEquals(200, response.statusCode())
-        val body = response.body()
-        val eligible = body.substringAfter("\"eligible\":").substringBefore("}").trim().toBoolean()
-        assertEquals(false, eligible)
     }
 }

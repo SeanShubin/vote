@@ -183,25 +183,6 @@ internal class ScenarioLauncher(
         )
         Output.success("Added ${candidateNames.size} candidates")
 
-        val voterNames = voters.map { (it.jsonObject["displayName"] as JsonPrimitive).content }
-        http.ensureSuccess(
-            "PUT", "$electionPath/eligibility",
-            http.put(
-                "$electionPath/eligibility",
-                """{"voterNames":${jsonArrayOfStrings(voterNames)}}""",
-                ownerToken
-            ),
-            "Set eligibility"
-        )
-        Output.success("Added ${voterNames.size} eligible voters")
-
-        http.ensureSuccess(
-            "POST", "$electionPath/launch",
-            http.post("$electionPath/launch", """{"allowEdit":false}""", ownerToken),
-            "Launch election"
-        )
-        Output.success("Election launched (revealed ballots)")
-
         println("   Casting ${ballots.size} ballots...")
         ballots.forEach { ballotEl ->
             val ballot = ballotEl.jsonObject

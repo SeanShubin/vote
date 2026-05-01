@@ -1,5 +1,6 @@
 package com.seanshubin.vote.contract
 
+import com.seanshubin.vote.domain.ElectionDetail
 import com.seanshubin.vote.domain.ElectionSummary
 import com.seanshubin.vote.domain.Ranking
 import com.seanshubin.vote.domain.Role
@@ -40,11 +41,9 @@ interface ApiClient {
 
     suspend fun listElections(): List<ElectionSummary>
     suspend fun createElection(electionName: String): String
-    suspend fun getElection(electionName: String): ElectionSummary
+    suspend fun getElection(electionName: String): ElectionDetail
     suspend fun setCandidates(electionName: String, candidates: List<String>)
     suspend fun listCandidates(electionName: String): List<String>
-    suspend fun setEligibleVoters(electionName: String, voters: List<String>)
-    suspend fun launchElection(electionName: String)
     suspend fun castBallot(electionName: String, rankings: List<Ranking>): String
     suspend fun getTally(electionName: String): Tally
 

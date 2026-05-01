@@ -12,7 +12,6 @@ object DynamoDbSingleTableSchema {
     const val USER_PREFIX = "USER#"
     const val ELECTION_PREFIX = "ELECTION#"
     const val CANDIDATE_PREFIX = "CANDIDATE#"
-    const val VOTER_PREFIX = "VOTER#"
     const val BALLOT_PREFIX = "BALLOT#"
     const val METADATA_SK = "METADATA"
     const val SYNC_SK = "SYNC"
@@ -98,6 +97,5 @@ object DynamoDbSingleTableSchema {
     fun userPK(userName: String) = "$USER_PREFIX$userName"
     fun electionPK(electionName: String) = "$ELECTION_PREFIX$electionName"
     fun candidateSK(candidateName: String) = "$CANDIDATE_PREFIX$candidateName"
-    fun voterSK(voterName: String) = "$VOTER_PREFIX$voterName"
     fun ballotSK(voterName: String) = "$BALLOT_PREFIX$voterName"
 }

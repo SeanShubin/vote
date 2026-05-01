@@ -13,16 +13,13 @@ import com.seanshubin.vote.contract.CastBallotRequest
 import com.seanshubin.vote.contract.ChangePasswordRequest
 import com.seanshubin.vote.contract.ClientErrorRequest
 import com.seanshubin.vote.contract.ErrorResponse
-import com.seanshubin.vote.contract.LaunchElectionRequest
 import com.seanshubin.vote.contract.PasswordResetRequest
 import com.seanshubin.vote.contract.PasswordResetRequestRequest
 import com.seanshubin.vote.contract.RegisterRequest
 import com.seanshubin.vote.contract.Service
 import com.seanshubin.vote.contract.SetCandidatesRequest
-import com.seanshubin.vote.contract.SetEligibleVotersRequest
 import com.seanshubin.vote.contract.SetRoleRequest
 import com.seanshubin.vote.contract.Tokens
-import com.seanshubin.vote.domain.ElectionUpdates
 import com.seanshubin.vote.domain.Role
 import com.seanshubin.vote.domain.UserUpdates
 import kotlinx.serialization.encodeToString
@@ -113,19 +110,13 @@ class RequestRouter(
             target == "/elections" && method == "GET" -> handleListElections(req)
             target == "/elections/count" && method == "GET" -> handleElectionCount(req)
             target.matches(Regex("/election/[^/]+")) && method == "GET" -> handleGetElection(req)
-            target.matches(Regex("/election/[^/]+")) && method == "PUT" -> handleUpdateElection(req)
             target.matches(Regex("/election/[^/]+")) && method == "DELETE" -> handleDeleteElection(req)
-            target.matches(Regex("/election/[^/]+/launch")) && method == "POST" -> handleLaunchElection(req)
-            target.matches(Regex("/election/[^/]+/finalize")) && method == "POST" -> handleFinalizeElection(req)
             target.matches(Regex("/election/[^/]+/candidates")) && method == "PUT" -> handleSetCandidates(req)
             target.matches(Regex("/election/[^/]+/candidates")) && method == "GET" -> handleListCandidates(req)
             target.matches(Regex("/election/[^/]+/ballot")) && method == "POST" -> handleCastBallot(req)
             target.matches(Regex("/election/[^/]+/ballot/[^/]+")) && method == "GET" -> handleGetBallot(req)
             target.matches(Regex("/election/[^/]+/rankings/[^/]+")) && method == "GET" -> handleListRankings(req)
             target.matches(Regex("/election/[^/]+/tally")) && method == "GET" -> handleTally(req)
-            target.matches(Regex("/election/[^/]+/eligibility")) && method == "PUT" -> handleSetEligibleVoters(req)
-            target.matches(Regex("/election/[^/]+/eligibility")) && method == "GET" -> handleListEligibility(req)
-            target.matches(Regex("/election/[^/]+/eligibility/[^/]+")) && method == "GET" -> handleIsEligible(req)
             else -> errorResponse(404, "Not found: $method $target")
         }
     }
@@ -395,34 +386,11 @@ class RequestRouter(
         return HttpResponse(200, json.encodeToString(election))
     }
 
-    private fun handleUpdateElection(req: HttpRequest): HttpResponse {
-        val accessToken = extractAccessToken(req)
-        val electionName = extractElectionName(req.target)
-        val electionUpdates = json.decodeFromString<ElectionUpdates>(req.body)
-        service.updateElection(accessToken, electionName, electionUpdates)
-        return HttpResponse(200, json.encodeToString(mapOf("status" to "election updated")))
-    }
-
     private fun handleDeleteElection(req: HttpRequest): HttpResponse {
         val accessToken = extractAccessToken(req)
         val electionName = extractElectionName(req.target)
         service.deleteElection(accessToken, electionName)
         return HttpResponse(200, json.encodeToString(mapOf("status" to "election deleted")))
-    }
-
-    private fun handleLaunchElection(req: HttpRequest): HttpResponse {
-        val accessToken = extractAccessToken(req)
-        val electionName = extractElectionName(req.target)
-        val launchRequest = json.decodeFromString<LaunchElectionRequest>(req.body)
-        service.launchElection(accessToken, electionName, launchRequest.allowEdit)
-        return HttpResponse(200, json.encodeToString(mapOf("status" to "election launched")))
-    }
-
-    private fun handleFinalizeElection(req: HttpRequest): HttpResponse {
-        val accessToken = extractAccessToken(req)
-        val electionName = extractElectionName(req.target)
-        service.finalizeElection(accessToken, electionName)
-        return HttpResponse(200, json.encodeToString(mapOf("status" to "election finalized")))
     }
 
     private fun handleSetCandidates(req: HttpRequest): HttpResponse {
@@ -476,26 +444,4 @@ class RequestRouter(
         return HttpResponse(200, json.encodeToString(tally))
     }
 
-    private fun handleSetEligibleVoters(req: HttpRequest): HttpResponse {
-        val accessToken = extractAccessToken(req)
-        val electionName = extractElectionName(req.target)
-        val setEligibleVotersRequest = json.decodeFromString<SetEligibleVotersRequest>(req.body)
-        service.setEligibleVoters(accessToken, electionName, setEligibleVotersRequest.voterNames)
-        return HttpResponse(200, json.encodeToString(mapOf("status" to "eligible voters updated")))
-    }
-
-    private fun handleListEligibility(req: HttpRequest): HttpResponse {
-        val accessToken = extractAccessToken(req)
-        val electionName = extractElectionName(req.target)
-        val eligibility = service.listEligibility(accessToken, electionName)
-        return HttpResponse(200, json.encodeToString(eligibility))
-    }
-
-    private fun handleIsEligible(req: HttpRequest): HttpResponse {
-        val accessToken = extractAccessToken(req)
-        val electionName = extractElectionName(req.target)
-        val userName = extractVoterOrUserName(req.target)
-        val isEligible = service.isEligible(accessToken, userName, electionName)
-        return HttpResponse(200, json.encodeToString(mapOf("eligible" to isEligible)))
-    }
 }

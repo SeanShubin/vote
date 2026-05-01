@@ -127,6 +127,17 @@ button:disabled {
     cursor: not-allowed;
 }
 
+/*
+ * Adjacent buttons should breathe. The sibling combinator targets the gap
+ * between a button and the button right after it; standalone buttons stay
+ * unaffected. Containers that already use flex `gap` (.menu, .form, .tabs,
+ * .tab-strip) lay out vertically or have their own gap, so this extra
+ * left-margin lands harmlessly there.
+ */
+button + button {
+    margin-left: 0.5rem;
+}
+
 .error {
     padding: 1rem;
     background-color: #fee;

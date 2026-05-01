@@ -37,18 +37,6 @@ class DirectServiceBackend(private val service: Service) : ScenarioBackend {
         service.setCandidates(token, electionName, candidateNames)
     }
 
-    override fun setEligibleVoters(token: AccessToken, electionName: String, voterNames: List<String>) {
-        service.setEligibleVoters(token, electionName, voterNames)
-    }
-
-    override fun launchElection(token: AccessToken, electionName: String, allowEdit: Boolean) {
-        service.launchElection(token, electionName, allowEdit)
-    }
-
-    override fun finalizeElection(token: AccessToken, electionName: String) {
-        service.finalizeElection(token, electionName)
-    }
-
     override fun deleteElection(token: AccessToken, electionName: String) {
         service.deleteElection(token, electionName)
     }
@@ -93,14 +81,6 @@ class DirectServiceBackend(private val service: Service) : ScenarioBackend {
         return service.listCandidates(token, electionName)
     }
 
-    override fun listEligibility(token: AccessToken, electionName: String): List<VoterEligibility> {
-        return service.listEligibility(token, electionName)
-    }
-
-    override fun isEligible(token: AccessToken, userName: String, electionName: String): Boolean {
-        return service.isEligible(token, userName, electionName)
-    }
-
     override fun listRankings(token: AccessToken, voterName: String, electionName: String): List<Ranking> {
         return service.listRankings(token, voterName, electionName)
     }
@@ -135,10 +115,6 @@ class DirectServiceBackend(private val service: Service) : ScenarioBackend {
 
     override fun authenticate(nameOrEmail: String, password: String): com.seanshubin.vote.contract.Tokens {
         return service.authenticate(nameOrEmail, password)
-    }
-
-    override fun updateElection(token: AccessToken, electionName: String, updates: ElectionUpdates) {
-        service.updateElection(token, electionName, updates)
     }
 
     override fun sendLoginLinkByEmail(email: String, baseUri: String) {

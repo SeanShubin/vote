@@ -113,7 +113,7 @@ class HttpApiClient(
         return electionName
     }
 
-    override suspend fun getElection(electionName: String): ElectionSummary =
+    override suspend fun getElection(electionName: String): ElectionDetail =
         getWithAuth("/election/${encodeURIComponent(electionName)}")
 
     override suspend fun setCandidates(electionName: String, candidates: List<String>) {
@@ -126,22 +126,6 @@ class HttpApiClient(
 
     override suspend fun listCandidates(electionName: String): List<String> =
         getWithAuth("/election/${encodeURIComponent(electionName)}/candidates")
-
-    override suspend fun setEligibleVoters(electionName: String, voters: List<String>) {
-        val request = SetEligibleVotersRequest(voters)
-        putWithAuth<SetEligibleVotersRequest, Unit>(
-            "/election/${encodeURIComponent(electionName)}/eligibility",
-            request,
-        )
-    }
-
-    override suspend fun launchElection(electionName: String) {
-        val request = LaunchElectionRequest(allowEdit = true)
-        postWithAuth<LaunchElectionRequest, Unit>(
-            "/election/${encodeURIComponent(electionName)}/launch",
-            request,
-        )
-    }
 
     override suspend fun castBallot(electionName: String, rankings: List<Ranking>): String {
         val voterName = requireSession().userName

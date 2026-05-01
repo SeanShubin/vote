@@ -2,6 +2,7 @@ package com.seanshubin.vote.frontend
 
 import com.seanshubin.vote.contract.ApiClient
 import com.seanshubin.vote.contract.AuthResponse
+import com.seanshubin.vote.domain.ElectionDetail
 import com.seanshubin.vote.domain.ElectionSummary
 import com.seanshubin.vote.domain.Ranking
 import com.seanshubin.vote.domain.Role
@@ -17,8 +18,6 @@ class FakeApiClient : ApiClient {
     val getElectionCalls = mutableListOf<String>()
     val setCandidatesCalls = mutableListOf<SetCandidatesCall>()
     val listCandidatesCalls = mutableListOf<String>()
-    val setEligibleVotersCalls = mutableListOf<SetEligibleVotersCall>()
-    val launchElectionCalls = mutableListOf<String>()
     val castBallotCalls = mutableListOf<CastBallotCall>()
     val getTallyCalls = mutableListOf<String>()
     val deleteElectionCalls = mutableListOf<String>()
@@ -36,11 +35,9 @@ class FakeApiClient : ApiClient {
     val resetPasswordCalls = mutableListOf<ResetPasswordCall>()
     var listElectionsResult: Result<List<ElectionSummary>> = Result.success(emptyList())
     var createElectionResult: Result<String> = Result.success("")
-    var getElectionResult: Result<ElectionSummary> = Result.failure(Exception("Get election not configured"))
+    var getElectionResult: Result<ElectionDetail> = Result.failure(Exception("Get election not configured"))
     var setCandidatesResult: Result<Unit> = Result.success(Unit)
     var listCandidatesResult: Result<List<String>> = Result.success(emptyList())
-    var setEligibleVotersResult: Result<Unit> = Result.success(Unit)
-    var launchElectionResult: Result<Unit> = Result.success(Unit)
     var castBallotResult: Result<String> = Result.success("ballot-confirmation-123")
     var getTallyResult: Result<Tally> = Result.failure(Exception("Get tally not configured"))
     var deleteElectionResult: Result<Unit> = Result.success(Unit)
@@ -97,7 +94,7 @@ class FakeApiClient : ApiClient {
         return createElectionResult.getOrThrow()
     }
 
-    override suspend fun getElection(electionName: String): ElectionSummary {
+    override suspend fun getElection(electionName: String): ElectionDetail {
         getElectionCalls.add(electionName)
         return getElectionResult.getOrThrow()
     }
@@ -110,16 +107,6 @@ class FakeApiClient : ApiClient {
     override suspend fun listCandidates(electionName: String): List<String> {
         listCandidatesCalls.add(electionName)
         return listCandidatesResult.getOrThrow()
-    }
-
-    override suspend fun setEligibleVoters(electionName: String, voters: List<String>) {
-        setEligibleVotersCalls.add(SetEligibleVotersCall(electionName, voters))
-        setEligibleVotersResult.getOrThrow()
-    }
-
-    override suspend fun launchElection(electionName: String) {
-        launchElectionCalls.add(electionName)
-        launchElectionResult.getOrThrow()
     }
 
     override suspend fun castBallot(electionName: String, rankings: List<Ranking>): String {
@@ -179,7 +166,6 @@ class FakeApiClient : ApiClient {
     data class RegisterCall(val userName: String, val email: String, val password: String)
     data class AuthenticateCall(val nameOrEmail: String, val password: String)
     data class SetCandidatesCall(val electionName: String, val candidates: List<String>)
-    data class SetEligibleVotersCall(val electionName: String, val voters: List<String>)
     data class CastBallotCall(val electionName: String, val rankings: List<Ranking>)
     data class ResetPasswordCall(val resetToken: String, val newPassword: String)
     data class SetRoleCall(val userName: String, val role: Role)

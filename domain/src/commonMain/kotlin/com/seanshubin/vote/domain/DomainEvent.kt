@@ -83,17 +83,6 @@ sealed interface DomainEvent {
     ) : DomainEvent
 
     @Serializable
-    @SerialName("ElectionUpdated")
-    data class ElectionUpdated(
-        val electionName: String,
-        val secretBallot: Boolean? = null,
-        val noVotingBefore: Instant? = null,
-        val noVotingAfter: Instant? = null,
-        val allowEdit: Boolean? = null,
-        val allowVote: Boolean? = null
-    ) : DomainEvent
-
-    @Serializable
     @SerialName("ElectionDeleted")
     data class ElectionDeleted(
         val electionName: String
@@ -114,23 +103,6 @@ sealed interface DomainEvent {
     data class CandidatesRemoved(
         val electionName: String,
         val candidateNames: List<String>
-    ) : DomainEvent
-
-    /**
-     * Voter Eligibility Events
-     */
-    @Serializable
-    @SerialName("VotersAdded")
-    data class VotersAdded(
-        val electionName: String,
-        val voterNames: List<String>
-    ) : DomainEvent
-
-    @Serializable
-    @SerialName("VotersRemoved")
-    data class VotersRemoved(
-        val electionName: String,
-        val voterNames: List<String>
     ) : DomainEvent
 
     /**

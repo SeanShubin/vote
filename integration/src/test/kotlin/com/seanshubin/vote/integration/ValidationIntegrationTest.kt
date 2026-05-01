@@ -9,53 +9,12 @@ import kotlin.test.assertTrue
 class ValidationIntegrationTest {
 
     @Test
-    fun `castBallot validates voter eligibility`() {
-        val testContext = TestContext()
-        val alice = testContext.registerUser("alice")
-        val bob = testContext.registerUser("bob")
-
-        val election = alice.createElection("Test Election")
-        election.setCandidates("Candidate A", "Candidate B")
-        election.setEligibleVoters("alice") // Bob NOT eligible
-        election.launch()
-
-        // Bob should not be able to cast ballot - not eligible
-        val exception = assertFailsWith<IllegalArgumentException> {
-            bob.castBallot(election, "Candidate A" to 1, "Candidate B" to 2)
-        }
-        assertTrue(exception.message!!.contains("not eligible"))
-
-        // Verify no ballot was created
-        val ballots = testContext.database.listBallots("Test Election")
-        assertEquals(0, ballots.size)
-    }
-
-    @Test
-    fun `castBallot validates election allows voting`() {
-        val testContext = TestContext()
-        val alice = testContext.registerUser("alice")
-
-        val election = alice.createElection("Test Election")
-        election.setCandidates("Candidate A", "Candidate B")
-        election.setEligibleVoters("alice")
-        // Don't launch - election should not allow voting
-
-        // Should fail - voting not allowed
-        val exception = assertFailsWith<IllegalArgumentException> {
-            alice.castBallot(election, "Candidate A" to 1, "Candidate B" to 2)
-        }
-        assertTrue(exception.message!!.contains("not currently allowed"))
-    }
-
-    @Test
     fun `castBallot validates rankings match candidates`() {
         val testContext = TestContext()
         val alice = testContext.registerUser("alice")
 
         val election = alice.createElection("Test Election")
         election.setCandidates("Candidate A", "Candidate B")
-        election.setEligibleVoters("alice")
-        election.launch()
 
         // Try to vote for a candidate that doesn't exist
         val exception = assertFailsWith<IllegalArgumentException> {
@@ -114,49 +73,6 @@ class ValidationIntegrationTest {
         assertTrue(candidates.contains("Alice"))
         assertTrue(candidates.contains("Bob"))
         assertTrue(candidates.contains("Charlie"))
-    }
-
-    @Test
-    fun `setEligibleVoters rejects duplicate names`() {
-        val testContext = TestContext()
-        val alice = testContext.registerUser("alice")
-        testContext.registerUser("bob")
-
-        val election = alice.createElection("Test Election")
-
-        // Try to set voters with duplicates
-        val exception = assertFailsWith<IllegalArgumentException> {
-            election.setEligibleVoters("bob", "bob")
-        }
-        assertTrue(exception.message!!.contains("Duplicate"))
-    }
-
-    @Test
-    fun `setEligibleVoters rejects empty list`() {
-        val testContext = TestContext()
-        val alice = testContext.registerUser("alice")
-
-        val election = alice.createElection("Test Election")
-
-        // Try to set empty voter list
-        val exception = assertFailsWith<IllegalArgumentException> {
-            election.setEligibleVoters()
-        }
-        assertTrue(exception.message!!.contains("empty"))
-    }
-
-    @Test
-    fun `setEligibleVoters rejects unregistered users`() {
-        val testContext = TestContext()
-        val alice = testContext.registerUser("alice")
-
-        val election = alice.createElection("Test Election")
-
-        // Try to set unregistered user as eligible voter
-        val exception = assertFailsWith<IllegalArgumentException> {
-            election.setEligibleVoters("nonexistent")
-        }
-        assertTrue(exception.message!!.contains("unregistered"))
     }
 
     @Test
@@ -225,18 +141,13 @@ class ValidationIntegrationTest {
     }
 
     @Test
-    fun `castBallot validates ranking has positive rank`() {
+    fun `castBallot accepts valid rankings`() {
         val testContext = TestContext()
         val alice = testContext.registerUser("alice")
 
         val election = alice.createElection("Test Election")
         election.setCandidates("Candidate A", "Candidate B")
-        election.setEligibleVoters("alice")
-        election.launch()
 
-        // Try to cast ballot with negative rank - this would need to be done
-        // via direct API call since the DSL likely prevents it
-        // For now, we'll verify the validation exists by checking positive ranks work
         alice.castBallot(election, "Candidate A" to 1, "Candidate B" to 2)
 
         val ballots = testContext.database.listBallots("Test Election")

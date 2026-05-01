@@ -19,14 +19,13 @@ class DynamoToRelational(
     private val eventLog: EventLog,
 ) {
     fun listDebugTableNames(): List<String> = listOf(
-        USERS, ELECTIONS, CANDIDATES, ELIGIBLE_VOTERS, BALLOTS, RANKINGS, SYNC_STATE, EVENT_LOG,
+        USERS, ELECTIONS, CANDIDATES, BALLOTS, RANKINGS, SYNC_STATE, EVENT_LOG,
     )
 
     fun project(tableName: String): TableData = when (tableName) {
         USERS -> projectUsers()
         ELECTIONS -> projectElections()
         CANDIDATES -> projectCandidates()
-        ELIGIBLE_VOTERS -> projectEligibleVoters()
         BALLOTS -> projectBallots()
         RANKINGS -> projectRankings()
         SYNC_STATE -> projectSyncState()
@@ -46,21 +45,11 @@ class DynamoToRelational(
         val columns = listOf(
             "election_name",
             "owner_name (-> users.name)",
-            "secret_ballot",
-            "no_voting_before",
-            "no_voting_after",
-            "allow_edit",
-            "allow_vote",
         )
         val rows = queryModel.listElections().map { e ->
             listOf<String?>(
                 e.electionName,
                 e.ownerName,
-                e.secretBallot.toString(),
-                e.noVotingBefore?.toString(),
-                e.noVotingAfter?.toString(),
-                e.allowEdit.toString(),
-                e.allowVote.toString(),
             )
         }
         return TableData(ELECTIONS, columns, rows)
@@ -77,19 +66,6 @@ class DynamoToRelational(
             }
         }
         return TableData(CANDIDATES, columns, rows)
-    }
-
-    private fun projectEligibleVoters(): TableData {
-        val columns = listOf(
-            "election_name (-> elections.election_name)",
-            "voter_name (-> users.name)",
-        )
-        val rows = queryModel.listElections().flatMap { election ->
-            queryModel.listVotersForElection(election.electionName).map { voterName ->
-                listOf<String?>(election.electionName, voterName)
-            }
-        }
-        return TableData(ELIGIBLE_VOTERS, columns, rows)
     }
 
     private fun projectBallots(): TableData {
@@ -176,7 +152,6 @@ class DynamoToRelational(
         const val USERS = "users"
         const val ELECTIONS = "elections"
         const val CANDIDATES = "candidates"
-        const val ELIGIBLE_VOTERS = "eligible_voters"
         const val BALLOTS = "ballots"
         const val RANKINGS = "rankings"
         const val SYNC_STATE = "sync_state"

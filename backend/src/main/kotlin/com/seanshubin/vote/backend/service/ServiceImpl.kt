@@ -69,16 +69,6 @@ class ServiceImpl(
             is DomainEvent.ElectionCreated -> {
                 commandModel.addElection(authority, event.ownerName, event.electionName)
             }
-            is DomainEvent.ElectionUpdated -> {
-                val updates = ElectionUpdates(
-                    secretBallot = event.secretBallot,
-                    noVotingBefore = event.noVotingBefore,
-                    noVotingAfter = event.noVotingAfter,
-                    allowEdit = event.allowEdit,
-                    allowVote = event.allowVote
-                )
-                commandModel.updateElection(authority, event.electionName, updates)
-            }
             is DomainEvent.ElectionDeleted -> {
                 commandModel.deleteElection(authority, event.electionName)
             }
@@ -87,12 +77,6 @@ class ServiceImpl(
             }
             is DomainEvent.CandidatesRemoved -> {
                 commandModel.removeCandidates(authority, event.electionName, event.candidateNames)
-            }
-            is DomainEvent.VotersAdded -> {
-                commandModel.addVoters(authority, event.electionName, event.voterNames)
-            }
-            is DomainEvent.VotersRemoved -> {
-                commandModel.removeVoters(authority, event.electionName, event.voterNames)
             }
             is DomainEvent.BallotCast -> {
                 commandModel.castBallot(
@@ -300,38 +284,6 @@ class ServiceImpl(
         synchronize()
     }
 
-    override fun launchElection(accessToken: AccessToken, electionName: String, allowEdit: Boolean) {
-        requirePermission(accessToken, Permission.USE_APPLICATION)
-        requireIsElectionOwner(accessToken, electionName)
-        val updates = ElectionUpdates(allowVote = true, allowEdit = allowEdit)
-        updateElection(accessToken, electionName, updates)
-    }
-
-    override fun finalizeElection(accessToken: AccessToken, electionName: String) {
-        requirePermission(accessToken, Permission.USE_APPLICATION)
-        requireIsElectionOwner(accessToken, electionName)
-        val updates = ElectionUpdates(allowVote = false, allowEdit = false)
-        updateElection(accessToken, electionName, updates)
-    }
-
-    override fun updateElection(accessToken: AccessToken, electionName: String, electionUpdates: ElectionUpdates) {
-        requirePermission(accessToken, Permission.USE_APPLICATION)
-        requireIsElectionOwner(accessToken, electionName)
-        eventLog.appendEvent(
-            accessToken.userName,
-            clock.now(),
-            DomainEvent.ElectionUpdated(
-                electionName,
-                electionUpdates.secretBallot,
-                electionUpdates.noVotingBefore,
-                electionUpdates.noVotingAfter,
-                electionUpdates.allowEdit,
-                electionUpdates.allowVote
-            )
-        )
-        synchronize()
-    }
-
     override fun updateUser(accessToken: AccessToken, userName: String, userUpdates: UserUpdates) {
         // VALIDATION SECTION
         requirePermission(accessToken, Permission.USE_APPLICATION)
@@ -385,8 +337,8 @@ class ServiceImpl(
         val election = queryModel.searchElectionByName(electionName)
             ?: throw ServiceException(ServiceException.Category.NOT_FOUND, "Election not found: $electionName")
         val candidateCount = queryModel.candidateCount(electionName)
-        val voterCount = queryModel.voterCount(electionName)
-        return election.toElectionDetail(candidateCount, voterCount)
+        val ballotCount = queryModel.ballotCount(electionName)
+        return election.toElectionDetail(candidateCount, ballotCount)
     }
 
     override fun deleteElection(accessToken: AccessToken, electionName: String) {
@@ -501,13 +453,11 @@ class ServiceImpl(
             )
         }
 
-        val election = queryModel.searchElectionByName(validElectionName)
+        queryModel.searchElectionByName(validElectionName)
             ?: throw ServiceException(ServiceException.Category.NOT_FOUND, "Election not found: $validElectionName")
 
-        require(election.allowVote) { "Voting is not currently allowed for election: $validElectionName" }
-
-        val eligibleVoters = queryModel.listVotersForElection(validElectionName)
-        require(validVoterName in eligibleVoters) { "User $validVoterName is not eligible to vote in election: $validElectionName" }
+        // No is-launched check (elections are live as soon as they exist) and no
+        // eligibility list (anyone authenticated can vote on any election).
 
         val candidates = queryModel.listCandidates(validElectionName)
         Validation.validateRankingsMatchCandidates(validRankings, candidates)
@@ -529,47 +479,12 @@ class ServiceImpl(
     }
 
     override fun tally(accessToken: AccessToken, electionName: String): Tally {
-        val election = queryModel.searchElectionByName(electionName)
+        queryModel.searchElectionByName(electionName)
             ?: throw ServiceException(ServiceException.Category.NOT_FOUND, "Election not found: $electionName")
         val candidates = queryModel.listCandidates(electionName)
         val ballots = queryModel.listBallots(electionName)
-        return Tally.countBallots(electionName, election.secretBallot, candidates, ballots)
-    }
-
-    override fun listEligibility(accessToken: AccessToken, electionName: String): List<VoterEligibility> {
-        val eligibleVoters = queryModel.listVotersForElection(electionName)
-        val allUsers = queryModel.listUserNames()
-        return allUsers.map { userName ->
-            VoterEligibility(userName, eligibleVoters.contains(userName))
-        }
-    }
-
-    override fun setEligibleVoters(accessToken: AccessToken, electionName: String, voterNames: List<String>) {
-        // VALIDATION SECTION
-        requirePermission(accessToken, Permission.USE_APPLICATION)
-        requireIsElectionOwner(accessToken, electionName)
-
-        val validElectionName = Validation.validateElectionName(electionName)
-        val validVoterNames = Validation.validateVoterNames(voterNames)
-
-        // Verify all voters are registered users
-        val registeredUsers = queryModel.listUserNames()
-        val unregisteredVoters = validVoterNames.filter { it !in registeredUsers }
-        require(unregisteredVoters.isEmpty()) {
-            "Cannot set eligibility for unregistered users: ${unregisteredVoters.joinToString()}"
-        }
-
-        // DIFF COMPUTATION (pure logic, no side effects)
-        val existing = queryModel.listVotersForElection(validElectionName)
-        val changes = computeVoterChanges(validElectionName, existing, validVoterNames)
-
-        // EXECUTION SECTION
-        applyVoterEvents(accessToken.userName, changes)
-        synchronize()
-    }
-
-    override fun isEligible(accessToken: AccessToken, userName: String, electionName: String): Boolean {
-        return queryModel.listVotersForElection(electionName).contains(userName)
+        // Secret-ballot toggle dropped — tally always shows ranked ballots.
+        return Tally.countBallots(electionName, secretBallot = false, candidates, ballots)
     }
 
     override fun getBallot(accessToken: AccessToken, voterName: String, electionName: String): BallotSummary? {
@@ -711,41 +626,8 @@ class ServiceImpl(
         }
     }
 
-    private fun computeVoterChanges(
-        electionName: String,
-        existing: List<String>,
-        desired: List<String>
-    ): VoterChanges {
-        val toAdd = desired.filter { it !in existing }
-        val toRemove = existing.filter { it !in desired }
-        return VoterChanges(electionName, toAdd, toRemove)
-    }
-
-    private fun applyVoterEvents(authority: String, changes: VoterChanges) {
-        if (changes.toAdd.isNotEmpty()) {
-            eventLog.appendEvent(
-                authority,
-                clock.now(),
-                DomainEvent.VotersAdded(changes.electionName, changes.toAdd)
-            )
-        }
-        if (changes.toRemove.isNotEmpty()) {
-            eventLog.appendEvent(
-                authority,
-                clock.now(),
-                DomainEvent.VotersRemoved(changes.electionName, changes.toRemove)
-            )
-        }
-    }
-
     // Data classes for change computation
     private data class CandidateChanges(
-        val electionName: String,
-        val toAdd: List<String>,
-        val toRemove: List<String>
-    )
-
-    private data class VoterChanges(
         val electionName: String,
         val toAdd: List<String>,
         val toRemove: List<String>

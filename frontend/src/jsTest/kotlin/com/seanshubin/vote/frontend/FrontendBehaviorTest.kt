@@ -72,20 +72,10 @@ class FrontendBehaviorTest {
             ElectionSummary(
                 electionName = "Best Language",
                 ownerName = "alice",
-                secretBallot = true,
-                allowEdit = true,
-                allowVote = false,
-                noVotingBefore = null,
-                noVotingAfter = null
             ),
             ElectionSummary(
                 electionName = "Best Framework",
                 ownerName = "bob",
-                secretBallot = true,
-                allowEdit = false,
-                allowVote = true,
-                noVotingBefore = null,
-                noVotingAfter = null
             )
         )
         fakeClient.listElectionsResult = Result.success(expectedElections)
@@ -141,14 +131,11 @@ class FrontendBehaviorTest {
     @Test
     fun electionDetailPageLoadsElectionAndCandidatesOnMount() = runTest {
         val fakeClient = FakeApiClient()
-        val expectedElection = ElectionSummary(
+        val expectedElection = ElectionDetail(
             electionName = "Best Language",
             ownerName = "alice",
-            secretBallot = true,
-            allowEdit = true,
-            allowVote = false,
-            noVotingBefore = null,
-            noVotingAfter = null
+            candidateCount = 3,
+            ballotCount = 0,
         )
         val expectedCandidates = listOf("Kotlin", "Rust", "Go")
         fakeClient.getElectionResult = Result.success(expectedElection)
@@ -180,63 +167,13 @@ class FrontendBehaviorTest {
     @Test
     fun electionSetupLogsErrorWhenSavingCandidatesFails() = runTest {
         val fakeClient = FakeApiClient()
-        fakeClient.setCandidatesResult = Result.failure(Exception("Election already launched"))
+        fakeClient.setCandidatesResult = Result.failure(Exception("Permission denied"))
 
         val exception = assertFailsWith<Exception> {
             fakeClient.setCandidates("Best Language", listOf("Kotlin"))
         }
 
-        assertEquals("Election already launched", exception.message)
-        fakeClient.logErrorToServer(exception)
-        assertEquals(1, fakeClient.loggedErrors.size)
-    }
-
-    @Test
-    fun electionSetupSavesEligibleVoters() = runTest {
-        val fakeClient = FakeApiClient()
-        val voters = listOf("bob", "charlie", "dave")
-
-        fakeClient.setEligibleVoters("Best Language", voters)
-
-        assertEquals(1, fakeClient.setEligibleVotersCalls.size)
-        assertEquals("Best Language", fakeClient.setEligibleVotersCalls[0].electionName)
-        assertEquals(voters, fakeClient.setEligibleVotersCalls[0].voters)
-    }
-
-    @Test
-    fun electionSetupLogsErrorWhenSavingVotersFails() = runTest {
-        val fakeClient = FakeApiClient()
-        fakeClient.setEligibleVotersResult = Result.failure(Exception("Invalid voter name"))
-
-        val exception = assertFailsWith<Exception> {
-            fakeClient.setEligibleVoters("Best Language", listOf("invalid-user"))
-        }
-
-        assertEquals("Invalid voter name", exception.message)
-        fakeClient.logErrorToServer(exception)
-        assertEquals(1, fakeClient.loggedErrors.size)
-    }
-
-    @Test
-    fun electionSetupLaunchesElection() = runTest {
-        val fakeClient = FakeApiClient()
-
-        fakeClient.launchElection("Best Language")
-
-        assertEquals(1, fakeClient.launchElectionCalls.size)
-        assertEquals("Best Language", fakeClient.launchElectionCalls[0])
-    }
-
-    @Test
-    fun electionSetupLogsErrorWhenLaunchFails() = runTest {
-        val fakeClient = FakeApiClient()
-        fakeClient.launchElectionResult = Result.failure(Exception("Must set candidates first"))
-
-        val exception = assertFailsWith<Exception> {
-            fakeClient.launchElection("Best Language")
-        }
-
-        assertEquals("Must set candidates first", exception.message)
+        assertEquals("Permission denied", exception.message)
         fakeClient.logErrorToServer(exception)
         assertEquals(1, fakeClient.loggedErrors.size)
     }
@@ -262,13 +199,13 @@ class FrontendBehaviorTest {
     @Test
     fun votingViewLogsErrorWhenCastingBallotFails() = runTest {
         val fakeClient = FakeApiClient()
-        fakeClient.castBallotResult = Result.failure(Exception("Election not launched"))
+        fakeClient.castBallotResult = Result.failure(Exception("No active session"))
 
         val exception = assertFailsWith<Exception> {
             fakeClient.castBallot("Best Language", listOf(Ranking("Kotlin", 1)))
         }
 
-        assertEquals("Election not launched", exception.message)
+        assertEquals("No active session", exception.message)
         fakeClient.logErrorToServer(exception)
         assertEquals(1, fakeClient.loggedErrors.size)
     }
@@ -281,14 +218,11 @@ class FrontendBehaviorTest {
         )
         fakeClient.createElectionResult = Result.success("Best Language")
         fakeClient.getElectionResult = Result.success(
-            ElectionSummary(
+            ElectionDetail(
                 electionName = "Best Language",
                 ownerName = "alice",
-                secretBallot = true,
-                allowEdit = true,
-                allowVote = false,
-                noVotingBefore = null,
-                noVotingAfter = null
+                candidateCount = 3,
+                ballotCount = 0,
             )
         )
         fakeClient.listCandidatesResult = Result.success(listOf("Kotlin", "Rust", "Go"))
@@ -297,8 +231,6 @@ class FrontendBehaviorTest {
         fakeClient.register("alice", "alice@example.com", "password123")
         fakeClient.createElection("Best Language")
         fakeClient.setCandidates("Best Language", listOf("Kotlin", "Rust", "Go"))
-        fakeClient.setEligibleVoters("Best Language", listOf("bob"))
-        fakeClient.launchElection("Best Language")
         fakeClient.castBallot("Best Language", listOf(
             Ranking("Kotlin", 1),
             Ranking("Rust", 2),
@@ -308,8 +240,6 @@ class FrontendBehaviorTest {
         assertEquals(1, fakeClient.registerCalls.size)
         assertEquals(1, fakeClient.createElectionCalls.size)
         assertEquals(1, fakeClient.setCandidatesCalls.size)
-        assertEquals(1, fakeClient.setEligibleVotersCalls.size)
-        assertEquals(1, fakeClient.launchElectionCalls.size)
         assertEquals(1, fakeClient.castBallotCalls.size)
     }
 }

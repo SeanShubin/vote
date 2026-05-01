@@ -1,3 +1,3 @@
 SELECT COUNT(*) as count
-FROM eligible_voters
+FROM ballots
 WHERE election_name = ?

@@ -29,13 +29,13 @@ class InMemoryQueryModel(private val data: InMemoryData) : QueryModel {
         return data.candidates[electionName]?.size ?: 0
     }
 
-    override fun voterCount(electionName: String): Int {
-        return data.eligibleVoters[electionName]?.size ?: 0
+    override fun ballotCount(electionName: String): Int {
+        return data.ballots.values.count { it.electionName == electionName }
     }
 
     override fun tableCount(): Int {
-        // For in-memory, we consider: users, elections, candidates, eligibleVoters, ballots
-        return 5
+        // users, elections, candidates, ballots
+        return 4
     }
 
     override fun listUsers(): List<User> {
@@ -97,14 +97,6 @@ class InMemoryQueryModel(private val data: InMemoryData) : QueryModel {
         return data.ballots.values
             .filter { it.electionName == electionName }
             .map { it.toRevealedBallot() }
-    }
-
-    override fun listVoterNames(): List<String> {
-        return data.ballots.values.map { it.voterName }.distinct()
-    }
-
-    override fun listVotersForElection(electionName: String): List<String> {
-        return data.eligibleVoters[electionName]?.toList() ?: emptyList()
     }
 
     override fun listUserNames(): List<String> {

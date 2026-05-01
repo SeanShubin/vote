@@ -127,23 +127,12 @@ class EventLogHtmlGeneratorWithHttp(private val recorder: DocumentationRecorder)
             "<strong>${event.userName}</strong> removed"
         is DomainEvent.ElectionCreated ->
             "Election <strong>${event.electionName}</strong> created by <strong>${event.ownerName}</strong>"
-        is DomainEvent.ElectionUpdated -> {
-            val changes = mutableListOf<String>()
-            event.allowVote?.let { changes.add("voting ${if (it) "enabled" else "disabled"}") }
-            event.allowEdit?.let { changes.add("editing ${if (it) "enabled" else "disabled"}") }
-            event.secretBallot?.let { changes.add("secret ballot ${if (it) "enabled" else "disabled"}") }
-            "Election <strong>${event.electionName}</strong> updated: ${changes.joinToString(", ")}"
-        }
         is DomainEvent.ElectionDeleted ->
             "Election <strong>${event.electionName}</strong> deleted"
         is DomainEvent.CandidatesAdded ->
             "Added candidates to <strong>${event.electionName}</strong>: ${event.candidateNames.joinToString(", ")}"
         is DomainEvent.CandidatesRemoved ->
             "Removed candidates from <strong>${event.electionName}</strong>: ${event.candidateNames.joinToString(", ")}"
-        is DomainEvent.VotersAdded ->
-            "Added voters to <strong>${event.electionName}</strong>: ${event.voterNames.joinToString(", ")}"
-        is DomainEvent.VotersRemoved ->
-            "Removed voters from <strong>${event.electionName}</strong>: ${event.voterNames.joinToString(", ")}"
         is DomainEvent.BallotCast -> {
             val rankings = event.rankings.sortedBy { it.rank }.take(3)
                 .joinToString(" > ") { "${it.candidateName}" }
@@ -192,12 +181,6 @@ class EventLogHtmlGeneratorWithHttp(private val recorder: DocumentationRecorder)
             <div class="detail-row"><span class="label">Owner:</span> ${event.ownerName}</div>
             <div class="detail-row"><span class="label">Election:</span> ${event.electionName}</div>
         """.trimIndent()
-        is DomainEvent.ElectionUpdated -> """
-            <div class="detail-row"><span class="label">Election:</span> ${event.electionName}</div>
-            ${event.allowVote?.let { "<div class=\"detail-row\"><span class=\"label\">Allow Vote:</span> $it</div>" } ?: ""}
-            ${event.allowEdit?.let { "<div class=\"detail-row\"><span class=\"label\">Allow Edit:</span> $it</div>" } ?: ""}
-            ${event.secretBallot?.let { "<div class=\"detail-row\"><span class=\"label\">Secret Ballot:</span> $it</div>" } ?: ""}
-        """.trimIndent()
         is DomainEvent.ElectionDeleted -> """
             <div class="detail-row"><span class="label">Election:</span> ${event.electionName}</div>
         """.trimIndent()
@@ -208,14 +191,6 @@ class EventLogHtmlGeneratorWithHttp(private val recorder: DocumentationRecorder)
         is DomainEvent.CandidatesRemoved -> """
             <div class="detail-row"><span class="label">Election:</span> ${event.electionName}</div>
             <div class="detail-row"><span class="label">Candidates:</span> ${event.candidateNames.joinToString(", ")}</div>
-        """.trimIndent()
-        is DomainEvent.VotersAdded -> """
-            <div class="detail-row"><span class="label">Election:</span> ${event.electionName}</div>
-            <div class="detail-row"><span class="label">Voters:</span> ${event.voterNames.joinToString(", ")}</div>
-        """.trimIndent()
-        is DomainEvent.VotersRemoved -> """
-            <div class="detail-row"><span class="label">Election:</span> ${event.electionName}</div>
-            <div class="detail-row"><span class="label">Voters:</span> ${event.voterNames.joinToString(", ")}</div>
         """.trimIndent()
         is DomainEvent.BallotCast -> """
             <div class="detail-row"><span class="label">Voter:</span> ${event.voterName}</div>

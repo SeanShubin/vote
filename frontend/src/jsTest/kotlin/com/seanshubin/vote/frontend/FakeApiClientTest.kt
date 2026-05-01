@@ -70,11 +70,6 @@ class FakeApiClientTest {
             ElectionSummary(
                 electionName = "Best Language",
                 ownerName = "alice",
-                secretBallot = true,
-                allowEdit = true,
-                allowVote = false,
-                noVotingBefore = null,
-                noVotingAfter = null
             )
         )
         fakeClient.listElectionsResult = Result.success(expectedElections)
@@ -100,14 +95,11 @@ class FakeApiClientTest {
     @Test
     fun getElectionCapturesCallAndReturnsConfiguredResult() = runTest {
         val fakeClient = FakeApiClient()
-        val expectedElection = ElectionSummary(
+        val expectedElection = ElectionDetail(
             electionName = "Best Language",
             ownerName = "alice",
-            secretBallot = true,
-            allowEdit = true,
-            allowVote = false,
-            noVotingBefore = null,
-            noVotingAfter = null
+            candidateCount = 3,
+            ballotCount = 0,
         )
         fakeClient.getElectionResult = Result.success(expectedElection)
 
@@ -141,28 +133,6 @@ class FakeApiClientTest {
         assertEquals(1, fakeClient.listCandidatesCalls.size)
         assertEquals("Best Language", fakeClient.listCandidatesCalls[0])
         assertEquals(expectedCandidates, candidates)
-    }
-
-    @Test
-    fun setEligibleVotersCapturesCallWithVoterList() = runTest {
-        val fakeClient = FakeApiClient()
-        val voters = listOf("bob", "charlie")
-
-        fakeClient.setEligibleVoters("Best Language", voters)
-
-        assertEquals(1, fakeClient.setEligibleVotersCalls.size)
-        assertEquals("Best Language", fakeClient.setEligibleVotersCalls[0].electionName)
-        assertEquals(voters, fakeClient.setEligibleVotersCalls[0].voters)
-    }
-
-    @Test
-    fun launchElectionCapturesCall() = runTest {
-        val fakeClient = FakeApiClient()
-
-        fakeClient.launchElection("Best Language")
-
-        assertEquals(1, fakeClient.launchElectionCalls.size)
-        assertEquals("Best Language", fakeClient.launchElectionCalls[0])
     }
 
     @Test

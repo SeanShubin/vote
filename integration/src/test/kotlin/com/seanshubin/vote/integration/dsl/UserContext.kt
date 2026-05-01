@@ -77,11 +77,6 @@ class UserContext(
         return testContext.backend.listRankings(accessToken, userName, electionName)
     }
 
-    fun isEligible(electionName: String): Boolean {
-        testContext.backend.synchronize()
-        return testContext.backend.isEligible(accessToken, userName, electionName)
-    }
-
     fun listUsers(): List<com.seanshubin.vote.domain.UserNameRole> {
         testContext.backend.synchronize()
         return testContext.backend.listUsers(accessToken)

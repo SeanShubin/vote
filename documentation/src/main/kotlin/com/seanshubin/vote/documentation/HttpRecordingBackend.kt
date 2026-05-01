@@ -66,25 +66,6 @@ class HttpRecordingBackend(
         recorder.put("/election/$encodedName/candidates", body, token)
     }
 
-    override fun setEligibleVoters(token: AccessToken, electionName: String, voterNames: List<String>) {
-        val request = SetEligibleVotersRequest(voterNames)
-        val body = json.encodeToString(request)
-        val encodedName = URLEncoder.encode(electionName, StandardCharsets.UTF_8)
-        recorder.put("/election/$encodedName/eligibility", body, token)
-    }
-
-    override fun launchElection(token: AccessToken, electionName: String, allowEdit: Boolean) {
-        val request = LaunchElectionRequest(allowEdit)
-        val body = json.encodeToString(request)
-        val encodedName = URLEncoder.encode(electionName, StandardCharsets.UTF_8)
-        recorder.post("/election/$encodedName/launch", body, token)
-    }
-
-    override fun finalizeElection(token: AccessToken, electionName: String) {
-        val encodedName = URLEncoder.encode(electionName, StandardCharsets.UTF_8)
-        recorder.post("/election/$encodedName/finalize", "{}", token)
-    }
-
     override fun deleteElection(token: AccessToken, electionName: String) {
         val encodedName = URLEncoder.encode(electionName, StandardCharsets.UTF_8)
         recorder.delete("/election/$encodedName", token)
@@ -155,19 +136,6 @@ class HttpRecordingBackend(
         return json.decodeFromString<List<String>>(response.body())
     }
 
-    override fun listEligibility(token: AccessToken, electionName: String): List<VoterEligibility> {
-        val encodedName = URLEncoder.encode(electionName, StandardCharsets.UTF_8)
-        val response = recorder.get("/election/$encodedName/eligibility", token)
-        return json.decodeFromString<List<VoterEligibility>>(response.body())
-    }
-
-    override fun isEligible(token: AccessToken, userName: String, electionName: String): Boolean {
-        val encodedElection = URLEncoder.encode(electionName, StandardCharsets.UTF_8)
-        val encodedUser = URLEncoder.encode(userName, StandardCharsets.UTF_8)
-        val response = recorder.get("/election/$encodedElection/eligible/$encodedUser", token)
-        return response.body().toBoolean()
-    }
-
     override fun listRankings(token: AccessToken, voterName: String, electionName: String): List<Ranking> {
         val encodedElection = URLEncoder.encode(electionName, StandardCharsets.UTF_8)
         val encodedVoter = URLEncoder.encode(voterName, StandardCharsets.UTF_8)
@@ -222,12 +190,6 @@ class HttpRecordingBackend(
         // The recorder doesn't follow cookies, so we surface a stub RefreshToken.
         val auth = json.decodeFromString<AuthResponse>(response.body())
         return Tokens(AccessToken(auth.userName, auth.role), RefreshToken(auth.userName))
-    }
-
-    override fun updateElection(token: AccessToken, electionName: String, updates: ElectionUpdates) {
-        val body = json.encodeToString(updates)
-        val encodedName = URLEncoder.encode(electionName, StandardCharsets.UTF_8)
-        recorder.put("/election/$encodedName", body, token)
     }
 
     override fun sendLoginLinkByEmail(email: String, baseUri: String) {

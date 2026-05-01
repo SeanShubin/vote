@@ -91,29 +91,7 @@ class TestLifecycle : CliktCommand(name = "test-lifecycle") {
         log("   [OK] Candidates set")
         log("")
 
-        log("10. Set eligible voters")
-        http.ensureSuccess(
-            "PUT", "$electionPath/eligibility",
-            http.put(
-                "$electionPath/eligibility",
-                """{"voterNames":["alice","bob","charlie"]}""",
-                aliceToken
-            ),
-            "Set eligibility"
-        )
-        log("   [OK] Eligible voters set")
-        log("")
-
-        log("11. Launch election")
-        http.ensureSuccess(
-            "POST", "$electionPath/launch",
-            http.post("$electionPath/launch", """{"allowEdit":true}""", aliceToken),
-            "Launch election"
-        )
-        log("   [OK] Election launched")
-        log("")
-
-        log("12. Cast ballots")
+        log("10. Cast ballots")
         castBallot(
             http, electionPath, aliceToken, "alice",
             listOf("Kotlin" to 1, "Rust" to 2, "Python" to 3, "TypeScript" to 4)
@@ -137,16 +115,7 @@ class TestLifecycle : CliktCommand(name = "test-lifecycle") {
         log("   [OK] Found $electionCount election")
         log("")
 
-        log("14. Finalize election")
-        http.ensureSuccess(
-            "POST", "$electionPath/finalize",
-            http.post("$electionPath/finalize", "{}", aliceToken),
-            "Finalize election"
-        )
-        log("   [OK] Election finalized")
-        log("")
-
-        log("15. Delete election")
+        log("14. Delete election")
         http.ensureSuccess("DELETE", electionPath, http.delete(electionPath, aliceToken), "Delete election")
         log("   [OK] Election deleted")
         log("")

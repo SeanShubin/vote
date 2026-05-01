@@ -1,6 +1,6 @@
 package com.seanshubin.vote.frontend
 
-import com.seanshubin.vote.domain.ElectionSummary
+import com.seanshubin.vote.domain.ElectionDetail
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
 import org.jetbrains.compose.web.renderComposable
@@ -36,8 +36,8 @@ class ElectionDetailPageRenderTest {
         }
 
         // Setup methods
-        fun setupElectionSuccess(electionSummary: ElectionSummary) {
-            fakeClient.getElectionResult = Result.success(electionSummary)
+        fun setupElectionSuccess(electionDetail: ElectionDetail) {
+            fakeClient.getElectionResult = Result.success(electionDetail)
         }
 
         fun setupCandidatesSuccess(candidates: List<String>) {
@@ -84,8 +84,8 @@ class ElectionDetailPageRenderTest {
     fun electionDetailPageRendersWithHeading() = runTest {
         ElectionDetailPageTester(this).use { tester ->
             // given
-            val electionSummary = ElectionSummary("owner1", "Test Election")
-            tester.setupElectionSuccess(electionSummary)
+            val electionDetail = ElectionDetail("owner1", "Test Election", candidateCount = 2, ballotCount = 0)
+            tester.setupElectionSuccess(electionDetail)
             tester.setupCandidatesSuccess(listOf("Candidate 1", "Candidate 2"))
 
             // when
@@ -100,8 +100,8 @@ class ElectionDetailPageRenderTest {
     fun electionDetailPageNavigationTabsRender() = runTest {
         ElectionDetailPageTester(this).use { tester ->
             // given
-            val electionSummary = ElectionSummary("owner1", "Test Election")
-            tester.setupElectionSuccess(electionSummary)
+            val electionDetail = ElectionDetail("owner1", "Test Election", candidateCount = 2, ballotCount = 0)
+            tester.setupElectionSuccess(electionDetail)
             tester.setupCandidatesSuccess(listOf("Candidate 1", "Candidate 2"))
 
             // when

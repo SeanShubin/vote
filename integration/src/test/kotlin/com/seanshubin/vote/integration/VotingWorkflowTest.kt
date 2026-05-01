@@ -11,7 +11,7 @@ class VotingWorkflowTest {
     @Test
     fun `first user becomes owner`() {
         val testContext = TestContext()
-        val alice = testContext.registerUser("alice")
+        testContext.registerUser("alice")
 
         val user = testContext.database.findUser("alice")
         assertEquals(Role.OWNER, user.role)
@@ -21,7 +21,7 @@ class VotingWorkflowTest {
     fun `second user becomes regular user`() {
         val testContext = TestContext()
         testContext.registerUser("alice")
-        val bob = testContext.registerUser("bob")
+        testContext.registerUser("bob")
 
         val aliceUser = testContext.database.findUser("alice")
         val bobUser = testContext.database.findUser("bob")
@@ -46,14 +46,12 @@ class VotingWorkflowTest {
     }
 
     @Test
-    fun `voters can cast ballots after launch`() {
+    fun `voters can cast ballots — elections are live as soon as they exist`() {
         val testContext = TestContext()
         val (alice, bob, charlie) = testContext.registerUsers("alice", "bob", "charlie")
 
         val election = alice.createElection("Programming Language")
         election.setCandidates("Kotlin", "Rust", "Go")
-        election.setEligibleVoters("bob", "charlie")
-        election.launch()
 
         bob.castBallot(election, "Kotlin" to 1, "Rust" to 2, "Go" to 3)
         charlie.castBallot(election, "Rust" to 1, "Kotlin" to 2, "Go" to 3)
@@ -78,8 +76,6 @@ class VotingWorkflowTest {
 
         val election = alice.createElection("Best Fruit")
         election.setCandidates("Apple", "Banana", "Cherry")
-        election.setEligibleVoters("bob", "charlie", "david")
-        election.launch()
 
         // Bob: Apple > Banana > Cherry
         bob.castBallot(election, "Apple" to 1, "Banana" to 2, "Cherry" to 3)
@@ -96,38 +92,6 @@ class VotingWorkflowTest {
         val winner = tally.places.first()
         assertEquals(1, winner.rank)
         assertEquals("Apple", winner.candidateName)
-    }
-
-    @Test
-    fun `election lifecycle from creation to finalization`() {
-        val testContext = TestContext()
-        val (alice, bob) = testContext.registerUsers("alice", "bob")
-
-        val election = alice.createElection("Favorite Color")
-        assertEquals("alice", testContext.database.findElection("Favorite Color").ownerName)
-
-        election.setCandidates("Red", "Blue", "Green")
-        assertEquals(3, election.candidates.size)
-
-        election.setEligibleVoters("bob")
-        assertEquals(listOf("bob"), election.eligibleVoters)
-
-        election.launch()
-        val launchedElection = testContext.database.findElection("Favorite Color")
-        assertTrue(launchedElection.allowVote)
-
-        bob.castBallot(election, "Blue" to 1, "Red" to 2, "Green" to 3)
-
-        election.finalize()
-        val finalizedElection = testContext.database.findElection("Favorite Color")
-        assertEquals(false, finalizedElection.allowVote)
-        assertEquals(false, finalizedElection.allowEdit)
-
-        val events = testContext.events.all()
-        assertTrue(events.any { it is DomainEvent.ElectionCreated })
-        assertTrue(events.any { it is DomainEvent.CandidatesAdded })
-        assertTrue(events.any { it is DomainEvent.VotersAdded })
-        assertTrue(events.any { it is DomainEvent.BallotCast })
     }
 
     @Test
@@ -149,7 +113,7 @@ class VotingWorkflowTest {
     @Test
     fun `owner can remove users`() {
         val testContext = TestContext()
-        val (alice, bob) = testContext.registerUsers("alice", "bob")
+        val (alice, _) = testContext.registerUsers("alice", "bob")
 
         assertEquals(2, testContext.database.userCount())
 
@@ -167,7 +131,7 @@ class VotingWorkflowTest {
     @Test
     fun `owner can change user roles`() {
         val testContext = TestContext()
-        val (alice, bob) = testContext.registerUsers("alice", "bob")
+        val (alice, _) = testContext.registerUsers("alice", "bob")
 
         assertEquals(Role.USER, testContext.database.findUser("bob").role)
 
@@ -260,12 +224,9 @@ class VotingWorkflowTest {
 
         val election = alice.createElection("Programming Language")
         election.setCandidates("Kotlin", "Rust", "Go")
-        election.setEligibleVoters("bob")
-        election.launch()
 
         bob.castBallot(election, "Kotlin" to 1, "Rust" to 2, "Go" to 3)
 
-        val initialBallot = testContext.database.findBallot("bob", "Programming Language")
         val initialRankings = testContext.database.listRankings("bob", "Programming Language")
         assertEquals("Kotlin", initialRankings.first { it.rank == 1 }.candidateName)
 
@@ -281,7 +242,7 @@ class VotingWorkflowTest {
     @Test
     fun `token refresh returns new tokens`() {
         val testContext = TestContext()
-        val alice = testContext.registerUser("alice", "alice@example.com", "password")
+        testContext.registerUser("alice", "alice@example.com", "password")
 
         val tokens = testContext.backend.authenticate("alice", "password")
         val refreshToken = tokens.refreshToken
@@ -303,88 +264,6 @@ class VotingWorkflowTest {
         assertEquals("alice", newTokens.accessToken.userName)
         assertEquals(Role.OWNER, newTokens.accessToken.role)
         assertEquals("alice", newTokens.refreshToken.userName)
-    }
-
-    // NOTE: Election renaming is supported in MySQL and DynamoDB but not yet in InMemory implementation
-    // Skipping this test until InMemoryCommandModel supports newElectionName field
-    // @Test
-    // fun `can rename election`() { ... }
-
-    @Test
-    fun `can toggle secret ballot flag`() {
-        val testContext = TestContext()
-        val alice = testContext.registerUser("alice")
-
-        val election = alice.createElection("Test Election")
-        election.setCandidates("A", "B")
-
-        val initialElection = testContext.database.findElection("Test Election")
-        assertEquals(true, initialElection.secretBallot)
-
-        val updates = com.seanshubin.vote.domain.ElectionUpdates(secretBallot = false)
-        testContext.backend.updateElection(alice.accessToken, "Test Election", updates)
-        testContext.backend.synchronize()
-
-        val updatedElection = testContext.database.findElection("Test Election")
-        assertEquals(false, updatedElection.secretBallot)
-
-        val events = testContext.events.ofType<DomainEvent.ElectionUpdated>()
-        assertTrue(events.any { it.secretBallot == false })
-    }
-
-    @Test
-    fun `can set voting time window`() {
-        val testContext = TestContext()
-        val alice = testContext.registerUser("alice")
-
-        val election = alice.createElection("Test Election")
-        election.setCandidates("A", "B")
-
-        val now = testContext.integrations.clock.now()
-        val oneHourLater = kotlinx.datetime.Instant.fromEpochMilliseconds(now.toEpochMilliseconds() + 3600000)
-        val twoHoursLater = kotlinx.datetime.Instant.fromEpochMilliseconds(now.toEpochMilliseconds() + 7200000)
-
-        val updates = com.seanshubin.vote.domain.ElectionUpdates(
-            noVotingBefore = oneHourLater,
-            noVotingAfter = twoHoursLater
-        )
-        testContext.backend.updateElection(alice.accessToken, "Test Election", updates)
-        testContext.backend.synchronize()
-
-        val updatedElection = testContext.database.findElection("Test Election")
-        assertEquals(oneHourLater, updatedElection.noVotingBefore)
-        assertEquals(twoHoursLater, updatedElection.noVotingAfter)
-
-        val events = testContext.events.ofType<DomainEvent.ElectionUpdated>()
-        assertTrue(events.any { it.noVotingBefore == oneHourLater && it.noVotingAfter == twoHoursLater })
-    }
-
-    // NOTE: Clearing voting time windows is supported in MySQL and DynamoDB but not yet in InMemory implementation
-    // Skipping this test until InMemoryCommandModel handles clearNoVotingBefore/clearNoVotingAfter flags
-    // @Test
-    // fun `can clear voting time window`() { ... }
-
-    @Test
-    fun `can directly set allowVote and allowEdit flags`() {
-        val testContext = TestContext()
-        val alice = testContext.registerUser("alice")
-
-        val election = alice.createElection("Test Election")
-        election.setCandidates("A", "B")
-
-        val updates = com.seanshubin.vote.domain.ElectionUpdates(
-            allowVote = true,
-            allowEdit = false
-        )
-        testContext.backend.updateElection(alice.accessToken, "Test Election", updates)
-        testContext.backend.synchronize()
-
-        val updatedElection = testContext.database.findElection("Test Election")
-        assertEquals(true, updatedElection.allowVote)
-        assertEquals(false, updatedElection.allowEdit)
-
-        val events = testContext.events.ofType<DomainEvent.ElectionUpdated>()
-        assertTrue(events.any { it.allowVote == true && it.allowEdit == false })
     }
 
     @Test

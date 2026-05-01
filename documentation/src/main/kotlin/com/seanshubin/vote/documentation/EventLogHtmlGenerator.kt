@@ -95,12 +95,6 @@ class EventLogHtmlGenerator(private val eventLog: EventLog) {
             <div class="detail-row"><span class="label">Owner:</span> ${event.ownerName}</div>
             <div class="detail-row"><span class="label">Election:</span> ${event.electionName}</div>
         """.trimIndent()
-        is DomainEvent.ElectionUpdated -> """
-            <div class="detail-row"><span class="label">Election:</span> ${event.electionName}</div>
-            ${event.allowVote?.let { "<div class=\"detail-row\"><span class=\"label\">Allow Vote:</span> $it</div>" } ?: ""}
-            ${event.allowEdit?.let { "<div class=\"detail-row\"><span class=\"label\">Allow Edit:</span> $it</div>" } ?: ""}
-            ${event.secretBallot?.let { "<div class=\"detail-row\"><span class=\"label\">Secret Ballot:</span> $it</div>" } ?: ""}
-        """.trimIndent()
         is DomainEvent.ElectionDeleted -> """
             <div class="detail-row"><span class="label">Election:</span> ${event.electionName}</div>
         """.trimIndent()
@@ -111,14 +105,6 @@ class EventLogHtmlGenerator(private val eventLog: EventLog) {
         is DomainEvent.CandidatesRemoved -> """
             <div class="detail-row"><span class="label">Election:</span> ${event.electionName}</div>
             <div class="detail-row"><span class="label">Candidates:</span> ${event.candidateNames.joinToString(", ")}</div>
-        """.trimIndent()
-        is DomainEvent.VotersAdded -> """
-            <div class="detail-row"><span class="label">Election:</span> ${event.electionName}</div>
-            <div class="detail-row"><span class="label">Voters:</span> ${event.voterNames.joinToString(", ")}</div>
-        """.trimIndent()
-        is DomainEvent.VotersRemoved -> """
-            <div class="detail-row"><span class="label">Election:</span> ${event.electionName}</div>
-            <div class="detail-row"><span class="label">Voters:</span> ${event.voterNames.joinToString(", ")}</div>
         """.trimIndent()
         is DomainEvent.BallotCast -> """
             <div class="detail-row"><span class="label">Voter:</span> ${event.voterName}</div>

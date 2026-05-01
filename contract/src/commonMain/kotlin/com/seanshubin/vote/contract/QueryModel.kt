@@ -10,7 +10,7 @@ interface QueryModel {
     fun userCount(): Int
     fun electionCount(): Int
     fun candidateCount(electionName: String): Int
-    fun voterCount(electionName: String): Int
+    fun ballotCount(electionName: String): Int
     fun tableCount(): Int
     fun listUsers(): List<User>
     fun listElections(): List<ElectionSummary>
@@ -22,8 +22,6 @@ interface QueryModel {
     fun listRankings(electionName: String): List<VoterElectionCandidateRank>
     fun searchBallot(voterName: String, electionName: String): BallotSummary?
     fun listBallots(electionName: String): List<Ballot.Revealed>
-    fun listVoterNames(): List<String>
-    fun listVotersForElection(electionName: String): List<String>
     fun listUserNames(): List<String>
     fun listPermissions(role: Role): List<Permission>
 }

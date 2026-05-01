@@ -19,14 +19,13 @@ CREATE TABLE IF NOT EXISTS users (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Command Model Projection: Elections
+-- Simplified to just name + owner. The previous toggles (secret_ballot, allow_edit,
+-- allow_vote, no_voting_before/after) and the eligible_voters table were dropped:
+-- elections are live as soon as they exist, anyone can vote, and the only
+-- moderation is delete-by-owner-or-ADMIN.
 CREATE TABLE IF NOT EXISTS elections (
     election_name VARCHAR(255) PRIMARY KEY,
     owner_name VARCHAR(255) NOT NULL,
-    secret_ballot BOOLEAN,
-    no_voting_before TIMESTAMP,
-    no_voting_after TIMESTAMP,
-    allow_edit BOOLEAN,
-    allow_vote BOOLEAN,
     FOREIGN KEY (owner_name) REFERENCES users(name) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -36,15 +35,6 @@ CREATE TABLE IF NOT EXISTS candidates (
     candidate_name VARCHAR(255) NOT NULL,
     PRIMARY KEY (election_name, candidate_name),
     FOREIGN KEY (election_name) REFERENCES elections(election_name) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- Command Model Projection: Eligible Voters
-CREATE TABLE IF NOT EXISTS eligible_voters (
-    election_name VARCHAR(255) NOT NULL,
-    voter_name VARCHAR(255) NOT NULL,
-    PRIMARY KEY (election_name, voter_name),
-    FOREIGN KEY (election_name) REFERENCES elections(election_name) ON DELETE CASCADE,
-    FOREIGN KEY (voter_name) REFERENCES users(name) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Command Model Projection: Ballots

@@ -81,6 +81,6 @@ class ScenarioCompatibilityTest {
         assertTrue(lastSynced!! > 0, "Should have synced events")
 
         val eventCount = provider.eventLog.eventCount()
-        assertTrue(eventCount > 20, "Should have many events logged (actual: $eventCount)")
+        assertTrue(eventCount >= 15, "Should have many events logged (actual: $eventCount)")
     }
 }

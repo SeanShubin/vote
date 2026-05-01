@@ -14,9 +14,6 @@ interface Service {
     fun removeUser(accessToken: AccessToken, userName: String)
     fun listUsers(accessToken: AccessToken): List<UserNameRole>
     fun addElection(accessToken: AccessToken, userName: String, electionName: String)
-    fun launchElection(accessToken: AccessToken, electionName: String, allowEdit: Boolean)
-    fun finalizeElection(accessToken: AccessToken, electionName: String)
-    fun updateElection(accessToken: AccessToken, electionName: String, electionUpdates: ElectionUpdates)
     fun updateUser(accessToken: AccessToken, userName: String, userUpdates: UserUpdates)
     fun getUser(accessToken: AccessToken, userName: String): UserNameEmail
     fun getElection(accessToken: AccessToken, electionName: String): ElectionDetail
@@ -36,9 +33,6 @@ interface Service {
     fun castBallot(accessToken: AccessToken, voterName: String, electionName: String, rankings: List<Ranking>): String
     fun listRankings(accessToken: AccessToken, voterName: String, electionName: String): List<Ranking>
     fun tally(accessToken: AccessToken, electionName: String): Tally
-    fun listEligibility(accessToken: AccessToken, electionName: String): List<VoterEligibility>
-    fun setEligibleVoters(accessToken: AccessToken, electionName: String, voterNames: List<String>)
-    fun isEligible(accessToken: AccessToken, userName: String, electionName: String): Boolean
     fun getBallot(accessToken: AccessToken, voterName: String, electionName: String): BallotSummary?
     fun changePassword(accessToken: AccessToken, userName: String, password: String)
     fun sendLoginLinkByEmail(email: String, baseUri: String)

@@ -1,6 +1,5 @@
 package com.seanshubin.vote.contract
 
-import com.seanshubin.vote.domain.ElectionUpdates
 import com.seanshubin.vote.domain.Ranking
 import com.seanshubin.vote.domain.Role
 import kotlinx.datetime.Instant
@@ -21,12 +20,9 @@ interface CommandModel {
     fun setRole(authority: String, userName: String, role: Role)
     fun removeUser(authority: String, userName: String)
     fun addElection(authority: String, owner: String, electionName: String)
-    fun updateElection(authority: String, electionName: String, updates: ElectionUpdates)
     fun deleteElection(authority: String, electionName: String)
     fun addCandidates(authority: String, electionName: String, candidateNames: List<String>)
     fun removeCandidates(authority: String, electionName: String, candidateNames: List<String>)
-    fun addVoters(authority: String, electionName: String, voterNames: List<String>)
-    fun removeVoters(authority: String, electionName: String, voterNames: List<String>)
 
     fun castBallot(
         authority: String,

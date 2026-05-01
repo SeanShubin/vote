@@ -45,11 +45,6 @@ class DynamoToRelationalTest {
                 ElectionSummary(
                     electionName = "Lang",
                     ownerName = "alice",
-                    secretBallot = true,
-                    noVotingBefore = null,
-                    noVotingAfter = null,
-                    allowEdit = true,
-                    allowVote = false,
                 ),
             ),
         )
@@ -78,21 +73,6 @@ class DynamoToRelationalTest {
         assertEquals(listOf("E1", "a"), rows[0])
         assertEquals(listOf("E1", "b"), rows[1])
         assertEquals(listOf("E2", "c"), rows[2])
-    }
-
-    @Test
-    fun `eligible_voters projection emits one row per (election, voter)`() {
-        val qm = stubQueryModel(
-            elections = listOf(election("E1")),
-            votersForElection = mapOf("E1" to listOf("bob", "carol")),
-        )
-        val sut = DynamoToRelational(qm, stubEventLog())
-
-        val rows = sut.project(DynamoToRelational.ELIGIBLE_VOTERS).rows
-
-        assertEquals(2, rows.size)
-        assertEquals(listOf("E1", "bob"), rows[0])
-        assertEquals(listOf("E1", "carol"), rows[1])
     }
 
     @Test
@@ -182,11 +162,11 @@ class DynamoToRelationalTest {
     }
 
     @Test
-    fun `listDebugTableNames returns the eight schema names`() {
+    fun `listDebugTableNames returns the seven schema names`() {
         val sut = DynamoToRelational(stubQueryModel(), stubEventLog())
         assertEquals(
             listOf(
-                "users", "elections", "candidates", "eligible_voters",
+                "users", "elections", "candidates",
                 "ballots", "rankings", "sync_state", "event_log",
             ),
             sut.listDebugTableNames(),
@@ -198,25 +178,18 @@ class DynamoToRelationalTest {
     private fun election(name: String, owner: String = "alice") = ElectionSummary(
         electionName = name,
         ownerName = owner,
-        secretBallot = true,
-        noVotingBefore = null,
-        noVotingAfter = null,
-        allowEdit = true,
-        allowVote = false,
     )
 
     private fun stubQueryModel(
         users: List<User> = emptyList(),
         elections: List<ElectionSummary> = emptyList(),
         candidates: Map<String, List<String>> = emptyMap(),
-        votersForElection: Map<String, List<String>> = emptyMap(),
         ballots: Map<String, List<Ballot.Revealed>> = emptyMap(),
         lastSynced: Long? = null,
     ): QueryModel = object : QueryModel {
         override fun listUsers() = users
         override fun listElections() = elections
         override fun listCandidates(electionName: String) = candidates[electionName] ?: emptyList()
-        override fun listVotersForElection(electionName: String) = votersForElection[electionName] ?: emptyList()
         override fun listBallots(electionName: String) = ballots[electionName] ?: emptyList()
         override fun lastSynced() = lastSynced
 
@@ -228,7 +201,7 @@ class DynamoToRelationalTest {
         override fun userCount() = users.size
         override fun electionCount() = elections.size
         override fun candidateCount(electionName: String) = listCandidates(electionName).size
-        override fun voterCount(electionName: String) = listVotersForElection(electionName).size
+        override fun ballotCount(electionName: String) = listBallots(electionName).size
         override fun tableCount() = 0
         override fun roleHasPermission(role: Role, permission: Permission): Boolean = true
         override fun searchElectionByName(name: String): ElectionSummary? =
@@ -236,7 +209,6 @@ class DynamoToRelationalTest {
         override fun listRankings(voterName: String, electionName: String): List<Ranking> = emptyList()
         override fun listRankings(electionName: String): List<VoterElectionCandidateRank> = emptyList()
         override fun searchBallot(voterName: String, electionName: String): BallotSummary? = null
-        override fun listVoterNames(): List<String> = emptyList()
         override fun listUserNames(): List<String> = users.map { it.name }
         override fun listPermissions(role: Role): List<Permission> = emptyList()
     }

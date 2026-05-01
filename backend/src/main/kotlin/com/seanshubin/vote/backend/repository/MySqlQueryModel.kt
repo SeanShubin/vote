@@ -102,8 +102,8 @@ class MySqlQueryModel(
         }
     }
 
-    override fun voterCount(electionName: String): Int {
-        val sql = queryLoader.load("voter-count")
+    override fun ballotCount(electionName: String): Int {
+        val sql = queryLoader.load("ballot-count")
         return connection.prepareStatement(sql).use { stmt ->
             stmt.setString(1, electionName)
             val rs = stmt.executeQuery()
@@ -116,8 +116,8 @@ class MySqlQueryModel(
     }
 
     override fun tableCount(): Int {
-        // Count number of tables in the database (event_log, users, elections, candidates, eligible_voters, ballots, rankings, sync_state)
-        return 8
+        // event_log, users, elections, candidates, ballots, rankings, sync_state
+        return 7
     }
 
     override fun listUsers(): List<User> {
@@ -290,31 +290,6 @@ class MySqlQueryModel(
         val whenCast: Instant
     )
 
-    override fun listVoterNames(): List<String> {
-        val sql = queryLoader.load("ballot-select-distinct-voters")
-        return connection.prepareStatement(sql).use { stmt ->
-            val rs = stmt.executeQuery()
-            buildList {
-                while (rs.next()) {
-                    add(rs.getString("voter_name"))
-                }
-            }
-        }
-    }
-
-    override fun listVotersForElection(electionName: String): List<String> {
-        val sql = queryLoader.load("eligible-voter-select-by-election")
-        return connection.prepareStatement(sql).use { stmt ->
-            stmt.setString(1, electionName)
-            val rs = stmt.executeQuery()
-            buildList {
-                while (rs.next()) {
-                    add(rs.getString("voter_name"))
-                }
-            }
-        }
-    }
-
     override fun listUserNames(): List<String> {
         val sql = queryLoader.load("user-select-names")
         return connection.prepareStatement(sql).use { stmt ->
@@ -345,15 +320,6 @@ class MySqlQueryModel(
         return ElectionSummary(
             electionName = getString("election_name"),
             ownerName = getString("owner_name"),
-            secretBallot = getBoolean("secret_ballot"),
-            noVotingBefore = getTimestamp("no_voting_before")?.let {
-                Instant.fromEpochMilliseconds(it.time)
-            },
-            noVotingAfter = getTimestamp("no_voting_after")?.let {
-                Instant.fromEpochMilliseconds(it.time)
-            },
-            allowEdit = getBoolean("allow_edit"),
-            allowVote = getBoolean("allow_vote")
         )
     }
 }

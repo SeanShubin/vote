@@ -7,23 +7,10 @@ class ElectionContext(
     val name: String,
     private val owner: UserContext
 ) {
+    val electionName: String get() = name
+
     fun setCandidates(vararg names: String) {
         testContext.backend.setCandidates(owner.accessToken, name, names.toList())
-        testContext.backend.synchronize()
-    }
-
-    fun setEligibleVoters(vararg names: String) {
-        testContext.backend.setEligibleVoters(owner.accessToken, name, names.toList())
-        testContext.backend.synchronize()
-    }
-
-    fun launch(allowEdit: Boolean = true) {
-        testContext.backend.launchElection(owner.accessToken, name, allowEdit)
-        testContext.backend.synchronize()
-    }
-
-    fun finalize() {
-        testContext.backend.finalizeElection(owner.accessToken, name)
         testContext.backend.synchronize()
     }
 
@@ -35,13 +22,8 @@ class ElectionContext(
     val candidates: List<String>
         get() = testContext.database.listCandidates(name)
 
-    val eligibleVoters: List<String>
-        get() = testContext.database.listEligibleVoters(name)
-
     fun tally(): Tally =
         testContext.backend.tally(owner.accessToken, name)
-
-    // Query methods
 
     fun getDetails(): com.seanshubin.vote.domain.ElectionDetail {
         testContext.backend.synchronize()
@@ -51,15 +33,5 @@ class ElectionContext(
     fun listCandidates(): List<String> {
         testContext.backend.synchronize()
         return testContext.backend.listCandidates(owner.accessToken, name)
-    }
-
-    fun listEligibility(): List<com.seanshubin.vote.domain.VoterEligibility> {
-        testContext.backend.synchronize()
-        return testContext.backend.listEligibility(owner.accessToken, name)
-    }
-
-    fun isEligible(voterName: String): Boolean {
-        testContext.backend.synchronize()
-        return testContext.backend.isEligible(owner.accessToken, voterName, name)
     }
 }

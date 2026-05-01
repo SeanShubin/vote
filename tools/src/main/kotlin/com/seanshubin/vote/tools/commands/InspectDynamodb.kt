@@ -72,11 +72,6 @@ class InspectDynamodbElections : CliktCommand(name = "inspect-dynamodb-elections
             items.forEach { item ->
                 println("Election:         ${DynamoClient.s(item, "electionName") ?: ""}")
                 println("Owner:            ${DynamoClient.s(item, "ownerName") ?: ""}")
-                println("Secret Ballot:    ${DynamoClient.bool(item, "secretBallot") ?: false}")
-                println("Allow Vote:       ${DynamoClient.bool(item, "allowVote") ?: false}")
-                println("Allow Edit:       ${DynamoClient.bool(item, "allowEdit") ?: false}")
-                DynamoClient.n(item, "noVotingBefore")?.let { println("No Voting Before: $it") }
-                DynamoClient.n(item, "noVotingAfter")?.let { println("No Voting After:  $it") }
                 println()
             }
         }

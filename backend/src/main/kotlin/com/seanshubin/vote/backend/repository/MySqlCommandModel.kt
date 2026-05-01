@@ -2,7 +2,6 @@ package com.seanshubin.vote.backend.repository
 
 import com.seanshubin.vote.contract.CommandModel
 import com.seanshubin.vote.contract.QueryLoader
-import com.seanshubin.vote.domain.ElectionUpdates
 import com.seanshubin.vote.domain.Ranking
 import com.seanshubin.vote.domain.Role
 import kotlinx.datetime.Instant
@@ -77,61 +76,6 @@ class MySqlCommandModel(
         }
     }
 
-    override fun updateElection(authority: String, electionName: String, updates: ElectionUpdates) {
-        val setClauses = mutableListOf<String>()
-        val params = mutableListOf<Any?>()
-
-        updates.newElectionName?.let {
-            setClauses.add("election_name = ?")
-            params.add(it)
-        }
-        updates.secretBallot?.let {
-            setClauses.add("secret_ballot = ?")
-            params.add(it)
-        }
-        if (updates.clearNoVotingBefore == true) {
-            setClauses.add("no_voting_before = NULL")
-        } else {
-            updates.noVotingBefore?.let {
-                setClauses.add("no_voting_before = ?")
-                params.add(Timestamp(it.toEpochMilliseconds()))
-            }
-        }
-        if (updates.clearNoVotingAfter == true) {
-            setClauses.add("no_voting_after = NULL")
-        } else {
-            updates.noVotingAfter?.let {
-                setClauses.add("no_voting_after = ?")
-                params.add(Timestamp(it.toEpochMilliseconds()))
-            }
-        }
-        updates.allowVote?.let {
-            setClauses.add("allow_vote = ?")
-            params.add(it)
-        }
-        updates.allowEdit?.let {
-            setClauses.add("allow_edit = ?")
-            params.add(it)
-        }
-
-        if (setClauses.isEmpty()) return
-
-        val sql = "UPDATE elections SET ${setClauses.joinToString(", ")} WHERE election_name = ?"
-        params.add(electionName)
-
-        connection.prepareStatement(sql).use { stmt ->
-            params.forEachIndexed { index, param ->
-                when (param) {
-                    is String -> stmt.setString(index + 1, param)
-                    is Boolean -> stmt.setBoolean(index + 1, param)
-                    is Timestamp -> stmt.setTimestamp(index + 1, param)
-                    else -> stmt.setObject(index + 1, param)
-                }
-            }
-            stmt.executeUpdate()
-        }
-    }
-
     override fun deleteElection(authority: String, electionName: String) {
         val sql = queryLoader.load("election-delete")
         connection.prepareStatement(sql).use { stmt ->
@@ -160,32 +104,6 @@ class MySqlCommandModel(
             for (candidateName in candidateNames) {
                 stmt.setString(1, electionName)
                 stmt.setString(2, candidateName)
-                stmt.addBatch()
-            }
-            stmt.executeBatch()
-        }
-    }
-
-    override fun addVoters(authority: String, electionName: String, voterNames: List<String>) {
-        if (voterNames.isEmpty()) return
-        val sql = queryLoader.load("eligible-voter-insert")
-        connection.prepareStatement(sql).use { stmt ->
-            for (voterName in voterNames) {
-                stmt.setString(1, electionName)
-                stmt.setString(2, voterName)
-                stmt.addBatch()
-            }
-            stmt.executeBatch()
-        }
-    }
-
-    override fun removeVoters(authority: String, electionName: String, voterNames: List<String>) {
-        if (voterNames.isEmpty()) return
-        val sql = queryLoader.load("eligible-voter-delete")
-        connection.prepareStatement(sql).use { stmt ->
-            for (voterName in voterNames) {
-                stmt.setString(1, electionName)
-                stmt.setString(2, voterName)
                 stmt.addBatch()
             }
             stmt.executeBatch()
@@ -304,13 +222,6 @@ class MySqlCommandModel(
 
         val updateElections = queryLoader.load("election-update-owner-name")
         connection.prepareStatement(updateElections).use { stmt ->
-            stmt.setString(1, newUserName)
-            stmt.setString(2, oldUserName)
-            stmt.executeUpdate()
-        }
-
-        val updateVoters = queryLoader.load("eligible-voter-update-name")
-        connection.prepareStatement(updateVoters).use { stmt ->
             stmt.setString(1, newUserName)
             stmt.setString(2, oldUserName)
             stmt.executeUpdate()
