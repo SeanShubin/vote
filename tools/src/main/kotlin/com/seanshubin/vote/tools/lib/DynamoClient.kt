@@ -20,6 +20,22 @@ object DynamoClient {
         }
 
     /**
+     * Real AWS DynamoDB client (no endpoint override). Uses the default AWS
+     * credential chain (env vars, ~/.aws/credentials, SSO, etc.). The caller
+     * must already be authenticated for the target account.
+     */
+    fun createForProd(): DynamoDbClient =
+        DynamoDbClient {
+            region = REGION
+        }
+
+    fun createFor(prod: Boolean): DynamoDbClient =
+        if (prod) createForProd() else create()
+
+    fun describe(prod: Boolean): String =
+        if (prod) "AWS DynamoDB (region $REGION)" else "DynamoDB Local at $ENDPOINT"
+
+    /**
      * Render an AttributeValue using the same JSON shape as the AWS CLI ({"S": "..."}, {"N": "..."}, {"BOOL": ...}).
      */
     fun render(value: AttributeValue): String = when (value) {

@@ -5,10 +5,15 @@ plugins {
 }
 
 dependencies {
+    implementation(project(":domain"))
+    implementation(project(":contract"))
+    implementation(project(":backend"))
+
     implementation("com.github.ajalt.clikt:clikt:5.0.2")
 
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:${project.property("kotlinx.serialization.version")}")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:${project.property("kotlinx.coroutines.version")}")
+    implementation("org.jetbrains.kotlinx:kotlinx-datetime:${project.property("kotlinx.datetime.version")}")
 
     implementation("org.eclipse.jetty:jetty-server:${project.property("jetty.version")}")
     implementation("org.eclipse.jetty:jetty-servlet:${project.property("jetty.version")}")

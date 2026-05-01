@@ -3,6 +3,7 @@ package com.seanshubin.vote.tools.app
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.main
 import com.github.ajalt.clikt.core.subcommands
+import com.seanshubin.vote.tools.commands.BackupDynamodb
 import com.seanshubin.vote.tools.commands.CheckJava
 import com.seanshubin.vote.tools.commands.ConvertScenarios
 import com.seanshubin.vote.tools.commands.DbInitDynamodb
@@ -36,9 +37,11 @@ import com.seanshubin.vote.tools.commands.LaunchKeepDynamodb
 import com.seanshubin.vote.tools.commands.LaunchKeepMysql
 import com.seanshubin.vote.tools.commands.LaunchScenarioDynamodb
 import com.seanshubin.vote.tools.commands.LaunchScenarioMysql
+import com.seanshubin.vote.tools.commands.NukeDynamodb
 import com.seanshubin.vote.tools.commands.PadTables
 import com.seanshubin.vote.tools.commands.PurgeDynamodb
 import com.seanshubin.vote.tools.commands.PurgeMysql
+import com.seanshubin.vote.tools.commands.RestoreDynamodb
 import com.seanshubin.vote.tools.commands.RollLogs
 import com.seanshubin.vote.tools.commands.RunLocal
 import com.seanshubin.vote.tools.commands.ServeFrontend
@@ -69,6 +72,9 @@ fun main(args: Array<String>) {
             DbInitDynamodb(),
             PurgeMysql(),
             PurgeDynamodb(),
+            BackupDynamodb(),
+            NukeDynamodb(),
+            RestoreDynamodb(),
             TerminateAll(),
             RollLogs(),
             ServeFrontend(),
