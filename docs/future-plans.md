@@ -89,7 +89,74 @@ working around the lack of CLI auth.
 
 ---
 
-## 3. Considered alternatives (not pursued)
+## 3. Multi-site deployment (separate stack per site)
+
+**Problem**: The deployment is hardcoded to a single site (`pairwisevote.com`).
+Reusing this codebase for a second site (different domain, separate S3 bucket,
+separate DynamoDB tables, fully isolated data) currently means forking or
+hand-editing config. Goal: deploy the same code to N sites from the same repo,
+each fully isolated — separate stacks, no shared data, no tenant concept in
+the domain model.
+
+**Why separate stacks (not multi-tenant)**: Cleaner isolation (one site's
+incident can't leak to another), per-site billing, no schema changes to
+domain entities, and the data layer already assumes single-tenant. Cost is
+duplicated AWS resources per site (one CloudFront distribution, one ACM cert,
+two DynamoDB tables) — fine for ~2–10 sites, clunky beyond that.
+
+**Changes required**:
+
+1. **Workflow parameterization** (`.github/workflows/deploy.yml:21-25`).
+   The four hardcoded env vars (`AWS_REGION`, `STACK_NAME`, `BOOTSTRAP_STACK`,
+   `DOMAIN_NAME`) become per-site inputs. Suggested shape: a `sites/<name>.env`
+   file per site committed to the repo, plus a workflow matrix that deploys
+   each on push (or `workflow_dispatch` with a site picker for one-at-a-time
+   deploys).
+
+2. **Per-stack DynamoDB table names** (`deploy/template.yaml:215, 246`).
+   Currently `TableName: vote_data` / `vote_event_log` — collide if two
+   stacks land in the same AWS account. Change to
+   `!Sub "${AWS::StackName}-vote-data"` and pass the resolved names to the
+   Lambda as new env vars (`MAIN_TABLE_NAME`, `EVENT_LOG_TABLE_NAME`).
+
+3. **Backend table-name constants → runtime config**
+   (`backend/.../repository/DynamoDbSingleTableSchema.kt:7-9`). The two
+   table-name `const val`s are referenced from four files
+   (`DynamoDbSingleTableCommandModel`, `…QueryModel`, `DynamoDbEventLog`,
+   `DynamoDbRawTableScanner`) at ~50 sites total. Refactor `DynamoDbSingleTableSchema`
+   from a singleton to an injected class with `mainTable`/`eventLogTable`
+   fields; `RepositoryFactory` reads them from env vars and constructs the
+   schema. Keep the prefix constants (`USER_PREFIX`, etc.) — those are wire
+   format, not infrastructure. Mechanical refactor, low risk.
+
+4. **EmailFromAddress default** (`deploy/template.yaml:18`). Drop the
+   `pairwisevote.com` default — make it required so a misconfigured deploy
+   fails fast instead of silently sending from the wrong domain.
+
+5. **Per-site bootstrap stack**. `BOOTSTRAP_STACK` is already
+   per-site-named, so each site gets its own artifacts bucket. Just deploy
+   it once per new site before the first main-stack deploy.
+
+**What does NOT need to change**:
+- Domain entities (User, Election, Candidate, Ballot) — no `siteId` needed
+  because each site has its own database.
+- `JwtSecret`, `BackendLogGroup`, `BackendFunction`, alarms — all already
+  scoped by `${AWS::StackName}`.
+- IAM role for GitHub Actions — one role can deploy multiple stacks.
+- Hosted-zone resolution (workflow lines 69–71) — already domain-driven.
+
+**Effort**: ~half a day for the workflow + CFN changes, plus ~half a day
+for the backend refactor and verification. Each new site after that is a
+new `sites/<name>.env` file plus a one-time bootstrap-stack deploy.
+
+**Risk**: The schema-name refactor touches every DynamoDB call site. Worth
+running the integration tests against a real DynamoDB Local to verify nothing
+slipped through, since unit tests with mocks won't catch a misnamed table at
+the AWS API boundary.
+
+---
+
+## 4. Considered alternatives (not pursued)
 
 These are alternative designs we evaluated and decided against. Linked here
 so they're easy to find if circumstances change.

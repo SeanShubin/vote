@@ -5,6 +5,7 @@ import com.seanshubin.vote.contract.QueryLoader
 import com.seanshubin.vote.domain.DomainEvent
 import com.seanshubin.vote.domain.EventEnvelope
 import kotlinx.datetime.Instant
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.sql.Connection
@@ -61,7 +62,14 @@ class MySqlEventLog(
         val whenHappened = Instant.fromEpochMilliseconds(getTimestamp("created_at").time)
         val authority = getString("authority")
         val eventData = getString("event_data")
-        val event = json.decodeFromString<DomainEvent>(eventData)
+        val event = try {
+            json.decodeFromString<DomainEvent>(eventData)
+        } catch (e: SerializationException) {
+            throw IllegalStateException(
+                "Event log contains event_id=$eventId of an unknown type — schema mismatch with current code. Reset the event log via the admin tool.",
+                e,
+            )
+        }
 
         return EventEnvelope(
             eventId = eventId,

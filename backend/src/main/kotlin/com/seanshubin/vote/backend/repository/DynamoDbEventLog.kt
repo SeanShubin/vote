@@ -6,6 +6,7 @@ import com.seanshubin.vote.contract.EventLog
 import com.seanshubin.vote.domain.DomainEvent
 import com.seanshubin.vote.domain.EventEnvelope
 import kotlinx.datetime.Instant
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
@@ -52,7 +53,14 @@ class DynamoDbEventLog(
                 val eventData = item["event_data"]?.asS() ?: error("Missing event_data")
                 val createdAt = item["created_at"]?.asN()?.toLong() ?: error("Missing created_at")
 
-                val domainEvent = json.decodeFromString<DomainEvent>(eventData)
+                val domainEvent = try {
+                    json.decodeFromString<DomainEvent>(eventData)
+                } catch (e: SerializationException) {
+                    throw IllegalStateException(
+                        "Event log contains event_id=$eventId of an unknown type — schema mismatch with current code. Reset the event log via the admin tool.",
+                        e,
+                    )
+                }
 
                 EventEnvelope(
                     eventId = eventId,
