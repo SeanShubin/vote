@@ -109,10 +109,7 @@ fun ElectionDetailPage(
                         apiClient = apiClient,
                         electionName = electionName,
                         candidates = candidates,
-                        onSuccess = { msg ->
-                            successMessage = msg
-                            pageFetch.reload()
-                        },
+                        onBallotSaved = { pageFetch.reload() },
                         onError = { errorMessage = it },
                     )
                     "tally" -> TallyView(
@@ -225,7 +222,9 @@ fun ElectionSetupView(
  * nudge the focused row. × returns a row to the arena. Ctrl+Z / Cmd+Z undoes
  * the last action (50-step session-only history).
  *
- * The wire format is unchanged — submit sends `List<Ranking>` where each
+ * There is no submit step: every change to the ranked list is persisted
+ * immediately via castBallot, so the on-screen ordering is always the
+ * voter's current ballot. The wire format sends `List<Ranking>` where each
  * ranked candidate gets `rank = position + 1`. Unranked candidates are simply
  * omitted; the tally treats absent candidates as "least preferred, tied with
  * each other" via `rankingFor(name) ?: Int.MAX_VALUE` in `Ranking.kt`.
@@ -235,11 +234,16 @@ fun VotingView(
     apiClient: ApiClient,
     electionName: String,
     candidates: List<String>,
-    onSuccess: (String) -> Unit,
+    onBallotSaved: () -> Unit,
     onError: (String) -> Unit,
 ) {
     var arena by remember(electionName, candidates) { mutableStateOf<List<String>>(emptyList()) }
     var ranked by remember(electionName, candidates) { mutableStateOf<List<String>>(emptyList()) }
+    // savedRanked is what we believe the server holds. Initialized when the
+    // existing ballot is loaded; updated after each successful auto-save.
+    // Kept separate from `ranked` so we can tell user-initiated changes apart
+    // from the initial load, and avoid re-saving an unchanged ballot.
+    var savedRanked by remember(electionName, candidates) { mutableStateOf<List<String>?>(null) }
     var history by remember(electionName) {
         mutableStateOf<List<Pair<List<String>, List<String>>>>(emptyList())
     }
@@ -256,6 +260,7 @@ fun VotingView(
         if (candidates.isEmpty()) {
             arena = emptyList()
             ranked = emptyList()
+            savedRanked = emptyList()
             isInitialized = true
             return@LaunchedEffect
         }
@@ -273,8 +278,34 @@ fun VotingView(
             .filter { it in candidateSet }
         val rankedSet = rankedNames.toSet()
         ranked = rankedNames
+        savedRanked = rankedNames
         arena = candidates.filter { it !in rankedSet }
         isInitialized = true
+    }
+
+    // Auto-save on every change to `ranked`. A short debounce coalesces the
+    // burst of intermediate states produced by drag-reorder (onDragOver fires
+    // many times during one drag). When `ranked` changes again before the
+    // debounce expires, LaunchedEffect cancels the in-flight coroutine and
+    // the older save never goes out, so the server only sees the settled state.
+    LaunchedEffect(ranked) {
+        val saved = savedRanked ?: return@LaunchedEffect
+        if (ranked == saved) return@LaunchedEffect
+        kotlinx.coroutines.delay(250)
+        val toSave = ranked
+        // Track whether this is the voter's first cast for this election so we
+        // only refresh the page fetch (and its ballot-count header) when it
+        // actually needs to change. Subsequent edits update the existing ballot
+        // and don't bump the count.
+        val wasFirstCast = saved.isEmpty()
+        try {
+            apiClient.castBallot(electionName, toSave.mapIndexed { i, n -> Ranking(n, i + 1) })
+            savedRanked = toSave
+            if (wasFirstCast) onBallotSaved()
+        } catch (e: Exception) {
+            apiClient.logErrorToServer(e)
+            onError(e.message ?: "Failed to save ballot")
+        }
     }
 
     fun pushHistory() {
@@ -313,17 +344,6 @@ fun VotingView(
         ranked = r
     }
 
-    val submitAction = rememberAsyncAction(
-        apiClient = apiClient,
-        fallbackErrorMessage = "Failed to cast ballot",
-        onError = onError,
-        action = {
-            val rankings = ranked.mapIndexed { i, n -> Ranking(n, i + 1) }
-            val confirmation = apiClient.castBallot(electionName, rankings)
-            onSuccess("Ballot cast successfully! Confirmation: $confirmation")
-        },
-    )
-
     // Window-level Ctrl+Z / Cmd+Z. The listener captures `handleUndo` once,
     // but `handleUndo` reads from `mutableStateOf`-backed delegates, so each
     // call sees current state.
@@ -340,7 +360,7 @@ fun VotingView(
     }
 
     Div({ classes("section") }) {
-        H2 { Text("Cast Ballot") }
+        H2 { Text("Vote") }
 
         if (candidates.isEmpty()) {
             P { Text("No candidates yet — the election owner can add them via the Setup tab.") }
@@ -476,15 +496,6 @@ fun VotingView(
                         if (history.isEmpty()) attr("disabled", "")
                         onClick { handleUndo() }
                     }) { Text("↩ Undo") }
-
-                    Button({
-                        if (submitAction.isLoading || ranked.isEmpty()) attr("disabled", "")
-                        onClick {
-                            if (ranked.isNotEmpty()) submitAction.invoke()
-                        }
-                    }) {
-                        Text(if (submitAction.isLoading) "Submitting…" else "Submit Ballot")
-                    }
 
                     Span({ classes("ranked-ballot-toolbar-hint") }) {
                         Text("Focus a row · ↑/↓ to nudge · Ctrl+Z to undo")
