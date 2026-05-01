@@ -48,6 +48,12 @@ class ServiceImpl(
             is DomainEvent.UserRoleChanged -> {
                 commandModel.setRole(authority, event.userName, event.newRole)
             }
+            is DomainEvent.OwnershipTransferred -> {
+                // Demote the outgoing owner first so the "exactly one OWNER" invariant
+                // holds at every projection sync point.
+                commandModel.setRole(authority, event.fromUserName, Role.SECONDARY_ROLE)
+                commandModel.setRole(authority, event.toUserName, Role.PRIMARY_ROLE)
+            }
             is DomainEvent.UserRemoved -> {
                 commandModel.removeUser(authority, event.userName)
             }
@@ -195,17 +201,49 @@ class ServiceImpl(
     }
 
     override fun setRole(accessToken: AccessToken, userName: String, role: Role) {
-        requirePermission(accessToken, Permission.MANAGE_USERS)
-        eventLog.appendEvent(
-            accessToken.userName,
-            clock.now(),
-            DomainEvent.UserRoleChanged(userName, role)
+        val targetUser = queryModel.searchUserByName(userName)
+            ?: throw ServiceException(ServiceException.Category.NOT_FOUND, "User not found: $userName")
+
+        val callerPermissions = UserRolePermissions(
+            userName = accessToken.userName,
+            role = accessToken.role,
+            permissions = queryModel.listPermissions(accessToken.role),
         )
+        val target = UserRole(targetUser.name, targetUser.role)
+        when (val result = callerPermissions.canChangeRole(target, role)) {
+            is RoleChangeResult.Denied -> throw ServiceException(
+                ServiceException.Category.UNAUTHORIZED,
+                result.reason,
+            )
+            is RoleChangeResult.Ok -> Unit
+        }
+
+        // The predicate already accepted this transition. Promotion to OWNER is
+        // an ownership handoff: emit a single OwnershipTransferred event so the
+        // event log records the atomic intent rather than two unrelated role changes.
+        val event = if (role == Role.PRIMARY_ROLE) {
+            DomainEvent.OwnershipTransferred(
+                fromUserName = accessToken.userName,
+                toUserName = userName,
+            )
+        } else {
+            DomainEvent.UserRoleChanged(userName, role)
+        }
+        eventLog.appendEvent(accessToken.userName, clock.now(), event)
         synchronize()
     }
 
     override fun removeUser(accessToken: AccessToken, userName: String) {
         requirePermission(accessToken, Permission.MANAGE_USERS)
+        val targetUser = queryModel.searchUserByName(userName)
+            ?: throw ServiceException(ServiceException.Category.NOT_FOUND, "User not found: $userName")
+        requireGreaterRole(accessToken, targetUser)
+        if (isSelf(accessToken, userName) && queryModel.userCount() > 1) {
+            throw ServiceException(
+                ServiceException.Category.UNSUPPORTED,
+                "Can not remove yourself unless you are the only user",
+            )
+        }
         eventLog.appendEvent(
             accessToken.userName,
             clock.now(),
@@ -216,9 +254,14 @@ class ServiceImpl(
 
     override fun listUsers(accessToken: AccessToken): List<UserNameRole> {
         requirePermission(accessToken, Permission.MANAGE_USERS)
+        val callerPermissions = UserRolePermissions(
+            userName = accessToken.userName,
+            role = accessToken.role,
+            permissions = queryModel.listPermissions(accessToken.role),
+        )
         return queryModel.listUsers().map { user ->
-            val allowedRoles = Role.entries.filter { role -> role <= user.role }
-            UserNameRole(user.name, user.role, allowedRoles)
+            val target = UserRole(user.name, user.role)
+            UserNameRole(user.name, user.role, callerPermissions.listedRolesFor(target))
         }
     }
 
@@ -281,9 +324,12 @@ class ServiceImpl(
 
     override fun updateUser(accessToken: AccessToken, userName: String, userUpdates: UserUpdates) {
         // VALIDATION SECTION
-        // Verify target user exists
-        queryModel.searchUserByName(userName)
+        requirePermission(accessToken, Permission.USE_APPLICATION)
+        val targetUser = queryModel.searchUserByName(userName)
             ?: throw ServiceException(ServiceException.Category.NOT_FOUND, "User not found: $userName")
+        if (!isSelf(accessToken, userName)) {
+            requireGreaterRole(accessToken, targetUser)
+        }
 
         // Validate new values if provided
         val validNewUserName = userUpdates.userName?.let { Validation.validateUserName(it) }
@@ -589,6 +635,15 @@ class ServiceImpl(
 
     private fun isSelf(accessToken: AccessToken, userName: String): Boolean {
         return accessToken.userName == userName
+    }
+
+    private fun requireGreaterRole(accessToken: AccessToken, target: User) {
+        if (accessToken.role <= target.role) {
+            throw ServiceException(
+                ServiceException.Category.UNAUTHORIZED,
+                "${accessToken.userName} with role ${accessToken.role} does not have greater role than ${target.name} with role ${target.role}",
+            )
+        }
     }
 
     private fun requireIsElectionOwner(accessToken: AccessToken, electionName: String) {

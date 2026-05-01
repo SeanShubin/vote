@@ -31,6 +31,19 @@ sealed interface DomainEvent {
         val newRole: Role
     ) : DomainEvent
 
+    /**
+     * Atomic ownership handoff: [fromUserName] (current OWNER) is demoted to AUDITOR
+     * and [toUserName] is promoted to OWNER. Emitted instead of two UserRoleChanged
+     * events so the projection — and any future audit consumer — sees the transfer
+     * as a single semantic operation.
+     */
+    @Serializable
+    @SerialName("OwnershipTransferred")
+    data class OwnershipTransferred(
+        val fromUserName: String,
+        val toUserName: String,
+    ) : DomainEvent
+
     @Serializable
     @SerialName("UserRemoved")
     data class UserRemoved(
