@@ -83,17 +83,19 @@ class ValidationIntegrationTest {
     }
 
     @Test
-    fun `setCandidates rejects empty list`() {
+    fun `setCandidates accepts empty list (clears candidates)`() {
         val testContext = TestContext()
         val alice = testContext.registerUser("alice")
 
         val election = alice.createElection("Test Election")
+        election.setCandidates("Kotlin", "Rust")
 
-        // Try to set empty candidate list
-        val exception = assertFailsWith<IllegalArgumentException> {
-            election.setCandidates()
-        }
-        assertTrue(exception.message!!.contains("empty"))
+        // Now clear with an empty list — supported as a "reset to no candidates"
+        // operation. The owner can re-add later before launching.
+        election.setCandidates()
+
+        val candidates = election.listCandidates()
+        assertEquals(0, candidates.size)
     }
 
     @Test

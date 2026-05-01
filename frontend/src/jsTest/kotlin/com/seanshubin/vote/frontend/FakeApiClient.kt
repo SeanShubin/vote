@@ -21,6 +21,8 @@ class FakeApiClient : ApiClient {
     val launchElectionCalls = mutableListOf<String>()
     val castBallotCalls = mutableListOf<CastBallotCall>()
     val getTallyCalls = mutableListOf<String>()
+    val deleteElectionCalls = mutableListOf<String>()
+    val removeUserCalls = mutableListOf<String>()
     val loggedErrors = mutableListOf<Throwable>()
 
     var registerResult: Result<AuthResponse> = Result.failure(Exception("Register not configured"))
@@ -41,6 +43,8 @@ class FakeApiClient : ApiClient {
     var launchElectionResult: Result<Unit> = Result.success(Unit)
     var castBallotResult: Result<String> = Result.success("ballot-confirmation-123")
     var getTallyResult: Result<Tally> = Result.failure(Exception("Get tally not configured"))
+    var deleteElectionResult: Result<Unit> = Result.success(Unit)
+    var removeUserResult: Result<Unit> = Result.success(Unit)
     var listTablesResult: Result<List<String>> = Result.success(emptyList())
     var tableDataResult: Result<TableData> = Result.success(TableData("", emptyList(), emptyList()))
     var listDebugTablesResult: Result<List<String>> = Result.success(emptyList())
@@ -51,10 +55,8 @@ class FakeApiClient : ApiClient {
     val debugTableDataCalls = mutableListOf<String>()
     var listUsersResult: Result<List<UserNameRole>> = Result.success(emptyList())
     var setRoleResult: Result<Unit> = Result.success(Unit)
-    var removeUserResult: Result<Unit> = Result.success(Unit)
     val listUsersCalls = mutableListOf<Unit>()
     val setRoleCalls = mutableListOf<SetRoleCall>()
-    val removeUserCalls = mutableListOf<String>()
 
     override suspend fun register(userName: String, email: String, password: String): AuthResponse {
         registerCalls.add(RegisterCall(userName, email, password))
@@ -130,6 +132,16 @@ class FakeApiClient : ApiClient {
         return getTallyResult.getOrThrow()
     }
 
+    override suspend fun deleteElection(electionName: String) {
+        deleteElectionCalls.add(electionName)
+        deleteElectionResult.getOrThrow()
+    }
+
+    override suspend fun removeUser(userName: String) {
+        removeUserCalls.add(userName)
+        removeUserResult.getOrThrow()
+    }
+
     override suspend fun listTables(): List<String> {
         listTablesCalls.add(Unit)
         return listTablesResult.getOrThrow()
@@ -158,11 +170,6 @@ class FakeApiClient : ApiClient {
     override suspend fun setRole(userName: String, role: Role) {
         setRoleCalls.add(SetRoleCall(userName, role))
         setRoleResult.getOrThrow()
-    }
-
-    override suspend fun removeUser(userName: String) {
-        removeUserCalls.add(userName)
-        removeUserResult.getOrThrow()
     }
 
     override fun logErrorToServer(error: Throwable) {

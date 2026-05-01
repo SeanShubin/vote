@@ -70,8 +70,9 @@ object Validation {
     }
 
     fun validateCandidateNames(names: List<String>): List<String> {
-        require(names.isNotEmpty()) { "Candidate list must not be empty" }
-
+        // Empty list is allowed — lets an owner clear all candidates (e.g. when
+        // restarting an election setup). Each individual name still has to pass
+        // validateCandidateName below, so empty *strings* in the list still fail.
         val validNames = names.map { validateCandidateName(it) }
 
         val duplicates = validNames.groupingBy { it }.eachCount().filter { it.value > 1 }.keys

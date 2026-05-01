@@ -97,7 +97,22 @@ fun VoteApp(apiClient: ApiClient) {
                     role = null
                     router.replace(Page.Login)
                 }
-            }
+            },
+            onDeleteAccount = {
+                val name = userName ?: return@HomePage
+                scope.launch {
+                    try {
+                        apiClient.removeUser(name)
+                    } catch (e: Exception) {
+                        apiClient.logErrorToServer(e)
+                    }
+                    // Whether or not the call succeeded, the local session is now
+                    // suspect — clear it and bounce to login.
+                    userName = null
+                    role = null
+                    router.replace(Page.Login)
+                }
+            },
         )
         is Page.CreateElection -> CreateElectionPage(
             apiClient = apiClient,
@@ -116,7 +131,10 @@ fun VoteApp(apiClient: ApiClient) {
         is Page.ElectionDetail -> ElectionDetailPage(
             apiClient = apiClient,
             electionName = page.electionName,
-            onBack = { router.navigate(Page.Elections) }
+            currentUserName = userName,
+            currentRole = role,
+            onBack = { router.navigate(Page.Elections) },
+            onElectionDeleted = { router.replace(Page.Elections) },
         )
         is Page.RawTables -> TablesPage(
             title = "Raw Tables",

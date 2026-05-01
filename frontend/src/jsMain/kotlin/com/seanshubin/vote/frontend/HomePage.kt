@@ -2,6 +2,7 @@ package com.seanshubin.vote.frontend
 
 import androidx.compose.runtime.Composable
 import com.seanshubin.vote.domain.Role
+import kotlinx.browser.window
 import org.jetbrains.compose.web.dom.*
 
 @Composable
@@ -13,7 +14,8 @@ fun HomePage(
     onNavigateToRawTables: () -> Unit,
     onNavigateToDebugTables: () -> Unit,
     onNavigateToUserManagement: () -> Unit,
-    onLogout: () -> Unit
+    onLogout: () -> Unit,
+    onDeleteAccount: () -> Unit,
 ) {
     Div({ classes("container") }) {
         H1 { Text("Vote - Home") }
@@ -67,6 +69,17 @@ fun HomePage(
                 onClick { onLogout() }
             }) {
                 Text("Logout")
+            }
+
+            // Destructive — confirm before firing. Browser confirm() blocks; we
+            // only invoke onDeleteAccount when the user actively says yes.
+            Button({
+                onClick {
+                    val confirmed = window.confirm("Delete your account? This cannot be undone.")
+                    if (confirmed) onDeleteAccount()
+                }
+            }) {
+                Text("Delete Account")
             }
         }
     }

@@ -26,7 +26,10 @@ class ElectionDetailPageRenderTest {
                 ElectionDetailPage(
                     apiClient = fakeClient,
                     electionName = electionName,
+                    currentUserName = null,
+                    currentRole = null,
                     onBack = { backCalled = true },
+                    onElectionDeleted = {},
                     coroutineScope = testScope
                 )
             }

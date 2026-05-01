@@ -189,6 +189,8 @@ class HttpApiTester(private val port: Int = 9876) : AutoCloseable {
 
     fun deleteElection(electionName: String, token: AccessToken): HttpResponse<String> = delete("/election/$electionName", token)
 
+    fun removeUser(userName: String, token: AccessToken): HttpResponse<String> = delete("/user/$userName", token)
+
     // Candidates
     fun setCandidates(electionName: String, candidates: List<String>, token: AccessToken): HttpResponse<String> {
         val candidatesJson = candidates.joinToString(",") { "\"$it\"" }
@@ -676,6 +678,64 @@ class HttpApiTest {
 
         val getResponse = tester.getElection("Test", tokens.accessToken)
         assertEquals(404, getResponse.statusCode())
+    }
+
+    @Test
+    fun `delete election - non-owner non-admin (USER) is rejected`() {
+        // alice = OWNER (first user); bob = plain USER.
+        val aliceTokens = tester.registerUserExpectSuccess("alice")
+        val bobTokens = tester.registerUserExpectSuccess("bob")
+        tester.createElection("Lang", aliceTokens.accessToken)
+
+        val response = tester.deleteElection("Lang", bobTokens.accessToken)
+
+        assertEquals(401, response.statusCode())
+        assertTrue(response.body().contains("Only the election owner"))
+    }
+
+    @Test
+    fun `delete election - admin can moderate someone else's election`() {
+        // alice = OWNER; she can delete bob's election by virtue of having
+        // MANAGE_USERS (which OWNER inherits from ADMIN).
+        val aliceTokens = tester.registerUserExpectSuccess("alice")
+        val bobTokens = tester.registerUserExpectSuccess("bob")
+        tester.createElection("Bobs", bobTokens.accessToken)
+
+        val response = tester.deleteElection("Bobs", aliceTokens.accessToken)
+
+        assertEquals(200, response.statusCode())
+    }
+
+    @Test
+    fun `self-delete - regular user can delete their own account`() {
+        tester.registerUserExpectSuccess("alice") // OWNER
+        val bobTokens = tester.registerUserExpectSuccess("bob") // plain USER
+
+        val response = tester.removeUser("bob", bobTokens.accessToken)
+
+        assertEquals(200, response.statusCode())
+    }
+
+    @Test
+    fun `self-delete - OWNER cannot self-delete while other users exist`() {
+        val aliceTokens = tester.registerUserExpectSuccess("alice") // OWNER
+        tester.registerUserExpectSuccess("bob")
+
+        val response = tester.removeUser("alice", aliceTokens.accessToken)
+
+        assertEquals(501, response.statusCode())
+        assertTrue(response.body().contains("OWNER cannot self-delete"))
+    }
+
+    @Test
+    fun `self-delete - lone OWNER can delete themselves (back to empty)`() {
+        // The system tolerates an empty user table (e.g., reset scenario);
+        // an OWNER who's the only user is allowed to leave.
+        val aliceTokens = tester.registerUserExpectSuccess("alice")
+
+        val response = tester.removeUser("alice", aliceTokens.accessToken)
+
+        assertEquals(200, response.statusCode())
     }
 
     @Test

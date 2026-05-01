@@ -3,6 +3,7 @@ package com.seanshubin.vote.frontend
 import androidx.compose.runtime.*
 import com.seanshubin.vote.contract.ApiClient
 import com.seanshubin.vote.domain.*
+import kotlinx.browser.window
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.web.attributes.*
@@ -12,7 +13,12 @@ import org.jetbrains.compose.web.dom.*
 fun ElectionDetailPage(
     apiClient: ApiClient,
     electionName: String,
+    // Used to decide whether to show the Delete button: shown to the
+    // election owner, or to any user with role >= ADMIN. Backend re-checks.
+    currentUserName: String?,
+    currentRole: Role?,
     onBack: () -> Unit,
+    onElectionDeleted: () -> Unit,
     coroutineScope: CoroutineScope = rememberCoroutineScope()
 ) {
     var election by remember { mutableStateOf<ElectionSummary?>(null) }
@@ -109,6 +115,34 @@ fun ElectionDetailPage(
             onClick { onBack() }
         }) {
             Text("Back to Elections")
+        }
+
+        // Delete is shown to the election owner OR any user with role >= ADMIN
+        // (moderators). Backend authorization is the real defense — this is just
+        // the visibility shortcut so non-owners don't see a button they can't use.
+        val canDelete = election != null && (
+            election!!.ownerName == currentUserName ||
+                (currentRole != null && currentRole!! >= Role.ADMIN)
+        )
+        if (canDelete) {
+            Button({
+                onClick {
+                    val confirmed = window.confirm("Delete election \"$electionName\"? This cannot be undone.")
+                    if (confirmed) {
+                        coroutineScope.launch {
+                            try {
+                                apiClient.deleteElection(electionName)
+                                onElectionDeleted()
+                            } catch (e: Exception) {
+                                apiClient.logErrorToServer(e)
+                                errorMessage = e.message ?: "Failed to delete election"
+                            }
+                        }
+                    }
+                }
+            }) {
+                Text("Delete Election")
+            }
         }
     }
 }

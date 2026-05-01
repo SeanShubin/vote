@@ -86,11 +86,9 @@ class ValidationTest {
 
     // validateCandidateNames tests
     @Test
-    fun `validateCandidateNames rejects empty list`() {
-        val exception = assertFailsWith<IllegalArgumentException> {
-            Validation.validateCandidateNames(emptyList())
-        }
-        assertTrue(exception.message!!.contains("empty"))
+    fun `validateCandidateNames accepts empty list (lets owner clear all candidates)`() {
+        val valid = Validation.validateCandidateNames(emptyList())
+        assertEquals(emptyList<String>(), valid)
     }
 
     @Test

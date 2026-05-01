@@ -234,16 +234,26 @@ class ServiceImpl(
     }
 
     override fun removeUser(accessToken: AccessToken, userName: String) {
-        requirePermission(accessToken, Permission.MANAGE_USERS)
         val targetUser = queryModel.searchUserByName(userName)
             ?: throw ServiceException(ServiceException.Category.NOT_FOUND, "User not found: $userName")
-        requireGreaterRole(accessToken, targetUser)
-        if (isSelf(accessToken, userName) && queryModel.userCount() > 1) {
-            throw ServiceException(
-                ServiceException.Category.UNSUPPORTED,
-                "Can not remove yourself unless you are the only user",
-            )
+
+        if (isSelf(accessToken, userName)) {
+            // Self-delete — anyone can leave the system, EXCEPT the OWNER, since
+            // exactly one OWNER must exist. The lone-user edge case (an OWNER
+            // who's the only user) is allowed — it deletes the system back to empty.
+            if (targetUser.role == Role.OWNER && queryModel.userCount() > 1) {
+                throw ServiceException(
+                    ServiceException.Category.UNSUPPORTED,
+                    "OWNER cannot self-delete while other users exist — transfer ownership first",
+                )
+            }
+        } else {
+            // Deleting another user requires MANAGE_USERS and a strictly higher role
+            // than the target (so e.g. an ADMIN can't remove the OWNER).
+            requirePermission(accessToken, Permission.MANAGE_USERS)
+            requireGreaterRole(accessToken, targetUser)
         }
+
         eventLog.appendEvent(
             accessToken.userName,
             clock.now(),
@@ -380,8 +390,21 @@ class ServiceImpl(
     }
 
     override fun deleteElection(accessToken: AccessToken, electionName: String) {
-        requirePermission(accessToken, Permission.USE_APPLICATION)
-        requireIsElectionOwner(accessToken, electionName)
+        // The election owner can delete their own; ADMIN+ can delete any election
+        // (moderation). Anyone else is rejected.
+        val election = queryModel.searchElectionByName(electionName)
+            ?: throw ServiceException(
+                ServiceException.Category.NOT_FOUND,
+                "Election '$electionName' not found"
+            )
+        val isOwnerOfElection = election.ownerName == accessToken.userName
+        val canModerate = hasPermission(accessToken, Permission.MANAGE_USERS)
+        if (!isOwnerOfElection && !canModerate) {
+            throw ServiceException(
+                ServiceException.Category.UNAUTHORIZED,
+                "Only the election owner or an ADMIN can delete '$electionName'"
+            )
+        }
         eventLog.appendEvent(
             accessToken.userName,
             clock.now(),

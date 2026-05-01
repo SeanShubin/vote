@@ -48,6 +48,9 @@ interface ApiClient {
     suspend fun castBallot(electionName: String, rankings: List<Ranking>): String
     suspend fun getTally(electionName: String): Tally
 
+    /** Delete an election. Allowed for the election owner or ADMIN+; rejected otherwise. */
+    suspend fun deleteElection(electionName: String)
+
     /**
      * Admin: list all users with each one's current role and the roles the
      * caller is allowed to assign. The backend computes [UserNameRole.allowedRoles]
