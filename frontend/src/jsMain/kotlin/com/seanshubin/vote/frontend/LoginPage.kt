@@ -4,7 +4,6 @@ import androidx.compose.runtime.*
 import com.seanshubin.vote.contract.ApiClient
 import com.seanshubin.vote.domain.Role
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.launch
 import org.jetbrains.compose.web.attributes.*
 import org.jetbrains.compose.web.dom.*
 
@@ -16,30 +15,23 @@ fun LoginPage(
     onLoginSuccess: (userName: String, role: Role) -> Unit,
     onNavigateToRegister: () -> Unit,
     onNavigateToForgotPassword: () -> Unit = {},
-    coroutineScope: CoroutineScope = rememberCoroutineScope()
+    coroutineScope: CoroutineScope = rememberCoroutineScope(),
 ) {
     var nameOrEmail by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf<String?>(null) }
-    var isLoading by remember { mutableStateOf(false) }
 
-    val handleLogin = {
-        if (!isLoading) {
-            isLoading = true
+    val loginAction = rememberAsyncAction(
+        apiClient = apiClient,
+        fallbackErrorMessage = "Login failed",
+        onError = { errorMessage = it },
+        coroutineScope = coroutineScope,
+        action = {
             errorMessage = null
-            coroutineScope.launch {
-                try {
-                    val auth = apiClient.authenticate(nameOrEmail, password)
-                    onLoginSuccess(auth.userName, auth.role)
-                } catch (e: Exception) {
-                    apiClient.logErrorToServer(e)
-                    errorMessage = e.message ?: "Login failed"
-                } finally {
-                    isLoading = false
-                }
-            }
-        }
-    }
+            val auth = apiClient.authenticate(nameOrEmail, password)
+            onLoginSuccess(auth.userName, auth.role)
+        },
+    )
 
     Div({ classes("container") }) {
         H1 { Text("Vote - Login") }
@@ -60,7 +52,7 @@ fun LoginPage(
             attr("autocomplete", "on")
             onSubmit { event ->
                 event.preventDefault()
-                handleLogin()
+                loginAction.invoke()
             }
         }) {
             // Backend's authenticate() tries the value as a username first, then
@@ -74,11 +66,6 @@ fun LoginPage(
                 placeholder("Username or email")
                 value(nameOrEmail)
                 onInput { nameOrEmail = it.value }
-                onKeyDown { event ->
-                    if (event.key == "Enter") {
-                        handleLogin()
-                    }
-                }
             }
 
             Input(InputType.Password) {
@@ -87,22 +74,18 @@ fun LoginPage(
                 placeholder("Password")
                 value(password)
                 onInput { password = it.value }
-                onKeyDown { event ->
-                    if (event.key == "Enter") {
-                        handleLogin()
-                    }
-                }
             }
 
             // type=submit so Enter / button-click triggers the form's onSubmit,
             // which is the path password managers watch for "save credential?".
             Button({
                 attr("type", "submit")
+                if (loginAction.isLoading) attr("disabled", "")
             }) {
-                Text(if (isLoading) "Logging in..." else "Login")
+                Text(if (loginAction.isLoading) "Logging in…" else "Login")
             }
 
-            // type=button so this doesn't accidentally submit the form.
+            // type=button so these don't accidentally submit the form.
             Button({
                 attr("type", "button")
                 onClick { onNavigateToRegister() }

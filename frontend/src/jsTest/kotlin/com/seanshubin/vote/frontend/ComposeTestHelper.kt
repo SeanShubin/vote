@@ -77,11 +77,19 @@ object ComposeTestHelper {
         containerId: String,
         placeholder: String
     ) {
+        // Synthetic Enter-keydown does NOT trigger the browser's default
+        // "Enter in single-line input inside form → submit form" behavior.
+        // We dispatch the keydown for any explicit handlers, and ALSO fire
+        // a 'submit' event on the input's enclosing form so pages relying
+        // on the form-submit pathway behave the same in tests as in browsers.
         val pressEnterFunction = js("""
             (function(containerId, placeholder) {
                 var input = document.querySelector('#' + containerId + ' input[placeholder="' + placeholder + '"]');
-                var event = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true });
-                input.dispatchEvent(event);
+                input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+                var form = input.closest('form');
+                if (form) {
+                    form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+                }
             })
         """)
         pressEnterFunction(containerId, placeholder)

@@ -145,19 +145,19 @@ fun VoteApp(apiClient: ApiClient) {
             onElectionDeleted = { router.replace(Page.Elections) },
         )
         is Page.RawTables -> TablesPage(
+            apiClient = apiClient,
             title = "Raw Tables",
             emptyMessage = "No raw tables (this backend has no physical tables to expose).",
             loadNames = { apiClient.listTables() },
             loadData = { name -> apiClient.tableData(name) },
-            onError = { apiClient.logErrorToServer(it) },
             onBack = { router.navigate(Page.Home) },
         )
         is Page.DebugTables -> TablesPage(
+            apiClient = apiClient,
             title = "Debug Tables",
             emptyMessage = "No debug tables available.",
             loadNames = { apiClient.listDebugTables() },
             loadData = { name -> apiClient.debugTableData(name) },
-            onError = { apiClient.logErrorToServer(it) },
             onBack = { router.navigate(Page.Home) },
         )
         is Page.UserManagement -> UserManagementPage(

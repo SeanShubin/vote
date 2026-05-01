@@ -30,7 +30,6 @@ class ElectionDetailPageRenderTest {
                     currentRole = null,
                     onBack = { backCalled = true },
                     onElectionDeleted = {},
-                    coroutineScope = testScope
                 )
             }
         }
