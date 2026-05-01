@@ -1,6 +1,7 @@
 package com.seanshubin.vote.frontend
 
 import com.seanshubin.vote.domain.Ranking
+import com.seanshubin.vote.domain.Role
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -16,22 +17,28 @@ import kotlin.test.assertEquals
  * endpoint. The frontend's other tests use FakeApiClient and so never
  * exercise serialization — the original castBallot bug (sending
  * electionName as voterName) lived in this gap.
+ *
+ * After the auth refactor, the access token is internal state on the client.
+ * Tests pass an [HttpApiClient.Session] directly to skip the
+ * register/authenticate handshake; the token value itself is irrelevant
+ * here (only headers and bodies are asserted).
  */
 class HttpApiClientWireTest {
 
     private data class Captured(val url: String, val method: String?, val body: String)
 
-    // Stub JWT whose middle (payload) segment base64url-decodes to {"userName":"alice"}.
-    // HttpApiClient.extractUserName reads the unverified payload — server-side verification
-    // is the real defense. Header and signature segments aren't inspected in these tests.
-    private val aliceToken: String = "header.eyJ1c2VyTmFtZSI6ImFsaWNlIn0.signature"
+    private val aliceSession = HttpApiClient.Session(
+        accessToken = "test-access-token",
+        userName = "alice",
+        role = Role.USER,
+    )
 
     private fun client(captured: MutableList<Captured>, responseBody: String): HttpApiClient {
         val fakeFetch: (String, RequestInit) -> Promise<Response> = { url, init ->
             captured.add(Captured(url, init.method, init.body as? String ?: ""))
             Promise.resolve(makeResponse(200, responseBody))
         }
-        return HttpApiClient("https://api.example.com", fakeFetch)
+        return HttpApiClient("https://api.example.com", fakeFetch, initialSession = aliceSession)
     }
 
     @Test
@@ -39,7 +46,7 @@ class HttpApiClientWireTest {
         val captured = mutableListOf<Captured>()
 
         client(captured, "\"confirmation-id\"")
-            .castBallot(aliceToken, "MyElection", listOf(Ranking("Kotlin", 1)))
+            .castBallot("MyElection", listOf(Ranking("Kotlin", 1)))
 
         assertEquals(1, captured.size)
         assertEquals("https://api.example.com/election/MyElection/ballot", captured[0].url)
@@ -56,7 +63,7 @@ class HttpApiClientWireTest {
         val captured = mutableListOf<Captured>()
 
         client(captured, "\"confirmation-id\"")
-            .castBallot(aliceToken, "Best Programming Language", listOf(Ranking("A", 1)))
+            .castBallot("Best Programming Language", listOf(Ranking("A", 1)))
 
         assertEquals("https://api.example.com/election/Best%20Programming%20Language/ballot", captured[0].url)
     }
@@ -66,7 +73,7 @@ class HttpApiClientWireTest {
         val captured = mutableListOf<Captured>()
 
         // createElection's HTTP response is Unit, so the fake returns "{}".
-        client(captured, "{}").createElection(aliceToken, "MyElection")
+        client(captured, "{}").createElection("MyElection")
 
         assertEquals(1, captured.size)
         assertEquals("https://api.example.com/election", captured[0].url)
@@ -78,7 +85,7 @@ class HttpApiClientWireTest {
     @Test
     fun registerSerializesAllFields() = runTest {
         val captured = mutableListOf<Captured>()
-        val authJson = """{"accessToken":"header.eyJ1c2VyTmFtZSI6ImFsaWNlIn0.signature","userName":"alice","role":"USER"}"""
+        val authJson = """{"accessToken":"some-jwt","userName":"alice","role":"USER"}"""
 
         client(captured, authJson).register("alice", "alice@example.com", "secret")
 

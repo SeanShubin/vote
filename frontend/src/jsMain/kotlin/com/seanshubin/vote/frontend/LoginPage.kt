@@ -11,7 +11,9 @@ import org.jetbrains.compose.web.dom.*
 @Composable
 fun LoginPage(
     apiClient: ApiClient,
-    onLoginSuccess: (authToken: String, userName: String, role: Role) -> Unit,
+    // The ApiClient stores the token internally on success — we just relay
+    // identity (user, role) up so the SPA can drive UI display.
+    onLoginSuccess: (userName: String, role: Role) -> Unit,
     onNavigateToRegister: () -> Unit,
     onNavigateToForgotPassword: () -> Unit = {},
     coroutineScope: CoroutineScope = rememberCoroutineScope()
@@ -28,7 +30,7 @@ fun LoginPage(
             coroutineScope.launch {
                 try {
                     val auth = apiClient.authenticate(nameOrEmail, password)
-                    onLoginSuccess(auth.accessToken, auth.userName, auth.role)
+                    onLoginSuccess(auth.userName, auth.role)
                 } catch (e: Exception) {
                     apiClient.logErrorToServer(e)
                     errorMessage = e.message ?: "Login failed"

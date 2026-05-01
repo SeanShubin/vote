@@ -14,7 +14,6 @@ class CreateElectionPageRenderTest {
      */
     class CreateElectionPageTester(
         private val testScope: TestScope,
-        private val authToken: String = "test-token",
         private val testId: String = "create-election-test"
     ) : AutoCloseable {
         private val fakeClient = FakeApiClient()
@@ -26,7 +25,6 @@ class CreateElectionPageRenderTest {
             renderComposable(rootElementId = testId) {
                 CreateElectionPage(
                     apiClient = fakeClient,
-                    authToken = authToken,
                     onElectionCreated = { name -> capturedElectionName = name },
                     onBack = { backCalled = true },
                     coroutineScope = testScope
@@ -93,8 +91,7 @@ class CreateElectionPageRenderTest {
 
             // then
             assertEquals(1, tester.createElectionCalls().size)
-            assertEquals("test-token", tester.createElectionCalls()[0].authToken)
-            assertEquals("Test Election", tester.createElectionCalls()[0].electionName)
+            assertEquals("Test Election", tester.createElectionCalls()[0])
             assertEquals("Test Election", tester.capturedElectionName())
         }
     }
@@ -125,8 +122,7 @@ class CreateElectionPageRenderTest {
 
             // then
             assertEquals(1, tester.createElectionCalls().size)
-            assertEquals("test-token", tester.createElectionCalls()[0].authToken)
-            assertEquals("Test Election", tester.createElectionCalls()[0].electionName)
+            assertEquals("Test Election", tester.createElectionCalls()[0])
             assertEquals("Test Election", tester.capturedElectionName())
         }
     }

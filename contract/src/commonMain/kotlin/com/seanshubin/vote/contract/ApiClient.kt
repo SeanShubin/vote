@@ -5,6 +5,15 @@ import com.seanshubin.vote.domain.Ranking
 import com.seanshubin.vote.domain.TableData
 import com.seanshubin.vote.domain.Tally
 
+/**
+ * The API client owns its own auth state. Callers (UI pages) don't pass an
+ * access token around — they just call methods. Implementations (HttpApiClient,
+ * FakeApiClient) are responsible for tracking the current session and, where
+ * applicable, transparently refreshing on 401.
+ *
+ * State transitions: register / authenticate / refresh start a session;
+ * logout ends one. Authenticated calls before a session is started will fail.
+ */
 interface ApiClient {
     suspend fun register(userName: String, email: String, password: String): AuthResponse
 
@@ -18,7 +27,7 @@ interface ApiClient {
      */
     suspend fun refresh(): AuthResponse?
 
-    /** Clear the refresh cookie server-side. Idempotent. */
+    /** Clear the refresh cookie server-side and the local session. Idempotent. */
     suspend fun logout()
 
     /** Kick off a password reset — backend looks up user and emails a signed reset link. */
@@ -27,27 +36,27 @@ interface ApiClient {
     /** Complete a password reset using the token from the email link. */
     suspend fun resetPassword(resetToken: String, newPassword: String)
 
-    suspend fun listElections(authToken: String): List<ElectionSummary>
-    suspend fun createElection(authToken: String, electionName: String): String
-    suspend fun getElection(authToken: String, electionName: String): ElectionSummary
-    suspend fun setCandidates(authToken: String, electionName: String, candidates: List<String>)
-    suspend fun listCandidates(authToken: String, electionName: String): List<String>
-    suspend fun setEligibleVoters(authToken: String, electionName: String, voters: List<String>)
-    suspend fun launchElection(authToken: String, electionName: String)
-    suspend fun castBallot(authToken: String, electionName: String, rankings: List<Ranking>): String
-    suspend fun getTally(authToken: String, electionName: String): Tally
+    suspend fun listElections(): List<ElectionSummary>
+    suspend fun createElection(electionName: String): String
+    suspend fun getElection(electionName: String): ElectionSummary
+    suspend fun setCandidates(electionName: String, candidates: List<String>)
+    suspend fun listCandidates(electionName: String): List<String>
+    suspend fun setEligibleVoters(electionName: String, voters: List<String>)
+    suspend fun launchElection(electionName: String)
+    suspend fun castBallot(electionName: String, rankings: List<Ranking>): String
+    suspend fun getTally(electionName: String): Tally
 
     /** Admin: physical DynamoDB table names (vote_data, vote_event_log). Empty for InMemory. */
-    suspend fun listTables(authToken: String): List<String>
+    suspend fun listTables(): List<String>
 
     /** Admin: raw rows of a physical DynamoDB table. */
-    suspend fun tableData(authToken: String, tableName: String): TableData
+    suspend fun tableData(tableName: String): TableData
 
     /** Admin: virtual relational table names projected from DynamoDB items. */
-    suspend fun listDebugTables(authToken: String): List<String>
+    suspend fun listDebugTables(): List<String>
 
     /** Admin: relational projection of one virtual table (users, elections, ballots, ...). */
-    suspend fun debugTableData(authToken: String, tableName: String): TableData
+    suspend fun debugTableData(tableName: String): TableData
 
     fun logErrorToServer(error: Throwable)
 }

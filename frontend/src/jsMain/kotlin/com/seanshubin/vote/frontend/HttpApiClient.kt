@@ -6,18 +6,28 @@ import kotlinx.browser.window
 import kotlinx.coroutines.await
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
 import org.w3c.fetch.RequestCredentials
 import org.w3c.fetch.RequestInit
 import org.w3c.fetch.Response
 import kotlin.js.Promise
 import kotlin.js.json
 
+/**
+ * HTTP-based ApiClient. Owns the current session state — access token,
+ * username, and role — set on register/authenticate/refresh and updated
+ * transparently when a 401 triggers a silent refresh.
+ *
+ * Production: callers don't pass tokens around. They just call methods;
+ * if no session is active, authenticated methods throw NotAuthenticatedException.
+ *
+ * Testing: pass [initialSession] in the constructor to simulate a logged-in
+ * state without going through the register/authenticate dance.
+ */
 class HttpApiClient(
     private val baseUrl: String,
-    // Injectable for wire-format tests; defaults to the browser's window.fetch.
     private val fetch: (String, RequestInit) -> Promise<Response> =
         { url, init -> window.fetch(url, init) },
+    initialSession: Session? = null,
 ) : ApiClient {
     private val json = Json { ignoreUnknownKeys = true }
 
@@ -26,14 +36,26 @@ class HttpApiClient(
     // the browser's fetch API expects.
     private val credentialsInclude: RequestCredentials = "include".unsafeCast<RequestCredentials>()
 
+    /** Current session state; null when not authenticated. */
+    private var session: Session? = initialSession
+
+    /** Snapshot of the current authenticated user. Useful for the SPA's UI display. */
+    val currentSession: Session? get() = session
+
+    data class Session(val accessToken: String, val userName: String, val role: Role)
+
     override suspend fun register(userName: String, email: String, password: String): AuthResponse {
         val request = RegisterRequest(userName, email, password)
-        return post<RegisterRequest, AuthResponse>("/register", request)
+        val auth = post<RegisterRequest, AuthResponse>("/register", request)
+        session = Session(auth.accessToken, auth.userName, auth.role)
+        return auth
     }
 
     override suspend fun authenticate(nameOrEmail: String, password: String): AuthResponse {
         val request = AuthenticateRequest(nameOrEmail, password)
-        return post<AuthenticateRequest, AuthResponse>("/authenticate", request)
+        val auth = post<AuthenticateRequest, AuthResponse>("/authenticate", request)
+        session = Session(auth.accessToken, auth.userName, auth.role)
+        return auth
     }
 
     /**
@@ -48,11 +70,17 @@ class HttpApiClient(
             credentials = credentialsInclude,
             body = "",
         )).await()
-        if (response.status.toInt() == 401) return null
-        return handleResponse(response)
+        if (response.status.toInt() == 401) {
+            session = null
+            return null
+        }
+        val auth = handleResponse<AuthResponse>(response)
+        session = Session(auth.accessToken, auth.userName, auth.role)
+        return auth
     }
 
     override suspend fun logout() {
+        session = null
         fetch("$baseUrl/logout", RequestInit(
             method = "POST",
             headers = json("Content-Type" to "application/json"),
@@ -75,69 +103,66 @@ class HttpApiClient(
         )
     }
 
-    override suspend fun listElections(authToken: String): List<ElectionSummary> {
-        return getWithAuth("/elections", authToken)
-    }
+    override suspend fun listElections(): List<ElectionSummary> =
+        getWithAuth("/elections")
 
-    override suspend fun createElection(authToken: String, electionName: String): String {
-        val userName = extractUserName(authToken)
+    override suspend fun createElection(electionName: String): String {
+        val userName = requireSession().userName
         val request = AddElectionRequest(userName, electionName)
-        postWithAuth<AddElectionRequest, Unit>("/election", request, authToken)
+        postWithAuth<AddElectionRequest, Unit>("/election", request)
         return electionName
     }
 
-    override suspend fun getElection(authToken: String, electionName: String): ElectionSummary {
-        return getWithAuth("/election/${encodeURIComponent(electionName)}", authToken)
-    }
+    override suspend fun getElection(electionName: String): ElectionSummary =
+        getWithAuth("/election/${encodeURIComponent(electionName)}")
 
-    override suspend fun setCandidates(authToken: String, electionName: String, candidates: List<String>) {
+    override suspend fun setCandidates(electionName: String, candidates: List<String>) {
         val request = SetCandidatesRequest(candidates)
-        putWithAuth<SetCandidatesRequest, Unit>("/election/${encodeURIComponent(electionName)}/candidates", request, authToken)
+        putWithAuth<SetCandidatesRequest, Unit>(
+            "/election/${encodeURIComponent(electionName)}/candidates",
+            request,
+        )
     }
 
-    override suspend fun listCandidates(authToken: String, electionName: String): List<String> {
-        return getWithAuth("/election/${encodeURIComponent(electionName)}/candidates", authToken)
-    }
+    override suspend fun listCandidates(electionName: String): List<String> =
+        getWithAuth("/election/${encodeURIComponent(electionName)}/candidates")
 
-    override suspend fun setEligibleVoters(authToken: String, electionName: String, voters: List<String>) {
+    override suspend fun setEligibleVoters(electionName: String, voters: List<String>) {
         val request = SetEligibleVotersRequest(voters)
-        putWithAuth<SetEligibleVotersRequest, Unit>("/election/${encodeURIComponent(electionName)}/eligibility", request, authToken)
+        putWithAuth<SetEligibleVotersRequest, Unit>(
+            "/election/${encodeURIComponent(electionName)}/eligibility",
+            request,
+        )
     }
 
-    override suspend fun launchElection(authToken: String, electionName: String) {
+    override suspend fun launchElection(electionName: String) {
         val request = LaunchElectionRequest(allowEdit = true)
         postWithAuth<LaunchElectionRequest, Unit>(
             "/election/${encodeURIComponent(electionName)}/launch",
             request,
-            authToken
         )
     }
 
-    override suspend fun castBallot(authToken: String, electionName: String, rankings: List<Ranking>): String {
-        val voterName = extractUserName(authToken)
+    override suspend fun castBallot(electionName: String, rankings: List<Ranking>): String {
+        val voterName = requireSession().userName
         val request = CastBallotRequest(voterName, rankings)
-        return postWithAuth("/election/${encodeURIComponent(electionName)}/ballot", request, authToken)
+        return postWithAuth("/election/${encodeURIComponent(electionName)}/ballot", request)
     }
 
-    override suspend fun getTally(authToken: String, electionName: String): Tally {
-        return getWithAuth("/election/${encodeURIComponent(electionName)}/tally", authToken)
-    }
+    override suspend fun getTally(electionName: String): Tally =
+        getWithAuth("/election/${encodeURIComponent(electionName)}/tally")
 
-    override suspend fun listTables(authToken: String): List<String> {
-        return getWithAuth("/tables", authToken)
-    }
+    override suspend fun listTables(): List<String> =
+        getWithAuth("/tables")
 
-    override suspend fun tableData(authToken: String, tableName: String): TableData {
-        return getWithAuth("/table/${encodeURIComponent(tableName)}", authToken)
-    }
+    override suspend fun tableData(tableName: String): TableData =
+        getWithAuth("/table/${encodeURIComponent(tableName)}")
 
-    override suspend fun listDebugTables(authToken: String): List<String> {
-        return getWithAuth("/debug-tables", authToken)
-    }
+    override suspend fun listDebugTables(): List<String> =
+        getWithAuth("/debug-tables")
 
-    override suspend fun debugTableData(authToken: String, tableName: String): TableData {
-        return getWithAuth("/debug-table/${encodeURIComponent(tableName)}", authToken)
-    }
+    override suspend fun debugTableData(tableName: String): TableData =
+        getWithAuth("/debug-table/${encodeURIComponent(tableName)}")
 
     override fun logErrorToServer(error: Throwable) {
         try {
@@ -151,9 +176,7 @@ class HttpApiClient(
 
             window.fetch("$baseUrl/log-client-error", RequestInit(
                 method = "POST",
-                headers = json(
-                    "Content-Type" to "application/json"
-                ),
+                headers = json("Content-Type" to "application/json"),
                 body = json.encodeToString(errorRequest)
             ))
         } catch (loggingError: Throwable) {
@@ -162,12 +185,40 @@ class HttpApiClient(
         }
     }
 
+    // --- Auth helpers ---
+
+    private fun requireSession(): Session =
+        session ?: throw NotAuthenticatedException()
+
+    /**
+     * Fire an authenticated request. If the server returns 401 we attempt one
+     * silent refresh via the HttpOnly refresh cookie and retry with the new
+     * access token. If refresh fails, the 401 propagates so the SPA can show
+     * the login screen.
+     *
+     * Why retry once and not loop: a single retry handles the common case
+     * (10-minute access token expired but 30-day refresh cookie still valid).
+     * If the retry also 401s, the cookie is gone — let it propagate.
+     */
+    private suspend fun fetchWithAutoRefresh(
+        path: String,
+        buildInit: (String) -> RequestInit,
+    ): Response {
+        val token = requireSession().accessToken
+        val response = fetch("$baseUrl$path", buildInit(token)).await()
+        if (response.status.toInt() != 401) return response
+
+        // Note: refresh() updates `session` as a side effect on success.
+        val refreshed = refresh() ?: return response
+        return fetch("$baseUrl$path", buildInit(refreshed.accessToken)).await()
+    }
+
+    // --- Wire-format helpers ---
+
     private suspend inline fun <reified TReq, reified TRes> post(path: String, body: TReq): TRes {
         val response = fetch("$baseUrl$path", RequestInit(
             method = "POST",
-            headers = json(
-                "Content-Type" to "application/json"
-            ),
+            headers = json("Content-Type" to "application/json"),
             // Server may return Set-Cookie (for refresh token) — credentials:include
             // is required on register/authenticate so the browser stores the cookie.
             credentials = credentialsInclude,
@@ -179,45 +230,51 @@ class HttpApiClient(
     private suspend inline fun <reified TReq, reified TRes> postWithAuth(
         path: String,
         body: TReq,
-        authToken: String
     ): TRes {
-        val response = fetch("$baseUrl$path", RequestInit(
-            method = "POST",
-            headers = json(
-                "Content-Type" to "application/json",
-                "Authorization" to "Bearer $authToken"
-            ),
-            credentials = credentialsInclude,
-            body = json.encodeToString(body)
-        )).await()
+        // Serialize before the lambda so the non-inline fetchWithAutoRefresh
+        // doesn't need TReq's reified type info inside its closure.
+        val serialized = json.encodeToString(body)
+        val response = fetchWithAutoRefresh(path) { token ->
+            RequestInit(
+                method = "POST",
+                headers = json(
+                    "Content-Type" to "application/json",
+                    "Authorization" to "Bearer $token"
+                ),
+                credentials = credentialsInclude,
+                body = serialized
+            )
+        }
         return handleResponse(response)
     }
 
     private suspend inline fun <reified TReq, reified TRes> putWithAuth(
         path: String,
         body: TReq,
-        authToken: String
     ): TRes {
-        val response = fetch("$baseUrl$path", RequestInit(
-            method = "PUT",
-            headers = json(
-                "Content-Type" to "application/json",
-                "Authorization" to "Bearer $authToken"
-            ),
-            credentials = credentialsInclude,
-            body = json.encodeToString(body)
-        )).await()
+        val serialized = json.encodeToString(body)
+        val response = fetchWithAutoRefresh(path) { token ->
+            RequestInit(
+                method = "PUT",
+                headers = json(
+                    "Content-Type" to "application/json",
+                    "Authorization" to "Bearer $token"
+                ),
+                credentials = credentialsInclude,
+                body = serialized
+            )
+        }
         return handleResponse(response)
     }
 
-    private suspend inline fun <reified T> getWithAuth(path: String, authToken: String): T {
-        val response = fetch("$baseUrl$path", RequestInit(
-            method = "GET",
-            headers = json(
-                "Authorization" to "Bearer $authToken"
-            ),
-            credentials = credentialsInclude,
-        )).await()
+    private suspend inline fun <reified T> getWithAuth(path: String): T {
+        val response = fetchWithAutoRefresh(path) { token ->
+            RequestInit(
+                method = "GET",
+                headers = json("Authorization" to "Bearer $token"),
+                credentials = credentialsInclude,
+            )
+        }
         return handleResponse(response)
     }
 
@@ -243,22 +300,9 @@ class HttpApiClient(
     private fun encodeURIComponent(str: String): String {
         return js("encodeURIComponent")(str) as String
     }
-
-    /**
-     * Extract the userName claim from a signed JWT's payload. The signature
-     * is verified server-side; clients can read claims without a secret.
-     */
-    private fun extractUserName(jwt: String): String {
-        val parts = jwt.split(".")
-        require(parts.size == 3) { "Invalid JWT (expected 3 segments, got ${parts.size})" }
-        // base64url → base64 (regular)
-        val b64 = parts[1].replace('-', '+').replace('_', '/')
-        val padded = b64 + "=".repeat((4 - b64.length % 4) % 4)
-        val decoded = js("atob")(padded) as String
-        val obj = json.decodeFromString<JsonObject>(decoded)
-        return obj["userName"]?.toString()?.removeSurrounding("\"")
-            ?: throw IllegalArgumentException("JWT missing userName claim")
-    }
 }
 
 class ApiException(message: String) : Exception(message)
+
+/** Thrown when an authenticated method is called without an active session. */
+class NotAuthenticatedException : RuntimeException("No active session. Call register() or authenticate() first.")

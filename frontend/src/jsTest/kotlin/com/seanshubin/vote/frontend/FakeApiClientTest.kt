@@ -79,10 +79,9 @@ class FakeApiClientTest {
         )
         fakeClient.listElectionsResult = Result.success(expectedElections)
 
-        val elections = fakeClient.listElections("token-123")
+        val elections = fakeClient.listElections()
 
         assertEquals(1, fakeClient.listElectionsCalls.size)
-        assertEquals("token-123", fakeClient.listElectionsCalls[0].authToken)
         assertEquals(expectedElections, elections)
     }
 
@@ -91,11 +90,10 @@ class FakeApiClientTest {
         val fakeClient = FakeApiClient()
         fakeClient.createElectionResult = Result.success("Best Language")
 
-        val electionName = fakeClient.createElection("token-123", "Best Language")
+        val electionName = fakeClient.createElection("Best Language")
 
         assertEquals(1, fakeClient.createElectionCalls.size)
-        assertEquals("token-123", fakeClient.createElectionCalls[0].authToken)
-        assertEquals("Best Language", fakeClient.createElectionCalls[0].electionName)
+        assertEquals("Best Language", fakeClient.createElectionCalls[0])
         assertEquals("Best Language", electionName)
     }
 
@@ -113,11 +111,10 @@ class FakeApiClientTest {
         )
         fakeClient.getElectionResult = Result.success(expectedElection)
 
-        val election = fakeClient.getElection("token-123", "Best Language")
+        val election = fakeClient.getElection("Best Language")
 
         assertEquals(1, fakeClient.getElectionCalls.size)
-        assertEquals("token-123", fakeClient.getElectionCalls[0].authToken)
-        assertEquals("Best Language", fakeClient.getElectionCalls[0].electionName)
+        assertEquals("Best Language", fakeClient.getElectionCalls[0])
         assertEquals(expectedElection, election)
     }
 
@@ -126,10 +123,9 @@ class FakeApiClientTest {
         val fakeClient = FakeApiClient()
         val candidates = listOf("Kotlin", "Rust", "Go")
 
-        fakeClient.setCandidates("token-123", "Best Language", candidates)
+        fakeClient.setCandidates("Best Language", candidates)
 
         assertEquals(1, fakeClient.setCandidatesCalls.size)
-        assertEquals("token-123", fakeClient.setCandidatesCalls[0].authToken)
         assertEquals("Best Language", fakeClient.setCandidatesCalls[0].electionName)
         assertEquals(candidates, fakeClient.setCandidatesCalls[0].candidates)
     }
@@ -140,11 +136,10 @@ class FakeApiClientTest {
         val expectedCandidates = listOf("Kotlin", "Rust", "Go")
         fakeClient.listCandidatesResult = Result.success(expectedCandidates)
 
-        val candidates = fakeClient.listCandidates("token-123", "Best Language")
+        val candidates = fakeClient.listCandidates("Best Language")
 
         assertEquals(1, fakeClient.listCandidatesCalls.size)
-        assertEquals("token-123", fakeClient.listCandidatesCalls[0].authToken)
-        assertEquals("Best Language", fakeClient.listCandidatesCalls[0].electionName)
+        assertEquals("Best Language", fakeClient.listCandidatesCalls[0])
         assertEquals(expectedCandidates, candidates)
     }
 
@@ -153,10 +148,9 @@ class FakeApiClientTest {
         val fakeClient = FakeApiClient()
         val voters = listOf("bob", "charlie")
 
-        fakeClient.setEligibleVoters("token-123", "Best Language", voters)
+        fakeClient.setEligibleVoters("Best Language", voters)
 
         assertEquals(1, fakeClient.setEligibleVotersCalls.size)
-        assertEquals("token-123", fakeClient.setEligibleVotersCalls[0].authToken)
         assertEquals("Best Language", fakeClient.setEligibleVotersCalls[0].electionName)
         assertEquals(voters, fakeClient.setEligibleVotersCalls[0].voters)
     }
@@ -165,11 +159,10 @@ class FakeApiClientTest {
     fun launchElectionCapturesCall() = runTest {
         val fakeClient = FakeApiClient()
 
-        fakeClient.launchElection("token-123", "Best Language")
+        fakeClient.launchElection("Best Language")
 
         assertEquals(1, fakeClient.launchElectionCalls.size)
-        assertEquals("token-123", fakeClient.launchElectionCalls[0].authToken)
-        assertEquals("Best Language", fakeClient.launchElectionCalls[0].electionName)
+        assertEquals("Best Language", fakeClient.launchElectionCalls[0])
     }
 
     @Test
@@ -182,10 +175,9 @@ class FakeApiClientTest {
         )
         fakeClient.castBallotResult = Result.success("ballot-456")
 
-        val confirmation = fakeClient.castBallot("token-123", "Best Language", rankings)
+        val confirmation = fakeClient.castBallot("Best Language", rankings)
 
         assertEquals(1, fakeClient.castBallotCalls.size)
-        assertEquals("token-123", fakeClient.castBallotCalls[0].authToken)
         assertEquals("Best Language", fakeClient.castBallotCalls[0].electionName)
         assertEquals(rankings, fakeClient.castBallotCalls[0].rankings)
         assertEquals("ballot-456", confirmation)

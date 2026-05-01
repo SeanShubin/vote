@@ -14,7 +14,6 @@ class ElectionDetailPageRenderTest {
      */
     class ElectionDetailPageTester(
         private val testScope: TestScope,
-        private val authToken: String = "test-token",
         private val electionName: String = "Test Election",
         private val testId: String = "election-detail-test"
     ) : AutoCloseable {
@@ -26,7 +25,6 @@ class ElectionDetailPageRenderTest {
             renderComposable(rootElementId = testId) {
                 ElectionDetailPage(
                     apiClient = fakeClient,
-                    authToken = authToken,
                     electionName = electionName,
                     onBack = { backCalled = true },
                     coroutineScope = testScope

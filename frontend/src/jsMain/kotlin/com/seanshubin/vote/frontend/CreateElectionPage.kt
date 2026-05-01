@@ -10,7 +10,6 @@ import org.jetbrains.compose.web.dom.*
 @Composable
 fun CreateElectionPage(
     apiClient: ApiClient,
-    authToken: String,
     onElectionCreated: (String) -> Unit,
     onBack: () -> Unit,
     coroutineScope: CoroutineScope = rememberCoroutineScope()
@@ -25,7 +24,7 @@ fun CreateElectionPage(
             errorMessage = null
             coroutineScope.launch {
                 try {
-                    apiClient.createElection(authToken, electionName)
+                    apiClient.createElection(electionName)
                     onElectionCreated(electionName)
                 } catch (e: Exception) {
                     apiClient.logErrorToServer(e)

@@ -19,7 +19,8 @@ fun main() {
 fun VoteApp(apiClient: ApiClient) {
     val router = rememberRouter()
     var isBootstrapping by remember { mutableStateOf(true) }
-    var authToken by remember { mutableStateOf<String?>(null) }
+    // userName + role drive UI display only. The access token itself is owned
+    // by the ApiClient — VoteApp doesn't see or pass it.
     var userName by remember { mutableStateOf<String?>(null) }
     var role by remember { mutableStateOf<Role?>(null) }
     val scope = rememberCoroutineScope()
@@ -33,7 +34,6 @@ fun VoteApp(apiClient: ApiClient) {
         try {
             val auth = apiClient.refresh()
             if (auth != null) {
-                authToken = auth.accessToken
                 userName = auth.userName
                 role = auth.role
                 // Bookmarked /login or /register but already authenticated?
@@ -61,8 +61,7 @@ fun VoteApp(apiClient: ApiClient) {
     when (val page = router.currentPage) {
         is Page.Login -> LoginPage(
             apiClient = apiClient,
-            onLoginSuccess = { token, user, userRole ->
-                authToken = token
+            onLoginSuccess = { user, userRole ->
                 userName = user
                 role = userRole
                 router.replace(Page.Home)
@@ -72,8 +71,7 @@ fun VoteApp(apiClient: ApiClient) {
         )
         is Page.Register -> RegisterPage(
             apiClient = apiClient,
-            onLoginSuccess = { token, user, userRole ->
-                authToken = token
+            onLoginSuccess = { user, userRole ->
                 userName = user
                 role = userRole
                 router.replace(Page.Home)
@@ -83,7 +81,6 @@ fun VoteApp(apiClient: ApiClient) {
         is Page.Home -> HomePage(
             userName = userName ?: "Unknown",
             role = role,
-            authToken = authToken ?: "",
             onNavigateToCreateElection = { router.navigate(Page.CreateElection) },
             onNavigateToElections = { router.navigate(Page.Elections) },
             onNavigateToRawTables = { router.navigate(Page.RawTables) },
@@ -95,7 +92,6 @@ fun VoteApp(apiClient: ApiClient) {
                     } catch (e: Exception) {
                         apiClient.logErrorToServer(e)
                     }
-                    authToken = null
                     userName = null
                     role = null
                     router.replace(Page.Login)
@@ -104,7 +100,6 @@ fun VoteApp(apiClient: ApiClient) {
         )
         is Page.CreateElection -> CreateElectionPage(
             apiClient = apiClient,
-            authToken = authToken ?: "",
             onElectionCreated = { electionName ->
                 router.navigate(Page.ElectionDetail(electionName))
             },
@@ -112,7 +107,6 @@ fun VoteApp(apiClient: ApiClient) {
         )
         is Page.Elections -> ElectionsPage(
             apiClient = apiClient,
-            authToken = authToken ?: "",
             onSelectElection = { electionName ->
                 router.navigate(Page.ElectionDetail(electionName))
             },
@@ -120,32 +114,25 @@ fun VoteApp(apiClient: ApiClient) {
         )
         is Page.ElectionDetail -> ElectionDetailPage(
             apiClient = apiClient,
-            authToken = authToken ?: "",
             electionName = page.electionName,
             onBack = { router.navigate(Page.Elections) }
         )
-        is Page.RawTables -> {
-            val token = authToken ?: ""
-            TablesPage(
-                title = "Raw Tables",
-                emptyMessage = "No raw tables (this backend has no physical tables to expose).",
-                loadNames = { apiClient.listTables(token) },
-                loadData = { name -> apiClient.tableData(token, name) },
-                onError = { apiClient.logErrorToServer(it) },
-                onBack = { router.navigate(Page.Home) },
-            )
-        }
-        is Page.DebugTables -> {
-            val token = authToken ?: ""
-            TablesPage(
-                title = "Debug Tables",
-                emptyMessage = "No debug tables available.",
-                loadNames = { apiClient.listDebugTables(token) },
-                loadData = { name -> apiClient.debugTableData(token, name) },
-                onError = { apiClient.logErrorToServer(it) },
-                onBack = { router.navigate(Page.Home) },
-            )
-        }
+        is Page.RawTables -> TablesPage(
+            title = "Raw Tables",
+            emptyMessage = "No raw tables (this backend has no physical tables to expose).",
+            loadNames = { apiClient.listTables() },
+            loadData = { name -> apiClient.tableData(name) },
+            onError = { apiClient.logErrorToServer(it) },
+            onBack = { router.navigate(Page.Home) },
+        )
+        is Page.DebugTables -> TablesPage(
+            title = "Debug Tables",
+            emptyMessage = "No debug tables available.",
+            loadNames = { apiClient.listDebugTables() },
+            loadData = { name -> apiClient.debugTableData(name) },
+            onError = { apiClient.logErrorToServer(it) },
+            onBack = { router.navigate(Page.Home) },
+        )
         is Page.PasswordResetRequest -> PasswordResetRequestPage(
             apiClient = apiClient,
             onNavigateToLogin = { router.navigate(Page.Login) },

@@ -11,7 +11,6 @@ import org.jetbrains.compose.web.dom.*
 @Composable
 fun ElectionDetailPage(
     apiClient: ApiClient,
-    authToken: String,
     electionName: String,
     onBack: () -> Unit,
     coroutineScope: CoroutineScope = rememberCoroutineScope()
@@ -25,8 +24,8 @@ fun ElectionDetailPage(
 
     LaunchedEffect(Unit) {
         try {
-            election = apiClient.getElection(authToken, electionName)
-            candidates = apiClient.listCandidates(authToken, electionName)
+            election = apiClient.getElection(electionName)
+            candidates = apiClient.listCandidates(electionName)
         } catch (e: Exception) {
             apiClient.logErrorToServer(e)
             errorMessage = e.message ?: "Failed to load election"
@@ -81,12 +80,12 @@ fun ElectionDetailPage(
             when (currentView) {
                 "details" -> ElectionDetailsView(election!!)
                 "setup" -> ElectionSetupView(
-                    apiClient, authToken, electionName, candidates,
+                    apiClient, electionName, candidates,
                     onSuccess = { msg ->
                         successMessage = msg
                         coroutineScope.launch {
                             try {
-                                candidates = apiClient.listCandidates(authToken, electionName)
+                                candidates = apiClient.listCandidates(electionName)
                             } catch (e: Exception) {
                                 // Ignore
                             }
@@ -95,12 +94,12 @@ fun ElectionDetailPage(
                     onError = { msg -> errorMessage = msg }
                 )
                 "vote" -> VotingView(
-                    apiClient, authToken, electionName, candidates,
+                    apiClient, electionName, candidates,
                     onSuccess = { msg -> successMessage = msg },
                     onError = { msg -> errorMessage = msg }
                 )
                 "tally" -> TallyView(
-                    apiClient, authToken, electionName,
+                    apiClient, electionName,
                     onError = { msg -> errorMessage = msg }
                 )
             }
@@ -128,7 +127,6 @@ fun ElectionDetailsView(election: ElectionSummary) {
 @Composable
 fun ElectionSetupView(
     apiClient: ApiClient,
-    authToken: String,
     electionName: String,
     existingCandidates: List<String>,
     onSuccess: (String) -> Unit,
@@ -158,7 +156,7 @@ fun ElectionSetupView(
                         .filter { it.isNotBlank() }
                     coroutineScope.launch {
                         try {
-                            apiClient.setCandidates(authToken, electionName, candidates)
+                            apiClient.setCandidates(electionName, candidates)
                             onSuccess("Candidates updated successfully")
                         } catch (e: Exception) {
                             apiClient.logErrorToServer(e)
@@ -191,7 +189,7 @@ fun ElectionSetupView(
                         .filter { it.isNotBlank() }
                     coroutineScope.launch {
                         try {
-                            apiClient.setEligibleVoters(authToken, electionName, voters)
+                            apiClient.setEligibleVoters(electionName, voters)
                             onSuccess("Eligible voters updated successfully")
                         } catch (e: Exception) {
                             apiClient.logErrorToServer(e)
@@ -214,7 +212,7 @@ fun ElectionSetupView(
                     isLoading = true
                     coroutineScope.launch {
                         try {
-                            apiClient.launchElection(authToken, electionName)
+                            apiClient.launchElection(electionName)
                             onSuccess("Election launched successfully")
                         } catch (e: Exception) {
                             apiClient.logErrorToServer(e)
@@ -234,7 +232,6 @@ fun ElectionSetupView(
 @Composable
 fun VotingView(
     apiClient: ApiClient,
-    authToken: String,
     electionName: String,
     candidates: List<String>,
     onSuccess: (String) -> Unit,
@@ -280,7 +277,7 @@ fun VotingView(
                         }
                         coroutineScope.launch {
                             try {
-                                val confirmation = apiClient.castBallot(authToken, electionName, ballotRankings)
+                                val confirmation = apiClient.castBallot(electionName, ballotRankings)
                                 onSuccess("Ballot cast successfully! Confirmation: $confirmation")
                             } catch (e: Exception) {
                                 apiClient.logErrorToServer(e)
@@ -301,7 +298,6 @@ fun VotingView(
 @Composable
 fun TallyView(
     apiClient: ApiClient,
-    authToken: String,
     electionName: String,
     onError: (String) -> Unit
 ) {
@@ -311,7 +307,7 @@ fun TallyView(
 
     LaunchedEffect(Unit) {
         try {
-            tally = apiClient.getTally(authToken, electionName)
+            tally = apiClient.getTally(electionName)
         } catch (e: Exception) {
             apiClient.logErrorToServer(e)
             onError(e.message ?: "Failed to load tally")

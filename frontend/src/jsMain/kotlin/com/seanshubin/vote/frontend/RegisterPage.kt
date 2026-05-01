@@ -11,7 +11,7 @@ import org.jetbrains.compose.web.dom.*
 @Composable
 fun RegisterPage(
     apiClient: ApiClient,
-    onLoginSuccess: (authToken: String, userName: String, role: Role) -> Unit,
+    onLoginSuccess: (userName: String, role: Role) -> Unit,
     onNavigateToLogin: () -> Unit,
     coroutineScope: CoroutineScope = rememberCoroutineScope()
 ) {
@@ -28,7 +28,7 @@ fun RegisterPage(
             coroutineScope.launch {
                 try {
                     val auth = apiClient.register(userName, email, password)
-                    onLoginSuccess(auth.accessToken, auth.userName, auth.role)
+                    onLoginSuccess(auth.userName, auth.role)
                 } catch (e: Exception) {
                     apiClient.logErrorToServer(e)
                     errorMessage = e.message ?: "Registration failed"

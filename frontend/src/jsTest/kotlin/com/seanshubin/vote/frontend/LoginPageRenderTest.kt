@@ -7,7 +7,6 @@ import kotlinx.coroutines.test.runTest
 import org.jetbrains.compose.web.renderComposable
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /**
@@ -37,7 +36,6 @@ class LoginPageRenderTest {
         private val fakeClient = FakeApiClient()
         private val testRoot = ComposeTestHelper.createTestRoot(testId)
         private var loginSuccessCalled = false
-        private var capturedToken: String? = null
         private var capturedUserName: String? = null
         private var navigateToRegisterCalled = false
 
@@ -45,9 +43,8 @@ class LoginPageRenderTest {
             renderComposable(rootElementId = testId) {
                 LoginPage(
                     apiClient = fakeClient,
-                    onLoginSuccess = { token, userName, _ ->
+                    onLoginSuccess = { userName, _ ->
                         loginSuccessCalled = true
-                        capturedToken = token
                         capturedUserName = userName
                     },
                     onNavigateToRegister = { navigateToRegisterCalled = true },
@@ -90,8 +87,6 @@ class LoginPageRenderTest {
         fun authenticateCalls() = fakeClient.authenticateCalls
 
         fun wasLoginSuccessCallbackInvoked() = loginSuccessCalled
-
-        fun capturedAuthToken() = capturedToken
 
         fun capturedUserName() = capturedUserName
 
@@ -184,7 +179,6 @@ class LoginPageRenderTest {
             // then
             assertTrue(tester.wasLoginSuccessCallbackInvoked(), "Login success callback should be invoked")
             assertEquals("dave", tester.capturedUserName())
-            assertNotNull(tester.capturedAuthToken())
         }
     }
 }

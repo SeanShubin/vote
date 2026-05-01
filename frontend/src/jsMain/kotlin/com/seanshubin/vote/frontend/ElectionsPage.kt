@@ -10,7 +10,6 @@ import org.jetbrains.compose.web.dom.*
 @Composable
 fun ElectionsPage(
     apiClient: ApiClient,
-    authToken: String,
     onSelectElection: (String) -> Unit,
     onBack: () -> Unit,
     coroutineScope: CoroutineScope = rememberCoroutineScope()
@@ -21,7 +20,7 @@ fun ElectionsPage(
 
     LaunchedEffect(Unit) {
         try {
-            elections = apiClient.listElections(authToken)
+            elections = apiClient.listElections()
         } catch (e: Exception) {
             apiClient.logErrorToServer(e)
             errorMessage = e.message ?: "Failed to load elections"

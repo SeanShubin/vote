@@ -8,7 +8,6 @@ import org.jetbrains.compose.web.dom.*
 fun HomePage(
     userName: String,
     role: Role?,
-    authToken: String,
     onNavigateToCreateElection: () -> Unit,
     onNavigateToElections: () -> Unit,
     onNavigateToRawTables: () -> Unit,

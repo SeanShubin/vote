@@ -10,15 +10,15 @@ import com.seanshubin.vote.domain.Tally
 class FakeApiClient : ApiClient {
     val registerCalls = mutableListOf<RegisterCall>()
     val authenticateCalls = mutableListOf<AuthenticateCall>()
-    val listElectionsCalls = mutableListOf<ListElectionsCall>()
-    val createElectionCalls = mutableListOf<CreateElectionCall>()
-    val getElectionCalls = mutableListOf<GetElectionCall>()
+    val listElectionsCalls = mutableListOf<Unit>()
+    val createElectionCalls = mutableListOf<String>()
+    val getElectionCalls = mutableListOf<String>()
     val setCandidatesCalls = mutableListOf<SetCandidatesCall>()
-    val listCandidatesCalls = mutableListOf<ListCandidatesCall>()
+    val listCandidatesCalls = mutableListOf<String>()
     val setEligibleVotersCalls = mutableListOf<SetEligibleVotersCall>()
-    val launchElectionCalls = mutableListOf<LaunchElectionCall>()
+    val launchElectionCalls = mutableListOf<String>()
     val castBallotCalls = mutableListOf<CastBallotCall>()
-    val getTallyCalls = mutableListOf<GetTallyCall>()
+    val getTallyCalls = mutableListOf<String>()
     val loggedErrors = mutableListOf<Throwable>()
 
     var registerResult: Result<AuthResponse> = Result.failure(Exception("Register not configured"))
@@ -43,10 +43,10 @@ class FakeApiClient : ApiClient {
     var tableDataResult: Result<TableData> = Result.success(TableData("", emptyList(), emptyList()))
     var listDebugTablesResult: Result<List<String>> = Result.success(emptyList())
     var debugTableDataResult: Result<TableData> = Result.success(TableData("", emptyList(), emptyList()))
-    val listTablesCalls = mutableListOf<String>()
-    val tableDataCalls = mutableListOf<TableDataCall>()
-    val listDebugTablesCalls = mutableListOf<String>()
-    val debugTableDataCalls = mutableListOf<TableDataCall>()
+    val listTablesCalls = mutableListOf<Unit>()
+    val tableDataCalls = mutableListOf<String>()
+    val listDebugTablesCalls = mutableListOf<Unit>()
+    val debugTableDataCalls = mutableListOf<String>()
 
     override suspend fun register(userName: String, email: String, password: String): AuthResponse {
         registerCalls.add(RegisterCall(userName, email, password))
@@ -77,68 +77,68 @@ class FakeApiClient : ApiClient {
         resetPasswordResult.getOrThrow()
     }
 
-    override suspend fun listElections(authToken: String): List<ElectionSummary> {
-        listElectionsCalls.add(ListElectionsCall(authToken))
+    override suspend fun listElections(): List<ElectionSummary> {
+        listElectionsCalls.add(Unit)
         return listElectionsResult.getOrThrow()
     }
 
-    override suspend fun createElection(authToken: String, electionName: String): String {
-        createElectionCalls.add(CreateElectionCall(authToken, electionName))
+    override suspend fun createElection(electionName: String): String {
+        createElectionCalls.add(electionName)
         return createElectionResult.getOrThrow()
     }
 
-    override suspend fun getElection(authToken: String, electionName: String): ElectionSummary {
-        getElectionCalls.add(GetElectionCall(authToken, electionName))
+    override suspend fun getElection(electionName: String): ElectionSummary {
+        getElectionCalls.add(electionName)
         return getElectionResult.getOrThrow()
     }
 
-    override suspend fun setCandidates(authToken: String, electionName: String, candidates: List<String>) {
-        setCandidatesCalls.add(SetCandidatesCall(authToken, electionName, candidates))
+    override suspend fun setCandidates(electionName: String, candidates: List<String>) {
+        setCandidatesCalls.add(SetCandidatesCall(electionName, candidates))
         setCandidatesResult.getOrThrow()
     }
 
-    override suspend fun listCandidates(authToken: String, electionName: String): List<String> {
-        listCandidatesCalls.add(ListCandidatesCall(authToken, electionName))
+    override suspend fun listCandidates(electionName: String): List<String> {
+        listCandidatesCalls.add(electionName)
         return listCandidatesResult.getOrThrow()
     }
 
-    override suspend fun setEligibleVoters(authToken: String, electionName: String, voters: List<String>) {
-        setEligibleVotersCalls.add(SetEligibleVotersCall(authToken, electionName, voters))
+    override suspend fun setEligibleVoters(electionName: String, voters: List<String>) {
+        setEligibleVotersCalls.add(SetEligibleVotersCall(electionName, voters))
         setEligibleVotersResult.getOrThrow()
     }
 
-    override suspend fun launchElection(authToken: String, electionName: String) {
-        launchElectionCalls.add(LaunchElectionCall(authToken, electionName))
+    override suspend fun launchElection(electionName: String) {
+        launchElectionCalls.add(electionName)
         launchElectionResult.getOrThrow()
     }
 
-    override suspend fun castBallot(authToken: String, electionName: String, rankings: List<Ranking>): String {
-        castBallotCalls.add(CastBallotCall(authToken, electionName, rankings))
+    override suspend fun castBallot(electionName: String, rankings: List<Ranking>): String {
+        castBallotCalls.add(CastBallotCall(electionName, rankings))
         return castBallotResult.getOrThrow()
     }
 
-    override suspend fun getTally(authToken: String, electionName: String): Tally {
-        getTallyCalls.add(GetTallyCall(authToken, electionName))
+    override suspend fun getTally(electionName: String): Tally {
+        getTallyCalls.add(electionName)
         return getTallyResult.getOrThrow()
     }
 
-    override suspend fun listTables(authToken: String): List<String> {
-        listTablesCalls.add(authToken)
+    override suspend fun listTables(): List<String> {
+        listTablesCalls.add(Unit)
         return listTablesResult.getOrThrow()
     }
 
-    override suspend fun tableData(authToken: String, tableName: String): TableData {
-        tableDataCalls.add(TableDataCall(authToken, tableName))
+    override suspend fun tableData(tableName: String): TableData {
+        tableDataCalls.add(tableName)
         return tableDataResult.getOrThrow()
     }
 
-    override suspend fun listDebugTables(authToken: String): List<String> {
-        listDebugTablesCalls.add(authToken)
+    override suspend fun listDebugTables(): List<String> {
+        listDebugTablesCalls.add(Unit)
         return listDebugTablesResult.getOrThrow()
     }
 
-    override suspend fun debugTableData(authToken: String, tableName: String): TableData {
-        debugTableDataCalls.add(TableDataCall(authToken, tableName))
+    override suspend fun debugTableData(tableName: String): TableData {
+        debugTableDataCalls.add(tableName)
         return debugTableDataResult.getOrThrow()
     }
 
@@ -148,15 +148,8 @@ class FakeApiClient : ApiClient {
 
     data class RegisterCall(val userName: String, val email: String, val password: String)
     data class AuthenticateCall(val nameOrEmail: String, val password: String)
-    data class ListElectionsCall(val authToken: String)
-    data class CreateElectionCall(val authToken: String, val electionName: String)
-    data class GetElectionCall(val authToken: String, val electionName: String)
-    data class SetCandidatesCall(val authToken: String, val electionName: String, val candidates: List<String>)
-    data class ListCandidatesCall(val authToken: String, val electionName: String)
-    data class SetEligibleVotersCall(val authToken: String, val electionName: String, val voters: List<String>)
-    data class LaunchElectionCall(val authToken: String, val electionName: String)
-    data class CastBallotCall(val authToken: String, val electionName: String, val rankings: List<Ranking>)
-    data class GetTallyCall(val authToken: String, val electionName: String)
-    data class TableDataCall(val authToken: String, val tableName: String)
+    data class SetCandidatesCall(val electionName: String, val candidates: List<String>)
+    data class SetEligibleVotersCall(val electionName: String, val voters: List<String>)
+    data class CastBallotCall(val electionName: String, val rankings: List<Ranking>)
     data class ResetPasswordCall(val resetToken: String, val newPassword: String)
 }
