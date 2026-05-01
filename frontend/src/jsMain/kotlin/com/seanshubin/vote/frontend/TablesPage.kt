@@ -1,9 +1,8 @@
 package com.seanshubin.vote.frontend
 
 import androidx.compose.runtime.*
+import com.seanshubin.vote.contract.ApiClient
 import com.seanshubin.vote.domain.TableData
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.launch
 import org.jetbrains.compose.web.dom.*
 
 /**
@@ -16,73 +15,66 @@ import org.jetbrains.compose.web.dom.*
  */
 @Composable
 fun TablesPage(
+    apiClient: ApiClient,
     title: String,
     emptyMessage: String,
     loadNames: suspend () -> List<String>,
     loadData: suspend (String) -> TableData,
-    onError: (Throwable) -> Unit,
     onBack: () -> Unit,
-    coroutineScope: CoroutineScope = rememberCoroutineScope(),
 ) {
-    var tableNames by remember { mutableStateOf<List<String>>(emptyList()) }
     var selectedTable by remember { mutableStateOf<String?>(null) }
-    var tableData by remember { mutableStateOf<TableData?>(null) }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
-    var isLoadingNames by remember { mutableStateOf(true) }
-    var isLoadingData by remember { mutableStateOf(false) }
 
-    LaunchedEffect(Unit) {
-        try {
-            tableNames = loadNames()
-            selectedTable = tableNames.firstOrNull()
-        } catch (e: Exception) {
-            onError(e)
-            errorMessage = e.message ?: "Failed to load table names"
-        } finally {
-            isLoadingNames = false
+    val namesFetch = rememberFetchState(
+        apiClient = apiClient,
+        fallbackErrorMessage = "Failed to load table names",
+    ) {
+        loadNames()
+    }
+
+    // Auto-select the first table once names have loaded.
+    LaunchedEffect(namesFetch.state) {
+        val state = namesFetch.state
+        if (state is FetchState.Success && selectedTable == null) {
+            selectedTable = state.value.firstOrNull()
         }
     }
 
-    LaunchedEffect(selectedTable) {
-        val name = selectedTable ?: return@LaunchedEffect
-        isLoadingData = true
-        try {
-            tableData = loadData(name)
-        } catch (e: Exception) {
-            onError(e)
-            errorMessage = e.message ?: "Failed to load table $name"
-        } finally {
-            isLoadingData = false
-        }
+    val dataFetch = rememberFetchState(
+        apiClient = apiClient,
+        key = selectedTable,
+        fallbackErrorMessage = "Failed to load table",
+    ) {
+        val name = selectedTable
+        if (name == null) null else loadData(name)
     }
 
     Div({ classes("admin-container") }) {
         H1 { Text(title) }
 
-        errorMessage?.let { msg ->
-            Div({ classes("error") }) { Text(msg) }
-        }
-
-        when {
-            isLoadingNames -> P { Text("Loading tables...") }
-            tableNames.isEmpty() -> P { Text(emptyMessage) }
-            else -> {
-                // Tab strip
-                Div({ classes("tab-strip") }) {
-                    tableNames.forEach { name ->
-                        Button({
-                            classes(if (name == selectedTable) "tab-active" else "tab")
-                            onClick { selectedTable = name }
-                        }) {
-                            Text(name)
+        when (val state = namesFetch.state) {
+            FetchState.Loading -> P { Text("Loading tables…") }
+            is FetchState.Error -> Div({ classes("error") }) { Text(state.message) }
+            is FetchState.Success -> {
+                if (state.value.isEmpty()) {
+                    P { Text(emptyMessage) }
+                } else {
+                    Div({ classes("tab-strip") }) {
+                        state.value.forEach { name ->
+                            Button({
+                                classes(if (name == selectedTable) "tab-active" else "tab")
+                                onClick { selectedTable = name }
+                            }) {
+                                Text(name)
+                            }
                         }
                     }
-                }
 
-                if (isLoadingData) {
-                    P { Text("Loading rows...") }
-                } else {
-                    tableData?.let { renderTable(it) }
+                    when (val dataState = dataFetch.state) {
+                        FetchState.Loading -> P { Text("Loading rows…") }
+                        is FetchState.Error ->
+                            Div({ classes("error") }) { Text(dataState.message) }
+                        is FetchState.Success -> dataState.value?.let { renderTable(it) }
+                    }
                 }
             }
         }

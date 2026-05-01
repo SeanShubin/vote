@@ -5,8 +5,6 @@ import com.seanshubin.vote.contract.ApiClient
 import com.seanshubin.vote.contract.AuthResponse
 import com.seanshubin.vote.domain.Role
 import com.seanshubin.vote.domain.UserNameRole
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.launch
 import org.jetbrains.compose.web.attributes.selected
 import org.jetbrains.compose.web.dom.*
 import org.w3c.dom.HTMLSelectElement
@@ -30,43 +28,39 @@ fun UserManagementPage(
     currentUserName: String,
     onSelfRoleChanged: (AuthResponse) -> Unit,
     onBack: () -> Unit,
-    coroutineScope: CoroutineScope = rememberCoroutineScope(),
 ) {
-    var users by remember { mutableStateOf<List<UserNameRole>>(emptyList()) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
-    var isLoading by remember { mutableStateOf(true) }
     var pendingTransfer by remember { mutableStateOf<UserNameRole?>(null) }
+    var pendingRoleChange by remember { mutableStateOf<Pair<String, Role>?>(null) }
 
-    suspend fun reload() {
-        try {
-            users = apiClient.listUsers()
-            errorMessage = null
-        } catch (e: Exception) {
-            apiClient.logErrorToServer(e)
-            errorMessage = e.message ?: "Failed to load users"
-        } finally {
-            isLoading = false
-        }
+    val usersFetch = rememberFetchState(
+        apiClient = apiClient,
+        fallbackErrorMessage = "Failed to load users",
+    ) {
+        apiClient.listUsers()
     }
 
-    LaunchedEffect(Unit) { reload() }
+    val roleChangeAction = rememberAsyncAction(
+        apiClient = apiClient,
+        fallbackErrorMessage = "Failed to update role",
+        onError = { errorMessage = it },
+        action = {
+            errorMessage = null
+            val (userName, newRole) = pendingRoleChange ?: return@rememberAsyncAction
+            apiClient.setRole(userName, newRole)
+            // The caller's access token may now be stale (most obviously after
+            // an ownership transfer demoted them to AUDITOR). Refresh so subsequent
+            // listUsers carries the caller's true current role, and surface the
+            // new identity to the rest of the app via [onSelfRoleChanged].
+            val refreshed = apiClient.refresh()
+            if (refreshed != null) onSelfRoleChanged(refreshed)
+            usersFetch.reload()
+        },
+    )
 
     fun submitRoleChange(userName: String, newRole: Role) {
-        coroutineScope.launch {
-            try {
-                apiClient.setRole(userName, newRole)
-                // The caller's access token may now be stale (most obviously after
-                // an ownership transfer demoted them to AUDITOR). Refresh so subsequent
-                // listUsers carries the caller's true current role, and surface the
-                // new identity to the rest of the app via [onSelfRoleChanged].
-                val refreshed = apiClient.refresh()
-                if (refreshed != null) onSelfRoleChanged(refreshed)
-                reload()
-            } catch (e: Exception) {
-                apiClient.logErrorToServer(e)
-                errorMessage = e.message ?: "Failed to update role"
-            }
-        }
+        pendingRoleChange = userName to newRole
+        roleChangeAction.invoke()
     }
 
     Div({ classes("container") }) {
@@ -76,25 +70,29 @@ fun UserManagementPage(
             Div({ classes("error") }) { Text(errorMessage!!) }
         }
 
-        if (isLoading) {
-            P { Text("Loading users...") }
-        } else if (users.isEmpty()) {
-            P { Text("No users found.") }
-        } else {
-            Div({ classes("users-list") }) {
-                users.forEach { user ->
-                    UserRow(
-                        user = user,
-                        isSelf = user.userName == currentUserName,
-                        onRoleSelected = { newRole ->
-                            if (newRole == user.role) return@UserRow
-                            if (newRole == Role.OWNER) {
-                                pendingTransfer = user
-                            } else {
-                                submitRoleChange(user.userName, newRole)
-                            }
-                        },
-                    )
+        when (val state = usersFetch.state) {
+            FetchState.Loading -> P { Text("Loading users…") }
+            is FetchState.Error -> Div({ classes("error") }) { Text(state.message) }
+            is FetchState.Success -> {
+                if (state.value.isEmpty()) {
+                    P { Text("No users found.") }
+                } else {
+                    Div({ classes("users-list") }) {
+                        state.value.forEach { user ->
+                            UserRow(
+                                user = user,
+                                isSelf = user.userName == currentUserName,
+                                onRoleSelected = { newRole ->
+                                    if (newRole == user.role) return@UserRow
+                                    if (newRole == Role.OWNER) {
+                                        pendingTransfer = user
+                                    } else {
+                                        submitRoleChange(user.userName, newRole)
+                                    }
+                                },
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -113,7 +111,7 @@ fun UserManagementPage(
                 pendingTransfer = null
                 // Force a reload so the dropdown snaps back to the user's actual role
                 // (the <select> currently shows OWNER because the user picked it).
-                coroutineScope.launch { reload() }
+                usersFetch.reload()
             },
         )
     }

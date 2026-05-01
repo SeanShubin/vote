@@ -48,7 +48,7 @@ class LoginPageRenderTest {
                         capturedUserName = userName
                     },
                     onNavigateToRegister = { navigateToRegisterCalled = true },
-                    coroutineScope = testScope
+                    coroutineScope = testScope,
                 )
             }
         }

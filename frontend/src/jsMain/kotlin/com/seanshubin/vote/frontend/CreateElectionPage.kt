@@ -3,7 +3,6 @@ package com.seanshubin.vote.frontend
 import androidx.compose.runtime.*
 import com.seanshubin.vote.contract.ApiClient
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.launch
 import org.jetbrains.compose.web.attributes.*
 import org.jetbrains.compose.web.dom.*
 
@@ -12,30 +11,23 @@ fun CreateElectionPage(
     apiClient: ApiClient,
     onElectionCreated: (String) -> Unit,
     onBack: () -> Unit,
-    coroutineScope: CoroutineScope = rememberCoroutineScope()
+    coroutineScope: CoroutineScope = rememberCoroutineScope(),
 ) {
     var electionName by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf<String?>(null) }
-    var isLoading by remember { mutableStateOf(false) }
 
-    val handleCreateElection = {
-        if (!isLoading && electionName.isNotBlank()) {
-            isLoading = true
+    val createAction = rememberAsyncAction(
+        apiClient = apiClient,
+        fallbackErrorMessage = "Failed to create election",
+        onSuccess = { onElectionCreated(electionName) },
+        onError = { errorMessage = it },
+        coroutineScope = coroutineScope,
+        action = {
             errorMessage = null
-            coroutineScope.launch {
-                try {
-                    apiClient.createElection(electionName, description)
-                    onElectionCreated(electionName)
-                } catch (e: Exception) {
-                    apiClient.logErrorToServer(e)
-                    errorMessage = e.message ?: "Failed to create election"
-                } finally {
-                    isLoading = false
-                }
-            }
-        }
-    }
+            apiClient.createElection(electionName, description)
+        },
+    )
 
     Div({ classes("container") }) {
         H1 { Text("Create Election") }
@@ -46,16 +38,17 @@ fun CreateElectionPage(
             }
         }
 
-        Div({ classes("form") }) {
+        Form(attrs = {
+            classes("form")
+            onSubmit { event ->
+                event.preventDefault()
+                if (electionName.isNotBlank()) createAction.invoke()
+            }
+        }) {
             Input(InputType.Text) {
                 placeholder("Election Name")
                 value(electionName)
                 onInput { electionName = it.value }
-                onKeyDown { event ->
-                    if (event.key == "Enter") {
-                        handleCreateElection()
-                    }
-                }
             }
 
             // Description is optional — empty string means "no description". A
@@ -69,12 +62,14 @@ fun CreateElectionPage(
             }
 
             Button({
-                onClick { handleCreateElection() }
+                attr("type", "submit")
+                if (createAction.isLoading) attr("disabled", "")
             }) {
-                Text(if (isLoading) "Creating..." else "Create")
+                Text(if (createAction.isLoading) "Creating…" else "Create")
             }
 
             Button({
+                attr("type", "button")
                 onClick { onBack() }
             }) {
                 Text("Back")

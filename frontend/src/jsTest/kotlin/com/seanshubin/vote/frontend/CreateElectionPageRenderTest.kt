@@ -27,7 +27,7 @@ class CreateElectionPageRenderTest {
                     apiClient = fakeClient,
                     onElectionCreated = { name -> capturedElectionName = name },
                     onBack = { backCalled = true },
-                    coroutineScope = testScope
+                    coroutineScope = testScope,
                 )
             }
         }

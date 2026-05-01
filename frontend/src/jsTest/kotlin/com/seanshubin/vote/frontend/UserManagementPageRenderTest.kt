@@ -32,7 +32,6 @@ class UserManagementPageRenderTest {
                     currentUserName = "alice",
                     onSelfRoleChanged = { lastSelfRoleChange = it },
                     onBack = { backCalled = true },
-                    coroutineScope = testScope,
                 )
             }
         }

@@ -2,8 +2,6 @@ package com.seanshubin.vote.frontend
 
 import androidx.compose.runtime.*
 import com.seanshubin.vote.contract.ApiClient
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.launch
 import org.jetbrains.compose.web.attributes.*
 import org.jetbrains.compose.web.dom.*
 
@@ -17,30 +15,21 @@ import org.jetbrains.compose.web.dom.*
 fun PasswordResetRequestPage(
     apiClient: ApiClient,
     onNavigateToLogin: () -> Unit,
-    coroutineScope: CoroutineScope = rememberCoroutineScope(),
 ) {
     var nameOrEmail by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var emailSent by remember { mutableStateOf(false) }
-    var isLoading by remember { mutableStateOf(false) }
 
-    val handleRequest = {
-        if (!isLoading && !emailSent) {
-            isLoading = true
+    val sendAction = rememberAsyncAction(
+        apiClient = apiClient,
+        fallbackErrorMessage = "Failed to send reset email",
+        onError = { errorMessage = it },
+        action = {
             errorMessage = null
-            coroutineScope.launch {
-                try {
-                    apiClient.requestPasswordReset(nameOrEmail)
-                    emailSent = true
-                } catch (e: Exception) {
-                    apiClient.logErrorToServer(e)
-                    errorMessage = e.message ?: "Failed to send reset email"
-                } finally {
-                    isLoading = false
-                }
-            }
-        }
-    }
+            apiClient.requestPasswordReset(nameOrEmail)
+            emailSent = true
+        },
+    )
 
     Div({ classes("container") }) {
         H1 { Text("Reset password") }
@@ -63,7 +52,7 @@ fun PasswordResetRequestPage(
             classes("form")
             onSubmit { event ->
                 event.preventDefault()
-                handleRequest()
+                if (!emailSent) sendAction.invoke()
             }
         }) {
             // The HTML name stays "username" so password-manager affordances
@@ -74,15 +63,13 @@ fun PasswordResetRequestPage(
                 placeholder("Username or email")
                 value(nameOrEmail)
                 onInput { nameOrEmail = it.value }
-                onKeyDown { event ->
-                    if (event.key == "Enter") {
-                        handleRequest()
-                    }
-                }
             }
 
-            Button({ attr("type", "submit") }) {
-                Text(if (isLoading) "Sending..." else "Send reset email")
+            Button({
+                attr("type", "submit")
+                if (sendAction.isLoading) attr("disabled", "")
+            }) {
+                Text(if (sendAction.isLoading) "Sending…" else "Send reset email")
             }
 
             Button({ attr("type", "button"); onClick { onNavigateToLogin() } }) {

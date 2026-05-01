@@ -33,7 +33,7 @@ class RegisterPageRenderTest {
                         capturedUserName = userName
                     },
                     onNavigateToLogin = { navigateToLoginCalled = true },
-                    coroutineScope = testScope
+                    coroutineScope = testScope,
                 )
             }
         }

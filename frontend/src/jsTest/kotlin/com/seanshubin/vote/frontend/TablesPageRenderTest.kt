@@ -21,19 +21,19 @@ class TablesPageRenderTest {
         loadData: (String) -> TableData = { TableData(it, emptyList(), emptyList()) },
         private val testId: String = "tables-page-test",
     ) : AutoCloseable {
+        private val fakeClient = FakeApiClient()
         private val testRoot = ComposeTestHelper.createTestRoot(testId)
         private var backCalled = false
 
         init {
             renderComposable(rootElementId = testId) {
                 TablesPage(
+                    apiClient = fakeClient,
                     title = "Test Tables",
                     emptyMessage = "No tables to show",
                     loadNames = { loadNames() },
                     loadData = { name -> loadData(name) },
-                    onError = { /* swallow in render tests */ },
                     onBack = { backCalled = true },
-                    coroutineScope = testScope,
                 )
             }
         }

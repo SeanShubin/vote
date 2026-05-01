@@ -2,9 +2,6 @@ package com.seanshubin.vote.frontend
 
 import androidx.compose.runtime.*
 import com.seanshubin.vote.contract.ApiClient
-import com.seanshubin.vote.domain.ElectionSummary
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.launch
 import org.jetbrains.compose.web.dom.*
 
 @Composable
@@ -12,46 +9,35 @@ fun ElectionsPage(
     apiClient: ApiClient,
     onSelectElection: (String) -> Unit,
     onBack: () -> Unit,
-    coroutineScope: CoroutineScope = rememberCoroutineScope()
 ) {
-    var elections by remember { mutableStateOf<List<ElectionSummary>>(emptyList()) }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
-    var isLoading by remember { mutableStateOf(true) }
-
-    LaunchedEffect(Unit) {
-        try {
-            elections = apiClient.listElections()
-        } catch (e: Exception) {
-            apiClient.logErrorToServer(e)
-            errorMessage = e.message ?: "Failed to load elections"
-        } finally {
-            isLoading = false
-        }
+    val electionsFetch = rememberFetchState(
+        apiClient = apiClient,
+        fallbackErrorMessage = "Failed to load elections",
+    ) {
+        apiClient.listElections()
     }
 
     Div({ classes("container") }) {
         H1 { Text("Elections") }
 
-        if (errorMessage != null) {
-            Div({ classes("error") }) {
-                Text(errorMessage!!)
-            }
-        }
-
-        if (isLoading) {
-            P { Text("Loading elections...") }
-        } else if (elections.isEmpty()) {
-            P { Text("No elections found.") }
-        } else {
-            Div({ classes("elections-list") }) {
-                elections.forEach { election ->
-                    Div({ classes("election-item") }) {
-                        Button({
-                            onClick { onSelectElection(election.electionName) }
-                        }) {
-                            Text(election.electionName)
+        when (val state = electionsFetch.state) {
+            FetchState.Loading -> P { Text("Loading elections…") }
+            is FetchState.Error -> Div({ classes("error") }) { Text(state.message) }
+            is FetchState.Success -> {
+                if (state.value.isEmpty()) {
+                    P { Text("No elections found.") }
+                } else {
+                    Div({ classes("elections-list") }) {
+                        state.value.forEach { election ->
+                            Div({ classes("election-item") }) {
+                                Button({
+                                    onClick { onSelectElection(election.electionName) }
+                                }) {
+                                    Text(election.electionName)
+                                }
+                                Span { Text(" - Owner: ${election.ownerName}") }
+                            }
                         }
-                        Span { Text(" - Owner: ${election.ownerName}") }
                     }
                 }
             }

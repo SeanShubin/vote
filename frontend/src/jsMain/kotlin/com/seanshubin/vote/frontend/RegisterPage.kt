@@ -4,7 +4,6 @@ import androidx.compose.runtime.*
 import com.seanshubin.vote.contract.ApiClient
 import com.seanshubin.vote.domain.Role
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.launch
 import org.jetbrains.compose.web.attributes.*
 import org.jetbrains.compose.web.dom.*
 
@@ -13,31 +12,24 @@ fun RegisterPage(
     apiClient: ApiClient,
     onLoginSuccess: (userName: String, role: Role) -> Unit,
     onNavigateToLogin: () -> Unit,
-    coroutineScope: CoroutineScope = rememberCoroutineScope()
+    coroutineScope: CoroutineScope = rememberCoroutineScope(),
 ) {
     var userName by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf<String?>(null) }
-    var isLoading by remember { mutableStateOf(false) }
 
-    val handleRegister = {
-        if (!isLoading) {
-            isLoading = true
+    val registerAction = rememberAsyncAction(
+        apiClient = apiClient,
+        fallbackErrorMessage = "Registration failed",
+        onError = { errorMessage = it },
+        coroutineScope = coroutineScope,
+        action = {
             errorMessage = null
-            coroutineScope.launch {
-                try {
-                    val auth = apiClient.register(userName, email, password)
-                    onLoginSuccess(auth.userName, auth.role)
-                } catch (e: Exception) {
-                    apiClient.logErrorToServer(e)
-                    errorMessage = e.message ?: "Registration failed"
-                } finally {
-                    isLoading = false
-                }
-            }
-        }
-    }
+            val auth = apiClient.register(userName, email, password)
+            onLoginSuccess(auth.userName, auth.role)
+        },
+    )
 
     Div({ classes("container") }) {
         H1 { Text("Vote - Register") }
@@ -56,7 +48,7 @@ fun RegisterPage(
             attr("autocomplete", "on")
             onSubmit { event ->
                 event.preventDefault()
-                handleRegister()
+                registerAction.invoke()
             }
         }) {
             Input(InputType.Text) {
@@ -65,11 +57,6 @@ fun RegisterPage(
                 placeholder("Username")
                 value(userName)
                 onInput { userName = it.value }
-                onKeyDown { event ->
-                    if (event.key == "Enter") {
-                        handleRegister()
-                    }
-                }
             }
 
             Input(InputType.Email) {
@@ -78,11 +65,6 @@ fun RegisterPage(
                 placeholder("Email")
                 value(email)
                 onInput { email = it.value }
-                onKeyDown { event ->
-                    if (event.key == "Enter") {
-                        handleRegister()
-                    }
-                }
             }
 
             Input(InputType.Password) {
@@ -91,17 +73,13 @@ fun RegisterPage(
                 placeholder("Password")
                 value(password)
                 onInput { password = it.value }
-                onKeyDown { event ->
-                    if (event.key == "Enter") {
-                        handleRegister()
-                    }
-                }
             }
 
             Button({
                 attr("type", "submit")
+                if (registerAction.isLoading) attr("disabled", "")
             }) {
-                Text(if (isLoading) "Registering..." else "Register")
+                Text(if (registerAction.isLoading) "Registering…" else "Register")
             }
 
             Button({

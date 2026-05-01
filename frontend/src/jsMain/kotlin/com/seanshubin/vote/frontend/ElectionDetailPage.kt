@@ -4,8 +4,6 @@ import androidx.compose.runtime.*
 import com.seanshubin.vote.contract.ApiClient
 import com.seanshubin.vote.domain.*
 import kotlinx.browser.window
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.launch
 import org.jetbrains.compose.web.attributes.*
 import org.jetbrains.compose.web.dom.*
 
@@ -30,30 +28,33 @@ fun ElectionDetailPage(
     currentRole: Role?,
     onBack: () -> Unit,
     onElectionDeleted: () -> Unit,
-    coroutineScope: CoroutineScope = rememberCoroutineScope()
 ) {
-    var election by remember { mutableStateOf<ElectionDetail?>(null) }
-    var candidates by remember { mutableStateOf<List<String>>(emptyList()) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var successMessage by remember { mutableStateOf<String?>(null) }
-    var isLoading by remember { mutableStateOf(true) }
     var currentView by remember { mutableStateOf("setup") }
 
-    suspend fun reload() {
-        election = apiClient.getElection(electionName)
-        candidates = apiClient.listCandidates(electionName)
+    val pageFetch = rememberFetchState(
+        apiClient = apiClient,
+        key = electionName,
+        fallbackErrorMessage = "Failed to load election",
+    ) {
+        val election = apiClient.getElection(electionName)
+        val candidates = apiClient.listCandidates(electionName)
+        election to candidates
     }
 
-    LaunchedEffect(Unit) {
-        try {
-            reload()
-        } catch (e: Exception) {
-            apiClient.logErrorToServer(e)
-            errorMessage = e.message ?: "Failed to load election"
-        } finally {
-            isLoading = false
-        }
-    }
+    val deleteAction = rememberAsyncAction(
+        apiClient = apiClient,
+        fallbackErrorMessage = "Failed to delete election",
+        onError = { errorMessage = it },
+        action = {
+            apiClient.deleteElection(electionName)
+            onElectionDeleted()
+        },
+    )
+
+    val pageState = pageFetch.state
+    val loadedElection = (pageState as? FetchState.Success)?.value?.first
 
     Div({ classes("container") }) {
         H1 { Text("Election: $electionName") }
@@ -61,7 +62,7 @@ fun ElectionDetailPage(
         // Header summary: owner + counts. Replaces the old Details tab.
         // Description (when provided) renders prominently right under the
         // election name so a voter casting a ballot knows what they're voting on.
-        election?.let { e ->
+        loadedElection?.let { e ->
             if (e.description.isNotBlank()) {
                 Div({ classes("section", "election-description") }) {
                     P { Text(e.description) }
@@ -74,61 +75,61 @@ fun ElectionDetailPage(
         }
 
         if (errorMessage != null) {
-            Div({ classes("error") }) {
-                Text(errorMessage!!)
-            }
+            Div({ classes("error") }) { Text(errorMessage!!) }
         }
-
         if (successMessage != null) {
-            Div({ classes("success") }) {
-                Text(successMessage!!)
-            }
+            Div({ classes("success") }) { Text(successMessage!!) }
         }
 
-        if (isLoading) {
-            P { Text("Loading...") }
-        } else if (election != null) {
-            // Tabs (no more Details — the header above covers it).
-            Div({ classes("tabs") }) {
-                Button({ onClick { currentView = "setup" } }) { Text("Setup") }
-                Button({ onClick { currentView = "vote" } }) { Text("Vote") }
-                Button({ onClick { currentView = "tally" } }) { Text("Results") }
-            }
+        when (pageState) {
+            FetchState.Loading -> P { Text("Loading…") }
+            is FetchState.Error -> Div({ classes("error") }) { Text(pageState.message) }
+            is FetchState.Success -> {
+                val (_, candidates) = pageState.value
 
-            when (currentView) {
-                "setup" -> ElectionSetupView(
-                    apiClient, electionName, candidates,
-                    onSuccess = { msg ->
-                        successMessage = msg
-                        coroutineScope.launch {
-                            try { reload() } catch (_: Exception) { /* keep current view */ }
-                        }
-                    },
-                    onError = { msg -> errorMessage = msg }
-                )
-                "vote" -> VotingView(
-                    apiClient, electionName, candidates,
-                    onSuccess = { msg ->
-                        successMessage = msg
-                        coroutineScope.launch {
-                            try { reload() } catch (_: Exception) { /* keep current view */ }
-                        }
-                    },
-                    onError = { msg -> errorMessage = msg }
-                )
-                "tally" -> TallyView(
-                    apiClient, electionName,
-                    onError = { msg -> errorMessage = msg }
-                )
+                // Tabs (no more Details — the header above covers it).
+                Div({ classes("tabs") }) {
+                    Button({ onClick { currentView = "setup" } }) { Text("Setup") }
+                    Button({ onClick { currentView = "vote" } }) { Text("Vote") }
+                    Button({ onClick { currentView = "tally" } }) { Text("Results") }
+                }
+
+                when (currentView) {
+                    "setup" -> ElectionSetupView(
+                        apiClient = apiClient,
+                        electionName = electionName,
+                        existingCandidates = candidates,
+                        onSuccess = { msg ->
+                            successMessage = msg
+                            pageFetch.reload()
+                        },
+                        onError = { errorMessage = it },
+                    )
+                    "vote" -> VotingView(
+                        apiClient = apiClient,
+                        electionName = electionName,
+                        candidates = candidates,
+                        onSuccess = { msg ->
+                            successMessage = msg
+                            pageFetch.reload()
+                        },
+                        onError = { errorMessage = it },
+                    )
+                    "tally" -> TallyView(
+                        apiClient = apiClient,
+                        electionName = electionName,
+                    )
+                }
             }
         }
 
         // Delete is shown to the election owner OR any user with role >= ADMIN
         // (moderators). Backend authorization is the real defense.
-        val canDelete = election != null && (
-            election!!.ownerName == currentUserName ||
+        val canDelete = loadedElection?.let { e ->
+            e.ownerName == currentUserName ||
                 (currentRole != null && currentRole >= Role.ADMIN)
-            )
+        } ?: false
+
         Div({ classes("button-row") }) {
             Button({
                 onClick { onBack() }
@@ -138,22 +139,15 @@ fun ElectionDetailPage(
 
             if (canDelete) {
                 Button({
+                    if (deleteAction.isLoading) attr("disabled", "")
                     onClick {
-                        val confirmed = window.confirm("Delete election \"$electionName\"? This cannot be undone.")
-                        if (confirmed) {
-                            coroutineScope.launch {
-                                try {
-                                    apiClient.deleteElection(electionName)
-                                    onElectionDeleted()
-                                } catch (e: Exception) {
-                                    apiClient.logErrorToServer(e)
-                                    errorMessage = e.message ?: "Failed to delete election"
-                                }
-                            }
-                        }
+                        val confirmed = window.confirm(
+                            "Delete election \"$electionName\"? This cannot be undone."
+                        )
+                        if (confirmed) deleteAction.invoke()
                     }
                 }) {
-                    Text("Delete Election")
+                    Text(if (deleteAction.isLoading) "Deleting…" else "Delete Election")
                 }
             }
         }
@@ -167,10 +161,23 @@ fun ElectionSetupView(
     existingCandidates: List<String>,
     onSuccess: (String) -> Unit,
     onError: (String) -> Unit,
-    coroutineScope: CoroutineScope = rememberCoroutineScope()
 ) {
-    var candidatesText by remember { mutableStateOf(existingCandidates.joinToString("\n")) }
-    var isLoading by remember { mutableStateOf(false) }
+    var candidatesText by remember(existingCandidates) {
+        mutableStateOf(existingCandidates.joinToString("\n"))
+    }
+
+    fun parseCandidates(): List<String> =
+        candidatesText.split("\n").map { it.trim() }.filter { it.isNotBlank() }
+
+    val saveAction = rememberAsyncAction(
+        apiClient = apiClient,
+        fallbackErrorMessage = "Failed to save candidates",
+        onError = onError,
+        action = {
+            apiClient.setCandidates(electionName, parseCandidates())
+            onSuccess("Candidates saved")
+        },
+    )
 
     Div({ classes("section") }) {
         H2 { Text("Candidates") }
@@ -183,11 +190,9 @@ fun ElectionSetupView(
         }
 
         Button({
+            if (saveAction.isLoading) attr("disabled", "")
             onClick {
-                if (isLoading) return@onClick
-                val candidates = candidatesText.split("\n")
-                    .map { it.trim() }
-                    .filter { it.isNotBlank() }
+                val candidates = parseCandidates()
 
                 // Warn about removed candidates before submitting. Removing a
                 // candidate also strips it from existing ballot rankings, so
@@ -205,21 +210,10 @@ fun ElectionSetupView(
                     if (!window.confirm(message)) return@onClick
                 }
 
-                isLoading = true
-                coroutineScope.launch {
-                    try {
-                        apiClient.setCandidates(electionName, candidates)
-                        onSuccess("Candidates saved")
-                    } catch (e: Exception) {
-                        apiClient.logErrorToServer(e)
-                        onError(e.message ?: "Failed to save candidates")
-                    } finally {
-                        isLoading = false
-                    }
-                }
+                saveAction.invoke()
             }
         }) {
-            Text(if (isLoading) "Saving..." else "Save Candidates")
+            Text(if (saveAction.isLoading) "Saving…" else "Save Candidates")
         }
     }
 }
@@ -243,7 +237,6 @@ fun VotingView(
     candidates: List<String>,
     onSuccess: (String) -> Unit,
     onError: (String) -> Unit,
-    coroutineScope: CoroutineScope = rememberCoroutineScope()
 ) {
     var arena by remember(electionName, candidates) { mutableStateOf<List<String>>(emptyList()) }
     var ranked by remember(electionName, candidates) { mutableStateOf<List<String>>(emptyList()) }
@@ -252,13 +245,13 @@ fun VotingView(
     }
     var draggingIndex by remember { mutableStateOf<Int?>(null) }
     var dragMoved by remember { mutableStateOf(false) }
-    var isLoading by remember { mutableStateOf(false) }
     var isInitialized by remember(electionName, candidates) { mutableStateOf(false) }
 
     // Pre-populate from any existing ballot so a returning voter sees their
     // prior pick instead of starting from scratch. New candidates added since
     // last vote land in the arena; candidates removed since last vote are
-    // dropped from the previous ranking.
+    // dropped from the previous ranking. logErrorToServer rethrows
+    // CancellationException, so navigating away mid-fetch cancels cleanly.
     LaunchedEffect(electionName, candidates) {
         if (candidates.isEmpty()) {
             arena = emptyList()
@@ -320,6 +313,17 @@ fun VotingView(
         ranked = r
     }
 
+    val submitAction = rememberAsyncAction(
+        apiClient = apiClient,
+        fallbackErrorMessage = "Failed to cast ballot",
+        onError = onError,
+        action = {
+            val rankings = ranked.mapIndexed { i, n -> Ranking(n, i + 1) }
+            val confirmation = apiClient.castBallot(electionName, rankings)
+            onSuccess("Ballot cast successfully! Confirmation: $confirmation")
+        },
+    )
+
     // Window-level Ctrl+Z / Cmd+Z. The listener captures `handleUndo` once,
     // but `handleUndo` reads from `mutableStateOf`-backed delegates, so each
     // call sees current state.
@@ -343,7 +347,7 @@ fun VotingView(
             return@Div
         }
         if (!isInitialized) {
-            P { Text("Loading...") }
+            P { Text("Loading…") }
             return@Div
         }
 
@@ -474,25 +478,12 @@ fun VotingView(
                     }) { Text("↩ Undo") }
 
                     Button({
-                        if (isLoading || ranked.isEmpty()) attr("disabled", "")
+                        if (submitAction.isLoading || ranked.isEmpty()) attr("disabled", "")
                         onClick {
-                            if (isLoading || ranked.isEmpty()) return@onClick
-                            isLoading = true
-                            val rankings = ranked.mapIndexed { i, n -> Ranking(n, i + 1) }
-                            coroutineScope.launch {
-                                try {
-                                    val confirmation = apiClient.castBallot(electionName, rankings)
-                                    onSuccess("Ballot cast successfully! Confirmation: $confirmation")
-                                } catch (e: Exception) {
-                                    apiClient.logErrorToServer(e)
-                                    onError(e.message ?: "Failed to cast ballot")
-                                } finally {
-                                    isLoading = false
-                                }
-                            }
+                            if (ranked.isNotEmpty()) submitAction.invoke()
                         }
                     }) {
-                        Text(if (isLoading) "Submitting..." else "Submit Ballot")
+                        Text(if (submitAction.isLoading) "Submitting…" else "Submit Ballot")
                     }
 
                     Span({ classes("ranked-ballot-toolbar-hint") }) {
@@ -508,60 +499,56 @@ fun VotingView(
 fun TallyView(
     apiClient: ApiClient,
     electionName: String,
-    onError: (String) -> Unit
 ) {
-    var tally by remember { mutableStateOf<Tally?>(null) }
-    var isLoading by remember { mutableStateOf(true) }
-
-    LaunchedEffect(Unit) {
-        try {
-            tally = apiClient.getTally(electionName)
-        } catch (e: Exception) {
-            apiClient.logErrorToServer(e)
-            onError(e.message ?: "Failed to load tally")
-        } finally {
-            isLoading = false
-        }
+    val tallyFetch = rememberFetchState(
+        apiClient = apiClient,
+        key = electionName,
+        fallbackErrorMessage = "Failed to load tally",
+    ) {
+        apiClient.getTally(electionName)
     }
 
     Div({ classes("section") }) {
         H2 { Text("Results") }
 
-        if (isLoading) {
-            P { Text("Loading results...") }
-        } else if (tally == null) {
-            P { Text("No tally data available.") }
-        } else {
-            P { Text("Total Ballots: ${tally!!.ballots.size}") }
+        when (val state = tallyFetch.state) {
+            FetchState.Loading -> P { Text("Loading results…") }
+            is FetchState.Error -> Div({ classes("error") }) { Text(state.message) }
+            is FetchState.Success -> renderTally(state.value)
+        }
+    }
+}
 
-            H3 { Text("Winners") }
-            if (tally!!.places.isEmpty()) {
-                P { Text("No winners yet") }
-            } else {
-                tally!!.places.forEach { place ->
-                    P { Text("Place ${place.rank}: ${place.candidateName}") }
+@Composable
+private fun renderTally(tally: Tally) {
+    P { Text("Total Ballots: ${tally.ballots.size}") }
+
+    H3 { Text("Winners") }
+    if (tally.places.isEmpty()) {
+        P { Text("No winners yet") }
+    } else {
+        tally.places.forEach { place ->
+            P { Text("Place ${place.rank}: ${place.candidateName}") }
+        }
+    }
+
+    H3 { Text("Preferences Matrix") }
+    Table {
+        Thead {
+            Tr {
+                Th { Text("") }
+                tally.candidateNames.forEach { candidate ->
+                    Th { Text(candidate) }
                 }
             }
-
-            H3 { Text("Preferences Matrix") }
-            Table {
-                Thead {
-                    Tr {
-                        Th { Text("") }
-                        tally!!.candidateNames.forEach { candidate ->
-                            Th { Text(candidate) }
-                        }
-                    }
-                }
-                Tbody {
-                    tally!!.candidateNames.forEachIndexed { rowIndex, rowCandidate ->
-                        Tr {
-                            Td { Text(rowCandidate) }
-                            tally!!.candidateNames.forEachIndexed { colIndex, _ ->
-                                val preference = tally!!.preferences[rowIndex][colIndex]
-                                Td { Text(preference.strength.toString()) }
-                            }
-                        }
+        }
+        Tbody {
+            tally.candidateNames.forEachIndexed { rowIndex, rowCandidate ->
+                Tr {
+                    Td { Text(rowCandidate) }
+                    tally.candidateNames.forEachIndexed { colIndex, _ ->
+                        val preference = tally.preferences[rowIndex][colIndex]
+                        Td { Text(preference.strength.toString()) }
                     }
                 }
             }

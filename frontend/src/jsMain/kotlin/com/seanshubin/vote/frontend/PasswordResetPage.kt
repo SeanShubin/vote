@@ -2,8 +2,6 @@ package com.seanshubin.vote.frontend
 
 import androidx.compose.runtime.*
 import com.seanshubin.vote.contract.ApiClient
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.launch
 import org.jetbrains.compose.web.attributes.*
 import org.jetbrains.compose.web.dom.*
 
@@ -22,34 +20,31 @@ fun PasswordResetPage(
     resetToken: String,
     onResetComplete: () -> Unit,
     onNavigateToLogin: () -> Unit,
-    coroutineScope: CoroutineScope = rememberCoroutineScope(),
 ) {
     var password by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf<String?>(null) }
-    var isLoading by remember { mutableStateOf(false) }
 
-    val handleReset = {
+    val resetAction = rememberAsyncAction(
+        apiClient = apiClient,
+        fallbackErrorMessage = "Failed to reset password",
+        onError = { errorMessage = it },
+        action = {
+            errorMessage = null
+            apiClient.resetPassword(resetToken, password)
+            onResetComplete()
+        },
+    )
+
+    fun handleSubmit() {
         when {
-            isLoading -> Unit
-            resetToken.isBlank() -> errorMessage = "Reset link is missing the token. Try requesting another email."
-            password != confirmPassword -> errorMessage = "Passwords do not match"
-            password.isBlank() -> errorMessage = "Password cannot be blank"
-            else -> {
-                isLoading = true
-                errorMessage = null
-                coroutineScope.launch {
-                    try {
-                        apiClient.resetPassword(resetToken, password)
-                        onResetComplete()
-                    } catch (e: Exception) {
-                        apiClient.logErrorToServer(e)
-                        errorMessage = e.message ?: "Failed to reset password"
-                    } finally {
-                        isLoading = false
-                    }
-                }
-            }
+            resetToken.isBlank() ->
+                errorMessage = "Reset link is missing the token. Try requesting another email."
+            password != confirmPassword ->
+                errorMessage = "Passwords do not match"
+            password.isBlank() ->
+                errorMessage = "Password cannot be blank"
+            else -> resetAction.invoke()
         }
     }
 
@@ -64,7 +59,7 @@ fun PasswordResetPage(
             classes("form")
             onSubmit { event ->
                 event.preventDefault()
-                handleReset()
+                handleSubmit()
             }
         }) {
             Input(InputType.Password) {
@@ -81,15 +76,13 @@ fun PasswordResetPage(
                 placeholder("Confirm new password")
                 value(confirmPassword)
                 onInput { confirmPassword = it.value }
-                onKeyDown { event ->
-                    if (event.key == "Enter") {
-                        handleReset()
-                    }
-                }
             }
 
-            Button({ attr("type", "submit") }) {
-                Text(if (isLoading) "Resetting..." else "Set password")
+            Button({
+                attr("type", "submit")
+                if (resetAction.isLoading) attr("disabled", "")
+            }) {
+                Text(if (resetAction.isLoading) "Resetting…" else "Set password")
             }
 
             Button({ attr("type", "button"); onClick { onNavigateToLogin() } }) {
