@@ -534,35 +534,124 @@ fun TallyView(
 private fun renderTally(tally: Tally) {
     P { Text("Total Ballots: ${tally.ballots.size}") }
 
-    H3 { Text("Winners") }
+    renderPlacings(tally)
+    renderPreferences(tally)
+    renderStrongestPaths(tally)
+}
+
+@Composable
+private fun renderPlacings(tally: Tally) {
+    H3 { Text("Placings") }
     if (tally.places.isEmpty()) {
         P { Text("No winners yet") }
-    } else {
-        tally.places.forEach { place ->
-            P { Text("Place ${place.rank}: ${place.candidateName}") }
-        }
+        return
     }
-
-    H3 { Text("Preferences Matrix") }
-    Table {
+    Table({ classes("data-table") }) {
         Thead {
             Tr {
-                Th { Text("") }
-                tally.candidateNames.forEach { candidate ->
-                    Th { Text(candidate) }
-                }
+                Th { Text("place") }
+                Th { Text("candidate") }
             }
         }
         Tbody {
-            tally.candidateNames.forEachIndexed { rowIndex, rowCandidate ->
+            tally.places.forEach { place ->
                 Tr {
-                    Td { Text(rowCandidate) }
-                    tally.candidateNames.forEachIndexed { colIndex, _ ->
-                        val preference = tally.preferences[rowIndex][colIndex]
-                        Td { Text(preference.strength.toString()) }
+                    Td { Text(formatOrdinal(place.rank)) }
+                    Td { Text(place.candidateName) }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun renderPreferences(tally: Tally) {
+    H3 { Text("Preferences") }
+    val candidates = tally.candidateNames
+    if (candidates.size < 2) {
+        P { Text("Not enough candidates to compare.") }
+        return
+    }
+    Table({ classes("data-table") }) {
+        Thead {
+            Tr {
+                Th { Text("winner") }
+                Th { Text("strength") }
+                Th { Text("loser") }
+            }
+        }
+        Tbody {
+            candidates.indices.forEach { i ->
+                candidates.indices.forEach { j ->
+                    if (i != j) {
+                        Tr {
+                            Td { Text(candidates[i]) }
+                            Td { Text(tally.preferences[i][j].strength.toString()) }
+                            Td { Text(candidates[j]) }
+                        }
                     }
                 }
             }
         }
     }
+}
+
+@Composable
+private fun renderStrongestPaths(tally: Tally) {
+    H3 { Text("Strongest Paths") }
+    val candidates = tally.candidateNames
+    if (candidates.size < 2) {
+        P { Text("Not enough candidates to compute paths.") }
+        return
+    }
+
+    // Off-diagonal entries only — diagonal is a self-loop and carries no path info.
+    val rows: List<Preference> = candidates.indices.flatMap { i ->
+        candidates.indices.mapNotNull { j ->
+            if (i == j) null else tally.strongestPathMatrix[i][j]
+        }
+    }
+    val maxHops = rows.maxOf { it.strengths.size }
+
+    Table({ classes("data-table") }) {
+        Thead {
+            Tr {
+                Th { Text("weakest link") }
+                Th { Text("id") }
+                repeat(maxHops) {
+                    Th { Text("strength") }
+                    Th { Text("id") }
+                }
+            }
+        }
+        Tbody {
+            rows.forEach { pref ->
+                Tr {
+                    Td { Text(pref.strength.toString()) }
+                    Td { Text(pref.path[0]) }
+                    pref.strengths.forEachIndexed { idx, s ->
+                        Td { Text(s.toString()) }
+                        Td { Text(pref.path[idx + 1]) }
+                    }
+                    // Pad short paths so all rows have the same column count.
+                    repeat(maxHops - pref.strengths.size) {
+                        Td { Text("") }
+                        Td { Text("") }
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun formatOrdinal(n: Int): String {
+    val mod100 = n % 100
+    val suffix = when {
+        mod100 in 11..13 -> "th"
+        n % 10 == 1 -> "st"
+        n % 10 == 2 -> "nd"
+        n % 10 == 3 -> "rd"
+        else -> "th"
+    }
+    return "$n$suffix"
 }
