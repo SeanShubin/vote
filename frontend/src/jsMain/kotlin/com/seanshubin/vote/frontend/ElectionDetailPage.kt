@@ -224,6 +224,18 @@ fun ElectionSetupView(
     }
 }
 
+/**
+ * Ranked-ballot voting UI ported from `prototype/ranked-ballot.html`. Candidates
+ * start in an "arena" pool (3-column grid). Click a chip to rank it (appends to
+ * the ranked list with the next ordinal). Drag a row to reorder live. ↑/↓ keys
+ * nudge the focused row. × returns a row to the arena. Ctrl+Z / Cmd+Z undoes
+ * the last action (50-step session-only history).
+ *
+ * The wire format is unchanged — submit sends `List<Ranking>` where each
+ * ranked candidate gets `rank = position + 1`. Unranked candidates are simply
+ * omitted; the tally treats absent candidates as "least preferred, tied with
+ * each other" via `rankingFor(name) ?: Int.MAX_VALUE` in `Ranking.kt`.
+ */
 @Composable
 fun VotingView(
     apiClient: ApiClient,
@@ -233,60 +245,260 @@ fun VotingView(
     onError: (String) -> Unit,
     coroutineScope: CoroutineScope = rememberCoroutineScope()
 ) {
-    var rankings by remember(candidates) {
-        mutableStateOf(candidates.mapIndexed { index, name -> name to (index + 1) })
+    var arena by remember(electionName, candidates) { mutableStateOf<List<String>>(emptyList()) }
+    var ranked by remember(electionName, candidates) { mutableStateOf<List<String>>(emptyList()) }
+    var history by remember(electionName) {
+        mutableStateOf<List<Pair<List<String>, List<String>>>>(emptyList())
     }
+    var draggingIndex by remember { mutableStateOf<Int?>(null) }
+    var dragMoved by remember { mutableStateOf(false) }
     var isLoading by remember { mutableStateOf(false) }
+    var isInitialized by remember(electionName, candidates) { mutableStateOf(false) }
+
+    // Pre-populate from any existing ballot so a returning voter sees their
+    // prior pick instead of starting from scratch. New candidates added since
+    // last vote land in the arena; candidates removed since last vote are
+    // dropped from the previous ranking.
+    LaunchedEffect(electionName, candidates) {
+        if (candidates.isEmpty()) {
+            arena = emptyList()
+            ranked = emptyList()
+            isInitialized = true
+            return@LaunchedEffect
+        }
+        val candidateSet = candidates.toSet()
+        val existing = try {
+            apiClient.getMyRankings(electionName)
+        } catch (e: Exception) {
+            apiClient.logErrorToServer(e)
+            emptyList()
+        }
+        val rankedNames = existing
+            .filter { it.rank != null }
+            .sortedBy { it.rank }
+            .map { it.candidateName }
+            .filter { it in candidateSet }
+        val rankedSet = rankedNames.toSet()
+        ranked = rankedNames
+        arena = candidates.filter { it !in rankedSet }
+        isInitialized = true
+    }
+
+    fun pushHistory() {
+        val next = history + (arena to ranked)
+        history = if (next.size > 50) next.drop(next.size - 50) else next
+    }
+
+    fun handleClickChip(name: String) {
+        pushHistory()
+        arena = arena.filter { it != name }
+        ranked = ranked + name
+    }
+
+    fun handleRemove(index: Int) {
+        if (index !in ranked.indices) return
+        pushHistory()
+        val name = ranked[index]
+        ranked = ranked.toMutableList().apply { removeAt(index) }
+        arena = arena + name
+    }
+
+    fun handleMove(i: Int, dir: Int) {
+        val j = i + dir
+        if (j < 0 || j >= ranked.size) return
+        pushHistory()
+        ranked = ranked.toMutableList().apply {
+            val tmp = this[i]; this[i] = this[j]; this[j] = tmp
+        }
+    }
+
+    fun handleUndo() {
+        if (history.isEmpty()) return
+        val (a, r) = history.last()
+        history = history.dropLast(1)
+        arena = a
+        ranked = r
+    }
+
+    // Window-level Ctrl+Z / Cmd+Z. The listener captures `handleUndo` once,
+    // but `handleUndo` reads from `mutableStateOf`-backed delegates, so each
+    // call sees current state.
+    DisposableEffect(electionName) {
+        val listener: (org.w3c.dom.events.Event) -> Unit = { event ->
+            val ke = event.unsafeCast<org.w3c.dom.events.KeyboardEvent>()
+            if ((ke.ctrlKey || ke.metaKey) && ke.key == "z") {
+                ke.preventDefault()
+                handleUndo()
+            }
+        }
+        window.addEventListener("keydown", listener)
+        onDispose { window.removeEventListener("keydown", listener) }
+    }
 
     Div({ classes("section") }) {
         H2 { Text("Cast Ballot") }
 
         if (candidates.isEmpty()) {
             P { Text("No candidates yet — the election owner can add them via the Setup tab.") }
-        } else {
-            P { Text("Rank the candidates (1 = most preferred):") }
+            return@Div
+        }
+        if (!isInitialized) {
+            P { Text("Loading...") }
+            return@Div
+        }
 
-            rankings.forEach { (candidateName, rank) ->
-                Div({ classes("ranking-row") }) {
-                    Span { Text(candidateName) }
-                    Input(InputType.Number) {
-                        value(rank.toString())
-                        onInput { event ->
-                            val newRank = try {
-                                event.value?.toString()?.toInt() ?: rank
-                            } catch (e: Exception) {
-                                rank
-                            }
-                            rankings = rankings.map { (name, r) ->
-                                if (name == candidateName) name to newRank else name to r
+        Div({ classes("ranked-ballot") }) {
+            if (arena.isNotEmpty()) {
+                Div({ classes("ranked-ballot-arena") }) {
+                    Span({ classes("ranked-ballot-arena-label") }) {
+                        Text("Candidates — click to rank in order of preference")
+                    }
+                    Div({ classes("ranked-ballot-arena-grid") }) {
+                        arena.forEach { name ->
+                            Button({
+                                classes("ranked-ballot-chip")
+                                onClick { handleClickChip(name) }
+                            }) {
+                                Text(name)
                             }
                         }
                     }
                 }
             }
 
-            Button({
-                onClick {
-                    if (!isLoading) {
-                        isLoading = true
-                        val ballotRankings = rankings.map { (name, rank) ->
-                            Ranking(name, rank)
+            Div {
+                Div({ classes("ranked-ballot-list-header") }) {
+                    Span({ classes("ranked-ballot-list-label") }) { Text("Your ranking") }
+                    if (history.isNotEmpty()) {
+                        Span({ classes("ranked-ballot-undo-count") }) {
+                            Text("${history.size} step${if (history.size == 1) "" else "s"} undoable")
                         }
-                        coroutineScope.launch {
-                            try {
-                                val confirmation = apiClient.castBallot(electionName, ballotRankings)
-                                onSuccess("Ballot cast successfully! Confirmation: $confirmation")
-                            } catch (e: Exception) {
-                                apiClient.logErrorToServer(e)
-                                onError(e.message ?: "Failed to cast ballot")
-                            } finally {
-                                isLoading = false
+                    }
+                }
+
+                Ol({ classes("ranked-ballot-list") }) {
+                    ranked.forEachIndexed { index, name ->
+                        Li({
+                            classes("ranked-ballot-row")
+                            if (draggingIndex == index) classes("dragging")
+                            attr("draggable", "true")
+                            attr("tabindex", "0")
+                            onDragStart {
+                                draggingIndex = index
+                                dragMoved = false
+                            }
+                            onDragOver { event ->
+                                event.preventDefault()
+                                val src = draggingIndex ?: return@onDragOver
+                                if (src == index) return@onDragOver
+                                if (!dragMoved) {
+                                    pushHistory()
+                                    dragMoved = true
+                                }
+                                ranked = ranked.toMutableList().apply {
+                                    val item = removeAt(src)
+                                    add(index, item)
+                                }
+                                draggingIndex = index
+                            }
+                            onDrop { event ->
+                                event.preventDefault()
+                                draggingIndex = null
+                                dragMoved = false
+                            }
+                            onDragEnd {
+                                draggingIndex = null
+                                dragMoved = false
+                            }
+                            onKeyDown { event ->
+                                when (event.key) {
+                                    "ArrowUp" -> {
+                                        event.preventDefault()
+                                        handleMove(index, -1)
+                                    }
+                                    "ArrowDown" -> {
+                                        event.preventDefault()
+                                        handleMove(index, 1)
+                                    }
+                                }
+                            }
+                        }) {
+                            Span({ classes("ranked-ballot-rank-num") }) {
+                                Text((index + 1).toString().padStart(2, '0'))
+                            }
+                            Span({ classes("ranked-ballot-row-name") }) { Text(name) }
+                            Span({ classes("ranked-ballot-row-buttons") }) {
+                                Button({
+                                    classes("ranked-ballot-row-button")
+                                    title("Move up")
+                                    if (index == 0) attr("disabled", "")
+                                    onClick { event ->
+                                        event.stopPropagation()
+                                        handleMove(index, -1)
+                                    }
+                                }) { Text("↑") }
+                                Button({
+                                    classes("ranked-ballot-row-button")
+                                    title("Move down")
+                                    if (index == ranked.size - 1) attr("disabled", "")
+                                    onClick { event ->
+                                        event.stopPropagation()
+                                        handleMove(index, 1)
+                                    }
+                                }) { Text("↓") }
+                                Button({
+                                    classes("ranked-ballot-row-button")
+                                    classes("ranked-ballot-row-remove")
+                                    title("Return to candidates")
+                                    onClick { event ->
+                                        event.stopPropagation()
+                                        handleRemove(index)
+                                    }
+                                }) { Text("×") }
                             }
                         }
                     }
                 }
-            }) {
-                Text(if (isLoading) "Submitting..." else "Submit Ballot")
+
+                if (ranked.isEmpty()) {
+                    P({ classes("ranked-ballot-empty-hint") }) {
+                        Text("Click a candidate above to begin")
+                    }
+                }
+
+                Div({ classes("ranked-ballot-toolbar") }) {
+                    Button({
+                        classes("ranked-ballot-undo-button")
+                        if (history.isEmpty()) attr("disabled", "")
+                        onClick { handleUndo() }
+                    }) { Text("↩ Undo") }
+
+                    Button({
+                        if (isLoading || ranked.isEmpty()) attr("disabled", "")
+                        onClick {
+                            if (isLoading || ranked.isEmpty()) return@onClick
+                            isLoading = true
+                            val rankings = ranked.mapIndexed { i, n -> Ranking(n, i + 1) }
+                            coroutineScope.launch {
+                                try {
+                                    val confirmation = apiClient.castBallot(electionName, rankings)
+                                    onSuccess("Ballot cast successfully! Confirmation: $confirmation")
+                                } catch (e: Exception) {
+                                    apiClient.logErrorToServer(e)
+                                    onError(e.message ?: "Failed to cast ballot")
+                                } finally {
+                                    isLoading = false
+                                }
+                            }
+                        }
+                    }) {
+                        Text(if (isLoading) "Submitting..." else "Submit Ballot")
+                    }
+
+                    Span({ classes("ranked-ballot-toolbar-hint") }) {
+                        Text("Focus a row · ↑/↓ to nudge · Ctrl+Z to undo")
+                    }
+                }
             }
         }
     }

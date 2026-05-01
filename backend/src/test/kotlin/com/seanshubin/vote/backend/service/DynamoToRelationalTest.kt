@@ -218,6 +218,10 @@ class DynamoToRelationalTest {
         override fun searchBallot(voterName: String, electionName: String): BallotSummary? = null
         override fun listUserNames(): List<String> = users.map { it.name }
         override fun listPermissions(role: Role): List<Permission> = emptyList()
+        override fun electionsOwnedCount(userName: String): Int =
+            elections.count { it.ownerName == userName }
+        override fun ballotsCastCount(userName: String): Int =
+            ballots.values.flatten().count { it.voterName == userName }
     }
 
     private fun stubEventLog(events: List<EventEnvelope> = emptyList()): EventLog = object : EventLog {

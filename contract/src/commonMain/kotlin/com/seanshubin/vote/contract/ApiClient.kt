@@ -46,6 +46,14 @@ interface ApiClient {
     suspend fun setCandidates(electionName: String, candidates: List<String>)
     suspend fun listCandidates(electionName: String): List<String>
     suspend fun castBallot(electionName: String, rankings: List<Ranking>): String
+
+    /**
+     * The current user's existing rankings for an election, used to pre-populate
+     * the voting view on edit-an-existing-ballot. Empty list when the voter
+     * hasn't cast a ballot yet.
+     */
+    suspend fun getMyRankings(electionName: String): List<Ranking>
+
     suspend fun getTally(electionName: String): Tally
 
     /** Delete an election. Allowed for the election owner or ADMIN+; rejected otherwise. */
