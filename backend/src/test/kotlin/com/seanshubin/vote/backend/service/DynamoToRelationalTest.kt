@@ -202,6 +202,10 @@ class DynamoToRelationalTest {
         override fun searchUserByName(name: String): User? = null
         override fun searchUserByEmail(email: String): User? = null
         override fun userCount() = users.size
+        override fun electionsOwnedCount(userName: String): Int =
+            elections.count { it.ownerName == userName }
+        override fun ballotsCastCount(userName: String): Int =
+            ballots.values.flatten().count { it.voterName == userName }
         override fun electionCount() = elections.size
         override fun candidateCount(electionName: String) = listCandidates(electionName).size
         override fun ballotCount(electionName: String) = listBallots(electionName).size
