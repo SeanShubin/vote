@@ -1,6 +1,7 @@
 package com.seanshubin.vote.backend.service
 
 import com.seanshubin.vote.backend.auth.TokenEncoder
+import com.seanshubin.vote.backend.validation.TestUser
 import com.seanshubin.vote.backend.validation.Validation
 import com.seanshubin.vote.contract.*
 import com.seanshubin.vote.domain.*
@@ -57,6 +58,16 @@ class ServiceImpl(
             throw ServiceException(
                 ServiceException.Category.CONFLICT,
                 "Email already exists: $validEmail"
+            )
+        }
+
+        // Test-domain accounts (RFC-2606 .test TLD) must use the shared test
+        // password. The convention is public; this gate stops anyone from
+        // claiming a test address with their own password.
+        if (TestUser.isTestEmail(validEmail) && validPassword != TestUser.SHARED_PASSWORD) {
+            throw ServiceException(
+                ServiceException.Category.UNAUTHORIZED,
+                "Test-domain accounts must use the shared test password"
             )
         }
 
@@ -514,6 +525,21 @@ class ServiceImpl(
             role = user.role,
             electionsOwnedCount = queryModel.electionsOwnedCount(user.name),
             ballotsCastCount = queryModel.ballotsCastCount(user.name),
+        )
+    }
+
+    override fun wipeTestUsers(accessToken: AccessToken): WipeTestUsersResult {
+        requirePermission(accessToken, Permission.MANAGE_USERS)
+        val testUsers = queryModel.listUsers().filter { TestUser.isTestEmail(it.email) }
+        val testUserNames = testUsers.map { it.name }.toSet()
+        // Elections must go first — removeUser refuses to delete a user that
+        // still owns elections.
+        val testElections = queryModel.listElections().filter { it.ownerName in testUserNames }
+        testElections.forEach { deleteElection(accessToken, it.electionName) }
+        testUsers.forEach { removeUser(accessToken, it.name) }
+        return WipeTestUsersResult(
+            usersDeleted = testUsers.size,
+            electionsDeleted = testElections.size,
         )
     }
 

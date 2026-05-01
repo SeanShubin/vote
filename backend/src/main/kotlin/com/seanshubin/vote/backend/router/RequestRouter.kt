@@ -118,6 +118,7 @@ class RequestRouter(
             target.matches(Regex("/election/[^/]+/ballot/[^/]+")) && method == "GET" -> handleGetBallot(req)
             target.matches(Regex("/election/[^/]+/rankings/[^/]+")) && method == "GET" -> handleListRankings(req)
             target.matches(Regex("/election/[^/]+/tally")) && method == "GET" -> handleTally(req)
+            target == "/admin/test-users" && method == "DELETE" -> handleWipeTestUsers(req)
             else -> errorResponse(404, "Not found: $method $target")
         }
     }
@@ -298,6 +299,12 @@ class RequestRouter(
         val userName = extractUserName(req.target)
         service.removeUser(accessToken, userName)
         return HttpResponse(200, json.encodeToString(mapOf("status" to "removed")))
+    }
+
+    private fun handleWipeTestUsers(req: HttpRequest): HttpResponse {
+        val accessToken = extractAccessToken(req)
+        val result = service.wipeTestUsers(accessToken)
+        return HttpResponse(200, json.encodeToString(result))
     }
 
     private fun handleSetRole(req: HttpRequest): HttpResponse {

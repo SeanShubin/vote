@@ -5,8 +5,10 @@ import com.seanshubin.vote.contract.*
 
 class ProductionIntegrations(
     override val commandLineArgs: Array<String>,
-    override val emailSender: EmailSender = ConsoleEmailSender,
+    rawEmailSender: EmailSender = ConsoleEmailSender,
 ) : Integrations {
+    // Always wrap so debug accounts in production don't generate real outbound mail.
+    override val emailSender: EmailSender = TestAwareEmailSender(rawEmailSender)
     override val emitLine: (String) -> Unit = { line -> println(line) }
     override val clock: Clock = SystemClock
     override val uniqueIdGenerator: UniqueIdGenerator = UUIDGenerator

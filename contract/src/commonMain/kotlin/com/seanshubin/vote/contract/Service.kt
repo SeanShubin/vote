@@ -54,4 +54,11 @@ interface Service {
      * removed since the token was issued.
      */
     fun resetPassword(resetToken: String, newPassword: String)
+
+    /**
+     * Delete every user whose email lands in the .test TLD, plus every
+     * election those users own. Cleanup path for the public test-user
+     * convention; gated by MANAGE_USERS.
+     */
+    fun wipeTestUsers(accessToken: AccessToken): WipeTestUsersResult
 }

@@ -79,6 +79,7 @@ class LambdaHandler : RequestHandler<APIGatewayV2HTTPEvent, APIGatewayV2HTTPResp
             val emailFromAddress = System.getenv("EMAIL_FROM_ADDRESS")
                 ?: error("EMAIL_FROM_ADDRESS env var is required")
             val emailSender = SesEmailSender(sesRegion, emailFromAddress)
+            // ProductionIntegrations wraps in TestAwareEmailSender so .test recipients are silently dropped.
             val integrations = ProductionIntegrations(emptyArray(), emailSender)
             val json = Json { prettyPrint = true }
             val connectionFactory = ConnectionFactory(configuration)
