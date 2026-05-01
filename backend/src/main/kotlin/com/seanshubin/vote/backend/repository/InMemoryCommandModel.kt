@@ -43,10 +43,11 @@ class InMemoryCommandModel(private val data: InMemoryData) : CommandModel {
             .forEach { data.ballots.remove(it) }
     }
 
-    override fun addElection(authority: String, owner: String, electionName: String) {
+    override fun addElection(authority: String, owner: String, electionName: String, description: String) {
         data.elections[electionName] = InMemoryData.ElectionData(
             ownerName = owner,
-            electionName = electionName
+            electionName = electionName,
+            description = description,
         )
         data.candidates[electionName] = mutableSetOf()
     }

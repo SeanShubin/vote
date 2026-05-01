@@ -110,7 +110,7 @@ class FrontendBehaviorTest {
         val electionName = fakeClient.createElection("Programming Language Poll")
 
         assertEquals(1, fakeClient.createElectionCalls.size)
-        assertEquals("Programming Language Poll", fakeClient.createElectionCalls[0])
+        assertEquals("Programming Language Poll", fakeClient.createElectionCalls[0].electionName)
         assertEquals("Programming Language Poll", electionName)
     }
 

@@ -85,10 +85,11 @@ class FakeApiClientTest {
         val fakeClient = FakeApiClient()
         fakeClient.createElectionResult = Result.success("Best Language")
 
-        val electionName = fakeClient.createElection("Best Language")
+        val electionName = fakeClient.createElection("Best Language", "What language do you prefer?")
 
         assertEquals(1, fakeClient.createElectionCalls.size)
-        assertEquals("Best Language", fakeClient.createElectionCalls[0])
+        assertEquals("Best Language", fakeClient.createElectionCalls[0].electionName)
+        assertEquals("What language do you prefer?", fakeClient.createElectionCalls[0].description)
         assertEquals("Best Language", electionName)
     }
 

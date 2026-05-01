@@ -106,9 +106,9 @@ class HttpApiClient(
     override suspend fun listElections(): List<ElectionSummary> =
         getWithAuth("/elections")
 
-    override suspend fun createElection(electionName: String): String {
+    override suspend fun createElection(electionName: String, description: String): String {
         val userName = requireSession().userName
-        val request = AddElectionRequest(userName, electionName)
+        val request = AddElectionRequest(userName, electionName, description)
         postWithAuth<AddElectionRequest, Unit>("/election", request)
         return electionName
     }

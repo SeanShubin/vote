@@ -12,4 +12,5 @@ data class ElectionDetail(
     val electionName: String,
     val candidateCount: Int,
     val ballotCount: Int,
+    val description: String = "",
 )

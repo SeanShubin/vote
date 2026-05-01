@@ -59,7 +59,14 @@ fun ElectionDetailPage(
         H1 { Text("Election: $electionName") }
 
         // Header summary: owner + counts. Replaces the old Details tab.
+        // Description (when provided) renders prominently right under the
+        // election name so a voter casting a ballot knows what they're voting on.
         election?.let { e ->
+            if (e.description.isNotBlank()) {
+                Div({ classes("section", "election-description") }) {
+                    P { Text(e.description) }
+                }
+            }
             Div({ classes("section") }) {
                 P { Text("Owner: ${e.ownerName}") }
                 P { Text("Candidates: ${e.candidateCount} • Ballots cast: ${e.ballotCount}") }

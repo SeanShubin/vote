@@ -23,10 +23,12 @@ class InMemoryData {
     data class ElectionData(
         val ownerName: String,
         val electionName: String,
+        val description: String = "",
     ) {
         fun toElectionSummary() = ElectionSummary(
             ownerName = ownerName,
             electionName = electionName,
+            description = description,
         )
     }
 

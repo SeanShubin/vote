@@ -11,9 +11,10 @@ class UserContext(
     val accessToken: AccessToken
 ) {
     fun createElection(
-        name: String = "Election ${testContext.integrations.sequentialIdGenerator.generate()}"
+        name: String = "Election ${testContext.integrations.sequentialIdGenerator.generate()}",
+        description: String = "",
     ): ElectionContext {
-        testContext.backend.addElection(accessToken, userName, name)
+        testContext.backend.addElection(accessToken, userName, name, description)
         testContext.backend.synchronize()
         return ElectionContext(testContext, name, this)
     }

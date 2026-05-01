@@ -15,6 +15,7 @@ fun CreateElectionPage(
     coroutineScope: CoroutineScope = rememberCoroutineScope()
 ) {
     var electionName by remember { mutableStateOf("") }
+    var description by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var isLoading by remember { mutableStateOf(false) }
 
@@ -24,7 +25,7 @@ fun CreateElectionPage(
             errorMessage = null
             coroutineScope.launch {
                 try {
-                    apiClient.createElection(electionName)
+                    apiClient.createElection(electionName, description)
                     onElectionCreated(electionName)
                 } catch (e: Exception) {
                     apiClient.logErrorToServer(e)
@@ -55,6 +56,16 @@ fun CreateElectionPage(
                         handleCreateElection()
                     }
                 }
+            }
+
+            // Description is optional — empty string means "no description". A
+            // textarea (rather than a single-line input) keeps paragraph breaks
+            // intact for voters reading the ballot.
+            TextArea(description) {
+                classes("textarea")
+                placeholder("Description (optional)")
+                attr("rows", "4")
+                onInput { description = it.value }
             }
 
             Button({

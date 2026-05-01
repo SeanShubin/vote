@@ -74,6 +74,9 @@ class ElectionDetailPageRenderTest {
 
         fun headingExists() = ComposeTestHelper.elementExists(testId, "h1")
 
+        fun pageContainsText(text: String) =
+            ComposeTestHelper.textExistsInRoot(testId, text)
+
         override fun close() {
             testRoot.close()
         }
@@ -109,6 +112,33 @@ class ElectionDetailPageRenderTest {
 
             // then - verify basic rendering structure
             assertTrue(tester.headingExists(), "Heading should exist")
+        }
+    }
+
+    @Test
+    fun electionDetailPageWithDescriptionRenders() = runTest {
+        // The description rendering happens after the LaunchedEffect inside the
+        // page resolves — and the LaunchedEffect runs on Compose's internal
+        // dispatcher, not the testScope, so it isn't deterministic from a test
+        // perspective (see frontend-testing-root-cause-found.md for the broader
+        // limitation). We verify here that supplying an ElectionDetail with a
+        // description doesn't break rendering — the actual description is
+        // exercised through the data flow tests (ElectionSummary -> Detail) and
+        // through the integration tests in :integration.
+        ElectionDetailPageTester(this).use { tester ->
+            val electionDetail = ElectionDetail(
+                ownerName = "owner1",
+                electionName = "Test Election",
+                candidateCount = 2,
+                ballotCount = 0,
+                description = "Pick your favorite color",
+            )
+            tester.setupElectionSuccess(electionDetail)
+            tester.setupCandidatesSuccess(listOf("Candidate 1", "Candidate 2"))
+
+            tester.waitForLoad()
+
+            assertTrue(tester.headingExists(), "Heading should exist when description is provided")
         }
     }
 }

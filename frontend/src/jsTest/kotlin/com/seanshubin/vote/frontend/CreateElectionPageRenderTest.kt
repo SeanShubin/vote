@@ -46,6 +46,10 @@ class CreateElectionPageRenderTest {
             ComposeTestHelper.setInputByPlaceholder(testId, "Election Name", name)
         }
 
+        fun enterDescription(text: String) {
+            ComposeTestHelper.setTextAreaByPlaceholder(testId, "Description (optional)", text)
+        }
+
         fun clickCreateButton() {
             ComposeTestHelper.clickButtonByText(testId, "Create")
             testScope.advanceUntilIdle()
@@ -65,6 +69,9 @@ class CreateElectionPageRenderTest {
 
         fun electionNameInputExists() = ComposeTestHelper.inputExistsByPlaceholder(testId, "Election Name")
 
+        fun descriptionInputExists() =
+            ComposeTestHelper.textAreaExistsByPlaceholder(testId, "Description (optional)")
+
         override fun close() {
             testRoot.close()
         }
@@ -76,6 +83,25 @@ class CreateElectionPageRenderTest {
         CreateElectionPageTester(this).use { tester ->
             // then - verify it rendered with expected input field
             assertTrue(tester.electionNameInputExists(), "Election name input should exist")
+            assertTrue(tester.descriptionInputExists(), "Description textarea should exist")
+        }
+    }
+
+    @Test
+    fun createElectionForwardsDescription() = runTest {
+        CreateElectionPageTester(this).use { tester ->
+            // given
+            tester.setupCreateElectionSuccess("Test Election")
+
+            // when
+            tester.enterElectionName("Test Election")
+            tester.enterDescription("Pick the best one")
+            tester.clickCreateButton()
+
+            // then
+            assertEquals(1, tester.createElectionCalls().size)
+            assertEquals("Test Election", tester.createElectionCalls()[0].electionName)
+            assertEquals("Pick the best one", tester.createElectionCalls()[0].description)
         }
     }
 
@@ -91,7 +117,8 @@ class CreateElectionPageRenderTest {
 
             // then
             assertEquals(1, tester.createElectionCalls().size)
-            assertEquals("Test Election", tester.createElectionCalls()[0])
+            assertEquals("Test Election", tester.createElectionCalls()[0].electionName)
+            assertEquals("", tester.createElectionCalls()[0].description)
             assertEquals("Test Election", tester.capturedElectionName())
         }
     }
@@ -122,7 +149,7 @@ class CreateElectionPageRenderTest {
 
             // then
             assertEquals(1, tester.createElectionCalls().size)
-            assertEquals("Test Election", tester.createElectionCalls()[0])
+            assertEquals("Test Election", tester.createElectionCalls()[0].electionName)
             assertEquals("Test Election", tester.capturedElectionName())
         }
     }
