@@ -36,7 +36,26 @@ class DynamoDbRawTableScanner(
         val orderedColumns = priority.filter { it in allColumns } +
             (allColumns - priority.toSet()).sorted()
 
-        val rows = items.map { item ->
+        // Row ordering: DynamoDB's natural scan order is hash-bucket distribution
+        // (effectively random) which is unhelpful for an admin view. Sort by the
+        // priority columns so the order is predictable and matches what someone
+        // would expect when paging through.
+        //  - vote_event_log → event_id descending (newest first, like the debug view)
+        //  - vote_data      → PK then SK ascending (groups related entities together)
+        val sortedItems = when (tableName) {
+            DynamoDbSingleTableSchema.EVENT_LOG_TABLE ->
+                items.sortedByDescending { it["event_id"]?.asN()?.toLongOrNull() ?: 0L }
+            DynamoDbSingleTableSchema.MAIN_TABLE ->
+                items.sortedWith(
+                    compareBy(
+                        { it["PK"]?.asS() ?: "" },
+                        { it["SK"]?.asS() ?: "" },
+                    )
+                )
+            else -> items
+        }
+
+        val rows = sortedItems.map { item ->
             orderedColumns.map { col -> item[col]?.let(::renderAttribute) }
         }
 
