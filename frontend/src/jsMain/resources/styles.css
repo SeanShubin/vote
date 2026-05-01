@@ -232,6 +232,207 @@ button:disabled {
     width: 80px;
 }
 
+/*
+ * Ranked-ballot voting view. Candidates start in the arena (3-column grid);
+ * click moves a chip to the bottom of the ranked list. Rows are draggable
+ * (HTML5 drag-and-drop), focusable for ↑↓ keyboard nudge, and have an ×
+ * button to derank. See VotingView in ElectionDetailPage.kt.
+ */
+.ranked-ballot {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.ranked-ballot-arena {
+    background: #f9f9f9;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    padding: 1rem;
+}
+
+.ranked-ballot-arena-label,
+.ranked-ballot-list-label {
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: #888;
+    display: block;
+    margin-bottom: 0.5rem;
+}
+
+.ranked-ballot-arena-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.5rem;
+}
+
+.ranked-ballot-chip {
+    padding: 0.75rem 0.5rem;
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    color: #333;
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    text-align: center;
+    line-height: 1.3;
+    margin-top: 0;
+    transition: background 0.1s, border-color 0.12s, color 0.1s, transform 0.08s;
+}
+
+.ranked-ballot-chip:hover {
+    background: #ecf2fb;
+    border-color: #3498db;
+    color: #3498db;
+    transform: translateY(-1px);
+}
+
+.ranked-ballot-list-header {
+    display: flex;
+    align-items: baseline;
+    margin-bottom: 0.5rem;
+}
+
+.ranked-ballot-undo-count {
+    font-size: 0.75rem;
+    color: #888;
+    margin-left: auto;
+}
+
+.ranked-ballot-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.ranked-ballot-row {
+    display: flex;
+    align-items: center;
+    height: 56px;
+    margin-bottom: 0.4rem;
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    user-select: none;
+    cursor: grab;
+}
+
+.ranked-ballot-row:focus {
+    outline: none;
+    border-color: #3498db;
+    box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+}
+
+.ranked-ballot-row.dragging {
+    opacity: 0.5;
+    border-color: #3498db;
+    cursor: grabbing;
+}
+
+.ranked-ballot-rank-num {
+    width: 3rem;
+    text-align: center;
+    font-weight: 600;
+    color: #888;
+    flex-shrink: 0;
+    font-variant-numeric: tabular-nums;
+}
+
+.ranked-ballot-row-name {
+    flex: 1;
+    font-size: 0.95rem;
+    font-weight: 500;
+    padding: 0 0.5rem;
+}
+
+.ranked-ballot-row-buttons {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding-right: 0.5rem;
+    flex-shrink: 0;
+}
+
+.ranked-ballot-row-button {
+    cursor: pointer;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    background: transparent;
+    color: #888;
+    font-size: 0.85rem;
+    margin-top: 0;
+    padding: 0;
+}
+
+.ranked-ballot-row-button:hover:not(:disabled) {
+    background: #f0f0f0;
+    color: #333;
+    border-color: #ddd;
+}
+
+.ranked-ballot-row-button:disabled {
+    opacity: 0.3;
+    cursor: default;
+}
+
+.ranked-ballot-row-remove:hover:not(:disabled) {
+    background: rgba(231, 76, 60, 0.12);
+    color: #e74c3c;
+    border-color: rgba(231, 76, 60, 0.3);
+}
+
+.ranked-ballot-empty-hint {
+    color: #888;
+    font-size: 0.9rem;
+    padding: 1rem 0;
+    margin-bottom: 0;
+}
+
+.ranked-ballot-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.ranked-ballot-undo-button {
+    cursor: pointer;
+    padding: 0.5rem 1rem;
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    color: #555;
+    font-size: 0.85rem;
+    margin-top: 0;
+}
+
+.ranked-ballot-undo-button:hover:not(:disabled) {
+    background: #f0f0f0;
+    border-color: #bbb;
+    color: #333;
+}
+
+.ranked-ballot-undo-button:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+
+.ranked-ballot-toolbar-hint {
+    font-size: 0.75rem;
+    color: #888;
+    margin-left: auto;
+}
+
 table {
     width: 100%;
     border-collapse: collapse;

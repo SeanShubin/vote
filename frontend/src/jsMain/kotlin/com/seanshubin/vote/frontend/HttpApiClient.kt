@@ -133,6 +133,13 @@ class HttpApiClient(
         return postWithAuth("/election/${encodeURIComponent(electionName)}/ballot", request)
     }
 
+    override suspend fun getMyRankings(electionName: String): List<Ranking> {
+        val voterName = requireSession().userName
+        return getWithAuth(
+            "/election/${encodeURIComponent(electionName)}/rankings/${encodeURIComponent(voterName)}"
+        )
+    }
+
     override suspend fun getTally(electionName: String): Tally =
         getWithAuth("/election/${encodeURIComponent(electionName)}/tally")
 
