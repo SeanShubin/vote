@@ -2,6 +2,7 @@ package com.seanshubin.vote.frontend
 
 import com.seanshubin.vote.contract.ApiClient
 import com.seanshubin.vote.contract.AuthResponse
+import kotlinx.coroutines.CancellationException
 import com.seanshubin.vote.domain.ElectionDetail
 import com.seanshubin.vote.domain.ElectionSummary
 import com.seanshubin.vote.domain.Ranking
@@ -175,6 +176,9 @@ class FakeApiClient : ApiClient {
     }
 
     override fun logErrorToServer(error: Throwable) {
+        // Match HttpApiClient: cancellation rethrows so callers' catch blocks
+        // exit cleanly instead of recording it.
+        if (error is CancellationException) throw error
         loggedErrors.add(error)
     }
 

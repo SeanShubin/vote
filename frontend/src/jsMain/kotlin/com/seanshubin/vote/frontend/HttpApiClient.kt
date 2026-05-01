@@ -178,9 +178,12 @@ class HttpApiClient(
     override fun logErrorToServer(error: Throwable) {
         // CancellationException isn't a real error — it's how Compose tells an
         // in-flight coroutine that the user navigated away or the composable
-        // was disposed. Forwarding it to the server fired the CloudWatch
-        // frontend-errors alarm on every page change with a pending fetch.
-        if (error is CancellationException) return
+        // was disposed. We RETHROW it (not just return) so that the surrounding
+        // catch (Exception) blocks across every page exit early instead of
+        // continuing to set state on a disposed composable. This is the
+        // single-point structural fix that obviates having to add a manual
+        // `catch (CancellationException) { throw e }` at every call site.
+        if (error is CancellationException) throw error
 
         try {
             val errorRequest = ClientErrorRequest(

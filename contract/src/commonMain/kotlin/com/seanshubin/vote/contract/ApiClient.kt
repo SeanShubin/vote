@@ -95,5 +95,16 @@ interface ApiClient {
     /** Admin: relational projection of one virtual table (users, elections, ballots, ...). */
     suspend fun debugTableData(tableName: String): TableData
 
+    /**
+     * Record a frontend exception for server-side observability.
+     *
+     * If [error] is a [kotlinx.coroutines.CancellationException], this method
+     * RETHROWS it instead of recording. Cancellation is a coroutine lifecycle
+     * signal (e.g., the composable left the composition while a fetch was in
+     * flight), not a real error — recording it would falsely trip the
+     * frontend-errors alarm. Rethrow is preferred over silent swallowing so
+     * the surrounding `catch (Exception)` block exits early and cancellation
+     * propagates correctly up the coroutine.
+     */
     fun logErrorToServer(error: Throwable)
 }
