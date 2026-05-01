@@ -1,5 +1,15 @@
 # Target Architecture
 
+> **Status: shipped (historical).** This describes the architecture we
+> migrated TO; that migration is complete. Treat this as a record of the
+> design decision, not a forward-looking plan. The implementation diverged
+> in some places (e.g., AWS Lambda + API Gateway instead of the originally
+> proposed ECS Fargate + ALB).
+>
+> For current architecture details see `docs/api-to-database-flow.md` and
+> `docs/dynamodb-single-table-design.md`. For pending work see
+> [`docs/future-plans.md`](../docs/future-plans.md).
+
 ## Single Kotlin Multiplatform Project
 
 ### Project Structure

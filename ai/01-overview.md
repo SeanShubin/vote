@@ -1,5 +1,12 @@
 # Project Overview: Condorcet Voting System
 
+> **Status: pre-rewrite framing (historical).** This is the original
+> project overview written before the migration. Architecture details,
+> requirements, and "open questions" reflect the planning phase, not the
+> current system. For current state see `docs/api-to-database-flow.md` and
+> `docs/dynamodb-design-summary.md`. For pending work see
+> [`docs/future-plans.md`](../docs/future-plans.md).
+
 ## Goal
 Merge three separate projects into a single Kotlin multiplatform application with Compose for Web frontend, deployable both locally and to AWS.
 

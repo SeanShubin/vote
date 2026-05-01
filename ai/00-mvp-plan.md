@@ -1,5 +1,12 @@
 # MVP Plan: Get Something Working Fast
 
+> **Status: shipped (historical).** This is the pre-rewrite MVP scoping
+> document. Everything described here was built in the migration to the
+> current Kotlin Multiplatform / Compose / DynamoDB stack. Kept for
+> historical reference only.
+>
+> For genuine pending work see [`docs/future-plans.md`](../docs/future-plans.md).
+
 ## Goal
 Get a minimal working system as quickly as possible to validate the architecture, then iterate.
 

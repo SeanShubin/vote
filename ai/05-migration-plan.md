@@ -1,5 +1,12 @@
 # Migration Plan
 
+> **Status: shipped (historical).** All five phases described below were
+> executed. The unchecked `[ ]` boxes throughout are the original planning
+> state, not current TODOs — they were not updated as work landed because
+> the doc shifted to a record-of-what-we-did rather than a live tracker.
+>
+> For genuine pending work see [`docs/future-plans.md`](../docs/future-plans.md).
+
 ## Overview
 
 This document outlines the step-by-step process to migrate from three separate projects (condorcet-backend, condorcet-frontend, condorcet-deploy) to a single Kotlin Multiplatform project with Compose for Web frontend.

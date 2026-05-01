@@ -1,5 +1,10 @@
 # Vote Project Planning Documentation
 
+> **Status: historical.** The migration these documents planned is
+> complete. They're kept as a record of how the rewrite was scoped,
+> decided, and executed. For genuine pending work see
+> [`../docs/future-plans.md`](../docs/future-plans.md).
+
 This directory contains comprehensive planning documents for migrating the Condorcet voting system from three separate projects into a single Kotlin Multiplatform application.
 
 ## Document Overview

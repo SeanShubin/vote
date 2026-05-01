@@ -1,5 +1,11 @@
 # Constraint Questions: Define the Approach
 
+> **Status: answered (historical).** This was the pre-rewrite questionnaire
+> used to elicit constraints. Answers were consolidated into
+> `00-constraint-summary.md` and the resulting plan was executed. Kept as
+> a record of the elicitation process. For pending work see
+> [`docs/future-plans.md`](../docs/future-plans.md).
+
 ## Philosophy
 
 We have:

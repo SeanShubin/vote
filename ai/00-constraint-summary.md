@@ -1,5 +1,11 @@
 # Constraint Summary: Complete Execution Blueprint
 
+> **Status: shipped (historical).** This was the pre-rewrite execution
+> blueprint. The plan it describes was executed; the resulting system is
+> what's currently running. Kept as a record of the constraints and
+> decisions at the start of the rewrite. For pending work see
+> [`docs/future-plans.md`](../docs/future-plans.md).
+
 **Purpose:** This document consolidates all constraint decisions. It is the definitive reference for execution.
 
 **Status:** ✅ All constraints finalized and approved.

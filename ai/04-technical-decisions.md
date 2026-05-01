@@ -1,5 +1,13 @@
 # Technical Decisions
 
+> **Status: decided (historical).** Each decision in this document was
+> resolved during the migration. The chosen options are now reflected in
+> the codebase. Kept as a record of the trade-off analysis we did at the
+> time — useful for understanding the "why" behind current choices and
+> for revisiting them if circumstances change.
+>
+> For genuine pending work see [`docs/future-plans.md`](../docs/future-plans.md).
+
 This document captures key technical choices that need to be made or confirmed. Each decision includes context, options, trade-offs, and recommendations.
 
 ## 1. Event Log Technology
