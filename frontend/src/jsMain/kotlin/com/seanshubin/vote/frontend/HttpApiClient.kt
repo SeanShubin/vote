@@ -3,6 +3,7 @@ package com.seanshubin.vote.frontend
 import com.seanshubin.vote.contract.*
 import com.seanshubin.vote.domain.*
 import kotlinx.browser.window
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.await
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -175,6 +176,12 @@ class HttpApiClient(
         getWithAuth("/debug-table/${encodeURIComponent(tableName)}")
 
     override fun logErrorToServer(error: Throwable) {
+        // CancellationException isn't a real error — it's how Compose tells an
+        // in-flight coroutine that the user navigated away or the composable
+        // was disposed. Forwarding it to the server fired the CloudWatch
+        // frontend-errors alarm on every page change with a pending fetch.
+        if (error is CancellationException) return
+
         try {
             val errorRequest = ClientErrorRequest(
                 message = error.message ?: error.toString(),
