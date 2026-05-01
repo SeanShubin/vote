@@ -36,6 +36,7 @@ interface Service {
     fun getBallot(accessToken: AccessToken, voterName: String, electionName: String): BallotSummary?
     fun changePassword(accessToken: AccessToken, userName: String, password: String)
     fun sendLoginLinkByEmail(email: String, baseUri: String)
+    fun getUserActivity(accessToken: AccessToken): UserActivity
 
     /**
      * Send a password reset email. Looks up the user by username or email and

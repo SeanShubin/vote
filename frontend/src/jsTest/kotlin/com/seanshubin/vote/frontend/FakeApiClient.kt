@@ -8,6 +8,7 @@ import com.seanshubin.vote.domain.Ranking
 import com.seanshubin.vote.domain.Role
 import com.seanshubin.vote.domain.TableData
 import com.seanshubin.vote.domain.Tally
+import com.seanshubin.vote.domain.UserActivity
 import com.seanshubin.vote.domain.UserNameRole
 
 class FakeApiClient : ApiClient {
@@ -52,8 +53,10 @@ class FakeApiClient : ApiClient {
     val debugTableDataCalls = mutableListOf<String>()
     var listUsersResult: Result<List<UserNameRole>> = Result.success(emptyList())
     var setRoleResult: Result<Unit> = Result.success(Unit)
+    var userActivityResult: Result<UserActivity> = Result.failure(Exception("getUserActivity not configured"))
     val listUsersCalls = mutableListOf<Unit>()
     val setRoleCalls = mutableListOf<SetRoleCall>()
+    val userActivityCalls = mutableListOf<Unit>()
 
     override suspend fun register(userName: String, email: String, password: String): AuthResponse {
         registerCalls.add(RegisterCall(userName, email, password))
@@ -152,6 +155,11 @@ class FakeApiClient : ApiClient {
     override suspend fun listUsers(): List<UserNameRole> {
         listUsersCalls.add(Unit)
         return listUsersResult.getOrThrow()
+    }
+
+    override suspend fun getUserActivity(): UserActivity {
+        userActivityCalls.add(Unit)
+        return userActivityResult.getOrThrow()
     }
 
     override suspend fun setRole(userName: String, role: Role) {

@@ -99,6 +99,20 @@ class MySqlCommandModel(
 
     override fun removeCandidates(authority: String, electionName: String, candidateNames: List<String>) {
         if (candidateNames.isEmpty()) return
+
+        // Cascade ranking rows first. The rankings table doesn't have an FK on
+        // candidate_name (just a string column), so without this the candidate
+        // row vanishes while ranking rows referencing it survive as ghosts.
+        val rankingDeleteSql = queryLoader.load("ranking-delete-by-candidate")
+        connection.prepareStatement(rankingDeleteSql).use { stmt ->
+            for (candidateName in candidateNames) {
+                stmt.setString(1, electionName)
+                stmt.setString(2, candidateName)
+                stmt.addBatch()
+            }
+            stmt.executeBatch()
+        }
+
         val sql = queryLoader.load("candidate-delete")
         connection.prepareStatement(sql).use { stmt ->
             for (candidateName in candidateNames) {

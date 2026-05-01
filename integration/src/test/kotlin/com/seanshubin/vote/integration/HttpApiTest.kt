@@ -162,6 +162,8 @@ class HttpApiTester(private val port: Int = 9876) : AutoCloseable {
     // User Management
     fun listUsers(token: AccessToken): HttpResponse<String> = get("/users", token)
 
+    fun getMyActivity(token: AccessToken): HttpResponse<String> = get("/me/activity", token)
+
     fun getUser(userName: String, token: AccessToken): HttpResponse<String> = get("/user/$userName", token)
 
     fun updateUserName(userName: String, newUserName: String, token: AccessToken): HttpResponse<String> {
@@ -658,6 +660,97 @@ class HttpApiTest {
     }
 
     @Test
+    fun `me activity returns role and footprint counts`() {
+        // Bob casts a ballot in alice's election; activity should reflect 0
+        // owned elections and 1 cast ballot.
+        val aliceTokens = tester.registerUserExpectSuccess("alice")
+        val bobTokens = tester.registerUserExpectSuccess("bob")
+        tester.createElection("Lang", aliceTokens.accessToken)
+        tester.setCandidates("Lang", listOf("Kotlin"), aliceTokens.accessToken)
+        tester.castBallot(
+            "Lang",
+            """{"voterName":"bob","rankings":[{"candidateName":"Kotlin","rank":1}]}""",
+            bobTokens.accessToken,
+        )
+
+        val response = tester.getMyActivity(bobTokens.accessToken)
+
+        assertEquals(200, response.statusCode())
+        val body = response.body()
+        assertTrue(Regex("\"role\"\\s*:\\s*\"USER\"").containsMatchIn(body), "Expected role USER in: $body")
+        assertTrue(Regex("\"electionsOwnedCount\"\\s*:\\s*0").containsMatchIn(body), "Expected 0 owned in: $body")
+        assertTrue(Regex("\"ballotsCastCount\"\\s*:\\s*1").containsMatchIn(body), "Expected 1 cast in: $body")
+    }
+
+    @Test
+    fun `removing a user cascades their cast ballots`() {
+        // Bob votes in alice's election. After alice removes bob, bob's ballot
+        // should be gone — no orphan voter_name pointing at a deleted user.
+        val aliceTokens = tester.registerUserExpectSuccess("alice")
+        val bobTokens = tester.registerUserExpectSuccess("bob")
+        tester.createElection("Lang", aliceTokens.accessToken)
+        tester.setCandidates("Lang", listOf("Kotlin", "Rust"), aliceTokens.accessToken)
+        tester.castBallot(
+            "Lang",
+            """{"voterName":"bob","rankings":[{"candidateName":"Kotlin","rank":1},{"candidateName":"Rust","rank":2}]}""",
+            bobTokens.accessToken,
+        )
+
+        // Sanity: bob's ballot is there before removal.
+        val beforeBallot = tester.getBallot("Lang", "bob", aliceTokens.accessToken)
+        assertEquals(200, beforeBallot.statusCode())
+        assertTrue(beforeBallot.body().contains("bob"), "Pre-cascade ballot should mention bob: ${beforeBallot.body()}")
+
+        // Alice removes bob — admin remove of a strictly lesser role.
+        val removeResponse = tester.removeUser("bob", aliceTokens.accessToken)
+        assertEquals(200, removeResponse.statusCode())
+
+        // Bob's ballot should have cascaded — getBallot encodes null when
+        // the row is gone, so the literal body is "null".
+        val afterBallot = tester.getBallot("Lang", "bob", aliceTokens.accessToken)
+        assertEquals(200, afterBallot.statusCode())
+        assertEquals("null", afterBallot.body().trim(), "Expected ballot to be cascaded; got: ${afterBallot.body()}")
+    }
+
+    @Test
+    fun `removing candidates cascades to existing ballot rankings`() {
+        // Bob votes for Kotlin and Rust. Alice then removes Rust from the
+        // candidate list. Bob's ranking for Rust should disappear.
+        val aliceTokens = tester.registerUserExpectSuccess("alice")
+        val bobTokens = tester.registerUserExpectSuccess("bob")
+        tester.createElection("Lang", aliceTokens.accessToken)
+        tester.setCandidates("Lang", listOf("Kotlin", "Rust"), aliceTokens.accessToken)
+        tester.castBallot(
+            "Lang",
+            """{"voterName":"bob","rankings":[{"candidateName":"Kotlin","rank":1},{"candidateName":"Rust","rank":2}]}""",
+            bobTokens.accessToken,
+        )
+
+        // Drop Rust from the candidate list.
+        tester.setCandidates("Lang", listOf("Kotlin"), aliceTokens.accessToken)
+
+        val rankings = tester.getVoterRankings("Lang", "bob", bobTokens.accessToken)
+        assertEquals(200, rankings.statusCode())
+        val body = rankings.body()
+        assertTrue(body.contains("Kotlin"), "Expected Kotlin still present in: $body")
+        assertTrue(!body.contains("Rust"), "Expected Rust stripped from rankings in: $body")
+    }
+
+    @Test
+    fun `self-delete - regular user cannot self-delete while owning elections`() {
+        // A non-owner who owns elections must clean them up first; otherwise
+        // their elections would be orphans pointing at a removed user.
+        tester.registerUserExpectSuccess("alice") // OWNER
+        val bobTokens = tester.registerUserExpectSuccess("bob") // plain USER
+        tester.createElection("Bob's Choice", bobTokens.accessToken)
+
+        val response = tester.removeUser("bob", bobTokens.accessToken)
+
+        assertEquals(501, response.statusCode())
+        assertTrue(response.body().contains("delete your elections first"))
+    }
+
+    @Test
     fun `self-delete - OWNER cannot self-delete while other users exist`() {
         val aliceTokens = tester.registerUserExpectSuccess("alice") // OWNER
         tester.registerUserExpectSuccess("bob")
@@ -669,9 +762,22 @@ class HttpApiTest {
     }
 
     @Test
-    fun `self-delete - lone OWNER can delete themselves (back to empty)`() {
-        // The system tolerates an empty user table (e.g., reset scenario);
-        // an OWNER who's the only user is allowed to leave.
+    fun `self-delete - OWNER cannot self-delete while elections exist`() {
+        // Even with no other users, leaving any elections behind would orphan
+        // them on a non-existent owner. Owner must wipe elections first.
+        val aliceTokens = tester.registerUserExpectSuccess("alice") // OWNER
+        tester.createElection("Languages", aliceTokens.accessToken)
+
+        val response = tester.removeUser("alice", aliceTokens.accessToken)
+
+        assertEquals(501, response.statusCode())
+        assertTrue(response.body().contains("OWNER cannot self-delete"))
+    }
+
+    @Test
+    fun `self-delete - lone OWNER with no elections can delete themselves (back to empty)`() {
+        // The system tolerates an empty state (e.g., reset scenario);
+        // an OWNER who is the only user AND has no elections is allowed to leave.
         val aliceTokens = tester.registerUserExpectSuccess("alice")
 
         val response = tester.removeUser("alice", aliceTokens.accessToken)

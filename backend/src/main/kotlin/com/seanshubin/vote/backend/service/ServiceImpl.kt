@@ -149,14 +149,30 @@ class ServiceImpl(
             ?: throw ServiceException(ServiceException.Category.NOT_FOUND, "User not found: $userName")
 
         if (isSelf(accessToken, userName)) {
-            // Self-delete — anyone can leave the system, EXCEPT the OWNER, since
-            // exactly one OWNER must exist. The lone-user edge case (an OWNER
-            // who's the only user) is allowed — it deletes the system back to empty.
-            if (targetUser.role == Role.OWNER && queryModel.userCount() > 1) {
-                throw ServiceException(
-                    ServiceException.Category.UNSUPPORTED,
-                    "OWNER cannot self-delete while other users exist — transfer ownership first",
-                )
+            // Self-delete — anyone can leave the system, with two integrity rules:
+            // 1. You must delete your own elections first, so removing you can't
+            //    leave orphan elections pointing at a non-existent owner.
+            // 2. The OWNER additionally must be alone (no other users) and the
+            //    system must be empty of elections — exactly one OWNER must exist
+            //    while the system is non-empty. Transfer ownership first, or wipe
+            //    everything else, before the lone OWNER can leave back to empty.
+            if (targetUser.role == Role.OWNER) {
+                val otherUsers = queryModel.userCount() > 1
+                val anyElections = queryModel.electionCount() > 0
+                if (otherUsers || anyElections) {
+                    throw ServiceException(
+                        ServiceException.Category.UNSUPPORTED,
+                        "OWNER cannot self-delete while other users or elections exist — transfer ownership first, or delete all other users and elections",
+                    )
+                }
+            } else {
+                val ownedElections = queryModel.listElections().count { it.ownerName == userName }
+                if (ownedElections > 0) {
+                    throw ServiceException(
+                        ServiceException.Category.UNSUPPORTED,
+                        "Cannot self-delete while you own elections ($ownedElections) — delete your elections first",
+                    )
+                }
             }
         } else {
             // Deleting another user requires MANAGE_USERS and a strictly higher role
@@ -482,6 +498,23 @@ class ServiceImpl(
             DomainEvent.UserPasswordChanged(user.name, saltAndHash.salt, saltAndHash.hash),
         )
         synchronize()
+    }
+
+    override fun getUserActivity(accessToken: AccessToken): UserActivity {
+        // Re-fetch the user's role from the projection rather than trusting
+        // the access token: tokens are 10-min lived, so a recent role change
+        // (e.g. ownership transfer) might not be reflected there yet.
+        val user = queryModel.searchUserByName(accessToken.userName)
+            ?: throw ServiceException(
+                ServiceException.Category.NOT_FOUND,
+                "User not found: ${accessToken.userName}",
+            )
+        return UserActivity(
+            userName = user.name,
+            role = user.role,
+            electionsOwnedCount = queryModel.electionsOwnedCount(user.name),
+            ballotsCastCount = queryModel.ballotsCastCount(user.name),
+        )
     }
 
     // Permission checking helpers

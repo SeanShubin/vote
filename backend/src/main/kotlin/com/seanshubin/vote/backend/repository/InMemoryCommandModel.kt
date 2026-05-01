@@ -34,6 +34,13 @@ class InMemoryCommandModel(private val data: InMemoryData) : CommandModel {
 
     override fun removeUser(authority: String, userName: String) {
         data.users.remove(userName)
+        // Cascade: drop any ballots this user cast (matches MySQL FK CASCADE on
+        // ballots.voter_name → users(name)). Without this, removing a voter would
+        // leave their ballot rows pointing at a non-existent user.
+        data.ballots.entries
+            .filter { (_, ballot) -> ballot.voterName == userName }
+            .map { it.key }
+            .forEach { data.ballots.remove(it) }
     }
 
     override fun addElection(authority: String, owner: String, electionName: String) {
@@ -58,6 +65,18 @@ class InMemoryCommandModel(private val data: InMemoryData) : CommandModel {
     override fun removeCandidates(authority: String, electionName: String, candidateNames: List<String>) {
         val candidates = data.candidates[electionName] ?: return
         candidates.removeAll(candidateNames.toSet())
+        // Cascade: strip the removed candidate names from any existing ballot's
+        // ranking list in this election. Without this, ballots would carry
+        // ghost rankings for candidates that no longer exist.
+        val removed = candidateNames.toSet()
+        data.ballots.entries
+            .filter { (_, ballot) -> ballot.electionName == electionName }
+            .forEach { (key, ballot) ->
+                val filtered = ballot.rankings.filter { it.candidateName !in removed }
+                if (filtered.size != ballot.rankings.size) {
+                    data.ballots[key] = ballot.copy(rankings = filtered)
+                }
+            }
     }
 
     override fun castBallot(

@@ -290,6 +290,37 @@ class DynamoDbSingleTableQueryModel(
         return Permission.entries.filter { roleHasPermission(role, it) }
     }
 
+    override fun electionsOwnedCount(userName: String): Int {
+        return runBlocking {
+            val response = dynamoDb.scan(ScanRequest {
+                tableName = DynamoDbSingleTableSchema.MAIN_TABLE
+                filterExpression = "begins_with(PK, :prefix) AND SK = :sk AND owner_name = :owner"
+                expressionAttributeValues = mapOf(
+                    ":prefix" to AttributeValue.S(DynamoDbSingleTableSchema.ELECTION_PREFIX),
+                    ":sk" to AttributeValue.S(DynamoDbSingleTableSchema.METADATA_SK),
+                    ":owner" to AttributeValue.S(userName),
+                )
+                select = Select.Count
+            })
+            response.count ?: 0
+        }
+    }
+
+    override fun ballotsCastCount(userName: String): Int {
+        return runBlocking {
+            val response = dynamoDb.scan(ScanRequest {
+                tableName = DynamoDbSingleTableSchema.MAIN_TABLE
+                filterExpression = "begins_with(SK, :prefix) AND voter_name = :voter"
+                expressionAttributeValues = mapOf(
+                    ":prefix" to AttributeValue.S(DynamoDbSingleTableSchema.BALLOT_PREFIX),
+                    ":voter" to AttributeValue.S(userName),
+                )
+                select = Select.Count
+            })
+            response.count ?: 0
+        }
+    }
+
     // Sync state queries
     override fun lastSynced(): Long? {
         return runBlocking {

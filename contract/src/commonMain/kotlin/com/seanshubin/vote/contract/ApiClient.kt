@@ -6,6 +6,7 @@ import com.seanshubin.vote.domain.Ranking
 import com.seanshubin.vote.domain.Role
 import com.seanshubin.vote.domain.TableData
 import com.seanshubin.vote.domain.Tally
+import com.seanshubin.vote.domain.UserActivity
 import com.seanshubin.vote.domain.UserNameRole
 
 /**
@@ -65,6 +66,14 @@ interface ApiClient {
 
     /** Admin: remove a user. Only allowed against users with strictly lesser roles. */
     suspend fun removeUser(userName: String)
+
+    /**
+     * The current user's role + how many elections they own + how many ballots
+     * they have cast. The Home page indicator binds directly to this; the
+     * delete-account confirmation uses the counts to warn the user about the
+     * cascade.
+     */
+    suspend fun getUserActivity(): UserActivity
 
     /** Admin: physical DynamoDB table names (vote_data, vote_event_log). Empty for InMemory. */
     suspend fun listTables(): List<String>

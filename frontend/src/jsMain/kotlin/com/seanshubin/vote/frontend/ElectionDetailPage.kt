@@ -177,21 +177,37 @@ fun ElectionSetupView(
 
         Button({
             onClick {
-                if (!isLoading) {
-                    isLoading = true
-                    val candidates = candidatesText.split("\n")
-                        .map { it.trim() }
-                        .filter { it.isNotBlank() }
-                    coroutineScope.launch {
-                        try {
-                            apiClient.setCandidates(electionName, candidates)
-                            onSuccess("Candidates saved")
-                        } catch (e: Exception) {
-                            apiClient.logErrorToServer(e)
-                            onError(e.message ?: "Failed to save candidates")
-                        } finally {
-                            isLoading = false
-                        }
+                if (isLoading) return@onClick
+                val candidates = candidatesText.split("\n")
+                    .map { it.trim() }
+                    .filter { it.isNotBlank() }
+
+                // Warn about removed candidates before submitting. Removing a
+                // candidate also strips it from existing ballot rankings, so
+                // surface exactly which candidates are being dropped before
+                // the user pulls the trigger.
+                val removed = existingCandidates - candidates.toSet()
+                if (removed.isNotEmpty()) {
+                    val list = removed.joinToString(", ")
+                    val message = "You are about to remove ${removed.size} candidate" +
+                        (if (removed.size == 1) "" else "s") +
+                        ": $list. " +
+                        "This will also strip " +
+                        (if (removed.size == 1) "it" else "them") +
+                        " from any ballots already cast. Continue?"
+                    if (!window.confirm(message)) return@onClick
+                }
+
+                isLoading = true
+                coroutineScope.launch {
+                    try {
+                        apiClient.setCandidates(electionName, candidates)
+                        onSuccess("Candidates saved")
+                    } catch (e: Exception) {
+                        apiClient.logErrorToServer(e)
+                        onError(e.message ?: "Failed to save candidates")
+                    } finally {
+                        isLoading = false
                     }
                 }
             }

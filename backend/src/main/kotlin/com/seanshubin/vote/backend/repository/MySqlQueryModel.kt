@@ -306,6 +306,24 @@ class MySqlQueryModel(
         return Permission.entries.filter { roleHasPermission(role, it) }
     }
 
+    override fun electionsOwnedCount(userName: String): Int {
+        val sql = queryLoader.load("election-count-owned-by")
+        return connection.prepareStatement(sql).use { stmt ->
+            stmt.setString(1, userName)
+            val rs = stmt.executeQuery()
+            if (rs.next()) rs.getInt(1) else 0
+        }
+    }
+
+    override fun ballotsCastCount(userName: String): Int {
+        val sql = queryLoader.load("ballot-count-cast-by")
+        return connection.prepareStatement(sql).use { stmt ->
+            stmt.setString(1, userName)
+            val rs = stmt.executeQuery()
+            if (rs.next()) rs.getInt(1) else 0
+        }
+    }
+
     private fun ResultSet.toUser(): User {
         return User(
             name = getString("name"),

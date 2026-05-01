@@ -147,6 +147,9 @@ class HttpApiClient(
     override suspend fun listUsers(): List<UserNameRole> =
         getWithAuth("/users")
 
+    override suspend fun getUserActivity(): UserActivity =
+        getWithAuth("/me/activity")
+
     override suspend fun setRole(userName: String, role: Role) {
         val request = SetRoleRequest(role)
         putWithAuth<SetRoleRequest, Unit>("/user/${encodeURIComponent(userName)}/role", request)

@@ -91,6 +91,7 @@ class RequestRouter(
             target == "/logout" && method == "POST" -> handleLogout()
             target == "/password-reset-request" && method == "POST" -> handleRequestPasswordReset(req)
             target == "/password-reset" && method == "POST" -> handleResetPassword(req)
+            target == "/me/activity" && method == "GET" -> handleGetUserActivity(req)
             target == "/users" && method == "GET" -> handleListUsers(req)
             target == "/users/count" && method == "GET" -> handleUserCount(req)
             target.matches(Regex("/user/[^/]+")) && method == "GET" -> handleGetUser(req)
@@ -263,6 +264,12 @@ class RequestRouter(
         val accessToken = extractAccessToken(req)
         val users = service.listUsers(accessToken)
         return HttpResponse(200, json.encodeToString(users))
+    }
+
+    private fun handleGetUserActivity(req: HttpRequest): HttpResponse {
+        val accessToken = extractAccessToken(req)
+        val activity = service.getUserActivity(accessToken)
+        return HttpResponse(200, json.encodeToString(activity))
     }
 
     private fun handleUserCount(req: HttpRequest): HttpResponse {

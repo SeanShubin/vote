@@ -97,6 +97,28 @@ class DynamoDbSingleTableCommandModel(
                     "SK" to AttributeValue.S(DynamoDbSingleTableSchema.METADATA_SK)
                 )
             })
+            // Cascade: drop ballot items cast by this user. Matches MySQL's
+            // FK CASCADE on ballots.voter_name → users(name); without this the
+            // ballot items survive and point at a deleted voter.
+            val ballotItems = dynamoDb.scan(ScanRequest {
+                tableName = DynamoDbSingleTableSchema.MAIN_TABLE
+                filterExpression = "begins_with(SK, :prefix) AND voter_name = :voter"
+                expressionAttributeValues = mapOf(
+                    ":prefix" to AttributeValue.S(DynamoDbSingleTableSchema.BALLOT_PREFIX),
+                    ":voter" to AttributeValue.S(userName),
+                )
+            }).items
+            ballotItems?.forEach { item ->
+                val pk = item["PK"]?.asS() ?: return@forEach
+                val sk = item["SK"]?.asS() ?: return@forEach
+                dynamoDb.deleteItem(DeleteItemRequest {
+                    tableName = DynamoDbSingleTableSchema.MAIN_TABLE
+                    key = mapOf(
+                        "PK" to AttributeValue.S(pk),
+                        "SK" to AttributeValue.S(sk),
+                    )
+                })
+            }
         }
     }
 
@@ -305,6 +327,38 @@ class DynamoDbSingleTableCommandModel(
                         "SK" to AttributeValue.S(DynamoDbSingleTableSchema.candidateSK(candidateName))
                     )
                 })
+            }
+
+            // Cascade: strip the removed candidate names from each ballot's
+            // rankings JSON in this election. Without this, ballots would carry
+            // ghost rankings for candidates that no longer exist on the election.
+            val removed = candidateNames.toSet()
+            val ballotItems = dynamoDb.query(QueryRequest {
+                tableName = DynamoDbSingleTableSchema.MAIN_TABLE
+                keyConditionExpression = "PK = :pk AND begins_with(SK, :prefix)"
+                expressionAttributeValues = mapOf(
+                    ":pk" to AttributeValue.S(DynamoDbSingleTableSchema.electionPK(electionName)),
+                    ":prefix" to AttributeValue.S(DynamoDbSingleTableSchema.BALLOT_PREFIX),
+                )
+            }).items
+            ballotItems?.forEach { item ->
+                val sk = item["SK"]?.asS() ?: return@forEach
+                val rankingsJson = item["rankings"]?.asS() ?: return@forEach
+                val rankings = json.decodeFromString<List<Ranking>>(rankingsJson)
+                val filtered = rankings.filter { it.candidateName !in removed }
+                if (filtered.size != rankings.size) {
+                    dynamoDb.updateItem(UpdateItemRequest {
+                        tableName = DynamoDbSingleTableSchema.MAIN_TABLE
+                        key = mapOf(
+                            "PK" to AttributeValue.S(DynamoDbSingleTableSchema.electionPK(electionName)),
+                            "SK" to AttributeValue.S(sk),
+                        )
+                        updateExpression = "SET rankings = :r"
+                        expressionAttributeValues = mapOf(
+                            ":r" to AttributeValue.S(json.encodeToString(filtered)),
+                        )
+                    })
+                }
             }
         }
     }

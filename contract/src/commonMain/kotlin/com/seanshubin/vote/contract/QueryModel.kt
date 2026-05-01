@@ -24,4 +24,6 @@ interface QueryModel {
     fun listBallots(electionName: String): List<Ballot.Revealed>
     fun listUserNames(): List<String>
     fun listPermissions(role: Role): List<Permission>
+    fun electionsOwnedCount(userName: String): Int
+    fun ballotsCastCount(userName: String): Int
 }

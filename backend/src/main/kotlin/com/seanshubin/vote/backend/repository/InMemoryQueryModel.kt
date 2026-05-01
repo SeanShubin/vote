@@ -106,4 +106,10 @@ class InMemoryQueryModel(private val data: InMemoryData) : QueryModel {
     override fun listPermissions(role: Role): List<Permission> {
         return Permission.entries.filter { roleHasPermission(role, it) }
     }
+
+    override fun electionsOwnedCount(userName: String): Int =
+        data.elections.values.count { it.ownerName == userName }
+
+    override fun ballotsCastCount(userName: String): Int =
+        data.ballots.values.count { it.voterName == userName }
 }
