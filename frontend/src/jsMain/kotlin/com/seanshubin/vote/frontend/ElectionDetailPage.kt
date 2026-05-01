@@ -116,36 +116,38 @@ fun ElectionDetailPage(
             }
         }
 
-        Button({
-            onClick { onBack() }
-        }) {
-            Text("Back to Elections")
-        }
-
         // Delete is shown to the election owner OR any user with role >= ADMIN
         // (moderators). Backend authorization is the real defense.
         val canDelete = election != null && (
             election!!.ownerName == currentUserName ||
                 (currentRole != null && currentRole >= Role.ADMIN)
             )
-        if (canDelete) {
+        Div({ classes("button-row") }) {
             Button({
-                onClick {
-                    val confirmed = window.confirm("Delete election \"$electionName\"? This cannot be undone.")
-                    if (confirmed) {
-                        coroutineScope.launch {
-                            try {
-                                apiClient.deleteElection(electionName)
-                                onElectionDeleted()
-                            } catch (e: Exception) {
-                                apiClient.logErrorToServer(e)
-                                errorMessage = e.message ?: "Failed to delete election"
+                onClick { onBack() }
+            }) {
+                Text("Back to Elections")
+            }
+
+            if (canDelete) {
+                Button({
+                    onClick {
+                        val confirmed = window.confirm("Delete election \"$electionName\"? This cannot be undone.")
+                        if (confirmed) {
+                            coroutineScope.launch {
+                                try {
+                                    apiClient.deleteElection(electionName)
+                                    onElectionDeleted()
+                                } catch (e: Exception) {
+                                    apiClient.logErrorToServer(e)
+                                    errorMessage = e.message ?: "Failed to delete election"
+                                }
                             }
                         }
                     }
+                }) {
+                    Text("Delete Election")
                 }
-            }) {
-                Text("Delete Election")
             }
         }
     }

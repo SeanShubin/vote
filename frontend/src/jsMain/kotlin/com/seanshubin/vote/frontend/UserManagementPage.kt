@@ -171,7 +171,7 @@ private fun OwnershipTransferDialog(
                         "There can only be one OWNER at a time.",
                 )
             }
-            Div({ classes("dialog-actions") }) {
+            Div({ classes("button-row") }) {
                 Button({ onClick { onConfirm() } }) { Text("Transfer ownership") }
                 Button({ onClick { onCancel() } }) { Text("Cancel") }
             }

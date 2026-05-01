@@ -128,14 +128,19 @@ button:disabled {
 }
 
 /*
- * Adjacent buttons should breathe. The sibling combinator targets the gap
- * between a button and the button right after it; standalone buttons stay
- * unaffected. Containers that already use flex `gap` (.menu, .form, .tabs,
- * .tab-strip) lay out vertically or have their own gap, so this extra
- * left-margin lands harmlessly there.
+ * Horizontal button row utility. Wrap any 2+ buttons that need to sit
+ * side-by-side in a parent that doesn't already do its own layout
+ * (.menu/.form are flex columns; .tabs/.tab-strip are their own rows).
  */
-button + button {
-    margin-left: 0.5rem;
+.button-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 1rem;
+}
+
+.button-row button {
+    margin-top: 0;
 }
 
 .error {
