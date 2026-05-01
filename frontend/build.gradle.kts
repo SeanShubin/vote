@@ -49,8 +49,10 @@ val generatedSrcDir = layout.buildDirectory.dir("generated/buildConfig/jsMain/ko
 
 val generateBuildConfig by tasks.registering {
     val apiBaseUrl = (project.findProperty("api.base.url") as? String) ?: "http://localhost:8080"
+    val gitHash = (project.findProperty("git.hash") as? String) ?: "dev"
     val outputDir = generatedSrcDir
     inputs.property("apiBaseUrl", apiBaseUrl)
+    inputs.property("gitHash", gitHash)
     outputs.dir(outputDir)
     doLast {
         val pkgDir = outputDir.get().asFile.resolve("com/seanshubin/vote/frontend")
@@ -61,6 +63,7 @@ val generateBuildConfig by tasks.registering {
             |
             |internal object BuildConfig {
             |    const val API_BASE_URL: String = "$apiBaseUrl"
+            |    const val GIT_HASH: String = "$gitHash"
             |}
             |
             """.trimMargin()

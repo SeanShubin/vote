@@ -12,6 +12,23 @@ fun main() {
 
     renderComposable(rootElementId = "root") {
         VoteApp(integrations.apiClient)
+        BuildStamp()
+    }
+}
+
+@Composable
+private fun BuildStamp() {
+    val short = BuildConfig.GIT_HASH.take(7)
+    val href = if (BuildConfig.GIT_HASH == "dev") null
+        else "https://github.com/SeanShubin/vote/commit/${BuildConfig.GIT_HASH}"
+    Div({ classes("build-stamp") }) {
+        if (href != null) {
+            A(href = href, attrs = { attr("target", "_blank") }) {
+                Text(short)
+            }
+        } else {
+            Text(short)
+        }
     }
 }
 

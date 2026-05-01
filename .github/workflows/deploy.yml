@@ -51,7 +51,8 @@ jobs:
       - name: Build frontend production bundle
         run: |
           ./gradlew :frontend:assemble \
-            -Papi.base.url=/api
+            -Papi.base.url=/api \
+            -Pgit.hash=${{ github.sha }}
 
       - name: Install graphviz (for schema diagram SVG rendering)
         run: sudo apt-get update && sudo apt-get install -y graphviz
