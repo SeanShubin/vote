@@ -120,6 +120,7 @@ fun ElectionDetailPage(
                     "tally" -> TallyView(
                         apiClient = apiClient,
                         electionName = electionName,
+                        tiers = loadedElection?.tiers ?: emptyList(),
                         onNavigateToPreferences = onNavigateToPreferences,
                         onNavigateToStrongestPaths = onNavigateToStrongestPaths,
                     )
@@ -766,6 +767,7 @@ private data class RankedItem(val name: String, val kind: RankingKind)
 fun TallyView(
     apiClient: ApiClient,
     electionName: String,
+    tiers: List<String>,
     onNavigateToPreferences: () -> Unit,
     onNavigateToStrongestPaths: () -> Unit,
 ) {
@@ -785,6 +787,7 @@ fun TallyView(
             is FetchState.Error -> Div({ classes("error") }) { Text(state.message) }
             is FetchState.Success -> renderTally(
                 state.value,
+                tiers = tiers,
                 onNavigateToPreferences = onNavigateToPreferences,
                 onNavigateToStrongestPaths = onNavigateToStrongestPaths,
             )
@@ -809,6 +812,7 @@ fun TallyView(
 @Composable
 private fun renderTally(
     serverTally: Tally,
+    tiers: List<String>,
     onNavigateToPreferences: () -> Unit,
     onNavigateToStrongestPaths: () -> Unit,
 ) {
@@ -845,8 +849,29 @@ private fun renderTally(
     if (displayTally.places.isEmpty()) {
         P { Text("No winners yet") }
     } else {
-        displayTally.places.forEach { place ->
-            P { Text("Place ${place.rank}: ${place.candidateName}") }
+        // Per the requirement: "To be 'in a tier' means to be ranked above
+        // that tier, but below the above tier if any." So for each candidate,
+        // the tier they're "in" is the next tier marker AFTER them in the
+        // placings (the tier they beat). Tier markers themselves render as
+        // distinguishable rows.
+        val tierSet = tiers.toSet()
+        displayTally.places.forEachIndexed { index, place ->
+            val isTier = place.candidateName in tierSet
+            if (isTier) {
+                P({ classes("tally-tier-marker") }) {
+                    Text("▸ ${place.candidateName}")
+                }
+            } else {
+                val tierLabel = (index + 1 until displayTally.places.size)
+                    .firstOrNull { displayTally.places[it].candidateName in tierSet }
+                    ?.let { displayTally.places[it].candidateName }
+                P {
+                    Text("Place ${place.rank}: ${place.candidateName}")
+                    if (tierLabel != null) {
+                        Text(" (in $tierLabel)")
+                    }
+                }
+            }
         }
     }
 

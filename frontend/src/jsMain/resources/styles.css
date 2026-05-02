@@ -355,6 +355,20 @@ button:disabled {
     box-shadow: 0 0 0 2px rgba(201, 169, 58, 0.25);
 }
 
+/*
+ * Tier markers in the Winners list (Results tab). Same visual cue as the
+ * voting view's tier rows — readers should recognize "Tier 1" the same
+ * way wherever it appears.
+ */
+.tally-tier-marker {
+    background: #f8f5e9;
+    border: 1px solid #d6cca0;
+    border-radius: 6px;
+    padding: 0.4rem 0.75rem;
+    margin: 0.4rem 0;
+    font-weight: 600;
+}
+
 .ranked-ballot-rank-num {
     width: 3rem;
     text-align: center;
