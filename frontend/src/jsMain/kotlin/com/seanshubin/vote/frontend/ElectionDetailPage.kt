@@ -33,7 +33,7 @@ fun ElectionDetailPage(
 ) {
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var successMessage by remember { mutableStateOf<String?>(null) }
-    var currentView by remember { mutableStateOf("setup") }
+    var currentView by rememberHashTab("setup", setOf("setup", "vote", "tally"))
 
     val pageFetch = rememberFetchState(
         apiClient = apiClient,
