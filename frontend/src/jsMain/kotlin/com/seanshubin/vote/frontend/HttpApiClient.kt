@@ -134,6 +134,13 @@ class HttpApiClient(
         return postWithAuth("/election/${encodeURIComponent(electionName)}/ballot", request)
     }
 
+    override suspend fun deleteMyBallot(electionName: String) {
+        val voterName = requireSession().userName
+        deleteWithAuth(
+            "/election/${encodeURIComponent(electionName)}/ballot/${encodeURIComponent(voterName)}"
+        )
+    }
+
     override suspend fun getMyRankings(electionName: String): List<Ranking> {
         val voterName = requireSession().userName
         return getWithAuth(

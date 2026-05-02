@@ -308,6 +308,24 @@ fun VotingView(
         }
     }
 
+    val deleteBallotAction = rememberAsyncAction(
+        apiClient = apiClient,
+        fallbackErrorMessage = "Failed to remove ballot",
+        onError = onError,
+        action = {
+            apiClient.deleteMyBallot(electionName)
+            // Reset local state so the UI reflects the now-empty ballot. All
+            // candidates return to the arena and the auto-save guard sees
+            // ranked == savedRanked, so no follow-up castBallot fires.
+            history = emptyList()
+            ranked = emptyList()
+            savedRanked = emptyList()
+            arena = candidates
+            // Update the ballot-count header above the tabs.
+            onBallotSaved()
+        },
+    )
+
     fun pushHistory() {
         val next = history + (arena to ranked)
         history = if (next.size > 50) next.drop(next.size - 50) else next
@@ -496,6 +514,25 @@ fun VotingView(
                         if (history.isEmpty()) attr("disabled", "")
                         onClick { handleUndo() }
                     }) { Text("↩ Undo") }
+
+                    // "Remove my ballot" is only meaningful when a saved ballot
+                    // exists; for a never-voted-yet user the button would be a
+                    // no-op so we hide it entirely.
+                    val hasSavedBallot = savedRanked?.isNotEmpty() == true
+                    if (hasSavedBallot) {
+                        Button({
+                            classes("ranked-ballot-remove-button")
+                            if (deleteBallotAction.isLoading) attr("disabled", "")
+                            onClick {
+                                val confirmed = window.confirm(
+                                    "Remove your ballot from \"$electionName\"? Your rankings will be cleared."
+                                )
+                                if (confirmed) deleteBallotAction.invoke()
+                            }
+                        }) {
+                            Text(if (deleteBallotAction.isLoading) "Removing…" else "Remove my ballot")
+                        }
+                    }
 
                     Span({ classes("ranked-ballot-toolbar-hint") }) {
                         Text("Focus a row · ↑/↓ to nudge · Ctrl+Z to undo")

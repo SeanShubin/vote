@@ -21,6 +21,7 @@ class FakeApiClient : ApiClient {
     val setCandidatesCalls = mutableListOf<SetCandidatesCall>()
     val listCandidatesCalls = mutableListOf<String>()
     val castBallotCalls = mutableListOf<CastBallotCall>()
+    val deleteMyBallotCalls = mutableListOf<String>()
     val getTallyCalls = mutableListOf<String>()
     val deleteElectionCalls = mutableListOf<String>()
     val removeUserCalls = mutableListOf<String>()
@@ -41,6 +42,7 @@ class FakeApiClient : ApiClient {
     var setCandidatesResult: Result<Unit> = Result.success(Unit)
     var listCandidatesResult: Result<List<String>> = Result.success(emptyList())
     var castBallotResult: Result<String> = Result.success("ballot-confirmation-123")
+    var deleteMyBallotResult: Result<Unit> = Result.success(Unit)
     var myRankingsResult: Result<List<Ranking>> = Result.success(emptyList())
     val myRankingsCalls = mutableListOf<String>()
     var getTallyResult: Result<Tally> = Result.failure(Exception("Get tally not configured"))
@@ -118,6 +120,11 @@ class FakeApiClient : ApiClient {
     override suspend fun castBallot(electionName: String, rankings: List<Ranking>): String {
         castBallotCalls.add(CastBallotCall(electionName, rankings))
         return castBallotResult.getOrThrow()
+    }
+
+    override suspend fun deleteMyBallot(electionName: String) {
+        deleteMyBallotCalls.add(electionName)
+        deleteMyBallotResult.getOrThrow()
     }
 
     override suspend fun getMyRankings(electionName: String): List<Ranking> {

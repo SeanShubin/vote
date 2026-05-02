@@ -217,6 +217,32 @@ class MySqlCommandModel(
         }
     }
 
+    override fun deleteBallot(authority: String, voterName: String, electionName: String) {
+        // Look up ballot_id so we can drop the ranking rows first; the rankings
+        // table has an FK on ballot_id but no ON DELETE CASCADE in schema, so we
+        // mirror the explicit cascade pattern used elsewhere (e.g. removeCandidates).
+        val ballotIdSql = queryLoader.load("ballot-select-id")
+        val ballotId = connection.prepareStatement(ballotIdSql).use { stmt ->
+            stmt.setString(1, electionName)
+            stmt.setString(2, voterName)
+            val rs = stmt.executeQuery()
+            if (rs.next()) rs.getLong(1) else null
+        } ?: return
+
+        val deleteRankingsSql = queryLoader.load("ranking-delete-by-ballot-id")
+        connection.prepareStatement(deleteRankingsSql).use { stmt ->
+            stmt.setLong(1, ballotId)
+            stmt.executeUpdate()
+        }
+
+        val deleteBallotSql = queryLoader.load("ballot-delete")
+        connection.prepareStatement(deleteBallotSql).use { stmt ->
+            stmt.setString(1, electionName)
+            stmt.setString(2, voterName)
+            stmt.executeUpdate()
+        }
+    }
+
     override fun setPassword(authority: String, userName: String, salt: String, hash: String) {
         val sql = queryLoader.load("user-update-password")
         connection.prepareStatement(sql).use { stmt ->

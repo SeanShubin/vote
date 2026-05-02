@@ -135,4 +135,11 @@ sealed interface DomainEvent {
         val electionName: String,
         val newRankings: List<Ranking>
     ) : DomainEvent
+
+    @Serializable
+    @SerialName("BallotDeleted")
+    data class BallotDeleted(
+        val voterName: String,
+        val electionName: String
+    ) : DomainEvent
 }

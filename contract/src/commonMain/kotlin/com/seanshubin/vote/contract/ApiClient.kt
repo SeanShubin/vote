@@ -48,6 +48,13 @@ interface ApiClient {
     suspend fun castBallot(electionName: String, rankings: List<Ranking>): String
 
     /**
+     * Remove the current user's ballot for [electionName]. Idempotent — succeeds
+     * silently if the voter has no ballot. The backend identifies the voter from
+     * the access token, mirroring [castBallot].
+     */
+    suspend fun deleteMyBallot(electionName: String)
+
+    /**
      * The current user's existing rankings for an election, used to pre-populate
      * the voting view on edit-an-existing-ballot. Empty list when the voter
      * hasn't cast a ballot yet.
