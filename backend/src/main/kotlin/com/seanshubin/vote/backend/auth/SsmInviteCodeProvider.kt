@@ -18,30 +18,39 @@ class SsmInviteCodeProvider(
     private val region: String,
     private val cacheTtlMillis: Long = 5 * 60 * 1000,
     private val nowMillis: () -> Long = System::currentTimeMillis,
+    private val fetcher: () -> String? = { defaultFetch(parameterName, region) },
 ) : InviteCodeProvider {
     @Volatile
     private var cachedValue: String? = null
+
+    // Nullable rather than a Long.MIN_VALUE sentinel — `now - Long.MIN_VALUE`
+    // overflows two's complement to a negative number that always satisfies
+    // `< cacheTtlMillis`, which would short-circuit every call to the (null)
+    // cached value and silently disable the gate.
     @Volatile
-    private var cachedAt: Long = Long.MIN_VALUE
+    private var cachedAt: Long? = null
 
     override fun current(): String? {
         val now = nowMillis()
-        if (now - cachedAt < cacheTtlMillis) return cachedValue
-        val fetched = fetch()
+        val lastFetch = cachedAt
+        if (lastFetch != null && now - lastFetch < cacheTtlMillis) return cachedValue
+        val fetched = fetcher()
         cachedValue = fetched
         cachedAt = now
         return fetched
     }
 
-    private fun fetch(): String? = runBlocking {
-        SsmClient { region = this@SsmInviteCodeProvider.region }.use { client ->
-            val response = client.getParameter(
-                GetParameterRequest {
-                    name = parameterName
-                    withDecryption = true
-                }
-            )
-            response.parameter?.value?.takeIf { it.isNotBlank() }
+    companion object {
+        private fun defaultFetch(parameterName: String, region: String): String? = runBlocking {
+            SsmClient { this.region = region }.use { client ->
+                val response = client.getParameter(
+                    GetParameterRequest {
+                        name = parameterName
+                        withDecryption = true
+                    }
+                )
+                response.parameter?.value?.takeIf { it.isNotBlank() }
+            }
         }
     }
 }
