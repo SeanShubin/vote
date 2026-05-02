@@ -631,7 +631,7 @@ private fun renderTally(
         P { Text("No winners yet") }
     } else {
         displayTally.places.forEach { place ->
-            P { Text("Place ${place.rank}: ${place.candidateName}") }
+            P { Text("${ordinal(place.rank)}: ${place.candidateName}") }
         }
     }
 
@@ -834,4 +834,16 @@ private fun renderStrongestPathsTable(tally: Tally) {
             }
         }
     }
+}
+
+// Teens (11th, 12th, 13th) take "th" even though they end in 1/2/3.
+private fun ordinal(n: Int): String {
+    val suffix = when {
+        n % 100 in 11..13 -> "th"
+        n % 10 == 1 -> "st"
+        n % 10 == 2 -> "nd"
+        n % 10 == 3 -> "rd"
+        else -> "th"
+    }
+    return "$n$suffix"
 }
