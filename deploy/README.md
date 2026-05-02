@@ -98,3 +98,21 @@ ls backend/build/libs/vote-backend-lambda.jar
 ./gradlew :frontend:assemble -Papi.base.url=https://api.pairwisevote.com
 ls frontend/build/dist/js/productionExecutable/
 ```
+
+## Rotating the invite code
+
+The shared registration invite code lives in SSM Parameter Store at
+`/${StackName}/invite-code` (e.g., `/pairwisevote-frontend/invite-code`).
+The Lambda re-reads it at most every 5 minutes, so a rotation takes
+effect within one TTL window — no redeploy needed.
+
+```bash
+aws ssm put-parameter \
+    --name /pairwisevote-frontend/invite-code \
+    --value "new-code-here" \
+    --type String \
+    --overwrite \
+    --region us-east-1
+```
+
+Setting the value to a blank string disables the gate (registration is open).

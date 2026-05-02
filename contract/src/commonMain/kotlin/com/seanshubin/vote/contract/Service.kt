@@ -6,7 +6,7 @@ interface Service {
     fun synchronize()
     fun health(): String
     fun refresh(refreshToken: RefreshToken): Tokens
-    fun register(userName: String, email: String, password: String): Tokens
+    fun register(userName: String, email: String, password: String, inviteCode: String = ""): Tokens
     fun authenticate(nameOrEmail: String, password: String): Tokens
     fun authenticateWithToken(accessToken: AccessToken): Tokens
     fun permissionsForRole(role: Role): List<Permission>

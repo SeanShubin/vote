@@ -5,7 +5,9 @@ import com.amazonaws.services.lambda.runtime.RequestHandler
 import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPEvent
 import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPResponse
 import com.seanshubin.vote.backend.auth.CookieConfig
+import com.seanshubin.vote.backend.auth.InviteCodeProvider
 import com.seanshubin.vote.backend.auth.JwtCipher
+import com.seanshubin.vote.backend.auth.SsmInviteCodeProvider
 import com.seanshubin.vote.backend.auth.TokenEncoder
 import com.seanshubin.vote.backend.dependencies.Configuration
 import com.seanshubin.vote.backend.dependencies.ConnectionFactory
@@ -109,6 +111,15 @@ class LambdaHandler : RequestHandler<APIGatewayV2HTTPEvent, APIGatewayV2HTTPResp
             val frontendBaseUrl = System.getenv("FRONTEND_BASE_URL")
                 ?: error("FRONTEND_BASE_URL env var is required")
 
+            // Invite-code gate. The SSM parameter name comes from CFN; if unset
+            // we fall back to a no-op provider (registration is open). Operator
+            // rotates the code in SSM with no redeploy; a five-minute TTL caps
+            // cross-Lambda inconsistency after a rotation.
+            val inviteCodeProvider: InviteCodeProvider =
+                System.getenv("INVITE_CODE_PARAMETER_NAME")?.takeIf { it.isNotBlank() }?.let { name ->
+                    SsmInviteCodeProvider(parameterName = name, region = region)
+                } ?: InviteCodeProvider { null }
+
             val service = ServiceImpl(
                 integrations = integrations,
                 eventLog = repositories.eventLog,
@@ -117,6 +128,7 @@ class LambdaHandler : RequestHandler<APIGatewayV2HTTPEvent, APIGatewayV2HTTPResp
                 rawTableScanner = repositories.rawTableScanner,
                 tokenEncoder = tokenEncoder,
                 frontendBaseUrl = frontendBaseUrl,
+                inviteCodeProvider = inviteCodeProvider,
             )
 
             return RequestRouter(service, json, tokenEncoder, cookieConfig)

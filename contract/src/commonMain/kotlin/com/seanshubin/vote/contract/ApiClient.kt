@@ -19,7 +19,7 @@ import com.seanshubin.vote.domain.UserNameRole
  * logout ends one. Authenticated calls before a session is started will fail.
  */
 interface ApiClient {
-    suspend fun register(userName: String, email: String, password: String): AuthResponse
+    suspend fun register(userName: String, email: String, password: String, inviteCode: String = ""): AuthResponse
 
     /** [nameOrEmail] is matched against username first, then email — login accepts either. */
     suspend fun authenticate(nameOrEmail: String, password: String): AuthResponse

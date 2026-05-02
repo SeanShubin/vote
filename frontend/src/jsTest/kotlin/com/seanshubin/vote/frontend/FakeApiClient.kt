@@ -69,8 +69,8 @@ class FakeApiClient : ApiClient {
     val setRoleCalls = mutableListOf<SetRoleCall>()
     val userActivityCalls = mutableListOf<Unit>()
 
-    override suspend fun register(userName: String, email: String, password: String): AuthResponse {
-        registerCalls.add(RegisterCall(userName, email, password))
+    override suspend fun register(userName: String, email: String, password: String, inviteCode: String): AuthResponse {
+        registerCalls.add(RegisterCall(userName, email, password, inviteCode))
         return registerResult.getOrThrow()
     }
 
@@ -210,7 +210,7 @@ class FakeApiClient : ApiClient {
         loggedErrors.add(error)
     }
 
-    data class RegisterCall(val userName: String, val email: String, val password: String)
+    data class RegisterCall(val userName: String, val email: String, val password: String, val inviteCode: String = "")
     data class CreateElectionCall(val electionName: String, val description: String)
     data class AuthenticateCall(val nameOrEmail: String, val password: String)
     data class SetCandidatesCall(val electionName: String, val candidates: List<String>)

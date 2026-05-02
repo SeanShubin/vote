@@ -45,6 +45,7 @@ import com.seanshubin.vote.tools.commands.RestoreDynamodb
 import com.seanshubin.vote.tools.commands.RollLogs
 import com.seanshubin.vote.tools.commands.RunLocal
 import com.seanshubin.vote.tools.commands.ServeFrontend
+import com.seanshubin.vote.tools.commands.SetInviteCode
 import com.seanshubin.vote.tools.commands.SetupTestBallot
 import com.seanshubin.vote.tools.commands.TerminateAll
 import com.seanshubin.vote.tools.commands.TestLifecycle
@@ -104,6 +105,7 @@ fun main(args: Array<String>) {
             LaunchScenarioMysql(),
             LaunchScenarioDynamodb(),
             SetupTestBallot(),
+            SetInviteCode(),
             TestLifecycle(),
             WorktreeSync()
         )

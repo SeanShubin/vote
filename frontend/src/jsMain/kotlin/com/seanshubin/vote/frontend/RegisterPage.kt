@@ -17,6 +17,7 @@ fun RegisterPage(
     var userName by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    var inviteCode by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
     val registerAction = rememberAsyncAction(
@@ -26,7 +27,7 @@ fun RegisterPage(
         coroutineScope = coroutineScope,
         action = {
             errorMessage = null
-            val auth = apiClient.register(userName, email, password)
+            val auth = apiClient.register(userName, email, password, inviteCode)
             onLoginSuccess(auth.userName, auth.role)
         },
     )
@@ -73,6 +74,14 @@ fun RegisterPage(
                 placeholder("Password")
                 value(password)
                 onInput { password = it.value }
+            }
+
+            Input(InputType.Text) {
+                attr("name", "invite-code")
+                attr("autocomplete", "off")
+                placeholder("Invite code")
+                value(inviteCode)
+                onInput { inviteCode = it.value }
             }
 
             Button({
