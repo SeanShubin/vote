@@ -292,20 +292,27 @@ fun VotingView(
     // many times during one drag). When `ranked` changes again before the
     // debounce expires, LaunchedEffect cancels the in-flight coroutine and
     // the older save never goes out, so the server only sees the settled state.
+    //
+    // Emptying the ranked list is treated as "this voter has no ballot" — we
+    // call deleteMyBallot rather than castBallot([]) so the ballot row goes
+    // away entirely and the ballot count drops. Both transitions that change
+    // the count (first cast and full clear) trigger onBallotSaved to refresh
+    // the header.
     LaunchedEffect(ranked) {
         val saved = savedRanked ?: return@LaunchedEffect
         if (ranked == saved) return@LaunchedEffect
         kotlinx.coroutines.delay(250)
         val toSave = ranked
-        // Track whether this is the voter's first cast for this election so we
-        // only refresh the page fetch (and its ballot-count header) when it
-        // actually needs to change. Subsequent edits update the existing ballot
-        // and don't bump the count.
         val wasFirstCast = saved.isEmpty()
+        val nowEmpty = toSave.isEmpty()
         try {
-            apiClient.castBallot(electionName, toSave.mapIndexed { i, n -> Ranking(n, i + 1) })
+            if (nowEmpty) {
+                apiClient.deleteMyBallot(electionName)
+            } else {
+                apiClient.castBallot(electionName, toSave.mapIndexed { i, n -> Ranking(n, i + 1) })
+            }
             savedRanked = toSave
-            if (wasFirstCast) onBallotSaved()
+            if (wasFirstCast || nowEmpty) onBallotSaved()
         } catch (e: Exception) {
             apiClient.logErrorToServer(e)
             onError(e.message ?: "Failed to save ballot")
