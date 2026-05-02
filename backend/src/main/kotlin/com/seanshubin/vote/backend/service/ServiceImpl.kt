@@ -672,6 +672,12 @@ class ServiceImpl(
         return accessToken.userName == userName
     }
 
+    /**
+     * Throws unless the caller's role is STRICTLY GREATER than the target's.
+     * Reading the negation: "if caller is not strictly greater (i.e. less or
+     * equal) → throw." So OWNER vs OWNER is rejected; ADMIN vs ADMIN is
+     * rejected; ADMIN vs USER passes; OWNER vs ADMIN passes.
+     */
     private fun requireGreaterRole(accessToken: AccessToken, target: User) {
         if (accessToken.role <= target.role) {
             throw ServiceException(
