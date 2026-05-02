@@ -35,7 +35,7 @@ class ServiceImpl(
     }
 
     override fun refresh(refreshToken: RefreshToken): Tokens {
-        val user = queryModel.findUserByName(refreshToken.userName)
+        val user = requireSessionUser(refreshToken.userName)
         val accessToken = AccessToken(user.name, user.role)
         return Tokens(accessToken, refreshToken)
     }
@@ -112,7 +112,7 @@ class ServiceImpl(
     }
 
     override fun authenticateWithToken(accessToken: AccessToken): Tokens {
-        val user = queryModel.findUserByName(accessToken.userName)
+        val user = requireSessionUser(accessToken.userName)
         val newAccessToken = AccessToken(user.name, user.role)
         val refreshToken = RefreshToken(user.name)
         return Tokens(newAccessToken, refreshToken)
@@ -627,12 +627,10 @@ class ServiceImpl(
     override fun getUserActivity(accessToken: AccessToken): UserActivity {
         // Re-fetch the user's role from the projection rather than trusting
         // the access token: tokens are 10-min lived, so a recent role change
-        // (e.g. ownership transfer) might not be reflected there yet.
-        val user = queryModel.searchUserByName(accessToken.userName)
-            ?: throw ServiceException(
-                ServiceException.Category.NOT_FOUND,
-                "User not found: ${accessToken.userName}",
-            )
+        // (e.g. ownership transfer) might not be reflected there yet. If the
+        // principal vanished, requireSessionUser raises 401 so the standard
+        // session-lost path on the frontend logs them out cleanly.
+        val user = requireSessionUser(accessToken.userName)
         return UserActivity(
             userName = user.name,
             role = user.role,
@@ -654,6 +652,23 @@ class ServiceImpl(
             usersDeleted = testUsers.size,
             electionsDeleted = testElections.size,
         )
+    }
+
+    /**
+     * Look up the user who *owns* the current session. Used wherever we need
+     * the principal's projection row — `/refresh`, `/authenticateWithToken`,
+     * `/me/activity`. Missing means the user was deleted while their token
+     * was still in flight; raise UNAUTHORIZED so the request lands on the
+     * frontend's standard 401 path, which clears the session and routes to
+     * /login. Anywhere else that looks up a principal user MUST go through
+     * here so that "user vanished" is uniformly a logout, not a 500 or 404.
+     */
+    private fun requireSessionUser(userName: String): User {
+        return queryModel.searchUserByName(userName)
+            ?: throw ServiceException(
+                ServiceException.Category.UNAUTHORIZED,
+                "Session user no longer exists: $userName",
+            )
     }
 
     // Permission checking helpers

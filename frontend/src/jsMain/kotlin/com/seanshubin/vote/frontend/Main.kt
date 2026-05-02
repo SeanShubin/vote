@@ -47,7 +47,18 @@ fun VoteApp(apiClient: ApiClient) {
     // straight from a bookmark). On failure, protected pages redirect to /login
     // — using replaceState so Back doesn't take them back to a page they
     // weren't authorized to see in the first place.
+    //
+    // The same `userName=null; role=null; replace(Login)` transition also
+    // serves as the SPA-wide handler for "session evaporated mid-use" (user
+    // was deleted server-side, refresh cookie expired, etc.). We register it
+    // once via apiClient.onSessionLost so individual pages don't have to
+    // catch+redirect each call site by hand.
     LaunchedEffect(Unit) {
+        apiClient.onSessionLost = {
+            userName = null
+            role = null
+            router.replace(Page.Login)
+        }
         try {
             val auth = apiClient.refresh()
             if (auth != null) {

@@ -12,6 +12,7 @@ logs/
 downloaded
 secrets
 local-config
+.local
 # Secret hygiene — never let a stray .env / credentials file land in git.
 .env
 .env.*

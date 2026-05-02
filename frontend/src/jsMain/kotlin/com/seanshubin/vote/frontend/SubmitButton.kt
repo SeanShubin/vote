@@ -43,6 +43,10 @@ fun rememberAsyncAction(
                 try {
                     action()
                     onSuccess()
+                } catch (e: SessionLostException) {
+                    // Session ended mid-action — ApiClient.onSessionLost has
+                    // already routed to /login. Don't log or surface an error
+                    // to a page that's about to be unmounted.
                 } catch (e: Exception) {
                     apiClient.logErrorToServer(e)
                     onError(e.message ?: fallbackErrorMessage)
