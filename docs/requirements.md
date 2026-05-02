@@ -45,7 +45,8 @@ Read endpoints (any OBSERVER+ unless noted):
 - View one's own activity (own role, own counts) — any authenticated user
   including NO_ACCESS, since they need this to render their own state
 
-Read endpoints requiring **MANAGE_USERS (ADMIN+)**:
+Read endpoints requiring **MANAGE_USERS (ADMIN+)** — except for self, which
+is always allowed (you can always look up your own email and your own profile):
 - List all users (exposes emails)
 - View any user's profile (exposes email)
 

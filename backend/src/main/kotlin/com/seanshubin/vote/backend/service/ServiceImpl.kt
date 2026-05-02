@@ -119,6 +119,8 @@ class ServiceImpl(
     }
 
     override fun permissionsForRole(role: Role): List<Permission> {
+        // Pure lookup of the static role→permissions table — no user data.
+        // The mapping is in the source code, so it isn't sensitive. No auth.
         return queryModel.listPermissions(role)
     }
 
@@ -262,6 +264,9 @@ class ServiceImpl(
         val targetUser = queryModel.searchUserByName(userName)
             ?: throw ServiceException(ServiceException.Category.NOT_FOUND, "User not found: $userName")
         if (!isSelf(accessToken, userName)) {
+            // Editing another user is a moderation action — needs MANAGE_USERS
+            // and a strictly higher role than the target.
+            requirePermission(accessToken, Permission.MANAGE_USERS)
             requireGreaterRole(accessToken, targetUser)
         }
 
@@ -301,11 +306,17 @@ class ServiceImpl(
     }
 
     override fun getUser(accessToken: AccessToken, userName: String): UserNameEmail {
+        // Returns email (PII). Allowed for self (you can always look up your
+        // own email) or for ADMIN+ moderators. Anyone else is rejected.
+        if (!isSelf(accessToken, userName)) {
+            requirePermission(accessToken, Permission.MANAGE_USERS)
+        }
         val user = queryModel.findUserByName(userName)
         return UserNameEmail(user.name, user.email)
     }
 
     override fun getElection(accessToken: AccessToken, electionName: String): ElectionDetail {
+        requirePermission(accessToken, Permission.VIEW_APPLICATION)
         val election = queryModel.searchElectionByName(electionName)
             ?: throw ServiceException(ServiceException.Category.NOT_FOUND, "Election not found: $electionName")
         val candidateCount = queryModel.candidateCount(electionName)
@@ -339,6 +350,7 @@ class ServiceImpl(
     }
 
     override fun listElections(accessToken: AccessToken): List<ElectionSummary> {
+        requirePermission(accessToken, Permission.VIEW_APPLICATION)
         return queryModel.listElections()
     }
 
@@ -353,18 +365,22 @@ class ServiceImpl(
     }
 
     override fun userCount(accessToken: AccessToken): Int {
+        requirePermission(accessToken, Permission.VIEW_APPLICATION)
         return queryModel.userCount()
     }
 
     override fun electionCount(accessToken: AccessToken): Int {
+        requirePermission(accessToken, Permission.VIEW_APPLICATION)
         return queryModel.electionCount()
     }
 
     override fun tableCount(accessToken: AccessToken): Int {
+        requirePermission(accessToken, Permission.VIEW_SECRETS)
         return queryModel.tableCount()
     }
 
     override fun eventCount(accessToken: AccessToken): Int {
+        requirePermission(accessToken, Permission.VIEW_SECRETS)
         return eventLog.eventCount()
     }
 
@@ -401,6 +417,7 @@ class ServiceImpl(
     }
 
     override fun listCandidates(accessToken: AccessToken, electionName: String): List<String> {
+        requirePermission(accessToken, Permission.VIEW_APPLICATION)
         return queryModel.listCandidates(electionName)
     }
 
@@ -436,6 +453,7 @@ class ServiceImpl(
     }
 
     override fun listTiers(accessToken: AccessToken, electionName: String): List<String> {
+        requirePermission(accessToken, Permission.VIEW_APPLICATION)
         return queryModel.listTiers(electionName)
     }
 
@@ -520,10 +538,12 @@ class ServiceImpl(
     }
 
     override fun listRankings(accessToken: AccessToken, voterName: String, electionName: String): List<Ranking> {
+        requirePermission(accessToken, Permission.VIEW_APPLICATION)
         return queryModel.listRankings(voterName, electionName)
     }
 
     override fun tally(accessToken: AccessToken, electionName: String): Tally {
+        requirePermission(accessToken, Permission.VIEW_APPLICATION)
         queryModel.searchElectionByName(electionName)
             ?: throw ServiceException(ServiceException.Category.NOT_FOUND, "Election not found: $electionName")
         val candidates = queryModel.listCandidates(electionName)
@@ -543,6 +563,7 @@ class ServiceImpl(
     }
 
     override fun getBallot(accessToken: AccessToken, voterName: String, electionName: String): BallotSummary? {
+        requirePermission(accessToken, Permission.VIEW_APPLICATION)
         return queryModel.searchBallot(voterName, electionName)
     }
 
