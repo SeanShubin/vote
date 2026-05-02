@@ -334,25 +334,45 @@ button:disabled {
 }
 
 /*
- * Tier markers — fixed anchors in the ranked list. Visually distinct
- * (different background, no grab cursor) and clickable to select as the
- * drop target for subsequent candidate clicks.
+ * Tier fieldsets — one per tier, containing the candidate rows that belong
+ * to that tier. The legend doubles as the tier-select control. Selected
+ * tier gets a thick accent border so it's visually unambiguous which tier
+ * a chip-click will drop into.
  */
-.ranked-ballot-tier-row {
-    background: #f8f5e9;
-    border-color: #d6cca0;
+.ranked-ballot-tier-fieldset {
+    border: 1px solid #d6cca0;
+    border-radius: 6px;
+    padding: 0.4rem 0.75rem 0.6rem;
+    margin: 0.6rem 0;
+    background: #fbf9f1;
+}
+
+.ranked-ballot-tier-fieldset-selected {
+    border: 3px solid #2c7be5;
+    padding: calc(0.4rem - 2px) calc(0.75rem - 2px) calc(0.6rem - 2px);
+    background: #f0f6ff;
+}
+
+.ranked-ballot-tier-legend {
     cursor: pointer;
+    padding: 0 0.4rem;
     font-weight: 600;
+    color: #34495e;
+    user-select: none;
 }
 
-.ranked-ballot-tier-row:hover {
-    background: #f3eed3;
+.ranked-ballot-tier-legend:hover {
+    color: #2c7be5;
 }
 
-.ranked-ballot-tier-selected {
-    background: #fff3c4;
-    border-color: #c9a93a;
-    box-shadow: 0 0 0 2px rgba(201, 169, 58, 0.25);
+.ranked-ballot-tier-empty {
+    padding: 0.6rem;
+    text-align: center;
+    color: #888;
+    font-size: 0.9rem;
+    font-style: italic;
+    border: 1px dashed #ccc;
+    border-radius: 4px;
 }
 
 /*
