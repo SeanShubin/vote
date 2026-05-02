@@ -225,6 +225,9 @@ class HttpApiTester(private val port: Int = 9876) : AutoCloseable {
     fun getBallot(electionName: String, voterName: String, token: AccessToken): HttpResponse<String> =
         get("/election/$electionName/ballot/$voterName", token)
 
+    fun deleteBallot(electionName: String, voterName: String, token: AccessToken): HttpResponse<String> =
+        delete("/election/$electionName/ballot/$voterName", token)
+
     fun getVoterRankings(electionName: String, voterName: String, token: AccessToken): HttpResponse<String> =
         get("/election/$electionName/rankings/$voterName", token)
 
@@ -846,6 +849,62 @@ class HttpApiTest {
 
         assertEquals(200, response.statusCode())
         assertTrue(response.body().contains("bob"))
+    }
+
+    @Test
+    fun `delete own ballot succeeds`() {
+        val aliceTokens = tester.registerUserExpectSuccess("alice")
+        val bobTokens = tester.registerUserExpectSuccess("bob")
+        tester.createElection("Lang", aliceTokens.accessToken)
+        tester.setCandidates("Lang", listOf("A", "B"), aliceTokens.accessToken)
+        tester.castBallot(
+            "Lang",
+            """{"voterName":"bob","rankings":[{"candidateName":"A","rank":1}]}""",
+            bobTokens.accessToken,
+        )
+
+        val deleteResponse = tester.deleteBallot("Lang", "bob", bobTokens.accessToken)
+        assertEquals(200, deleteResponse.statusCode())
+
+        // After deletion, the ballot row is gone — searchBallot returns null,
+        // which encodes to the literal "null" body.
+        val afterBallot = tester.getBallot("Lang", "bob", bobTokens.accessToken)
+        assertEquals(200, afterBallot.statusCode())
+        assertEquals("null", afterBallot.body().trim(), "Expected ballot to be removed; got: ${afterBallot.body()}")
+    }
+
+    @Test
+    fun `delete ballot rejects voterName that does not match auth token`() {
+        val aliceTokens = tester.registerUserExpectSuccess("alice")
+        val bobTokens = tester.registerUserExpectSuccess("bob")
+        tester.createElection("Lang", aliceTokens.accessToken)
+        tester.setCandidates("Lang", listOf("A", "B"), aliceTokens.accessToken)
+        tester.castBallot(
+            "Lang",
+            """{"voterName":"bob","rankings":[{"candidateName":"A","rank":1}]}""",
+            bobTokens.accessToken,
+        )
+
+        // Alice trying to delete bob's ballot must be rejected — only the
+        // ballot's own voter can remove it.
+        val response = tester.deleteBallot("Lang", "bob", aliceTokens.accessToken)
+        assertEquals(401, response.statusCode())
+
+        // Bob's ballot must still be intact.
+        val afterBallot = tester.getBallot("Lang", "bob", bobTokens.accessToken)
+        assertTrue(afterBallot.body().contains("bob"), "Ballot should be intact: ${afterBallot.body()}")
+    }
+
+    @Test
+    fun `delete ballot is idempotent when no ballot exists`() {
+        val aliceTokens = tester.registerUserExpectSuccess("alice")
+        val bobTokens = tester.registerUserExpectSuccess("bob")
+        tester.createElection("Lang", aliceTokens.accessToken)
+        tester.setCandidates("Lang", listOf("A"), aliceTokens.accessToken)
+
+        // Bob never voted; deleting his nonexistent ballot should still succeed.
+        val response = tester.deleteBallot("Lang", "bob", bobTokens.accessToken)
+        assertEquals(200, response.statusCode())
     }
 
     @Test

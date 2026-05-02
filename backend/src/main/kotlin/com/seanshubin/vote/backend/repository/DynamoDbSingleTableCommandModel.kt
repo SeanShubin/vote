@@ -454,4 +454,16 @@ class DynamoDbSingleTableCommandModel(
             }
         }
     }
+
+    override fun deleteBallot(authority: String, voterName: String, electionName: String) {
+        runBlocking {
+            dynamoDb.deleteItem(DeleteItemRequest {
+                tableName = DynamoDbSingleTableSchema.MAIN_TABLE
+                key = mapOf(
+                    "PK" to AttributeValue.S(DynamoDbSingleTableSchema.electionPK(electionName)),
+                    "SK" to AttributeValue.S(DynamoDbSingleTableSchema.ballotSK(voterName))
+                )
+            })
+        }
+    }
 }

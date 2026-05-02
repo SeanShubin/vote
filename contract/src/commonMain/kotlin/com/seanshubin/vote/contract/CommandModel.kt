@@ -35,6 +35,7 @@ interface CommandModel {
 
     fun setRankings(authority: String, confirmation: String, electionName: String, rankings: List<Ranking>)
     fun updateWhenCast(authority: String, confirmation: String, now: Instant)
+    fun deleteBallot(authority: String, voterName: String, electionName: String)
     fun setPassword(authority: String, userName: String, salt: String, hash: String)
     fun setUserName(authority: String, oldUserName: String, newUserName: String)
     fun setEmail(authority: String, userName: String, email: String)

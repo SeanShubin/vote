@@ -81,6 +81,9 @@ class EventApplier(
             is DomainEvent.BallotRankingsChanged -> {
                 commandModel.setRankings(authority, event.confirmation, event.electionName, event.newRankings)
             }
+            is DomainEvent.BallotDeleted -> {
+                commandModel.deleteBallot(authority, event.voterName, event.electionName)
+            }
         }
     }
 }

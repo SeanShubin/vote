@@ -116,6 +116,7 @@ class RequestRouter(
             target.matches(Regex("/election/[^/]+/candidates")) && method == "GET" -> handleListCandidates(req)
             target.matches(Regex("/election/[^/]+/ballot")) && method == "POST" -> handleCastBallot(req)
             target.matches(Regex("/election/[^/]+/ballot/[^/]+")) && method == "GET" -> handleGetBallot(req)
+            target.matches(Regex("/election/[^/]+/ballot/[^/]+")) && method == "DELETE" -> handleDeleteBallot(req)
             target.matches(Regex("/election/[^/]+/rankings/[^/]+")) && method == "GET" -> handleListRankings(req)
             target.matches(Regex("/election/[^/]+/tally")) && method == "GET" -> handleTally(req)
             target == "/admin/test-users" && method == "DELETE" -> handleWipeTestUsers(req)
@@ -446,6 +447,14 @@ class RequestRouter(
         val voterName = extractVoterOrUserName(req.target)
         val ballot = service.getBallot(accessToken, voterName, electionName)
         return HttpResponse(200, json.encodeToString(ballot))
+    }
+
+    private fun handleDeleteBallot(req: HttpRequest): HttpResponse {
+        val accessToken = extractAccessToken(req)
+        val electionName = extractElectionName(req.target)
+        val voterName = extractVoterOrUserName(req.target)
+        service.deleteBallot(accessToken, voterName, electionName)
+        return HttpResponse(200, json.encodeToString(mapOf("status" to "ballot deleted")))
     }
 
     private fun handleListRankings(req: HttpRequest): HttpResponse {

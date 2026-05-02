@@ -117,6 +117,10 @@ class InMemoryCommandModel(private val data: InMemoryData) : CommandModel {
         data.ballots[entry.key] = ballot.copy(whenCast = now)
     }
 
+    override fun deleteBallot(authority: String, voterName: String, electionName: String) {
+        data.ballots.remove(electionName to voterName)
+    }
+
     override fun setPassword(authority: String, userName: String, salt: String, hash: String) {
         val user = data.users[userName] ?: error("User not found: $userName")
         data.users[userName] = user.copy(salt = salt, hash = hash)

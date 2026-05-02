@@ -429,6 +429,39 @@ class ServiceImpl(
         return confirmation
     }
 
+    override fun deleteBallot(accessToken: AccessToken, voterName: String, electionName: String) {
+        // VALIDATION SECTION
+        requirePermission(accessToken, Permission.VOTE)
+
+        val validVoterName = Validation.validateUserName(voterName)
+        val validElectionName = Validation.validateElectionName(electionName)
+
+        // Identity check mirrors castBallot: only the authenticated voter can
+        // remove their own ballot. No moderator / proxy path today.
+        if (validVoterName != accessToken.userName) {
+            throw ServiceException(
+                ServiceException.Category.UNAUTHORIZED,
+                "Cannot delete ballot for $validVoterName when authenticated as ${accessToken.userName}"
+            )
+        }
+
+        queryModel.searchElectionByName(validElectionName)
+            ?: throw ServiceException(ServiceException.Category.NOT_FOUND, "Election not found: $validElectionName")
+
+        // Idempotent: if no ballot exists, the post-condition (no ballot) already
+        // holds, so emit nothing rather than throwing.
+        queryModel.searchBallot(validVoterName, validElectionName)
+            ?: return
+
+        // EXECUTION SECTION
+        eventLog.appendEvent(
+            accessToken.userName,
+            clock.now(),
+            DomainEvent.BallotDeleted(validVoterName, validElectionName)
+        )
+        synchronize()
+    }
+
     override fun listRankings(accessToken: AccessToken, voterName: String, electionName: String): List<Ranking> {
         return queryModel.listRankings(voterName, electionName)
     }

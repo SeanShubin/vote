@@ -69,6 +69,21 @@ class HttpApiClientWireTest {
     }
 
     @Test
+    fun deleteMyBallotIssuesDeleteAgainstAuthenticatedUserPath() = runTest {
+        val captured = mutableListOf<Captured>()
+
+        // Server replies with the standard {"status": "..."} envelope; the
+        // client's DELETE helper just discards it, so any 200 body is fine.
+        client(captured, """{"status":"ballot deleted"}""").deleteMyBallot("MyElection")
+
+        assertEquals(1, captured.size)
+        // URL embeds both the election (path arg) and the AUTHENTICATED user
+        // name (alice from aliceSession) — the same identity rule castBallot uses.
+        assertEquals("https://api.example.com/election/MyElection/ballot/alice", captured[0].url)
+        assertEquals("DELETE", captured[0].method)
+    }
+
+    @Test
     fun createElectionPutsAuthenticatedUserInUserNameField() = runTest {
         val captured = mutableListOf<Captured>()
 
