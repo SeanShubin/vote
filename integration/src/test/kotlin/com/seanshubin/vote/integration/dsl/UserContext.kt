@@ -36,11 +36,6 @@ class UserContext(
         testContext.backend.synchronize()
     }
 
-    fun changePassword(newPassword: String) {
-        testContext.backend.changePassword(accessToken, userName, newPassword)
-        testContext.backend.synchronize()
-    }
-
     fun setRole(targetUserName: String, newRole: Role) {
         testContext.backend.setRole(accessToken, targetUserName, newRole)
         testContext.backend.synchronize()

@@ -13,10 +13,6 @@ class DirectServiceBackend(private val service: Service) : ScenarioBackend {
         return service.register(name, email, password).accessToken
     }
 
-    override fun changePassword(token: AccessToken, userName: String, newPassword: String) {
-        service.changePassword(token, userName, newPassword)
-    }
-
     override fun setRole(token: AccessToken, targetUserName: String, newRole: Role) {
         service.setRole(token, targetUserName, newRole)
     }

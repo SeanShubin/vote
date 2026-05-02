@@ -10,7 +10,6 @@ import com.seanshubin.vote.domain.*
 interface ScenarioBackend {
     // User operations
     fun registerUser(name: String, email: String, password: String): AccessToken
-    fun changePassword(token: AccessToken, userName: String, newPassword: String)
     fun setRole(token: AccessToken, targetUserName: String, newRole: Role)
     fun updateUser(token: AccessToken, userName: String, updates: UserUpdates)
     fun removeUser(token: AccessToken, targetUserName: String)

@@ -38,7 +38,6 @@ interface Service {
     fun listRankings(accessToken: AccessToken, voterName: String, electionName: String): List<Ranking>
     fun tally(accessToken: AccessToken, electionName: String): Tally
     fun getBallot(accessToken: AccessToken, voterName: String, electionName: String): BallotSummary?
-    fun changePassword(accessToken: AccessToken, userName: String, password: String)
     fun sendLoginLinkByEmail(email: String, baseUri: String)
     fun getUserActivity(accessToken: AccessToken): UserActivity
 

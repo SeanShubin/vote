@@ -74,7 +74,6 @@ object Scenario {
         alice.listUsers()
         context.permissionsForRole(Role.ADMIN)
         alice.setRole("bob", Role.ADMIN)
-        bob.changePassword("newbobpass")
         charlie.updateUser(newEmail = "charlie.new@example.com")
         charlie.getMyProfile()
         david.updateUser(newName = "dave")

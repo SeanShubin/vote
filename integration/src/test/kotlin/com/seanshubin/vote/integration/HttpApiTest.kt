@@ -212,10 +212,6 @@ class HttpApiTester(private val port: Int = 9876) : AutoCloseable {
         return put("/user/$userName/role", body, token)
     }
 
-    fun updateUserPassword(userName: String, password: String, token: AccessToken): HttpResponse<String> {
-        val body = """{"password":"$password"}"""
-        return put("/user/$userName/password", body, token)
-    }
 
     // Ballots and Rankings
     fun castBallot(electionName: String, body: String, token: AccessToken): HttpResponse<String> {
@@ -546,15 +542,6 @@ class HttpApiTest {
 
         val getResponse = tester.getUser("bob", aliceTokens.accessToken)
         assertTrue(getResponse.statusCode() in listOf(404, 500))
-    }
-
-    @Test
-    fun `user can change password`() {
-        val tokens = tester.registerUserExpectSuccess("alice", password = "oldpass")
-
-        val response = tester.updateUserPassword("alice", "newpass", tokens.accessToken)
-
-        assertEquals(200, response.statusCode())
     }
 
     @Test

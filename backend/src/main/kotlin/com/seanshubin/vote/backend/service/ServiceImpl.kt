@@ -546,17 +546,6 @@ class ServiceImpl(
         return queryModel.searchBallot(voterName, electionName)
     }
 
-    override fun changePassword(accessToken: AccessToken, userName: String, password: String) {
-        val validPassword = Validation.validatePassword(password)
-        val saltAndHash = passwordUtil.createSaltAndHash(validPassword)
-        eventLog.appendEvent(
-            accessToken.userName,
-            clock.now(),
-            DomainEvent.UserPasswordChanged(userName, saltAndHash.salt, saltAndHash.hash)
-        )
-        synchronize()
-    }
-
     override fun sendLoginLinkByEmail(email: String, baseUri: String) {
         notifications.sendMailEvent(email, "Login link")
     }
