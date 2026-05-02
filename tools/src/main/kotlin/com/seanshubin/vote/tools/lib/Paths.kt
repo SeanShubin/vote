@@ -11,6 +11,7 @@ object ProjectPaths {
     val logsDir: Path get() = projectRoot.resolve("logs")
     val logsArchiveDir: Path get() = logsDir.resolve("archive")
     val scenarioDataDir: Path get() = projectRoot.resolve("scenario-data")
+    val prodSnapshotDir: Path get() = projectRoot.resolve(".local/prod-snapshots")
     val frontendDistDir: Path get() = projectRoot.resolve("frontend/build/dist/js/productionExecutable")
     val backendSchemaSql: Path get() = projectRoot.resolve("backend/src/main/resources/database/schema.sql")
     val gradlew: Path get() = projectRoot.resolve(if (isWindows) "gradlew.bat" else "gradlew")

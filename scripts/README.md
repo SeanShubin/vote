@@ -43,6 +43,7 @@ scripts/dev launch-fresh-mysql        Fresh MySQL launch (purge + start everythi
 scripts/dev launch-fresh-dynamodb     Fresh DynamoDB launch (purge + start everything)
 scripts/dev launch-keep-mysql         Launch MySQL keeping existing data
 scripts/dev launch-keep-dynamodb      Launch DynamoDB keeping existing data
+scripts/dev launch-from-prod          Download prod event log to .local/, replay into local DynamoDB, then launch
 scripts/dev run-local                 Convenience: launch-fresh-dynamodb
 scripts/dev launch-scenario-mysql     Launch with scenario data preloaded (MySQL)
 scripts/dev launch-scenario-dynamodb  Launch with scenario data preloaded (DynamoDB)

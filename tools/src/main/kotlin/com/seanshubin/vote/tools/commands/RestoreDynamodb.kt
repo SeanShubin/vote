@@ -37,110 +37,115 @@ class RestoreDynamodb : CliktCommand(name = "restore-dynamodb") {
     override fun run() = runBlocking {
         val file = Path.of(inputPath)
         if (!file.exists()) Output.error("File not found: $file")
+        restoreEventLog(prod, file, skipConfirmation = yes)
+    }
 
-        val target = DynamoClient.describe(prod)
-        Output.banner("Restoring event log to $target")
+    companion object {
+        suspend fun restoreEventLog(prod: Boolean, file: Path, skipConfirmation: Boolean) {
+            val target = DynamoClient.describe(prod)
+            Output.banner("Restoring event log to $target")
 
-        val json = Json { ignoreUnknownKeys = true }
-        val narratives = readNarratives(file, json)
-        if (narratives.isEmpty()) Output.error("Narrative file contains no events: $file")
+            val json = Json { ignoreUnknownKeys = true }
+            val narratives = readNarratives(file, json)
+            if (narratives.isEmpty()) Output.error("Narrative file contains no events: $file")
 
-        val envelopes = narratives.mapIndexed { index, narrative ->
-            EventEnvelope(
-                eventId = (index + 1).toLong(),
-                whenHappened = narrative.whenHappened,
-                authority = narrative.authority,
-                event = narrative.event,
-            )
-        }
-        val maxEventId = envelopes.last().eventId
-        println("Read ${envelopes.size} event(s); assigning event_id 1..$maxEventId from line position.")
-
-        if (!yes) {
-            requireConfirmation(prod)
-        }
-
-        DynamoClient.createFor(prod).use { client ->
-            val existingEvents = countTable(client, DynamoClient.TABLE_EVENT_LOG)
-            if (existingEvents > 0) {
-                Output.error(
-                    "Refusing to restore: ${DynamoClient.TABLE_EVENT_LOG} already contains $existingEvents item(s). " +
-                        "Run nuke-dynamodb first to start from a clean state."
+            val envelopes = narratives.mapIndexed { index, narrative ->
+                EventEnvelope(
+                    eventId = (index + 1).toLong(),
+                    whenHappened = narrative.whenHappened,
+                    authority = narrative.authority,
+                    event = narrative.event,
                 )
             }
+            val maxEventId = envelopes.last().eventId
+            println("Read ${envelopes.size} event(s); assigning event_id 1..$maxEventId from line position.")
 
-            putEvents(client, envelopes, json)
-            println("Wrote ${envelopes.size} event(s) into ${DynamoClient.TABLE_EVENT_LOG}.")
+            if (!skipConfirmation) {
+                requireConfirmation(prod)
+            }
 
-            setEventCounter(client, maxEventId)
-            println("Set EVENT_COUNTER = $maxEventId.")
+            DynamoClient.createFor(prod).use { client ->
+                val existingEvents = countTable(client, DynamoClient.TABLE_EVENT_LOG)
+                if (existingEvents > 0) {
+                    Output.error(
+                        "Refusing to restore: ${DynamoClient.TABLE_EVENT_LOG} already contains $existingEvents item(s). " +
+                            "Run nuke-dynamodb first to start from a clean state."
+                    )
+                }
 
-            val applier = EventApplier(
-                eventLog = DynamoDbEventLog(client, json),
-                commandModel = DynamoDbSingleTableCommandModel(client, json),
-                queryModel = DynamoDbSingleTableQueryModel(client, json),
-            )
-            applier.synchronize()
-            println("Rebuilt projection in ${DynamoClient.TABLE_DATA}.")
+                putEvents(client, envelopes, json)
+                println("Wrote ${envelopes.size} event(s) into ${DynamoClient.TABLE_EVENT_LOG}.")
+
+                setEventCounter(client, maxEventId)
+                println("Set EVENT_COUNTER = $maxEventId.")
+
+                val applier = EventApplier(
+                    eventLog = DynamoDbEventLog(client, json),
+                    commandModel = DynamoDbSingleTableCommandModel(client, json),
+                    queryModel = DynamoDbSingleTableQueryModel(client, json),
+                )
+                applier.synchronize()
+                println("Rebuilt projection in ${DynamoClient.TABLE_DATA}.")
+            }
+
+            Output.success("Restore complete.")
         }
 
-        Output.success("Restore complete.")
-    }
-
-    private fun requireConfirmation(prod: Boolean) {
-        if (prod) {
-            print("Type 'restore production' to continue: ")
-            val typed = readlnOrNull()?.trim()
-            if (typed != "restore production") Output.error("Aborted (got: ${typed ?: "<eof>"}).")
-        } else {
-            print("Restore into local DynamoDB? Type 'y' to continue: ")
-            val typed = readlnOrNull()?.trim()
-            if (typed != "y" && typed != "yes") Output.error("Aborted.")
+        private fun requireConfirmation(prod: Boolean) {
+            if (prod) {
+                print("Type 'restore production' to continue: ")
+                val typed = readlnOrNull()?.trim()
+                if (typed != "restore production") Output.error("Aborted (got: ${typed ?: "<eof>"}).")
+            } else {
+                print("Restore into local DynamoDB? Type 'y' to continue: ")
+                val typed = readlnOrNull()?.trim()
+                if (typed != "y" && typed != "yes") Output.error("Aborted.")
+            }
         }
-    }
 
-    private fun readNarratives(file: Path, json: Json): List<NarrativeEvent> {
-        val result = mutableListOf<NarrativeEvent>()
-        Files.newBufferedReader(file).useLines { lines ->
-            lines.forEachIndexed { index, raw ->
-                val line = raw.trim()
-                if (line.isEmpty()) return@forEachIndexed
-                try {
-                    result.add(json.decodeFromString<NarrativeEvent>(line))
-                } catch (e: Exception) {
-                    Output.error("Failed to parse line ${index + 1} of $file: ${e.message}")
+        private fun readNarratives(file: Path, json: Json): List<NarrativeEvent> {
+            val result = mutableListOf<NarrativeEvent>()
+            Files.newBufferedReader(file).useLines { lines ->
+                lines.forEachIndexed { index, raw ->
+                    val line = raw.trim()
+                    if (line.isEmpty()) return@forEachIndexed
+                    try {
+                        result.add(json.decodeFromString<NarrativeEvent>(line))
+                    } catch (e: Exception) {
+                        Output.error("Failed to parse line ${index + 1} of $file: ${e.message}")
+                    }
                 }
             }
+            return result
         }
-        return result
-    }
 
-    private suspend fun putEvents(client: DynamoDbClient, envelopes: List<EventEnvelope>, json: Json) {
-        envelopes.forEach { envelope ->
-            val eventType = envelope.event::class.simpleName ?: "Unknown"
-            client.putItem(PutItemRequest {
-                tableName = DynamoClient.TABLE_EVENT_LOG
-                item = mapOf(
-                    "event_id" to AttributeValue.N(envelope.eventId.toString()),
-                    "authority" to AttributeValue.S(envelope.authority),
-                    "event_type" to AttributeValue.S(eventType),
-                    "event_data" to AttributeValue.S(json.encodeToString(envelope.event)),
-                    "created_at" to AttributeValue.N(envelope.whenHappened.toEpochMilliseconds().toString()),
+        private suspend fun putEvents(client: DynamoDbClient, envelopes: List<EventEnvelope>, json: Json) {
+            envelopes.forEach { envelope ->
+                val eventType = envelope.event::class.simpleName ?: "Unknown"
+                client.putItem(PutItemRequest {
+                    tableName = DynamoClient.TABLE_EVENT_LOG
+                    item = mapOf(
+                        "event_id" to AttributeValue.N(envelope.eventId.toString()),
+                        "authority" to AttributeValue.S(envelope.authority),
+                        "event_type" to AttributeValue.S(eventType),
+                        "event_data" to AttributeValue.S(json.encodeToString(envelope.event)),
+                        "created_at" to AttributeValue.N(envelope.whenHappened.toEpochMilliseconds().toString()),
+                    )
+                })
+            }
+        }
+
+        private suspend fun setEventCounter(client: DynamoDbClient, value: Long) {
+            client.updateItem(UpdateItemRequest {
+                tableName = DynamoDbSingleTableSchema.MAIN_TABLE
+                key = mapOf(
+                    "PK" to AttributeValue.S("METADATA"),
+                    "SK" to AttributeValue.S("EVENT_COUNTER"),
                 )
+                updateExpression = "SET next_event_id = :v"
+                expressionAttributeValues = mapOf(":v" to AttributeValue.N(value.toString()))
+                returnValues = ReturnValue.None
             })
         }
-    }
-
-    private suspend fun setEventCounter(client: DynamoDbClient, value: Long) {
-        client.updateItem(UpdateItemRequest {
-            tableName = DynamoDbSingleTableSchema.MAIN_TABLE
-            key = mapOf(
-                "PK" to AttributeValue.S("METADATA"),
-                "SK" to AttributeValue.S("EVENT_COUNTER"),
-            )
-            updateExpression = "SET next_event_id = :v"
-            expressionAttributeValues = mapOf(":v" to AttributeValue.N(value.toString()))
-            returnValues = ReturnValue.None
-        })
     }
 }

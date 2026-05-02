@@ -16,31 +16,47 @@ internal enum class Database(val argLabel: String, val displayName: String) {
 internal class LaunchPlan(
     private val database: Database,
     private val freshStart: Boolean,
-    private val openBrowser: Boolean = true
+    private val openBrowser: Boolean = true,
+    private val bannerSuffix: String? = null,
+    private val postPurge: (() -> Unit)? = null,
 ) {
+    private var stepCounter = 0
+    private fun step(label: String) {
+        stepCounter++
+        println()
+        println("$stepCounter. $label")
+    }
+
     fun run() {
         Logs.pidFile("backend") // ensure logs/ exists implicitly via writePidFile later
-        Output.banner("Launch ${if (freshStart) "Fresh" else "Keep"} (${database.displayName})")
-
+        val title = if (bannerSuffix != null) {
+            "Launch $bannerSuffix (${database.displayName})"
+        } else {
+            "Launch ${if (freshStart) "Fresh" else "Keep"} (${database.displayName})"
+        }
+        Output.banner(title)
+        // first step doesn't need a leading blank line — strip it inline
+        stepCounter = 1
         println("1. Terminating existing processes...")
         TerminateAll().run()
         Thread.sleep(1000)
 
-        println()
-        println("2. Rolling logs...")
+        step("Rolling logs...")
         RollLogs().run()
 
         if (freshStart) {
-            println()
-            println("3. Purging ${database.displayName} database...")
+            step("Purging ${database.displayName} database...")
             when (database) {
                 Database.Mysql -> PurgeMysql().run()
                 Database.Dynamodb -> PurgeDynamodb().run()
             }
+            postPurge?.let {
+                step("Loading post-purge data...")
+                it()
+            }
         }
 
-        println()
-        println("${if (freshStart) 4 else 3}. Building frontend (incremental)...")
+        step("Building frontend (incremental)...")
         Procs.runOrFail(
             ProjectPaths.gradlew.toString(),
             ":frontend:build",
@@ -49,20 +65,17 @@ internal class LaunchPlan(
             description = "Build frontend"
         )
 
-        println()
-        println("${if (freshStart) 5 else 4}. Starting backend (${database.displayName})...")
+        step("Starting backend (${database.displayName})...")
         val backend = startBackend(database)
         Procs.writePidFile(Logs.pidFile("backend"), backend.pid())
         println("   Backend started (PID: ${backend.pid()}, log: logs/backend.log)")
 
-        println()
-        println("${if (freshStart) 6 else 5}. Starting frontend server...")
+        step("Starting frontend server...")
         val frontend = startFrontend()
         Procs.writePidFile(Logs.pidFile("frontend"), frontend.pid())
         println("   Frontend started (PID: ${frontend.pid()}, log: logs/frontend.log)")
 
-        println()
-        println("${if (freshStart) 7 else 6}. Waiting for backend to be ready...")
+        step("Waiting for backend to be ready...")
         val backendReady = Procs.waitUntil(timeoutSeconds = 60) {
             runCatching {
                 val client = java.net.http.HttpClient.newHttpClient()
@@ -73,15 +86,13 @@ internal class LaunchPlan(
         if (!backendReady) Output.error("Backend did not start within 60 seconds. Check logs/backend.log.")
         Output.success("Backend ready!")
 
-        println()
-        println("${if (freshStart) 8 else 7}. Waiting for frontend to be ready...")
+        step("Waiting for frontend to be ready...")
         val frontendReady = Procs.waitUntil(timeoutSeconds = 30) { Procs.isPortOpen(FRONTEND_PORT) }
         if (!frontendReady) Output.error("Frontend did not start within 30 seconds. Check logs/frontend.log.")
         Output.success("Frontend ready!")
 
         if (openBrowser) {
-            println()
-            println("${if (freshStart) 9 else 8}. Opening browser...")
+            step("Opening browser...")
             Procs.openBrowser("http://localhost:$FRONTEND_PORT")
         }
 

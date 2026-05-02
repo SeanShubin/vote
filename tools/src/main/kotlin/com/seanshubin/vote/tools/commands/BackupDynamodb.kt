@@ -28,55 +28,59 @@ class BackupDynamodb : CliktCommand(name = "backup-dynamodb") {
     override fun help(context: Context) =
         "Stream every event in vote_event_log to a JSONL narrative (no event_id; line position is the id on restore). Use --prod to read from AWS."
 
-    override fun run() = runBlocking {
+    override fun run() {
         val file = Path.of(outputPath)
         if (file.exists() && !force) {
             Output.error("File already exists: $file (pass --force to overwrite)")
         }
-
-        Output.banner("Backing up event log from ${DynamoClient.describe(prod)}")
-
-        val json = Json { encodeDefaults = true }
-        var count = 0L
-
-        DynamoClient.createFor(prod).use { client ->
-            // Collect, sort by event_id ascending, then write — so the on-disk
-            // narrative starts as a faithful chronology even though restore
-            // ignores any ordering hint other than line position.
-            val rows = mutableListOf<Pair<Long, NarrativeEvent>>()
-            var startKey: Map<String, AttributeValue>? = null
-            do {
-                val response = client.scan(ScanRequest {
-                    tableName = DynamoClient.TABLE_EVENT_LOG
-                    exclusiveStartKey = startKey
-                })
-                response.items?.forEach { item ->
-                    rows.add(parseRow(item, json))
-                }
-                startKey = response.lastEvaluatedKey
-            } while (startKey != null)
-
-            rows.sortBy { it.first }
-
-            Files.newBufferedWriter(
-                file,
-                StandardOpenOption.CREATE,
-                StandardOpenOption.TRUNCATE_EXISTING,
-                StandardOpenOption.WRITE,
-            ).use { writer ->
-                rows.forEach { (_, narrative) ->
-                    writer.write(json.encodeToString(narrative))
-                    writer.newLine()
-                    count++
-                }
-            }
-        }
-
-        val bytes = Files.size(file)
-        Output.success("Backed up $count event(s) to $file ($bytes bytes)")
+        runBlocking { backupEventLog(prod, file) }
     }
 
     companion object {
+        suspend fun backupEventLog(prod: Boolean, file: Path): Long {
+            Output.banner("Backing up event log from ${DynamoClient.describe(prod)}")
+
+            val json = Json { encodeDefaults = true }
+            var count = 0L
+
+            DynamoClient.createFor(prod).use { client ->
+                // Collect, sort by event_id ascending, then write — so the on-disk
+                // narrative starts as a faithful chronology even though restore
+                // ignores any ordering hint other than line position.
+                val rows = mutableListOf<Pair<Long, NarrativeEvent>>()
+                var startKey: Map<String, AttributeValue>? = null
+                do {
+                    val response = client.scan(ScanRequest {
+                        tableName = DynamoClient.TABLE_EVENT_LOG
+                        exclusiveStartKey = startKey
+                    })
+                    response.items?.forEach { item ->
+                        rows.add(parseRow(item, json))
+                    }
+                    startKey = response.lastEvaluatedKey
+                } while (startKey != null)
+
+                rows.sortBy { it.first }
+
+                Files.newBufferedWriter(
+                    file,
+                    StandardOpenOption.CREATE,
+                    StandardOpenOption.TRUNCATE_EXISTING,
+                    StandardOpenOption.WRITE,
+                ).use { writer ->
+                    rows.forEach { (_, narrative) ->
+                        writer.write(json.encodeToString(narrative))
+                        writer.newLine()
+                        count++
+                    }
+                }
+            }
+
+            val bytes = Files.size(file)
+            Output.success("Backed up $count event(s) to $file ($bytes bytes)")
+            return count
+        }
+
         fun parseRow(item: Map<String, AttributeValue>, json: Json): Pair<Long, NarrativeEvent> {
             val eventId = (item["event_id"] as? AttributeValue.N)?.value?.toLong()
                 ?: error("event log row missing numeric event_id")

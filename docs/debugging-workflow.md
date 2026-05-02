@@ -84,6 +84,39 @@ MySQL, point them back here.
 `restore-dynamodb`, `nuke-dynamodb`. The first is the canonical way to take a
 full event-log snapshot to a JSONL file (vs. inspect, which streams to stdout).
 
+## Running Locally Against a Prod Snapshot
+
+When inspecting prod isn't enough — e.g., the bug only reproduces when you
+exercise the UI/API against the data — you can stand up a full local dev
+environment seeded from production:
+
+```bash
+# Download prod event log, replay into local DynamoDB, then start backend+frontend.
+scripts/dev launch-from-prod
+```
+
+Snapshots land in `.local/prod-snapshots/prod-snapshot-<timestamp>.jsonl`
+(`.local` is gitignored, so prod data never gets committed). Each invocation
+downloads a fresh snapshot by default.
+
+Reuse an existing snapshot (skips the download):
+
+```bash
+scripts/dev launch-from-prod --snapshot .local/prod-snapshots/prod-snapshot-20260502-153012.jsonl
+```
+
+Under the hood this is the same flow as `launch-fresh-dynamodb` with a restore
+inserted after the purge: terminate → roll logs → purge local → restore
+snapshot → build frontend → start backend → start frontend → open browser. Same
+AWS credential expectations as `inspect-dynamodb --prod`.
+
+**When to use this vs. just `--prod` inspect commands:**
+- `inspect-dynamodb-* --prod` — read-only; fastest path for "what's in prod
+  right now?"
+- `launch-from-prod` — when you need to *interact with* prod-shaped data
+  locally (reproduce a UI bug, replay a sequence, run a write that you'd
+  never run against real prod).
+
 ## Debugging Workflow
 
 ### Step 1: Identify the Problem (Admin View)

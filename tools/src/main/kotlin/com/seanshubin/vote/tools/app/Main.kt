@@ -33,6 +33,7 @@ import com.seanshubin.vote.tools.commands.InspectMysqlRawQuery
 import com.seanshubin.vote.tools.commands.InspectMysqlRawSchema
 import com.seanshubin.vote.tools.commands.LaunchFreshDynamodb
 import com.seanshubin.vote.tools.commands.LaunchFreshMysql
+import com.seanshubin.vote.tools.commands.LaunchFromProd
 import com.seanshubin.vote.tools.commands.LaunchKeepDynamodb
 import com.seanshubin.vote.tools.commands.LaunchKeepMysql
 import com.seanshubin.vote.tools.commands.LaunchScenarioDynamodb
@@ -84,6 +85,7 @@ fun main(args: Array<String>) {
             LaunchFreshDynamodb(),
             LaunchKeepMysql(),
             LaunchKeepDynamodb(),
+            LaunchFromProd(),
             RunLocal(),
             InspectMysqlAll(),
             InspectMysqlRawQuery(),
