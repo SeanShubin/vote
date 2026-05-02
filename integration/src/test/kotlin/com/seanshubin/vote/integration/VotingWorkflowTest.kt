@@ -146,23 +146,6 @@ class VotingWorkflowTest {
     }
 
     @Test
-    fun `user can change their password`() {
-        val testContext = TestContext()
-        val alice = testContext.registerUser("alice")
-
-        val oldHash = testContext.database.findUser("alice").hash
-
-        alice.changePassword("newPassword123")
-
-        val newHash = testContext.database.findUser("alice").hash
-        assertTrue(oldHash != newHash, "Password hash should change")
-
-        val events = testContext.events.ofType<DomainEvent.UserPasswordChanged>()
-        assertEquals(1, events.size)
-        assertEquals("alice", events[0].userName)
-    }
-
-    @Test
     fun `user can change their name`() {
         val testContext = TestContext()
         val alice = testContext.registerUser("alice", "alice@example.com")

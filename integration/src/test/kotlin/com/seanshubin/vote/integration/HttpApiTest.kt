@@ -212,10 +212,6 @@ class HttpApiTester(private val port: Int = 9876) : AutoCloseable {
         return put("/user/$userName/role", body, token)
     }
 
-    fun updateUserPassword(userName: String, password: String, token: AccessToken): HttpResponse<String> {
-        val body = """{"password":"$password"}"""
-        return put("/user/$userName/password", body, token)
-    }
 
     // Ballots and Rankings
     fun castBallot(electionName: String, body: String, token: AccessToken): HttpResponse<String> {
@@ -250,8 +246,6 @@ class HttpApiTester(private val port: Int = 9876) : AutoCloseable {
         return httpClient.send(request, HttpResponse.BodyHandlers.ofString())
     }
 
-    // System Operations
-    fun sync(token: AccessToken): HttpResponse<String> = post("/sync", "", token)
 
     fun logClientError(message: String, stackTrace: String, url: String, userAgent: String, timestamp: String): HttpResponse<String> {
         val body = """{"message":"$message","stackTrace":"$stackTrace","url":"$url","userAgent":"$userAgent","timestamp":"$timestamp"}"""
@@ -548,15 +542,6 @@ class HttpApiTest {
 
         val getResponse = tester.getUser("bob", aliceTokens.accessToken)
         assertTrue(getResponse.statusCode() in listOf(404, 500))
-    }
-
-    @Test
-    fun `user can change password`() {
-        val tokens = tester.registerUserExpectSuccess("alice", password = "oldpass")
-
-        val response = tester.updateUserPassword("alice", "newpass", tokens.accessToken)
-
-        assertEquals(200, response.statusCode())
     }
 
     @Test
@@ -972,15 +957,6 @@ class HttpApiTest {
         assertEquals(200, response.statusCode())
         val auth = tester.decodeJson(response, AuthResponse.serializer())
         assertEquals("alice", auth.userName)
-    }
-
-    @Test
-    fun `sync endpoint succeeds`() {
-        val tokens = tester.registerUserExpectSuccess("alice")
-
-        val response = tester.sync(tokens.accessToken)
-
-        assertEquals(200, response.statusCode())
     }
 
     @Test

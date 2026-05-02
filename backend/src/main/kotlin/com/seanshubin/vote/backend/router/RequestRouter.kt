@@ -10,7 +10,6 @@ import com.seanshubin.vote.contract.AddElectionRequest
 import com.seanshubin.vote.contract.AuthResponse
 import com.seanshubin.vote.contract.AuthenticateRequest
 import com.seanshubin.vote.contract.CastBallotRequest
-import com.seanshubin.vote.contract.ChangePasswordRequest
 import com.seanshubin.vote.contract.ClientErrorRequest
 import com.seanshubin.vote.contract.ErrorResponse
 import com.seanshubin.vote.contract.PasswordResetRequest
@@ -85,7 +84,6 @@ class RequestRouter(
         val method = req.method
         return when {
             target == "/health" && method == "GET" -> handleHealth()
-            target == "/sync" && method == "POST" -> handleSync()
             target == "/log-client-error" && method == "POST" -> handleLogClientError(req)
             target == "/register" && method == "POST" -> handleRegister(req)
             target == "/authenticate" && method == "POST" -> handleAuthenticate(req)
@@ -100,7 +98,6 @@ class RequestRouter(
             target.matches(Regex("/user/[^/]+")) && method == "PUT" -> handleUpdateUser(req)
             target.matches(Regex("/user/[^/]+")) && method == "DELETE" -> handleRemoveUser(req)
             target.matches(Regex("/user/[^/]+/role")) && method == "PUT" -> handleSetRole(req)
-            target.matches(Regex("/user/[^/]+/password")) && method == "PUT" -> handleChangePassword(req)
             target.matches(Regex("/permissions/[^/]+")) && method == "GET" -> handlePermissionsForRole(req)
             target == "/tables" && method == "GET" -> handleListTables(req)
             target == "/tables/count" && method == "GET" -> handleTableCount(req)
@@ -190,11 +187,6 @@ class RequestRouter(
     private fun handleHealth(): HttpResponse {
         val result = service.health()
         return HttpResponse(200, json.encodeToString(mapOf("status" to result)))
-    }
-
-    private fun handleSync(): HttpResponse {
-        service.synchronize()
-        return HttpResponse(200, json.encodeToString(mapOf("status" to "synced")))
     }
 
     private fun handleLogClientError(req: HttpRequest): HttpResponse {
@@ -319,14 +311,6 @@ class RequestRouter(
         val setRoleRequest = json.decodeFromString<SetRoleRequest>(req.body)
         service.setRole(accessToken, userName, setRoleRequest.role)
         return HttpResponse(200, json.encodeToString(mapOf("status" to "role updated")))
-    }
-
-    private fun handleChangePassword(req: HttpRequest): HttpResponse {
-        val accessToken = extractAccessToken(req)
-        val userName = extractUserName(req.target)
-        val changePasswordRequest = json.decodeFromString<ChangePasswordRequest>(req.body)
-        service.changePassword(accessToken, userName, changePasswordRequest.password)
-        return HttpResponse(200, json.encodeToString(mapOf("status" to "password changed")))
     }
 
     private fun handlePermissionsForRole(req: HttpRequest): HttpResponse {

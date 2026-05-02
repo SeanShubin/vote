@@ -32,12 +32,6 @@ class HttpRecordingBackend(
         return AccessToken(auth.userName, auth.role)
     }
 
-    override fun changePassword(token: AccessToken, userName: String, newPassword: String) {
-        val request = ChangePasswordRequest(newPassword)
-        val body = json.encodeToString(request)
-        recorder.put("/user/$userName/password", body, token)
-    }
-
     override fun setRole(token: AccessToken, targetUserName: String, newRole: Role) {
         val request = SetRoleRequest(newRole)
         val body = json.encodeToString(request)
