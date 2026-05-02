@@ -6,7 +6,8 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 $sha = (git rev-parse HEAD).Trim()
 $runId = $null
 for ($i = 0; $i -lt 30; $i++) {
-    $runId = gh run list --limit 20 --json databaseId,headSha --jq ".[] | select(.headSha == `"$sha`") | .databaseId" 2>$null | Select-Object -First 1
+    $runs = gh run list --limit 20 --json databaseId,headSha 2>$null | ConvertFrom-Json
+    $runId = ($runs | Where-Object { $_.headSha -eq $sha } | Select-Object -First 1).databaseId
     if ($runId) { break }
     Start-Sleep -Seconds 2
 }
