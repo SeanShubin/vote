@@ -333,6 +333,28 @@ button:disabled {
     cursor: grabbing;
 }
 
+/*
+ * Tier markers — fixed anchors in the ranked list. Visually distinct
+ * (different background, no grab cursor) and clickable to select as the
+ * drop target for subsequent candidate clicks.
+ */
+.ranked-ballot-tier-row {
+    background: #f8f5e9;
+    border-color: #d6cca0;
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.ranked-ballot-tier-row:hover {
+    background: #f3eed3;
+}
+
+.ranked-ballot-tier-selected {
+    background: #fff3c4;
+    border-color: #c9a93a;
+    box-shadow: 0 0 0 2px rgba(201, 169, 58, 0.25);
+}
+
 .ranked-ballot-rank-num {
     width: 3rem;
     text-align: center;
