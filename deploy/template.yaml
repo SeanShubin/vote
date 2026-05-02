@@ -206,6 +206,17 @@ Resources:
         ExcludePunctuation: true
         PasswordLength: 64
 
+  # Invite code for self-service registration. Created with placeholder value;
+  # operator rotates it via `aws ssm put-parameter --name ... --overwrite`
+  # without redeploying the Lambda. Blank value disables the gate.
+  InviteCodeParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Sub "/${AWS::StackName}/invite-code"
+      Type: String
+      Value: change-me-then-rotate
+      Description: Shared registration invite code; rotate with put-parameter.
+
   # Hard-coded table names (vote_data, vote_event_log) match the constants
   # in DynamoDbSingleTableSchema.kt — keeps the code simple, locks the stack
   # to one deploy per account/region.
@@ -312,6 +323,9 @@ Resources:
           FRONTEND_BASE_URL: !Sub "https://${DomainName}"
           # SES sender — must be a verified identity in this region.
           EMAIL_FROM_ADDRESS: !Ref EmailFromAddress
+          # Lambda reads this parameter at runtime (cached 5 min) so the
+          # operator can rotate the invite code without a redeploy.
+          INVITE_CODE_PARAMETER_NAME: !Ref InviteCodeParameter
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref MainTable
@@ -326,6 +340,13 @@ Resources:
                 - ses:SendEmail
                 - ses:SendRawEmail
               Resource: !Sub "arn:aws:ses:${AWS::Region}:${AWS::AccountId}:identity/*"
+        # Read the invite-code parameter. Scoped to the one parameter so a
+        # compromised Lambda can't enumerate other secrets in SSM.
+        - Statement:
+            - Effect: Allow
+              Action:
+                - ssm:GetParameter
+              Resource: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${AWS::StackName}/invite-code"
       Events:
         Proxy:
           Type: HttpApi

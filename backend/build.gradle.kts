@@ -29,6 +29,9 @@ dependencies {
     // Email - AWS SES (Lambda role uses ses:SendEmail; no SMTP credentials needed)
     implementation("aws.sdk.kotlin:ses:${project.property("aws.sdk.kotlin.version")}")
 
+    // SSM Parameter Store - fetch the rotating invite code without redeploying.
+    implementation("aws.sdk.kotlin:ssm:${project.property("aws.sdk.kotlin.version")}")
+
     // JWT/Auth
     implementation("com.auth0:java-jwt:4.4.0")
 

@@ -47,8 +47,8 @@ class HttpApiClient(
 
     data class Session(val accessToken: String, val userName: String, val role: Role)
 
-    override suspend fun register(userName: String, email: String, password: String): AuthResponse {
-        val request = RegisterRequest(userName, email, password)
+    override suspend fun register(userName: String, email: String, password: String, inviteCode: String): AuthResponse {
+        val request = RegisterRequest(userName, email, password, inviteCode)
         val auth = post<RegisterRequest, AuthResponse>("/register", request)
         session = Session(auth.accessToken, auth.userName, auth.role)
         return auth

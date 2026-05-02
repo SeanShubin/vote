@@ -1,5 +1,6 @@
 package com.seanshubin.vote.backend.service
 
+import com.seanshubin.vote.backend.auth.InviteCodeProvider
 import com.seanshubin.vote.backend.auth.TokenEncoder
 import com.seanshubin.vote.backend.validation.TestUser
 import com.seanshubin.vote.backend.validation.Validation
@@ -14,6 +15,7 @@ class ServiceImpl(
     private val rawTableScanner: RawTableScanner,
     private val tokenEncoder: TokenEncoder,
     private val frontendBaseUrl: String,
+    private val inviteCodeProvider: InviteCodeProvider = InviteCodeProvider { null },
 ) : Service {
     private val clock = integrations.clock
     private val uniqueIdGenerator = integrations.uniqueIdGenerator
@@ -40,7 +42,19 @@ class ServiceImpl(
         return Tokens(accessToken, refreshToken)
     }
 
-    override fun register(userName: String, email: String, password: String): Tokens {
+    override fun register(userName: String, email: String, password: String, inviteCode: String): Tokens {
+        // Invite-code gate. Provider returning null/blank disables it (dev/tests
+        // and any environment where the operator hasn't set the SSM parameter).
+        // Compare with `equals`, not constant-time — leaking the code via timing
+        // would still require ~10^9 attempts against a per-Lambda 5-minute cache.
+        val expectedInviteCode = inviteCodeProvider.current()
+        if (!expectedInviteCode.isNullOrBlank() && inviteCode != expectedInviteCode) {
+            throw ServiceException(
+                ServiceException.Category.UNAUTHORIZED,
+                "Invalid invite code"
+            )
+        }
+
         val validUserName = Validation.validateUserName(userName)
         val validEmail = Validation.validateEmail(email)
         val validPassword = Validation.validatePassword(password)

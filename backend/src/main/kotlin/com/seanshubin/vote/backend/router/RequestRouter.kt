@@ -207,6 +207,7 @@ class RequestRouter(
             userName = registerRequest.userName,
             email = registerRequest.email,
             password = registerRequest.password,
+            inviteCode = registerRequest.inviteCode,
         )
         return authSuccess(tokens)
     }
