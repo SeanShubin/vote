@@ -93,9 +93,14 @@ object DynamoDbSingleTableSchema {
         })
     }
 
-    // Helper functions to build keys
-    fun userPK(userName: String) = "$USER_PREFIX$userName"
+    // Helper functions to build keys.
+    // User and ballot keys lowercase the username segment because username
+    // uniqueness is case-insensitive — the lookup path is the canonical key.
+    // The display case lives in the item's "name" / "voter_name" attributes.
+    // Election and candidate names are case-sensitive and used as-is.
+    fun userPK(userName: String) = "$USER_PREFIX${userName.lowercase()}"
     fun electionPK(electionName: String) = "$ELECTION_PREFIX$electionName"
     fun candidateSK(candidateName: String) = "$CANDIDATE_PREFIX$candidateName"
-    fun ballotSK(voterName: String) = "$BALLOT_PREFIX$voterName"
+    fun ballotSK(voterName: String) = "$BALLOT_PREFIX${voterName.lowercase()}"
+    fun emailKey(email: String) = email.lowercase()
 }

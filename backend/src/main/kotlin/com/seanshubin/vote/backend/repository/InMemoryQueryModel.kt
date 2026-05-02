@@ -5,20 +5,20 @@ import com.seanshubin.vote.domain.*
 
 class InMemoryQueryModel(private val data: InMemoryData) : QueryModel {
     override fun findUserByName(name: String): User {
-        return data.users[name]?.toUser() ?: error("User not found: $name")
+        return data.users[name.lowercase()]?.toUser() ?: error("User not found: $name")
     }
 
     override fun findUserByEmail(email: String): User {
-        return data.users.values.find { it.email == email }?.toUser()
+        return data.users.values.find { it.email.equals(email, ignoreCase = true) }?.toUser()
             ?: error("User not found with email: $email")
     }
 
     override fun searchUserByName(name: String): User? {
-        return data.users[name]?.toUser()
+        return data.users[name.lowercase()]?.toUser()
     }
 
     override fun searchUserByEmail(email: String): User? {
-        return data.users.values.find { it.email == email }?.toUser()
+        return data.users.values.find { it.email.equals(email, ignoreCase = true) }?.toUser()
     }
 
     override fun userCount(): Int = data.users.size
@@ -72,7 +72,7 @@ class InMemoryQueryModel(private val data: InMemoryData) : QueryModel {
     }
 
     override fun listRankings(voterName: String, electionName: String): List<Ranking> {
-        val ballot = data.ballots[electionName to voterName]
+        val ballot = data.ballots[electionName to voterName.lowercase()]
         return ballot?.rankings ?: emptyList()
     }
 
@@ -94,7 +94,7 @@ class InMemoryQueryModel(private val data: InMemoryData) : QueryModel {
     }
 
     override fun searchBallot(voterName: String, electionName: String): BallotSummary? {
-        return data.ballots[electionName to voterName]?.toBallotSummary()
+        return data.ballots[electionName to voterName.lowercase()]?.toBallotSummary()
     }
 
     override fun listBallots(electionName: String): List<Ballot.Revealed> {
@@ -104,7 +104,7 @@ class InMemoryQueryModel(private val data: InMemoryData) : QueryModel {
     }
 
     override fun listUserNames(): List<String> {
-        return data.users.keys.toList()
+        return data.users.values.map { it.name }
     }
 
     override fun listPermissions(role: Role): List<Permission> {
@@ -112,8 +112,8 @@ class InMemoryQueryModel(private val data: InMemoryData) : QueryModel {
     }
 
     override fun electionsOwnedCount(userName: String): Int =
-        data.elections.values.count { it.ownerName == userName }
+        data.elections.values.count { it.ownerName.equals(userName, ignoreCase = true) }
 
     override fun ballotsCastCount(userName: String): Int =
-        data.ballots.values.count { it.voterName == userName }
+        data.ballots.values.count { it.voterName.equals(userName, ignoreCase = true) }
 }
