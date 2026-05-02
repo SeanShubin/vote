@@ -56,7 +56,18 @@ fun ElectionDetailPage(
     )
 
     val pageState = pageFetch.state
-    val loadedElection = (pageState as? FetchState.Success)?.value?.first
+    // Hold onto the most recent Success so a reload (which briefly flips
+    // pageState back to Loading) doesn't unmount VotingView. Without this,
+    // the user's in-progress ballot loses its remember-state every time
+    // pageFetch.reload runs — clicking a candidate and triggering the
+    // first-cast reload made the candidate "snap back" into the arena.
+    var lastLoaded by remember(electionName) {
+        mutableStateOf<Pair<ElectionDetail, List<String>>?>(null)
+    }
+    LaunchedEffect(pageState) {
+        (pageState as? FetchState.Success)?.value?.let { lastLoaded = it }
+    }
+    val loadedElection = lastLoaded?.first
 
     Div({ classes("container") }) {
         H1 { Text("Election: $electionName") }
@@ -83,11 +94,13 @@ fun ElectionDetailPage(
             Div({ classes("success") }) { Text(successMessage!!) }
         }
 
-        when (pageState) {
-            FetchState.Loading -> P { Text("Loading…") }
-            is FetchState.Error -> Div({ classes("error") }) { Text(pageState.message) }
-            is FetchState.Success -> {
-                val (_, candidates) = pageState.value
+        when {
+            lastLoaded == null && pageState is FetchState.Error ->
+                Div({ classes("error") }) { Text(pageState.message) }
+            lastLoaded == null ->
+                P { Text("Loading…") }
+            else -> {
+                val (_, candidates) = lastLoaded!!
 
                 // Tabs (no more Details — the header above covers it).
                 Div({ classes("tabs") }) {
