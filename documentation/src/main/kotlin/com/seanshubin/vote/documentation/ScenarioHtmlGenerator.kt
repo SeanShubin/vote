@@ -113,6 +113,9 @@ class ScenarioHtmlGenerator(private val eventLog: EventLog) {
             val more = if (event.newRankings.size > 3) "..." else ""
             "<strong>Ballot updated</strong>: $rankings$more"
         }
+
+        is DomainEvent.BallotDeleted ->
+            "<strong>${event.voterName}</strong> deleted ballot"
     }
 
     private fun css() = """

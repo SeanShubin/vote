@@ -147,6 +147,8 @@ class EventLogHtmlGeneratorWithHttp(private val recorder: DocumentationRecorder)
             val more = if (event.newRankings.size > 3) "..." else ""
             "Ballot rankings updated in <strong>${event.electionName}</strong>: $rankings$more"
         }
+        is DomainEvent.BallotDeleted ->
+            "<strong>${event.voterName}</strong> deleted ballot in <strong>${event.electionName}</strong>"
     }
 
     private fun formatEventDetails(event: DomainEvent): String = when (event) {
@@ -206,6 +208,10 @@ class EventLogHtmlGeneratorWithHttp(private val recorder: DocumentationRecorder)
             <div class="detail-row"><span class="label">Confirmation:</span> ${event.confirmation}</div>
             <div class="detail-row"><span class="label">Election:</span> ${event.electionName}</div>
             <div class="detail-row"><span class="label">New Rankings:</span> ${event.newRankings.joinToString(", ") { "${it.candidateName}:${it.rank}" }}</div>
+        """.trimIndent()
+        is DomainEvent.BallotDeleted -> """
+            <div class="detail-row"><span class="label">Voter:</span> ${event.voterName}</div>
+            <div class="detail-row"><span class="label">Election:</span> ${event.electionName}</div>
         """.trimIndent()
     }
 
