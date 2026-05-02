@@ -29,6 +29,8 @@ sealed class Page {
      */
     data class PasswordReset(val resetToken: String) : Page()
     data class ElectionDetail(val electionName: String) : Page()
+    data class ElectionPreferences(val electionName: String) : Page()
+    data class ElectionStrongestPaths(val electionName: String) : Page()
 }
 
 /**
@@ -45,6 +47,8 @@ fun pageToPath(page: Page): String = when (page) {
     is Page.Elections -> "/elections"
     is Page.CreateElection -> "/elections/new"
     is Page.ElectionDetail -> "/elections/${encodeUriComponent(page.electionName)}"
+    is Page.ElectionPreferences -> "/elections/${encodeUriComponent(page.electionName)}/preferences"
+    is Page.ElectionStrongestPaths -> "/elections/${encodeUriComponent(page.electionName)}/strongest-paths"
     is Page.RawTables -> "/admin/raw-tables"
     is Page.DebugTables -> "/admin/debug-tables"
     is Page.UserManagement -> "/admin/users"
@@ -78,7 +82,18 @@ fun pathToPage(pathWithQuery: String): Page {
         normalized == "/elections/new" -> Page.CreateElection
         normalized.startsWith("/elections/") -> {
             val raw = normalized.removePrefix("/elections/")
-            Page.ElectionDetail(decodeUriComponent(raw))
+            // Sub-routes (preferences, strongest-paths) are detail-style child
+            // pages of an election. Election names are percent-encoded so any
+            // literal "/" in the rest of the path is a route separator, not
+            // part of the name.
+            val parts = raw.split("/", limit = 2)
+            when {
+                parts.size == 2 && parts[1] == "preferences" ->
+                    Page.ElectionPreferences(decodeUriComponent(parts[0]))
+                parts.size == 2 && parts[1] == "strongest-paths" ->
+                    Page.ElectionStrongestPaths(decodeUriComponent(parts[0]))
+                else -> Page.ElectionDetail(decodeUriComponent(raw))
+            }
         }
         normalized == "/admin/raw-tables" -> Page.RawTables
         normalized == "/admin/debug-tables" -> Page.DebugTables

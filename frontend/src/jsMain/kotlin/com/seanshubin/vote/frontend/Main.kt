@@ -143,6 +143,22 @@ fun VoteApp(apiClient: ApiClient) {
             currentRole = role,
             onBack = { router.navigate(Page.Elections) },
             onElectionDeleted = { router.replace(Page.Elections) },
+            onNavigateToPreferences = {
+                router.navigate(Page.ElectionPreferences(page.electionName))
+            },
+            onNavigateToStrongestPaths = {
+                router.navigate(Page.ElectionStrongestPaths(page.electionName))
+            },
+        )
+        is Page.ElectionPreferences -> ElectionPreferencesPage(
+            apiClient = apiClient,
+            electionName = page.electionName,
+            onBack = { router.navigate(Page.ElectionDetail(page.electionName)) },
+        )
+        is Page.ElectionStrongestPaths -> ElectionStrongestPathsPage(
+            apiClient = apiClient,
+            electionName = page.electionName,
+            onBack = { router.navigate(Page.ElectionDetail(page.electionName)) },
         )
         is Page.RawTables -> TablesPage(
             apiClient = apiClient,

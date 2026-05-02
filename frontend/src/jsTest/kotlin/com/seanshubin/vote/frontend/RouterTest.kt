@@ -19,6 +19,8 @@ class RouterTest {
         assertEquals("/elections", pageToPath(Page.Elections))
         assertEquals("/elections/new", pageToPath(Page.CreateElection))
         assertEquals("/elections/Lang", pageToPath(Page.ElectionDetail("Lang")))
+        assertEquals("/elections/Lang/preferences", pageToPath(Page.ElectionPreferences("Lang")))
+        assertEquals("/elections/Lang/strongest-paths", pageToPath(Page.ElectionStrongestPaths("Lang")))
         assertEquals("/admin/raw-tables", pageToPath(Page.RawTables))
         assertEquals("/admin/debug-tables", pageToPath(Page.DebugTables))
         assertEquals("/admin/users", pageToPath(Page.UserManagement))
@@ -32,9 +34,23 @@ class RouterTest {
         assertEquals(Page.Elections, pathToPage("/elections"))
         assertEquals(Page.CreateElection, pathToPage("/elections/new"))
         assertEquals(Page.ElectionDetail("Lang"), pathToPage("/elections/Lang"))
+        assertEquals(Page.ElectionPreferences("Lang"), pathToPage("/elections/Lang/preferences"))
+        assertEquals(Page.ElectionStrongestPaths("Lang"), pathToPage("/elections/Lang/strongest-paths"))
         assertEquals(Page.RawTables, pathToPage("/admin/raw-tables"))
         assertEquals(Page.DebugTables, pathToPage("/admin/debug-tables"))
         assertEquals(Page.UserManagement, pathToPage("/admin/users"))
+    }
+
+    @Test
+    fun `election sub-routes round-trip with percent-encoded names`() {
+        val name = "Best Programming Language"
+        val prefs = pageToPath(Page.ElectionPreferences(name))
+        assertEquals("/elections/Best%20Programming%20Language/preferences", prefs)
+        assertEquals(Page.ElectionPreferences(name), pathToPage(prefs))
+
+        val paths = pageToPath(Page.ElectionStrongestPaths(name))
+        assertEquals("/elections/Best%20Programming%20Language/strongest-paths", paths)
+        assertEquals(Page.ElectionStrongestPaths(name), pathToPage(paths))
     }
 
     @Test
@@ -74,6 +90,8 @@ class RouterTest {
         assertEquals(false, isPublicPage(Page.Home))
         assertEquals(false, isPublicPage(Page.Elections))
         assertEquals(false, isPublicPage(Page.ElectionDetail("Lang")))
+        assertEquals(false, isPublicPage(Page.ElectionPreferences("Lang")))
+        assertEquals(false, isPublicPage(Page.ElectionStrongestPaths("Lang")))
         assertEquals(false, isPublicPage(Page.CreateElection))
         assertEquals(false, isPublicPage(Page.RawTables))
         assertEquals(false, isPublicPage(Page.DebugTables))
