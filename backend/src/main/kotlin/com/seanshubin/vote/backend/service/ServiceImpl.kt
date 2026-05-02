@@ -451,7 +451,11 @@ class ServiceImpl(
         // eligibility list (anyone authenticated can vote on any election).
 
         val candidates = queryModel.listCandidates(validElectionName)
-        Validation.validateRankingsMatchCandidates(validRankings, candidates)
+        val tiers = queryModel.listTiers(validElectionName)
+        // Tier markers are valid ranking targets too (they appear in ballots
+        // alongside candidates), so the "unknown candidates" check has to
+        // accept either. A truly bogus name still trips the check.
+        Validation.validateRankingsMatchCandidates(validRankings, candidates + tiers)
 
         // EXECUTION SECTION
         val confirmation = uniqueIdGenerator.generate()

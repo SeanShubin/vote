@@ -673,8 +673,15 @@ fun VotingView(
                                 onClick { selectedTierName = item.name }
                             }
                         }) {
+                            // Numbered position is meaningful for candidates
+                            // (their rank in your preferences) but not for tier
+                            // markers (which are fixed labels). Render an empty
+                            // placeholder for tiers so the column alignment
+                            // stays consistent across rows.
                             Span({ classes("ranked-ballot-rank-num") }) {
-                                Text((index + 1).toString().padStart(2, '0'))
+                                if (!isTier) {
+                                    Text((index + 1).toString().padStart(2, '0'))
+                                }
                             }
                             Span({ classes("ranked-ballot-row-name") }) {
                                 Text(if (isTier) "▸ ${item.name}" else item.name)
