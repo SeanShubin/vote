@@ -101,6 +101,8 @@ fun ElectionDetailPage(
                         apiClient = apiClient,
                         electionName = electionName,
                         existingCandidates = candidates,
+                        existingTiers = loadedElection?.tiers ?: emptyList(),
+                        ballotsExist = (loadedElection?.ballotCount ?: 0) > 0,
                         onSuccess = { msg ->
                             successMessage = msg
                             pageFetch.reload()
@@ -160,15 +162,23 @@ fun ElectionSetupView(
     apiClient: ApiClient,
     electionName: String,
     existingCandidates: List<String>,
+    existingTiers: List<String>,
+    ballotsExist: Boolean,
     onSuccess: (String) -> Unit,
     onError: (String) -> Unit,
 ) {
     var candidatesText by remember(existingCandidates) {
         mutableStateOf(existingCandidates.joinToString("\n"))
     }
+    var tiersText by remember(existingTiers) {
+        mutableStateOf(existingTiers.joinToString("\n"))
+    }
 
     fun parseCandidates(): List<String> =
         candidatesText.split("\n").map { it.trim() }.filter { it.isNotBlank() }
+
+    fun parseTiers(): List<String> =
+        tiersText.split("\n").map { it.trim() }.filter { it.isNotBlank() }
 
     val saveAction = rememberAsyncAction(
         apiClient = apiClient,
@@ -177,6 +187,16 @@ fun ElectionSetupView(
         action = {
             apiClient.setCandidates(electionName, parseCandidates())
             onSuccess("Candidates saved")
+        },
+    )
+
+    val saveTiersAction = rememberAsyncAction(
+        apiClient = apiClient,
+        fallbackErrorMessage = "Failed to save tiers",
+        onError = onError,
+        action = {
+            apiClient.setTiers(electionName, parseTiers())
+            onSuccess("Tiers saved")
         },
     )
 
@@ -215,6 +235,44 @@ fun ElectionSetupView(
             }
         }) {
             Text(if (saveAction.isLoading) "Saving…" else "Save Candidates")
+        }
+    }
+
+    // Tiers — separate section per requirements. Locked once any ballot has
+    // been cast: a tier name is part of the meaning of an existing ballot,
+    // so renaming it would silently invalidate votes. Empty list disables
+    // tier voting and reverts to plain candidate-only ranking.
+    Div({ classes("section") }) {
+        H2 { Text("Tiers (optional)") }
+
+        if (ballotsExist) {
+            P {
+                Text(
+                    "Tier names are locked while ballots exist. " +
+                        "They can be edited again once all ballots have been removed."
+                )
+            }
+        } else {
+            P {
+                Text(
+                    "Enter one tier per line, top tier first. " +
+                        "Leave blank for plain candidate-only ranking."
+                )
+            }
+        }
+
+        TextArea(tiersText) {
+            classes("textarea")
+            attr("rows", "4")
+            if (ballotsExist) attr("disabled", "")
+            onInput { tiersText = it.value }
+        }
+
+        Button({
+            if (saveTiersAction.isLoading || ballotsExist) attr("disabled", "")
+            onClick { saveTiersAction.invoke() }
+        }) {
+            Text(if (saveTiersAction.isLoading) "Saving…" else "Save Tiers")
         }
     }
 }
