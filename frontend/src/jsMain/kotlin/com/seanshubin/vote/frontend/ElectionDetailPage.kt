@@ -1050,28 +1050,7 @@ private fun renderTally(
     if (displayTally.places.isEmpty()) {
         P { Text("No winners yet") }
     } else {
-        // Group placings into tier cards mirroring the Vote view's layout.
-        // Tier markers are virtual candidates: Schulze ranks them alongside
-        // the real ones, and a candidate is "in" tier T if voters
-        // collectively put them ahead of T's marker but not ahead of any
-        // harder tier. We walk the placings top-down, buffering candidates
-        // until we cross a marker, then emit a tier card containing the
-        // candidates that just cleared it. Candidates below the bottom
-        // marker (cleared no tier) — or the whole list, when no tiers are
-        // configured — render as a plain row list with no tier wrapper.
-        val tierSet = tiers.toSet()
-        val sections = buildList<Pair<String?, List<Place>>> {
-            val buffer = mutableListOf<Place>()
-            displayTally.places.forEach { place ->
-                if (place.candidateName in tierSet) {
-                    add(place.candidateName to buffer.toList())
-                    buffer.clear()
-                } else {
-                    buffer.add(place)
-                }
-            }
-            if (buffer.isNotEmpty()) add(null to buffer.toList())
-        }
+        val sections = tallySections(displayTally.places, tiers)
 
         val renderPlaceList: @Composable (List<Place>) -> Unit = { places ->
             Ol({ classes("ranked-ballot-list") }) {
@@ -1085,14 +1064,15 @@ private fun renderTally(
         }
 
         Div({ classes("tally-results") }) {
-            sections.forEach { (tierName, places) ->
+            sections.forEach { section ->
+                val tierName = section.tierName
                 if (tierName != null) {
                     Div({ classes("ranked-ballot-tier") }) {
                         Span({ classes("ranked-ballot-tier-title") }) { Text(tierName) }
-                        if (places.isNotEmpty()) renderPlaceList(places)
+                        if (section.places.isNotEmpty()) renderPlaceList(section.places)
                     }
                 } else {
-                    renderPlaceList(places)
+                    renderPlaceList(section.places)
                 }
             }
         }
