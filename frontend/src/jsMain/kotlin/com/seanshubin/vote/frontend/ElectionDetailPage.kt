@@ -94,6 +94,24 @@ fun ElectionDetailPage(
             Div({ classes("success") }) { Text(successMessage!!) }
         }
 
+        // Setup is restricted to the election owner or any user with role >=
+        // ADMIN. Same gate as the Delete button. Backend re-checks; this just
+        // hides the UI surface so non-privileged voters don't see edit fields
+        // they couldn't successfully save anyway.
+        val canSetup = loadedElection?.let { e ->
+            e.ownerName == currentUserName ||
+                (currentRole != null && currentRole >= Role.ADMIN)
+        } ?: false
+
+        // Snap a deep-linked or stale `#setup` hash back to the vote tab when
+        // the viewer isn't allowed to see it. Runs once `canSetup` is known
+        // (post-load) so we don't bounce away while loading.
+        LaunchedEffect(canSetup, currentView) {
+            if (!canSetup && currentView == "setup") {
+                currentView = "vote"
+            }
+        }
+
         when {
             lastLoaded == null && pageState is FetchState.Error ->
                 Div({ classes("error") }) { Text(pageState.message) }
@@ -104,12 +122,18 @@ fun ElectionDetailPage(
 
                 // Tabs (no more Details — the header above covers it).
                 Div({ classes("tabs") }) {
-                    Button({ onClick { currentView = "setup" } }) { Text("Setup") }
+                    if (canSetup) {
+                        Button({ onClick { currentView = "setup" } }) { Text("Setup") }
+                    }
                     Button({ onClick { currentView = "vote" } }) { Text("Vote") }
                     Button({ onClick { currentView = "tally" } }) { Text("Results") }
                 }
 
-                when (currentView) {
+                // Defense in depth: if the LaunchedEffect above hasn't fired
+                // yet (first frame after load), treat "setup" as "vote" for
+                // viewers who can't setup so they never see the edit pane.
+                val effectiveView = if (currentView == "setup" && !canSetup) "vote" else currentView
+                when (effectiveView) {
                     "setup" -> ElectionSetupView(
                         apiClient = apiClient,
                         electionName = electionName,
