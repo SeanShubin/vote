@@ -59,6 +59,9 @@ class EventApplier(
             is DomainEvent.ElectionDeleted -> {
                 commandModel.deleteElection(authority, event.electionName)
             }
+            is DomainEvent.ElectionDescriptionChanged -> {
+                commandModel.setElectionDescription(authority, event.electionName, event.newDescription)
+            }
             is DomainEvent.CandidatesAdded -> {
                 commandModel.addCandidates(authority, event.electionName, event.candidateNames)
             }

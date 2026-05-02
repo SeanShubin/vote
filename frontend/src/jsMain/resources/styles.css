@@ -21,10 +21,20 @@ body {
 }
 
 /*
- * Admin pages (Raw Tables, Debug Tables) reclaim browser width for the
- * data tables. Unlike .container, no max-width — small viewport margin
- * only. When a table overflows the card, the card's own horizontal
- * scrollbar handles it, so the page never scrolls horizontally.
+ * Admin pages (Raw Tables, Debug Tables, Preferences, Strongest Paths) reclaim
+ * browser width for the data tables. Unlike .container, no max-width — small
+ * viewport margin only.
+ *
+ * Layout: a flex column sized to the dynamic viewport so children can be split
+ * into "fixed" (page header, action buttons) and "fills the rest" (the
+ * .admin-table-scroll region that holds the data table). The scroll region
+ * scrolls independently of the page; sticky <thead> stays pinned while rows
+ * scroll past.
+ *
+ * Why 100dvh and not 100vh: on iOS Safari and Android Chrome, 100vh includes
+ * the area behind the dynamic URL bar, which clips the bottom button. dvh
+ * (dynamic viewport height) tracks the visible area as the bar shows/hides.
+ * The 2rem deduction accounts for the 1rem top + 1rem bottom margins.
  */
 .admin-container {
     margin: 1rem;
@@ -32,7 +42,24 @@ body {
     background: white;
     border-radius: 8px;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    overflow-x: auto;
+    height: calc(100dvh - 2rem);
+    display: flex;
+    flex-direction: column;
+}
+
+/*
+ * Scroll region inside .admin-container that holds a .data-table. flex: 1 lets
+ * it fill whatever space is left after the H1, tabs, and bottom buttons.
+ * min-height: 0 is required for that fill to actually shrink below content
+ * height — without it the table would push siblings off-screen instead of
+ * scrolling internally. overscroll-behavior: contain stops touch scrolls at
+ * the table edges from chaining out to the page (no iOS pull-to-refresh).
+ */
+.admin-table-scroll {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    overscroll-behavior: contain;
 }
 
 h1 {
@@ -196,25 +223,33 @@ button:disabled {
     margin-top: 1rem;
 }
 
+/*
+ * Elections list — same grid+display:contents pattern as the user
+ * management list. Two columns (election button | owner) shared across
+ * rows so the buttons line up at one width and the owner labels at one
+ * left edge, regardless of how long each individual name is.
+ */
 .elections-list {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
+    display: grid;
+    grid-template-columns: auto auto;
+    column-gap: 1rem;
+    row-gap: 0.5rem;
+    align-items: center;
+    justify-content: start;
     margin: 1rem 0;
 }
 
 .election-item {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    padding: 0.5rem;
-    background-color: #f9f9f9;
-    border-radius: 4px;
+    display: contents;
 }
 
 .election-item button {
     padding: 0.5rem 1rem;
     margin-top: 0;
+}
+
+.election-owner {
+    color: #555;
 }
 
 /*
@@ -447,17 +482,21 @@ button:disabled {
 }
 
 /*
- * Tier markers in the Winners list (Results tab). Same visual cue as the
- * voting view's tier rows — readers should recognize "Tier 1" the same
- * way wherever it appears.
+ * Winners list (Results tab) reuses the voting view's tier-card and row
+ * styles so a reader recognizes the layout. The page is read-only though,
+ * so suppress the interactive affordances (pointer cursor, grab cursor,
+ * hover-tinted title) that signal "click me / drag me" in the voting view.
  */
-.tally-tier-marker {
-    background: #f8f5e9;
-    border: 1px solid #d6cca0;
-    border-radius: 6px;
-    padding: 0.4rem 0.75rem;
-    margin: 0.4rem 0;
-    font-weight: 600;
+.tally-results .ranked-ballot-tier {
+    cursor: default;
+}
+
+.tally-results .ranked-ballot-tier:hover .ranked-ballot-tier-title {
+    color: #34495e;
+}
+
+.tally-results .ranked-ballot-row {
+    cursor: default;
 }
 
 .ranked-ballot-rank-num {

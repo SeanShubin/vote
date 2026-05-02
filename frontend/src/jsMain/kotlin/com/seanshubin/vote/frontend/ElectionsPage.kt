@@ -35,7 +35,9 @@ fun ElectionsPage(
                                 }) {
                                     Text(election.electionName)
                                 }
-                                Span { Text(" - Owner: ${election.ownerName}") }
+                                Span({ classes("election-owner") }) {
+                                    Text("Owner: ${election.ownerName}")
+                                }
                             }
                         }
                     }

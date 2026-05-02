@@ -263,6 +263,22 @@ class DynamoDbSingleTableCommandModel(
         }
     }
 
+    override fun setElectionDescription(authority: String, electionName: String, description: String) {
+        runBlocking {
+            dynamoDb.updateItem(UpdateItemRequest {
+                tableName = DynamoDbSingleTableSchema.MAIN_TABLE
+                key = mapOf(
+                    "PK" to AttributeValue.S(DynamoDbSingleTableSchema.electionPK(electionName)),
+                    "SK" to AttributeValue.S(DynamoDbSingleTableSchema.METADATA_SK),
+                )
+                updateExpression = "SET description = :description"
+                expressionAttributeValues = mapOf(
+                    ":description" to AttributeValue.S(description),
+                )
+            })
+        }
+    }
+
     override fun deleteElection(authority: String, electionName: String) {
         runBlocking {
             // Delete election metadata

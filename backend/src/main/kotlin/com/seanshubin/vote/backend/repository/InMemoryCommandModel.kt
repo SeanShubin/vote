@@ -52,6 +52,11 @@ class InMemoryCommandModel(private val data: InMemoryData) : CommandModel {
         data.candidates[electionName] = mutableSetOf()
     }
 
+    override fun setElectionDescription(authority: String, electionName: String, description: String) {
+        val election = data.elections[electionName] ?: error("Election not found: $electionName")
+        data.elections[electionName] = election.copy(description = description)
+    }
+
     override fun deleteElection(authority: String, electionName: String) {
         data.elections.remove(electionName)
         data.candidates.remove(electionName)

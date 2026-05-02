@@ -117,6 +117,14 @@ class HttpApiClient(
     override suspend fun getElection(electionName: String): ElectionDetail =
         getWithAuth("/election/${encodeURIComponent(electionName)}")
 
+    override suspend fun setElectionDescription(electionName: String, description: String) {
+        val request = SetDescriptionRequest(description)
+        putWithAuth<SetDescriptionRequest, Unit>(
+            "/election/${encodeURIComponent(electionName)}/description",
+            request,
+        )
+    }
+
     override suspend fun setCandidates(electionName: String, candidates: List<String>) {
         val request = SetCandidatesRequest(candidates)
         putWithAuth<SetCandidatesRequest, Unit>(

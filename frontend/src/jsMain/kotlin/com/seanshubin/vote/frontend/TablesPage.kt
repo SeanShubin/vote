@@ -69,11 +69,13 @@ fun TablesPage(
                         }
                     }
 
-                    when (val dataState = dataFetch.state) {
-                        FetchState.Loading -> P { Text("Loading rows…") }
-                        is FetchState.Error ->
-                            Div({ classes("error") }) { Text(dataState.message) }
-                        is FetchState.Success -> dataState.value?.let { renderTable(it) }
+                    Div({ classes("admin-table-scroll") }) {
+                        when (val dataState = dataFetch.state) {
+                            FetchState.Loading -> P { Text("Loading rows…") }
+                            is FetchState.Error ->
+                                Div({ classes("error") }) { Text(dataState.message) }
+                            is FetchState.Success -> dataState.value?.let { renderTable(it) }
+                        }
                     }
                 }
             }

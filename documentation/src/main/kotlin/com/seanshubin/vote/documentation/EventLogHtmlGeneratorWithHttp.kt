@@ -129,6 +129,8 @@ class EventLogHtmlGeneratorWithHttp(private val recorder: DocumentationRecorder)
             "Election <strong>${event.electionName}</strong> created by <strong>${event.ownerName}</strong>"
         is DomainEvent.ElectionDeleted ->
             "Election <strong>${event.electionName}</strong> deleted"
+        is DomainEvent.ElectionDescriptionChanged ->
+            "Description updated on <strong>${event.electionName}</strong>"
         is DomainEvent.CandidatesAdded ->
             "Added candidates to <strong>${event.electionName}</strong>: ${event.candidateNames.joinToString(", ")}"
         is DomainEvent.CandidatesRemoved ->
@@ -190,6 +192,10 @@ class EventLogHtmlGeneratorWithHttp(private val recorder: DocumentationRecorder)
         """.trimIndent()
         is DomainEvent.ElectionDeleted -> """
             <div class="detail-row"><span class="label">Election:</span> ${event.electionName}</div>
+        """.trimIndent()
+        is DomainEvent.ElectionDescriptionChanged -> """
+            <div class="detail-row"><span class="label">Election:</span> ${event.electionName}</div>
+            <div class="detail-row"><span class="label">New Description:</span> ${event.newDescription}</div>
         """.trimIndent()
         is DomainEvent.CandidatesAdded -> """
             <div class="detail-row"><span class="label">Election:</span> ${event.electionName}</div>

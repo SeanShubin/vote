@@ -18,6 +18,7 @@ import com.seanshubin.vote.contract.PasswordResetRequestRequest
 import com.seanshubin.vote.contract.RegisterRequest
 import com.seanshubin.vote.contract.Service
 import com.seanshubin.vote.contract.SetCandidatesRequest
+import com.seanshubin.vote.contract.SetDescriptionRequest
 import com.seanshubin.vote.contract.SetRoleRequest
 import com.seanshubin.vote.contract.SetTiersRequest
 import com.seanshubin.vote.contract.Tokens
@@ -113,6 +114,7 @@ class RequestRouter(
             target == "/elections/count" && method == "GET" -> handleElectionCount(req)
             target.matches(Regex("/election/[^/]+")) && method == "GET" -> handleGetElection(req)
             target.matches(Regex("/election/[^/]+")) && method == "DELETE" -> handleDeleteElection(req)
+            target.matches(Regex("/election/[^/]+/description")) && method == "PUT" -> handleSetDescription(req)
             target.matches(Regex("/election/[^/]+/candidates")) && method == "PUT" -> handleSetCandidates(req)
             target.matches(Regex("/election/[^/]+/candidates")) && method == "GET" -> handleListCandidates(req)
             target.matches(Regex("/election/[^/]+/tiers")) && method == "PUT" -> handleSetTiers(req)
@@ -437,6 +439,14 @@ class RequestRouter(
         val setTiersRequest = json.decodeFromString<SetTiersRequest>(req.body)
         service.setTiers(accessToken, electionName, setTiersRequest.tierNames)
         return HttpResponse(200, json.encodeToString(mapOf("status" to "tiers updated")))
+    }
+
+    private fun handleSetDescription(req: HttpRequest): HttpResponse {
+        val accessToken = extractAccessToken(req)
+        val electionName = extractElectionName(req.target)
+        val setDescriptionRequest = json.decodeFromString<SetDescriptionRequest>(req.body)
+        service.setElectionDescription(accessToken, electionName, setDescriptionRequest.description)
+        return HttpResponse(200, json.encodeToString(mapOf("status" to "description updated")))
     }
 
     private fun handleListTiers(req: HttpRequest): HttpResponse {

@@ -113,6 +113,7 @@ fun ElectionDetailPage(
                     "setup" -> ElectionSetupView(
                         apiClient = apiClient,
                         electionName = electionName,
+                        existingDescription = loadedElection?.description ?: "",
                         existingCandidates = candidates,
                         existingTiers = loadedElection?.tiers ?: emptyList(),
                         ballotsExist = (loadedElection?.ballotCount ?: 0) > 0,
@@ -176,12 +177,16 @@ fun ElectionDetailPage(
 fun ElectionSetupView(
     apiClient: ApiClient,
     electionName: String,
+    existingDescription: String,
     existingCandidates: List<String>,
     existingTiers: List<String>,
     ballotsExist: Boolean,
     onSuccess: (String) -> Unit,
     onError: (String) -> Unit,
 ) {
+    var descriptionText by remember(existingDescription) {
+        mutableStateOf(existingDescription)
+    }
     var candidatesText by remember(existingCandidates) {
         mutableStateOf(existingCandidates.joinToString("\n"))
     }
@@ -194,6 +199,16 @@ fun ElectionSetupView(
 
     fun parseTiers(): List<String> =
         tiersText.split("\n").map { it.trim() }.filter { it.isNotBlank() }
+
+    val saveDescriptionAction = rememberAsyncAction(
+        apiClient = apiClient,
+        fallbackErrorMessage = "Failed to save description",
+        onError = onError,
+        action = {
+            apiClient.setElectionDescription(electionName, descriptionText)
+            onSuccess("Description saved")
+        },
+    )
 
     val saveAction = rememberAsyncAction(
         apiClient = apiClient,
@@ -214,6 +229,28 @@ fun ElectionSetupView(
             onSuccess("Tiers saved")
         },
     )
+
+    // Description editor — owners can update freely (no ballot lock since
+    // the text isn't part of any ballot's meaning). Backend rejects the
+    // PUT for non-owners; the field is shown to everyone in the Setup tab
+    // for symmetry with the candidates / tiers fields.
+    Div({ classes("section") }) {
+        H2 { Text("Description") }
+
+        P { Text("Shown to voters at the top of the election page. Optional.") }
+        TextArea(descriptionText) {
+            classes("textarea")
+            attr("rows", "3")
+            onInput { descriptionText = it.value }
+        }
+
+        Button({
+            if (saveDescriptionAction.isLoading) attr("disabled", "")
+            onClick { saveDescriptionAction.invoke() }
+        }) {
+            Text(if (saveDescriptionAction.isLoading) "Saving…" else "Save Description")
+        }
+    }
 
     Div({ classes("section") }) {
         H2 { Text("Candidates") }
@@ -1037,27 +1074,48 @@ private fun renderTally(
     if (displayTally.places.isEmpty()) {
         P { Text("No winners yet") }
     } else {
-        // Per the requirement: "To be 'in a tier' means to be ranked above
-        // that tier, but below the above tier if any." So for each candidate,
-        // the tier they're "in" is the next tier marker AFTER them in the
-        // placings (the tier they beat). Tier markers themselves render as
-        // distinguishable rows.
+        // Group placings into tier cards mirroring the Vote view's layout:
+        // a candidate ranked above a tier marker is "in" that tier (per
+        // "to be in a tier means to be ranked above that tier, but below
+        // the tier above it if any"), so we accumulate candidates into a
+        // buffer and emit a tier card each time we cross a marker. Anything
+        // ranked below the bottom marker (or the entire list, when no tiers
+        // are configured) renders as a plain row list with the same row
+        // styling but no tier wrapper.
         val tierSet = tiers.toSet()
-        displayTally.places.forEachIndexed { index, place ->
-            val isTier = place.candidateName in tierSet
-            if (isTier) {
-                P({ classes("tally-tier-marker") }) {
-                    Text("▸ ${place.candidateName}")
+        val sections = buildList<Pair<String?, List<Place>>> {
+            val buffer = mutableListOf<Place>()
+            displayTally.places.forEach { place ->
+                if (place.candidateName in tierSet) {
+                    add(place.candidateName to buffer.toList())
+                    buffer.clear()
+                } else {
+                    buffer.add(place)
                 }
-            } else {
-                val tierLabel = (index + 1 until displayTally.places.size)
-                    .firstOrNull { displayTally.places[it].candidateName in tierSet }
-                    ?.let { displayTally.places[it].candidateName }
-                P {
-                    Text("${ordinal(place.rank)}: ${place.candidateName}")
-                    if (tierLabel != null) {
-                        Text(" (in $tierLabel)")
+            }
+            if (buffer.isNotEmpty()) add(null to buffer.toList())
+        }
+
+        val renderPlaceList: @Composable (List<Place>) -> Unit = { places ->
+            Ol({ classes("ranked-ballot-list") }) {
+                places.forEach { place ->
+                    Li({ classes("ranked-ballot-row") }) {
+                        Span({ classes("ranked-ballot-rank-num") }) { Text(ordinal(place.rank)) }
+                        Span({ classes("ranked-ballot-row-name") }) { Text(place.candidateName) }
                     }
+                }
+            }
+        }
+
+        Div({ classes("tally-results") }) {
+            sections.forEach { (tierName, places) ->
+                if (tierName != null) {
+                    Div({ classes("ranked-ballot-tier") }) {
+                        Span({ classes("ranked-ballot-tier-title") }) { Text(tierName) }
+                        if (places.isNotEmpty()) renderPlaceList(places)
+                    }
+                } else {
+                    renderPlaceList(places)
                 }
             }
         }
@@ -1143,10 +1201,12 @@ fun ElectionPreferencesPage(
     Div({ classes("admin-container") }) {
         H1 { Text("Preferences: $electionName") }
 
-        when (val state = tallyFetch.state) {
-            FetchState.Loading -> P { Text("Loading…") }
-            is FetchState.Error -> Div({ classes("error") }) { Text(state.message) }
-            is FetchState.Success -> renderPreferencesTable(state.value)
+        Div({ classes("admin-table-scroll") }) {
+            when (val state = tallyFetch.state) {
+                FetchState.Loading -> P { Text("Loading…") }
+                is FetchState.Error -> Div({ classes("error") }) { Text(state.message) }
+                is FetchState.Success -> renderPreferencesTable(state.value)
+            }
         }
 
         Button({ onClick { onBack() } }) { Text("Back to Election") }
@@ -1176,10 +1236,12 @@ fun ElectionStrongestPathsPage(
     Div({ classes("admin-container") }) {
         H1 { Text("Strongest Paths: $electionName") }
 
-        when (val state = tallyFetch.state) {
-            FetchState.Loading -> P { Text("Loading…") }
-            is FetchState.Error -> Div({ classes("error") }) { Text(state.message) }
-            is FetchState.Success -> renderStrongestPathsTable(state.value)
+        Div({ classes("admin-table-scroll") }) {
+            when (val state = tallyFetch.state) {
+                FetchState.Loading -> P { Text("Loading…") }
+                is FetchState.Error -> Div({ classes("error") }) { Text(state.message) }
+                is FetchState.Success -> renderStrongestPathsTable(state.value)
+            }
         }
 
         Button({ onClick { onBack() } }) { Text("Back to Election") }

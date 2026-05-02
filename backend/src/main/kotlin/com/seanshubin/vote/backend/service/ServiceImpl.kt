@@ -239,6 +239,23 @@ class ServiceImpl(
         synchronize()
     }
 
+    override fun setElectionDescription(accessToken: AccessToken, electionName: String, description: String) {
+        // VALIDATION SECTION
+        requirePermission(accessToken, Permission.USE_APPLICATION)
+        requireIsElectionOwner(accessToken, electionName)
+
+        val validElectionName = Validation.validateElectionName(electionName)
+        val validDescription = Validation.validateElectionDescription(description)
+
+        // EXECUTION SECTION
+        eventLog.appendEvent(
+            accessToken.userName,
+            clock.now(),
+            DomainEvent.ElectionDescriptionChanged(validElectionName, validDescription),
+        )
+        synchronize()
+    }
+
     override fun updateUser(accessToken: AccessToken, userName: String, userUpdates: UserUpdates) {
         // VALIDATION SECTION
         requirePermission(accessToken, Permission.USE_APPLICATION)

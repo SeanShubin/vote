@@ -43,6 +43,7 @@ interface ApiClient {
     suspend fun listElections(): List<ElectionSummary>
     suspend fun createElection(electionName: String, description: String = ""): String
     suspend fun getElection(electionName: String): ElectionDetail
+    suspend fun setElectionDescription(electionName: String, description: String)
     suspend fun setCandidates(electionName: String, candidates: List<String>)
     suspend fun listCandidates(electionName: String): List<String>
 

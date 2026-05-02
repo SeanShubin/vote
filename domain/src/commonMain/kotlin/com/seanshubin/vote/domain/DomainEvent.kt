@@ -92,6 +92,18 @@ sealed interface DomainEvent {
     ) : DomainEvent
 
     /**
+     * Description edits after creation. The owner can change the description
+     * freely — unlike tier names, it isn't part of the meaning of any cast
+     * ballot, so there's no "no ballots exist" lock here.
+     */
+    @Serializable
+    @SerialName("ElectionDescriptionChanged")
+    data class ElectionDescriptionChanged(
+        val electionName: String,
+        val newDescription: String,
+    ) : DomainEvent
+
+    /**
      * Candidate Management Events
      */
     @Serializable
