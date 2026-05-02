@@ -613,121 +613,170 @@ fun VotingView(
                     }
                 }
 
-                Ol({ classes("ranked-ballot-list") }) {
-                    ranked.forEachIndexed { index, item ->
-                        val isTier = item.kind == RankingKind.TIER
-                        Li({
-                            classes("ranked-ballot-row")
-                            if (isTier) classes("ranked-ballot-tier-row")
-                            if (isTier && item.name == selectedTierName) classes("ranked-ballot-tier-selected")
-                            if (draggingIndex == index) classes("dragging")
-                            // Tier markers are not draggable: the requirement
-                            // "tiers cannot be in a different order on a ballot"
-                            // means tier rows are fixed anchors.
-                            if (!isTier) attr("draggable", "true")
-                            attr("tabindex", "0")
-                            if (!isTier) {
-                                onDragStart {
-                                    draggingIndex = index
-                                    dragMoved = false
+                // Single source of row rendering used by both the plain (no
+                // tiers) and tier modes — captures the surrounding state so
+                // we don't have to thread a dozen parameters through.
+                val renderCandidateRow: @Composable (Int) -> Unit = { idx ->
+                    val item = ranked[idx]
+                    Li({
+                        classes("ranked-ballot-row")
+                        if (draggingIndex == idx) classes("dragging")
+                        attr("draggable", "true")
+                        attr("tabindex", "0")
+                        onDragStart {
+                            draggingIndex = idx
+                            dragMoved = false
+                        }
+                        onDragOver { event ->
+                            event.preventDefault()
+                            val src = draggingIndex ?: return@onDragOver
+                            if (src == idx) return@onDragOver
+                            if (ranked[src].kind == RankingKind.TIER) return@onDragOver
+                            if (!dragMoved) {
+                                pushHistory()
+                                dragMoved = true
+                            }
+                            val candidateMove = ranked.toMutableList().apply {
+                                val moved = removeAt(src)
+                                add(idx, moved)
+                            }
+                            // Defense in depth: a candidate move shouldn't
+                            // permute tier markers, but reject if it did.
+                            val originalTierOrder = ranked.filter { it.kind == RankingKind.TIER }.map { it.name }
+                            val newTierOrder = candidateMove.filter { it.kind == RankingKind.TIER }.map { it.name }
+                            if (newTierOrder != originalTierOrder) return@onDragOver
+                            ranked = candidateMove
+                            draggingIndex = idx
+                        }
+                        onDrop { event ->
+                            event.preventDefault()
+                            draggingIndex = null
+                            dragMoved = false
+                        }
+                        onDragEnd {
+                            draggingIndex = null
+                            dragMoved = false
+                        }
+                        onKeyDown { event ->
+                            when (event.key) {
+                                "ArrowUp" -> {
+                                    event.preventDefault()
+                                    handleMove(idx, -1)
+                                }
+                                "ArrowDown" -> {
+                                    event.preventDefault()
+                                    handleMove(idx, 1)
                                 }
                             }
-                            onDragOver { event ->
-                                event.preventDefault()
-                                val src = draggingIndex ?: return@onDragOver
-                                if (src == index) return@onDragOver
-                                // Only candidates can move. Tier markers stay
-                                // put (the source is checked above; the target
-                                // index can be a tier row — that just means
-                                // the candidate slots in just before the tier).
-                                if (ranked[src].kind == RankingKind.TIER) return@onDragOver
-                                if (!dragMoved) {
-                                    pushHistory()
-                                    dragMoved = true
+                        }
+                    }) {
+                        Span({ classes("ranked-ballot-rank-num") }) {
+                            Text((idx + 1).toString().padStart(2, '0'))
+                        }
+                        Span({ classes("ranked-ballot-row-name") }) { Text(item.name) }
+                        Span({ classes("ranked-ballot-row-buttons") }) {
+                            Button({
+                                classes("ranked-ballot-row-button")
+                                title("Move up")
+                                if (idx == 0) attr("disabled", "")
+                                onClick { event ->
+                                    event.stopPropagation()
+                                    handleMove(idx, -1)
                                 }
-                                val candidateMove = ranked.toMutableList().apply {
-                                    val moved = removeAt(src)
-                                    add(index, moved)
+                            }) { Text("↑") }
+                            Button({
+                                classes("ranked-ballot-row-button")
+                                title("Move down")
+                                if (idx == ranked.size - 1) attr("disabled", "")
+                                onClick { event ->
+                                    event.stopPropagation()
+                                    handleMove(idx, 1)
                                 }
-                                // Validate that the move didn't reorder tier
-                                // markers relative to each other (it won't,
-                                // since only a candidate moved, but defend
-                                // in depth — drag math is easy to get wrong).
-                                val originalTierOrder = ranked.filter { it.kind == RankingKind.TIER }.map { it.name }
-                                val newTierOrder = candidateMove.filter { it.kind == RankingKind.TIER }.map { it.name }
-                                if (newTierOrder != originalTierOrder) return@onDragOver
-                                ranked = candidateMove
-                                draggingIndex = index
-                            }
-                            onDrop { event ->
-                                event.preventDefault()
-                                draggingIndex = null
-                                dragMoved = false
-                            }
-                            onDragEnd {
-                                draggingIndex = null
-                                dragMoved = false
-                            }
-                            onKeyDown { event ->
-                                when (event.key) {
-                                    "ArrowUp" -> {
-                                        event.preventDefault()
-                                        handleMove(index, -1)
-                                    }
-                                    "ArrowDown" -> {
-                                        event.preventDefault()
-                                        handleMove(index, 1)
-                                    }
+                            }) { Text("↓") }
+                            Button({
+                                classes("ranked-ballot-row-button")
+                                classes("ranked-ballot-row-remove")
+                                title("Return to candidates")
+                                onClick { event ->
+                                    event.stopPropagation()
+                                    handleRemove(idx)
                                 }
+                            }) { Text("×") }
+                        }
+                    }
+                }
+
+                if (tiers.isEmpty()) {
+                    // Plain mode: flat ordered list of candidate rows.
+                    Ol({ classes("ranked-ballot-list") }) {
+                        ranked.indices.forEach { idx -> renderCandidateRow(idx) }
+                    }
+                } else {
+                    // Tier mode: each tier is its own fieldset; the legend
+                    // is the click target to select. Items between tier
+                    // markers belong to the fieldset of the next tier marker
+                    // (per "in tier X" = above tier X marker). The bottom
+                    // tier marker terminates the list, so leftover candidates
+                    // after the loop shouldn't normally exist.
+                    val chunks = buildList {
+                        var bufferStart = 0
+                        ranked.forEachIndexed { idx, item ->
+                            if (item.kind == RankingKind.TIER) {
+                                val cands = (bufferStart until idx).toList()
+                                add(TierChunk(item.name, idx, cands))
+                                bufferStart = idx + 1
                             }
-                            // Clicking a tier marker selects it as the
-                            // drop target for subsequent candidate clicks.
-                            if (isTier) {
-                                onClick { selectedTierName = item.name }
+                        }
+                    }
+                    chunks.forEach { chunk ->
+                        Fieldset({
+                            classes("ranked-ballot-tier-fieldset")
+                            if (chunk.tierName == selectedTierName) {
+                                classes("ranked-ballot-tier-fieldset-selected")
                             }
                         }) {
-                            // Numbered position is meaningful for candidates
-                            // (their rank in your preferences) but not for tier
-                            // markers (which are fixed labels). Render an empty
-                            // placeholder for tiers so the column alignment
-                            // stays consistent across rows.
-                            Span({ classes("ranked-ballot-rank-num") }) {
-                                if (!isTier) {
-                                    Text((index + 1).toString().padStart(2, '0'))
+                            Legend({
+                                classes("ranked-ballot-tier-legend")
+                                onClick { selectedTierName = chunk.tierName }
+                            }) { Text(chunk.tierName) }
+
+                            if (chunk.candidateIndices.isEmpty()) {
+                                // Drop target for an empty tier — dropping
+                                // here inserts before the tier marker, so
+                                // the candidate lands "in" this tier.
+                                Div({
+                                    classes("ranked-ballot-tier-empty")
+                                    onDragOver { event ->
+                                        event.preventDefault()
+                                        val src = draggingIndex ?: return@onDragOver
+                                        if (ranked[src].kind == RankingKind.TIER) return@onDragOver
+                                        if (!dragMoved) {
+                                            pushHistory()
+                                            dragMoved = true
+                                        }
+                                        val target = chunk.tierIndex
+                                        // After removal, target shifts by 1
+                                        // if src was earlier in the list.
+                                        val insertAt = if (src < target) target - 1 else target
+                                        ranked = ranked.toMutableList().apply {
+                                            val moved = removeAt(src)
+                                            add(insertAt, moved)
+                                        }
+                                        draggingIndex = insertAt
+                                    }
+                                    onDrop { event ->
+                                        event.preventDefault()
+                                        draggingIndex = null
+                                        dragMoved = false
+                                    }
+                                }) {
+                                    Text("(empty — drop a candidate here)")
                                 }
-                            }
-                            Span({ classes("ranked-ballot-row-name") }) {
-                                Text(if (isTier) "▸ ${item.name}" else item.name)
-                            }
-                            Span({ classes("ranked-ballot-row-buttons") }) {
-                                if (!isTier) {
-                                    Button({
-                                        classes("ranked-ballot-row-button")
-                                        title("Move up")
-                                        if (index == 0) attr("disabled", "")
-                                        onClick { event ->
-                                            event.stopPropagation()
-                                            handleMove(index, -1)
-                                        }
-                                    }) { Text("↑") }
-                                    Button({
-                                        classes("ranked-ballot-row-button")
-                                        title("Move down")
-                                        if (index == ranked.size - 1) attr("disabled", "")
-                                        onClick { event ->
-                                            event.stopPropagation()
-                                            handleMove(index, 1)
-                                        }
-                                    }) { Text("↓") }
-                                    Button({
-                                        classes("ranked-ballot-row-button")
-                                        classes("ranked-ballot-row-remove")
-                                        title("Return to candidates")
-                                        onClick { event ->
-                                            event.stopPropagation()
-                                            handleRemove(index)
-                                        }
-                                    }) { Text("×") }
+                            } else {
+                                Ol({ classes("ranked-ballot-list") }) {
+                                    chunk.candidateIndices.forEach { idx ->
+                                        renderCandidateRow(idx)
+                                    }
                                 }
                             }
                         }
@@ -782,6 +831,19 @@ fun VotingView(
 }
 
 private data class RankedItem(val name: String, val kind: RankingKind)
+
+/**
+ * One tier's slice of the ranked list: the tier's name, the index of the
+ * tier marker in `ranked` (used as the drop position for empty tiers), and
+ * the indices of the candidates that belong to this tier (rows that come
+ * before this tier marker but after the previous one — "in" this tier per
+ * the requirement "above this tier, below the above tier if any").
+ */
+private data class TierChunk(
+    val tierName: String,
+    val tierIndex: Int,
+    val candidateIndices: List<Int>,
+)
 
 @Composable
 fun TallyView(
