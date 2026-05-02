@@ -121,6 +121,10 @@ class EventLogHtmlGenerator(private val eventLog: EventLog) {
             <div class="detail-row"><span class="label">Election:</span> ${event.electionName}</div>
             <div class="detail-row"><span class="label">New Rankings:</span> ${event.newRankings.joinToString(", ") { "${it.candidateName}:${it.rank}" }}</div>
         """.trimIndent()
+        is DomainEvent.BallotDeleted -> """
+            <div class="detail-row"><span class="label">Voter:</span> ${event.voterName}</div>
+            <div class="detail-row"><span class="label">Election:</span> ${event.electionName}</div>
+        """.trimIndent()
     }
 
     private fun getEventColor(eventType: String): String = when {
