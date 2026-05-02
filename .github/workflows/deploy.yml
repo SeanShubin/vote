@@ -101,10 +101,33 @@ jobs:
             --stack-name "$STACK_NAME" \
             --query 'Stacks[0].Outputs[?OutputKey==`BucketName`].OutputValue' \
             --output text)
+          # Two-pass cache strategy.
+          #
+          # HTML: no-cache (browsers must revalidate). The frontend gradle
+          # build rewrites references inside index.html to /frontend.js?v=<ts>
+          # and /styles.css?v=<ts> so the URL changes per build — but only if
+          # the browser actually fetches a fresh index.html to see the new
+          # version. Without this header, browsers heuristic-cache index.html
+          # for hours and keep loading the stale query string (and therefore
+          # the stale JS bundle, even after a CloudFront invalidation).
+          #
+          # Other assets: immutable + 1-year max-age. Each build emits a new
+          # ?v= query string, so a fresh index.html produces a URL the browser
+          # hasn't seen before and refetches. The first sync runs without
+          # --delete (to avoid wiping non-HTML keys); the second sync owns
+          # the delete pass with --exclude "*.html" so HTML is left alone.
           aws s3 sync \
             frontend/build/dist/js/productionExecutable/ \
             "s3://${BUCKET}/" \
-            --delete
+            --exclude "*" \
+            --include "*.html" \
+            --cache-control "no-cache"
+          aws s3 sync \
+            frontend/build/dist/js/productionExecutable/ \
+            "s3://${BUCKET}/" \
+            --delete \
+            --exclude "*.html" \
+            --cache-control "public, max-age=31536000, immutable"
 
       - name: Invalidate CloudFront
         run: |
