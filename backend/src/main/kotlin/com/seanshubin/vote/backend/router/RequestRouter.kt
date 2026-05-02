@@ -19,6 +19,7 @@ import com.seanshubin.vote.contract.RegisterRequest
 import com.seanshubin.vote.contract.Service
 import com.seanshubin.vote.contract.SetCandidatesRequest
 import com.seanshubin.vote.contract.SetRoleRequest
+import com.seanshubin.vote.contract.SetTiersRequest
 import com.seanshubin.vote.contract.Tokens
 import com.seanshubin.vote.domain.Role
 import com.seanshubin.vote.domain.UserUpdates
@@ -114,6 +115,8 @@ class RequestRouter(
             target.matches(Regex("/election/[^/]+")) && method == "DELETE" -> handleDeleteElection(req)
             target.matches(Regex("/election/[^/]+/candidates")) && method == "PUT" -> handleSetCandidates(req)
             target.matches(Regex("/election/[^/]+/candidates")) && method == "GET" -> handleListCandidates(req)
+            target.matches(Regex("/election/[^/]+/tiers")) && method == "PUT" -> handleSetTiers(req)
+            target.matches(Regex("/election/[^/]+/tiers")) && method == "GET" -> handleListTiers(req)
             target.matches(Regex("/election/[^/]+/ballot")) && method == "POST" -> handleCastBallot(req)
             target.matches(Regex("/election/[^/]+/ballot/[^/]+")) && method == "GET" -> handleGetBallot(req)
             target.matches(Regex("/election/[^/]+/ballot/[^/]+")) && method == "DELETE" -> handleDeleteBallot(req)
@@ -426,6 +429,21 @@ class RequestRouter(
         val electionName = extractElectionName(req.target)
         val candidates = service.listCandidates(accessToken, electionName)
         return HttpResponse(200, json.encodeToString(candidates))
+    }
+
+    private fun handleSetTiers(req: HttpRequest): HttpResponse {
+        val accessToken = extractAccessToken(req)
+        val electionName = extractElectionName(req.target)
+        val setTiersRequest = json.decodeFromString<SetTiersRequest>(req.body)
+        service.setTiers(accessToken, electionName, setTiersRequest.tierNames)
+        return HttpResponse(200, json.encodeToString(mapOf("status" to "tiers updated")))
+    }
+
+    private fun handleListTiers(req: HttpRequest): HttpResponse {
+        val accessToken = extractAccessToken(req)
+        val electionName = extractElectionName(req.target)
+        val tiers = service.listTiers(accessToken, electionName)
+        return HttpResponse(200, json.encodeToString(tiers))
     }
 
     private fun handleCastBallot(req: HttpRequest): HttpResponse {

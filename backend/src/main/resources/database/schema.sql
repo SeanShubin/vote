@@ -38,6 +38,19 @@ CREATE TABLE IF NOT EXISTS candidates (
     FOREIGN KEY (election_name) REFERENCES elections(election_name) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Command Model Projection: Tiers (ordered list per election)
+-- Position determines tier order, tier_name is the displayed label.
+-- The "set tiers" event replaces the entire list for an election (delete-
+-- then-insert), which matches the lock-while-ballots-exist rule.
+CREATE TABLE IF NOT EXISTS tiers (
+    election_name VARCHAR(255) NOT NULL,
+    position INT NOT NULL,
+    tier_name VARCHAR(255) NOT NULL,
+    PRIMARY KEY (election_name, position),
+    UNIQUE KEY unique_tier_name (election_name, tier_name),
+    FOREIGN KEY (election_name) REFERENCES elections(election_name) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- Command Model Projection: Ballots
 CREATE TABLE IF NOT EXISTS ballots (
     ballot_id BIGINT AUTO_INCREMENT PRIMARY KEY,

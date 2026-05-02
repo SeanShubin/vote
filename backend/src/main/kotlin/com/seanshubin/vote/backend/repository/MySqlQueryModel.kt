@@ -116,8 +116,8 @@ class MySqlQueryModel(
     }
 
     override fun tableCount(): Int {
-        // event_log, users, elections, candidates, ballots, rankings, sync_state
-        return 7
+        // event_log, users, elections, candidates, tiers, ballots, rankings, sync_state
+        return 8
     }
 
     override fun listUsers(): List<User> {
@@ -188,6 +188,19 @@ class MySqlQueryModel(
             buildList {
                 while (rs.next()) {
                     add(rs.getString("candidate_name"))
+                }
+            }
+        }
+    }
+
+    override fun listTiers(electionName: String): List<String> {
+        val sql = queryLoader.load("tier-select-by-election")
+        return connection.prepareStatement(sql).use { stmt ->
+            stmt.setString(1, electionName)
+            val rs = stmt.executeQuery()
+            buildList {
+                while (rs.next()) {
+                    add(rs.getString("tier_name"))
                 }
             }
         }

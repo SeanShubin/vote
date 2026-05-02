@@ -67,6 +67,10 @@ class InMemoryQueryModel(private val data: InMemoryData) : QueryModel {
         return data.candidates[electionName]?.toList() ?: emptyList()
     }
 
+    override fun listTiers(electionName: String): List<String> {
+        return data.tiers[electionName] ?: emptyList()
+    }
+
     override fun listRankings(voterName: String, electionName: String): List<Ranking> {
         val ballot = data.ballots[electionName to voterName]
         return ballot?.rankings ?: emptyList()

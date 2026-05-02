@@ -30,6 +30,8 @@ interface Service {
     fun eventData(accessToken: AccessToken): TableData
     fun setCandidates(accessToken: AccessToken, electionName: String, candidateNames: List<String>)
     fun listCandidates(accessToken: AccessToken, electionName: String): List<String>
+    fun setTiers(accessToken: AccessToken, electionName: String, tierNames: List<String>)
+    fun listTiers(accessToken: AccessToken, electionName: String): List<String>
     fun castBallot(accessToken: AccessToken, voterName: String, electionName: String, rankings: List<Ranking>): String
     fun deleteBallot(accessToken: AccessToken, voterName: String, electionName: String)
     fun listRankings(accessToken: AccessToken, voterName: String, electionName: String): List<Ranking>

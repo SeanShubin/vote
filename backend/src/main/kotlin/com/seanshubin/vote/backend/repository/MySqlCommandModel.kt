@@ -98,6 +98,30 @@ class MySqlCommandModel(
         }
     }
 
+    override fun setTiers(authority: String, electionName: String, tierNames: List<String>) {
+        // Replace the entire tier list atomically: delete-then-insert. The
+        // service layer enforces that this only fires when no ballots exist,
+        // so churning the rows here can't orphan ranking data.
+        val deleteSql = queryLoader.load("tier-delete-by-election")
+        connection.prepareStatement(deleteSql).use { stmt ->
+            stmt.setString(1, electionName)
+            stmt.executeUpdate()
+        }
+
+        if (tierNames.isEmpty()) return
+
+        val insertSql = queryLoader.load("tier-insert")
+        connection.prepareStatement(insertSql).use { stmt ->
+            tierNames.forEachIndexed { position, tierName ->
+                stmt.setString(1, electionName)
+                stmt.setInt(2, position)
+                stmt.setString(3, tierName)
+                stmt.addBatch()
+            }
+            stmt.executeBatch()
+        }
+    }
+
     override fun removeCandidates(authority: String, electionName: String, candidateNames: List<String>) {
         if (candidateNames.isEmpty()) return
 

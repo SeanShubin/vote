@@ -18,6 +18,7 @@ interface QueryModel {
     fun lastSynced(): Long?
     fun searchElectionByName(name: String): ElectionSummary?
     fun listCandidates(electionName: String): List<String>
+    fun listTiers(electionName: String): List<String>
     fun listRankings(voterName: String, electionName: String): List<Ranking>
     fun listRankings(electionName: String): List<VoterElectionCandidateRank>
     fun searchBallot(voterName: String, electionName: String): BallotSummary?
