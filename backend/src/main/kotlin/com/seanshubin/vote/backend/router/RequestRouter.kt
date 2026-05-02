@@ -85,7 +85,6 @@ class RequestRouter(
         val method = req.method
         return when {
             target == "/health" && method == "GET" -> handleHealth()
-            target == "/sync" && method == "POST" -> handleSync()
             target == "/log-client-error" && method == "POST" -> handleLogClientError(req)
             target == "/register" && method == "POST" -> handleRegister(req)
             target == "/authenticate" && method == "POST" -> handleAuthenticate(req)
@@ -190,11 +189,6 @@ class RequestRouter(
     private fun handleHealth(): HttpResponse {
         val result = service.health()
         return HttpResponse(200, json.encodeToString(mapOf("status" to result)))
-    }
-
-    private fun handleSync(): HttpResponse {
-        service.synchronize()
-        return HttpResponse(200, json.encodeToString(mapOf("status" to "synced")))
     }
 
     private fun handleLogClientError(req: HttpRequest): HttpResponse {

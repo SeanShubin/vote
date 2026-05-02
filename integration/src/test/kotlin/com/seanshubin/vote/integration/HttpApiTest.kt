@@ -250,8 +250,6 @@ class HttpApiTester(private val port: Int = 9876) : AutoCloseable {
         return httpClient.send(request, HttpResponse.BodyHandlers.ofString())
     }
 
-    // System Operations
-    fun sync(token: AccessToken): HttpResponse<String> = post("/sync", "", token)
 
     fun logClientError(message: String, stackTrace: String, url: String, userAgent: String, timestamp: String): HttpResponse<String> {
         val body = """{"message":"$message","stackTrace":"$stackTrace","url":"$url","userAgent":"$userAgent","timestamp":"$timestamp"}"""
@@ -972,15 +970,6 @@ class HttpApiTest {
         assertEquals(200, response.statusCode())
         val auth = tester.decodeJson(response, AuthResponse.serializer())
         assertEquals("alice", auth.userName)
-    }
-
-    @Test
-    fun `sync endpoint succeeds`() {
-        val tokens = tester.registerUserExpectSuccess("alice")
-
-        val response = tester.sync(tokens.accessToken)
-
-        assertEquals(200, response.statusCode())
     }
 
     @Test
