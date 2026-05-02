@@ -445,11 +445,11 @@ button:disabled {
  * arena is empty, since selection is meaningless then.
  */
 .ranked-ballot-tier {
-    border: 1px solid #d6cca0;
+    border: 1px solid #aab8ca;
     border-radius: 6px;
     padding: 0.4rem 0.75rem 0.6rem;
     margin: 0.6rem 0;
-    background: #fbf9f1;
+    background: #e8eef5;
     cursor: pointer;
 }
 
