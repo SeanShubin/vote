@@ -45,6 +45,15 @@ interface ApiClient {
     suspend fun getElection(electionName: String): ElectionDetail
     suspend fun setCandidates(electionName: String, candidates: List<String>)
     suspend fun listCandidates(electionName: String): List<String>
+
+    /**
+     * Set the ordered tier names for an election. Empty list disables tier
+     * support (ballots become candidate-only). Non-empty enables tier
+     * voting; rejected by the backend if the election already has ballots
+     * cast — tier names are part of the meaning of those ballots.
+     */
+    suspend fun setTiers(electionName: String, tiers: List<String>)
+    suspend fun listTiers(electionName: String): List<String>
     suspend fun castBallot(electionName: String, rankings: List<Ranking>): String
 
     /**

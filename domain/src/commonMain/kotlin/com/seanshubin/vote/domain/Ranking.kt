@@ -4,8 +4,18 @@ import kotlinx.serialization.Serializable
 import kotlin.math.max
 import kotlin.random.Random
 
+/**
+ * One entry in a voter's ballot. [candidateName] holds either a real
+ * candidate name or a tier marker name; [kind] disambiguates. The default
+ * [RankingKind.CANDIDATE] keeps existing serialized events readable —
+ * tier rankings are only produced when the election has tiers configured.
+ */
 @Serializable
-data class Ranking(val candidateName: String, val rank: Int?) {
+data class Ranking(
+    val candidateName: String,
+    val rank: Int?,
+    val kind: RankingKind = RankingKind.CANDIDATE,
+) {
     companion object {
         fun List<Ranking>.prefers(a: String, b: String): Boolean =
             rankingFor(a) < rankingFor(b)

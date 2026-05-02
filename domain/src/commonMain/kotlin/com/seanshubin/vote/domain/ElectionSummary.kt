@@ -8,12 +8,17 @@ data class ElectionSummary(
     val electionName: String,
     val description: String = "",
 ) {
-    fun toElectionDetail(candidateCount: Int, ballotCount: Int): ElectionDetail =
+    fun toElectionDetail(
+        candidateCount: Int,
+        ballotCount: Int,
+        tiers: List<String> = emptyList(),
+    ): ElectionDetail =
         ElectionDetail(
             ownerName = ownerName,
             electionName = electionName,
             description = description,
             candidateCount = candidateCount,
             ballotCount = ballotCount,
+            tiers = tiers,
         )
 }

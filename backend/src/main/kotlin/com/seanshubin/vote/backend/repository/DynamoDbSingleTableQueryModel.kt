@@ -173,6 +173,26 @@ class DynamoDbSingleTableQueryModel(
         }
     }
 
+    override fun listTiers(electionName: String): List<String> {
+        // Tiers live as a list attribute on the election METADATA item — same
+        // GetItem shape as searchElectionByName, just projecting only the
+        // tiers attribute. Missing attribute = no tiers configured.
+        return runBlocking {
+            val response = dynamoDb.getItem(GetItemRequest {
+                tableName = DynamoDbSingleTableSchema.MAIN_TABLE
+                key = mapOf(
+                    "PK" to AttributeValue.S(DynamoDbSingleTableSchema.electionPK(electionName)),
+                    "SK" to AttributeValue.S(DynamoDbSingleTableSchema.METADATA_SK)
+                )
+                projectionExpression = "tiers"
+            })
+
+            response.item?.get("tiers")?.asLOrNull()
+                ?.mapNotNull { it.asSOrNull() }
+                ?: emptyList()
+        }
+    }
+
     override fun ballotCount(electionName: String): Int {
         return runBlocking {
             val response = dynamoDb.query(QueryRequest {

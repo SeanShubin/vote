@@ -55,6 +55,26 @@ object Validation {
         return trimmed.replace(whitespacePattern, " ")
     }
 
+    fun validateTierName(tierName: String): String {
+        val trimmed = tierName.trim()
+        require(trimmed.isNotEmpty()) { "Tier name must not be empty" }
+        require(trimmed.length <= 200) { "Tier name must not be more than 200 characters long" }
+        return trimmed.replace(whitespacePattern, " ")
+    }
+
+    fun validateTierNames(names: List<String>): List<String> {
+        // Empty list is allowed — clearing tiers reverts the election to
+        // candidate-only voting (the no-tiers code path).
+        val validNames = names.map { validateTierName(it) }
+
+        val duplicates = validNames.groupingBy { it }.eachCount().filter { it.value > 1 }.keys
+        require(duplicates.isEmpty()) {
+            "Duplicate tier names found: ${duplicates.joinToString()}"
+        }
+
+        return validNames
+    }
+
     fun validateNameOrEmail(nameOrEmail: String): String {
         val trimmed = nameOrEmail.trim()
         require(trimmed.isNotEmpty()) { "Name or email must not be empty" }

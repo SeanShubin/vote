@@ -65,6 +65,9 @@ class EventApplier(
             is DomainEvent.CandidatesRemoved -> {
                 commandModel.removeCandidates(authority, event.electionName, event.candidateNames)
             }
+            is DomainEvent.TiersSet -> {
+                commandModel.setTiers(authority, event.electionName, event.tierNames)
+            }
             is DomainEvent.BallotCast -> {
                 commandModel.castBallot(
                     authority = authority,

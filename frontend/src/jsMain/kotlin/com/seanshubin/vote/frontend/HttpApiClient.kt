@@ -128,6 +128,17 @@ class HttpApiClient(
     override suspend fun listCandidates(electionName: String): List<String> =
         getWithAuth("/election/${encodeURIComponent(electionName)}/candidates")
 
+    override suspend fun setTiers(electionName: String, tiers: List<String>) {
+        val request = SetTiersRequest(tiers)
+        putWithAuth<SetTiersRequest, Unit>(
+            "/election/${encodeURIComponent(electionName)}/tiers",
+            request,
+        )
+    }
+
+    override suspend fun listTiers(electionName: String): List<String> =
+        getWithAuth("/election/${encodeURIComponent(electionName)}/tiers")
+
     override suspend fun castBallot(electionName: String, rankings: List<Ranking>): String {
         val voterName = requireSession().userName
         val request = CastBallotRequest(voterName, rankings)

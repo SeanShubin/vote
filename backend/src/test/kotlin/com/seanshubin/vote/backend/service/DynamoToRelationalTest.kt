@@ -213,6 +213,7 @@ class DynamoToRelationalTest {
         override fun roleHasPermission(role: Role, permission: Permission): Boolean = true
         override fun searchElectionByName(name: String): ElectionSummary? =
             elections.firstOrNull { it.electionName == name }
+        override fun listTiers(electionName: String): List<String> = emptyList()
         override fun listRankings(voterName: String, electionName: String): List<Ranking> = emptyList()
         override fun listRankings(electionName: String): List<VoterElectionCandidateRank> = emptyList()
         override fun searchBallot(voterName: String, electionName: String): BallotSummary? = null

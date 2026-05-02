@@ -316,6 +316,39 @@ class DynamoDbSingleTableCommandModel(
         }
     }
 
+    override fun setTiers(authority: String, electionName: String, tierNames: List<String>) {
+        // Tiers ride as an attribute on the election's METADATA item rather
+        // than as separate items: reading the election (frequent path) gets
+        // tiers in the same request, matching the denormalized-for-perf shape
+        // of this single-table store. UpdateItem replaces the whole list
+        // atomically, which matches the "all-or-nothing while no ballots"
+        // semantics enforced one layer up in ServiceImpl.
+        runBlocking {
+            if (tierNames.isEmpty()) {
+                dynamoDb.updateItem(UpdateItemRequest {
+                    tableName = DynamoDbSingleTableSchema.MAIN_TABLE
+                    key = mapOf(
+                        "PK" to AttributeValue.S(DynamoDbSingleTableSchema.electionPK(electionName)),
+                        "SK" to AttributeValue.S(DynamoDbSingleTableSchema.METADATA_SK)
+                    )
+                    updateExpression = "REMOVE tiers"
+                })
+            } else {
+                dynamoDb.updateItem(UpdateItemRequest {
+                    tableName = DynamoDbSingleTableSchema.MAIN_TABLE
+                    key = mapOf(
+                        "PK" to AttributeValue.S(DynamoDbSingleTableSchema.electionPK(electionName)),
+                        "SK" to AttributeValue.S(DynamoDbSingleTableSchema.METADATA_SK)
+                    )
+                    updateExpression = "SET tiers = :tiers"
+                    expressionAttributeValues = mapOf(
+                        ":tiers" to AttributeValue.L(tierNames.map { AttributeValue.S(it) })
+                    )
+                })
+            }
+        }
+    }
+
     override fun removeCandidates(authority: String, electionName: String, candidateNames: List<String>) {
         if (candidateNames.isEmpty()) return
 

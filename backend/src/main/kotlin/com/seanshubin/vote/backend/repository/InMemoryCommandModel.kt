@@ -55,12 +55,21 @@ class InMemoryCommandModel(private val data: InMemoryData) : CommandModel {
     override fun deleteElection(authority: String, electionName: String) {
         data.elections.remove(electionName)
         data.candidates.remove(electionName)
+        data.tiers.remove(electionName)
         data.ballots.keys.removeIf { (election, _) -> election == electionName }
     }
 
     override fun addCandidates(authority: String, electionName: String, candidateNames: List<String>) {
         val candidates = data.candidates.getOrPut(electionName) { mutableSetOf() }
         candidates.addAll(candidateNames)
+    }
+
+    override fun setTiers(authority: String, electionName: String, tierNames: List<String>) {
+        if (tierNames.isEmpty()) {
+            data.tiers.remove(electionName)
+        } else {
+            data.tiers[electionName] = tierNames.toList()
+        }
     }
 
     override fun removeCandidates(authority: String, electionName: String, candidateNames: List<String>) {

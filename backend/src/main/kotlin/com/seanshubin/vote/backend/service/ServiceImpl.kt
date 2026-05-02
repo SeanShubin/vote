@@ -293,7 +293,8 @@ class ServiceImpl(
             ?: throw ServiceException(ServiceException.Category.NOT_FOUND, "Election not found: $electionName")
         val candidateCount = queryModel.candidateCount(electionName)
         val ballotCount = queryModel.ballotCount(electionName)
-        return election.toElectionDetail(candidateCount, ballotCount)
+        val tiers = queryModel.listTiers(electionName)
+        return election.toElectionDetail(candidateCount, ballotCount, tiers)
     }
 
     override fun deleteElection(accessToken: AccessToken, electionName: String) {
@@ -386,6 +387,41 @@ class ServiceImpl(
         return queryModel.listCandidates(electionName)
     }
 
+    override fun setTiers(accessToken: AccessToken, electionName: String, tierNames: List<String>) {
+        // VALIDATION SECTION
+        requirePermission(accessToken, Permission.USE_APPLICATION)
+        requireIsElectionOwner(accessToken, electionName)
+
+        val validElectionName = Validation.validateElectionName(electionName)
+        val validTierNames = Validation.validateTierNames(tierNames)
+
+        // The "no ballots" lock: tier names are part of the meaning of a
+        // ranked ballot, so changing them out from under voters who have
+        // already cast would silently invalidate their vote. The lock lifts
+        // again once those ballots are gone.
+        val ballotCount = queryModel.ballotCount(validElectionName)
+        if (ballotCount > 0) {
+            throw ServiceException(
+                ServiceException.Category.CONFLICT,
+                "Cannot change tier names while ballots exist " +
+                    "($ballotCount ballot${if (ballotCount == 1) "" else "s"} cast); " +
+                    "voters have to remove their ballots first."
+            )
+        }
+
+        // EXECUTION SECTION
+        eventLog.appendEvent(
+            accessToken.userName,
+            clock.now(),
+            DomainEvent.TiersSet(validElectionName, validTierNames)
+        )
+        synchronize()
+    }
+
+    override fun listTiers(accessToken: AccessToken, electionName: String): List<String> {
+        return queryModel.listTiers(electionName)
+    }
+
     override fun castBallot(
         accessToken: AccessToken,
         voterName: String,
@@ -470,9 +506,19 @@ class ServiceImpl(
         queryModel.searchElectionByName(electionName)
             ?: throw ServiceException(ServiceException.Category.NOT_FOUND, "Election not found: $electionName")
         val candidates = queryModel.listCandidates(electionName)
+        val tiers = queryModel.listTiers(electionName)
         val ballots = queryModel.listBallots(electionName)
+        // Tiers participate in the pairwise tally as if they were candidates,
+        // so the algorithm can place each real candidate relative to the tier
+        // markers ("in tier X" = beats tier X but loses to tier X-1). When
+        // there are no tiers, the call is identical to the pre-tier behavior.
         // Secret-ballot toggle dropped — tally always shows ranked ballots.
-        return Tally.countBallots(electionName, secretBallot = false, candidates, ballots)
+        return Tally.countBallots(
+            electionName = electionName,
+            secretBallot = false,
+            candidates = candidates + tiers,
+            ballots = ballots,
+        )
     }
 
     override fun getBallot(accessToken: AccessToken, voterName: String, electionName: String): BallotSummary? {

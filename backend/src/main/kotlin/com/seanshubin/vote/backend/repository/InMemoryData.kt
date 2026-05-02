@@ -7,6 +7,11 @@ class InMemoryData {
     val users = mutableMapOf<String, UserData>()
     val elections = mutableMapOf<String, ElectionData>()
     val candidates = mutableMapOf<String, MutableSet<String>>()
+    // Per-election ordered tier names. The list is the source of truth for
+    // tier ordering; the InMemory store mirrors what MySQL stores in a
+    // separate table and what DynamoDB stores as an attribute on the
+    // election METADATA item.
+    val tiers = mutableMapOf<String, List<String>>()
     val ballots = mutableMapOf<Pair<String, String>, BallotData>()
     var lastSynced: Long? = null
 
