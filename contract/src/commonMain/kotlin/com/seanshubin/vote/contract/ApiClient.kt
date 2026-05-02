@@ -34,6 +34,19 @@ interface ApiClient {
     /** Clear the refresh cookie server-side and the local session. Idempotent. */
     suspend fun logout()
 
+    /**
+     * Set by the SPA shell to perform "you are now logged out" UX (clear
+     * userName/role, route to /login). Implementations invoke it exactly when
+     * an authenticated request can't be recovered via refresh — e.g. the user
+     * was deleted server-side while their session was still in flight, or the
+     * refresh cookie expired. Distinct from [logout] (user-initiated) and
+     * from a normal API error (request failed, but the session is still good).
+     *
+     * Setter, not constructor arg, because the apiClient is built before the
+     * Compose tree exists and the callback needs to capture composable state.
+     */
+    var onSessionLost: (() -> Unit)?
+
     /** Kick off a password reset — backend looks up user and emails a signed reset link. */
     suspend fun requestPasswordReset(nameOrEmail: String)
 

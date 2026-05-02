@@ -53,6 +53,12 @@ fun <T> rememberFetchState(
         value = FetchState.Loading
         value = try {
             FetchState.Success(fetcher())
+        } catch (e: SessionLostException) {
+            // Session ended mid-fetch (user deleted, or refresh cookie gone).
+            // ApiClient.onSessionLost has already cleared state and routed to
+            // /login — leave the fetch in Loading so the disposed page doesn't
+            // flash an error message before the route swap completes.
+            FetchState.Loading
         } catch (e: Exception) {
             apiClient.logErrorToServer(e)
             FetchState.Error(e.message ?: fallbackErrorMessage)

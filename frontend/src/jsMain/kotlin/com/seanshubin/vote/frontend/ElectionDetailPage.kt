@@ -333,8 +333,7 @@ fun ElectionSetupView(
  * Ranked-ballot voting UI. Candidates start in the "arena" pool (3-column
  * grid). Click a chip to rank it, or drag it directly into the list / a tier.
  * Drag a row to reorder live. ↑/↓ keys nudge the focused row. × returns a row
- * to the arena. Ctrl+Z / Cmd+Z undoes the last action (50-step session-only
- * history).
+ * to the arena.
  *
  * There is no submit step: every change to the ranked list is persisted
  * immediately via castBallot, so the on-screen ordering is always the
@@ -344,14 +343,20 @@ fun ElectionSetupView(
  * candidates as "least preferred, tied with each other" via
  * `rankingFor(name) ?: Int.MAX_VALUE` in `Ranking.kt`.
  *
- * Tier mode (when [tiers] is non-empty): the ranked list is pre-populated
- * with all tier markers in declared order. Clicking a tier card selects it
- * as the destination for click-to-rank; the highlight only shows while the
- * arena still has unranked chips, since selection is meaningless once
- * everything is ranked. Tier markers are not draggable and have no
- * remove/move buttons — their relative order is invariant. Clearing every
- * candidate row (only tier markers remain) is treated as "no ballot" and
- * deletes the ballot server-side.
+ * Tier mode — the threshold metaphor. Tier markers are virtual candidates
+ * the voter ranks alongside the real ones; ranking a candidate ahead of a
+ * tier marker means "this candidate clears that tier." A candidate's tier
+ * is the highest tier they cleared. The ballot is pre-populated with the
+ * tier markers in declared order. Clicking a tier card selects it as the
+ * default target for click-to-rank. The selection highlight only shows
+ * while the arena still has unranked chips, since once everything is ranked
+ * the selection has nowhere to be applied. When the arena empties to non-
+ * empty via a candidate removal, the selection snaps to the tier that
+ * candidate had cleared, so putting them back in the same tier is one
+ * click. Tier markers are not draggable and have no remove/move buttons —
+ * their relative order is invariant. Clearing every candidate row (only
+ * tier markers remain) is treated as "no ballot" and deletes the ballot
+ * server-side.
  *
  * The on-screen rank number ignores tier markers — voters see 01, 02, 03
  * over their candidates regardless of how the tier markers are interleaved.
@@ -376,11 +381,7 @@ fun VotingView(
     // Stored as the tier name (not index) so insertions/deletions in `ranked`
     // don't invalidate it. Null when tiers are not configured.
     var selectedTierName by remember(electionName, tiers) { mutableStateOf<String?>(null) }
-    var history by remember(electionName) {
-        mutableStateOf<List<Pair<List<String>, List<RankedItem>>>>(emptyList())
-    }
     var dragSource by remember { mutableStateOf<DragSource?>(null) }
-    var dragMoved by remember { mutableStateOf(false) }
     var isInitialized by remember(electionName, candidates, tiers) { mutableStateOf(false) }
 
     // Pre-populate from any existing ballot so a returning voter sees their
@@ -494,7 +495,6 @@ fun VotingView(
             // candidates return to the arena; tier markers go back to the
             // initial pre-populated template. The auto-save guard sees
             // !rankedHasCandidates && !savedHasBallot, so no follow-up fires.
-            history = emptyList()
             val freshRanked = if (tiers.isEmpty()) emptyList()
                 else tiers.map { RankedItem.TierMarker(it) }
             ranked = freshRanked
@@ -505,22 +505,16 @@ fun VotingView(
         },
     )
 
-    fun pushHistory() {
-        val next = history + (arena to ranked)
-        history = if (next.size > 50) next.drop(next.size - 50) else next
-    }
-
     fun handleClickChip(name: String) {
-        pushHistory()
         arena = arena.filter { it != name }
         val tierToInsertAt = selectedTierName
         if (tierToInsertAt == null) {
             // Plain mode — append at the end of the ranking.
             ranked = ranked + RankedItem.Candidate(name)
         } else {
-            // Insert just above the selected tier marker so the new
-            // candidate lands "in" that tier (above the marker, below the
-            // next-higher tier if any).
+            // The candidate clears the selected tier — insert directly
+            // ahead of that tier marker so the marker is the highest tier
+            // they cleared, and any harder tier above stays uncleared.
             val tierIndex = ranked.indexOfFirst {
                 it is RankedItem.TierMarker && it.name == tierToInsertAt
             }
@@ -539,7 +533,19 @@ fun VotingView(
         if (index !in ranked.indices) return
         val item = ranked[index]
         if (item !is RankedItem.Candidate) return
-        pushHistory()
+        // If the arena was empty before this removal, there's no visible
+        // tier selection (the highlight is suppressed when arena is empty).
+        // Snap the selection to the tier the removed candidate had cleared
+        // — i.e. the next tier marker after them in `ranked` — so putting
+        // them back is one click. If they cleared no tier (no marker after
+        // them), leave the prior selection alone.
+        if (arena.isEmpty()) {
+            val clearedTier = ranked.asSequence()
+                .drop(index + 1)
+                .filterIsInstance<RankedItem.TierMarker>()
+                .firstOrNull()
+            if (clearedTier != null) selectedTierName = clearedTier.name
+        }
         ranked = ranked.toMutableList().apply { removeAt(index) }
         arena = arena + item.name
     }
@@ -561,16 +567,16 @@ fun VotingView(
             val newTierOrder = updated.filterIsInstance<RankedItem.TierMarker>().map { it.name }
             if (newTierOrder != originalTierOrder) return
         }
-        pushHistory()
         ranked = ranked.toMutableList().apply {
             val tmp = this[i]; this[i] = this[j]; this[j] = tmp
         }
     }
 
-    // Returns the new `ranked` list after dropping `source` at end-of-tier
-    // for `tierName` (i.e. immediately before the tier marker). null means
-    // the drop is a no-op or invalid; caller should bail without touching
-    // state. Used by the tier-card-level drop target.
+    // Returns the new `ranked` list after dropping `source` so the candidate
+    // clears `tierName` and no harder tier — i.e. positioned immediately
+    // ahead of that tier marker. null means the drop is a no-op or invalid;
+    // caller should bail without touching state. Used by the tier-card-level
+    // drop target.
     fun rankedAfterDropOnTier(source: DragSource, tierName: String): List<RankedItem>? {
         val markerIdx = ranked.indexOfFirst {
             it is RankedItem.TierMarker && it.name == tierName
@@ -598,37 +604,10 @@ fun VotingView(
     fun handleDropOnTier(tierName: String) {
         val src = dragSource ?: return
         val newRanked = rankedAfterDropOnTier(src, tierName) ?: return
-        if (!dragMoved) {
-            pushHistory()
-            dragMoved = true
-        }
         if (src is DragSource.FromArena) {
             arena = arena.filter { it != src.name }
         }
         ranked = newRanked
-    }
-
-    fun handleUndo() {
-        if (history.isEmpty()) return
-        val (a, r) = history.last()
-        history = history.dropLast(1)
-        arena = a
-        ranked = r
-    }
-
-    // Window-level Ctrl+Z / Cmd+Z. The listener captures `handleUndo` once,
-    // but `handleUndo` reads from `mutableStateOf`-backed delegates, so each
-    // call sees current state.
-    DisposableEffect(electionName) {
-        val listener: (org.w3c.dom.events.Event) -> Unit = { event ->
-            val ke = event.unsafeCast<org.w3c.dom.events.KeyboardEvent>()
-            if ((ke.ctrlKey || ke.metaKey) && ke.key == "z") {
-                ke.preventDefault()
-                handleUndo()
-            }
-        }
-        window.addEventListener("keydown", listener)
-        onDispose { window.removeEventListener("keydown", listener) }
     }
 
     Div({ classes("section") }) {
@@ -675,11 +654,9 @@ fun VotingView(
                                 attr("draggable", "true")
                                 onDragStart {
                                     dragSource = DragSource.FromArena(name)
-                                    dragMoved = false
                                 }
                                 onDragEnd {
                                     dragSource = null
-                                    dragMoved = false
                                 }
                                 onClick { handleClickChip(name) }
                             }) {
@@ -693,11 +670,6 @@ fun VotingView(
             Div {
                 Div({ classes("ranked-ballot-list-header") }) {
                     Span({ classes("ranked-ballot-list-label") }) { Text("Your ranking") }
-                    if (history.isNotEmpty()) {
-                        Span({ classes("ranked-ballot-undo-count") }) {
-                            Text("${history.size} step${if (history.size == 1) "" else "s"} undoable")
-                        }
-                    }
                 }
 
                 // Single source of row rendering used by both the plain (no
@@ -714,7 +686,6 @@ fun VotingView(
                         attr("tabindex", "0")
                         onDragStart {
                             dragSource = DragSource.FromRanked(idx)
-                            dragMoved = false
                         }
                         onDragOver { event ->
                             event.preventDefault()
@@ -724,10 +695,6 @@ fun VotingView(
                                     // of this row, then convert the source
                                     // into a FromRanked so further dragOver
                                     // ticks reorder rather than re-insert.
-                                    if (!dragMoved) {
-                                        pushHistory()
-                                        dragMoved = true
-                                    }
                                     arena = arena.filter { it != s.name }
                                     ranked = ranked.toMutableList().apply {
                                         add(idx, RankedItem.Candidate(s.name))
@@ -737,10 +704,6 @@ fun VotingView(
                                 is DragSource.FromRanked -> {
                                     if (s.index == idx) return@onDragOver
                                     if (ranked[s.index] !is RankedItem.Candidate) return@onDragOver
-                                    if (!dragMoved) {
-                                        pushHistory()
-                                        dragMoved = true
-                                    }
                                     val moved = ranked.toMutableList().apply {
                                         val it = removeAt(s.index)
                                         add(idx, it)
@@ -760,11 +723,9 @@ fun VotingView(
                         onDrop { event ->
                             event.preventDefault()
                             dragSource = null
-                            dragMoved = false
                         }
                         onDragEnd {
                             dragSource = null
-                            dragMoved = false
                         }
                         onKeyDown { event ->
                             when (event.key) {
@@ -825,10 +786,6 @@ fun VotingView(
                             event.preventDefault()
                             val s = dragSource
                             if (s !is DragSource.FromArena) return@onDragOver
-                            if (!dragMoved) {
-                                pushHistory()
-                                dragMoved = true
-                            }
                             arena = arena.filter { it != s.name }
                             val newIdx = ranked.size
                             ranked = ranked + RankedItem.Candidate(s.name)
@@ -837,17 +794,19 @@ fun VotingView(
                         onDrop { event ->
                             event.preventDefault()
                             dragSource = null
-                            dragMoved = false
                         }
                     }) {
                         ranked.indices.forEach { idx -> renderCandidateRow(idx) }
                     }
                 } else {
-                    // Tier mode: each tier is its own card; the whole card is
+                    // Tier mode: each tier is its own card showing the
+                    // candidates that cleared it (the run between the
+                    // previous tier marker and this one). The whole card is
                     // the click target to select it, AND a drop target —
-                    // dropping anywhere inside (other than on a candidate row,
-                    // which has its own row-position drop logic) drops the
-                    // dragged item at the end of that tier.
+                    // dropping anywhere inside (other than on a candidate
+                    // row, which has its own row-position drop logic) lands
+                    // the dragged item just ahead of this tier's marker so
+                    // it clears this tier.
                     val chunks = buildList {
                         var bufferStart = 0
                         ranked.forEachIndexed { idx, item ->
@@ -874,7 +833,6 @@ fun VotingView(
                                 event.preventDefault()
                                 handleDropOnTier(chunk.tierName)
                                 dragSource = null
-                                dragMoved = false
                             }
                         }) {
                             Span({ classes("ranked-ballot-tier-title") }) { Text(chunk.tierName) }
@@ -906,12 +864,6 @@ fun VotingView(
                 }
 
                 Div({ classes("ranked-ballot-toolbar") }) {
-                    Button({
-                        classes("ranked-ballot-undo-button")
-                        if (history.isEmpty()) attr("disabled", "")
-                        onClick { handleUndo() }
-                    }) { Text("↩ Undo") }
-
                     // "Remove my ballot" is only meaningful when the server
                     // actually holds a ballot. With tiers, ranked always has
                     // tier markers, so we test savedRanked (server state)
@@ -933,7 +885,7 @@ fun VotingView(
                     }
 
                     Span({ classes("ranked-ballot-toolbar-hint") }) {
-                        Text("Focus a row · ↑/↓ to nudge · Ctrl+Z to undo")
+                        Text("Focus a row · ↑/↓ to nudge")
                     }
                 }
             }
@@ -978,9 +930,9 @@ private sealed interface DragSource {
 /**
  * One tier's slice of the ranked list: the tier's name, the index of the
  * tier marker in `ranked` (used as the drop position for empty tiers), and
- * the indices of the candidates that belong to this tier (rows that come
- * before this tier marker but after the previous one — "in" this tier per
- * the requirement "above this tier, below the above tier if any").
+ * the indices of the candidates that cleared this tier — the rows between
+ * the previous tier marker (or the start of the list) and this one. A
+ * candidate clears tier T iff they sit ahead of T's marker on the ballot.
  */
 private data class TierChunk(
     val tierName: String,
@@ -1074,14 +1026,15 @@ private fun renderTally(
     if (displayTally.places.isEmpty()) {
         P { Text("No winners yet") }
     } else {
-        // Group placings into tier cards mirroring the Vote view's layout:
-        // a candidate ranked above a tier marker is "in" that tier (per
-        // "to be in a tier means to be ranked above that tier, but below
-        // the tier above it if any"), so we accumulate candidates into a
-        // buffer and emit a tier card each time we cross a marker. Anything
-        // ranked below the bottom marker (or the entire list, when no tiers
-        // are configured) renders as a plain row list with the same row
-        // styling but no tier wrapper.
+        // Group placings into tier cards mirroring the Vote view's layout.
+        // Tier markers are virtual candidates: Schulze ranks them alongside
+        // the real ones, and a candidate is "in" tier T if voters
+        // collectively put them ahead of T's marker but not ahead of any
+        // harder tier. We walk the placings top-down, buffering candidates
+        // until we cross a marker, then emit a tier card containing the
+        // candidates that just cleared it. Candidates below the bottom
+        // marker (cleared no tier) — or the whole list, when no tiers are
+        // configured — render as a plain row list with no tier wrapper.
         val tierSet = tiers.toSet()
         val sections = buildList<Pair<String?, List<Place>>> {
             val buffer = mutableListOf<Place>()

@@ -121,11 +121,13 @@ sealed interface DomainEvent {
     ) : DomainEvent
 
     /**
-     * Tier list management. Tier names are atomic — a single event replaces
-     * the entire ordered list. Empty list disables tier voting; non-empty
-     * enables it. The validation rule "tier names cannot change while ballots
-     * exist" is enforced in the service layer before this event is emitted,
-     * so the event applier can trust whatever it reads.
+     * Tier list management. Tier names are the thresholds candidates can
+     * clear — they appear as virtual candidates on every ballot. Tier
+     * names are atomic: a single event replaces the entire ordered list.
+     * Empty list disables tier voting; non-empty enables it. The
+     * validation rule "tier names cannot change while ballots exist" is
+     * enforced in the service layer before this event is emitted, so the
+     * event applier can trust whatever it reads.
      */
     @Serializable
     @SerialName("TiersSet")

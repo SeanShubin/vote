@@ -43,6 +43,8 @@ class HttpApiClient(
     /** Snapshot of the current authenticated user. Useful for the SPA's UI display. */
     val currentSession: Session? get() = session
 
+    override var onSessionLost: (() -> Unit)? = null
+
     data class Session(val accessToken: String, val userName: String, val role: Role)
 
     override suspend fun register(userName: String, email: String, password: String, inviteCode: String): AuthResponse {
@@ -239,12 +241,13 @@ class HttpApiClient(
     /**
      * Fire an authenticated request. If the server returns 401 we attempt one
      * silent refresh via the HttpOnly refresh cookie and retry with the new
-     * access token. If refresh fails, the 401 propagates so the SPA can show
-     * the login screen.
+     * access token. If refresh also fails, throw [SessionLostException] and
+     * fire [onSessionLost] — exactly one place declares the session over.
      *
      * Why retry once and not loop: a single retry handles the common case
      * (10-minute access token expired but 30-day refresh cookie still valid).
-     * If the retry also 401s, the cookie is gone — let it propagate.
+     * If the retry also 401s, the cookie is gone or the user is gone — either
+     * way, the only sensible UX is "log them out."
      */
     private suspend fun fetchWithAutoRefresh(
         path: String,
@@ -254,8 +257,12 @@ class HttpApiClient(
         val response = fetch("$baseUrl$path", buildInit(token)).await()
         if (response.status.toInt() != 401) return response
 
-        // Note: refresh() updates `session` as a side effect on success.
-        val refreshed = refresh() ?: return response
+        // Note: refresh() updates `session` (sets it to null on 401).
+        val refreshed = refresh()
+        if (refreshed == null) {
+            onSessionLost?.invoke()
+            throw SessionLostException()
+        }
         return fetch("$baseUrl$path", buildInit(refreshed.accessToken)).await()
     }
 
@@ -359,7 +366,17 @@ class HttpApiClient(
     }
 }
 
-class ApiException(message: String) : Exception(message)
+open class ApiException(message: String) : Exception(message)
+
+/**
+ * Raised by [HttpApiClient] when an authenticated request can't be recovered
+ * via silent refresh (the server-side session is gone — refresh cookie expired
+ * or the user was deleted). [HttpApiClient.onSessionLost] is invoked just
+ * before this throws, so the SPA shell handles the navigation/state-clear; the
+ * centralized async wrappers ([rememberFetchState], [rememberAsyncAction])
+ * recognize this type and skip their normal error-display + server-log paths.
+ */
+class SessionLostException : ApiException("Session is no longer valid")
 
 /** Thrown when an authenticated method is called without an active session. */
 class NotAuthenticatedException : RuntimeException("No active session. Call register() or authenticate() first.")

@@ -88,6 +88,8 @@ class FakeApiClient : ApiClient {
         logoutCalls.add(Unit)
     }
 
+    override var onSessionLost: (() -> Unit)? = null
+
     override suspend fun requestPasswordReset(nameOrEmail: String) {
         requestPasswordResetCalls.add(nameOrEmail)
         requestPasswordResetResult.getOrThrow()

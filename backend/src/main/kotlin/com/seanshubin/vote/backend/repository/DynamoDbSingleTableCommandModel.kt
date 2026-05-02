@@ -65,8 +65,10 @@ class DynamoDbSingleTableCommandModel(
                     "salt" to AttributeValue.S(salt),
                     "hash" to AttributeValue.S(hash),
                     "role" to AttributeValue.S(role.name),
-                    // GSI attributes for email lookup
-                    "GSI1PK" to AttributeValue.S(email),
+                    // GSI attributes for email lookup — keyed by lowercase email so
+                    // the equality lookup is case-insensitive. Display case is the
+                    // "email" attribute above.
+                    "GSI1PK" to AttributeValue.S(DynamoDbSingleTableSchema.emailKey(email)),
                     "GSI1SK" to AttributeValue.S(DynamoDbSingleTableSchema.userPK(userName))
                 )
             })
@@ -240,7 +242,7 @@ class DynamoDbSingleTableCommandModel(
                 updateExpression = "SET email = :e, GSI1PK = :gsi1pk"
                 expressionAttributeValues = mapOf(
                     ":e" to AttributeValue.S(email),
-                    ":gsi1pk" to AttributeValue.S(email)
+                    ":gsi1pk" to AttributeValue.S(DynamoDbSingleTableSchema.emailKey(email))
                 )
             })
         }
