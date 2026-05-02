@@ -28,6 +28,8 @@ fun ElectionDetailPage(
     currentRole: Role?,
     onBack: () -> Unit,
     onElectionDeleted: () -> Unit,
+    onNavigateToPreferences: () -> Unit = {},
+    onNavigateToStrongestPaths: () -> Unit = {},
 ) {
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var successMessage by remember { mutableStateOf<String?>(null) }
@@ -115,6 +117,8 @@ fun ElectionDetailPage(
                     "tally" -> TallyView(
                         apiClient = apiClient,
                         electionName = electionName,
+                        onNavigateToPreferences = onNavigateToPreferences,
+                        onNavigateToStrongestPaths = onNavigateToStrongestPaths,
                     )
                 }
             }
@@ -510,6 +514,8 @@ fun VotingView(
 fun TallyView(
     apiClient: ApiClient,
     electionName: String,
+    onNavigateToPreferences: () -> Unit,
+    onNavigateToStrongestPaths: () -> Unit,
 ) {
     val tallyFetch = rememberFetchState(
         apiClient = apiClient,
@@ -525,48 +531,109 @@ fun TallyView(
         when (val state = tallyFetch.state) {
             FetchState.Loading -> P { Text("Loading results…") }
             is FetchState.Error -> Div({ classes("error") }) { Text(state.message) }
-            is FetchState.Success -> renderTally(state.value)
+            is FetchState.Success -> renderTally(
+                state.value,
+                onNavigateToPreferences = onNavigateToPreferences,
+                onNavigateToStrongestPaths = onNavigateToStrongestPaths,
+            )
         }
     }
 }
 
 @Composable
-private fun renderTally(tally: Tally) {
+private fun renderTally(
+    tally: Tally,
+    onNavigateToPreferences: () -> Unit,
+    onNavigateToStrongestPaths: () -> Unit,
+) {
     P { Text("Total Ballots: ${tally.ballots.size}") }
 
-    renderPlacings(tally)
-    renderPreferences(tally)
-    renderStrongestPaths(tally)
-}
-
-@Composable
-private fun renderPlacings(tally: Tally) {
-    H3 { Text("Placings") }
+    H3 { Text("Winners") }
     if (tally.places.isEmpty()) {
         P { Text("No winners yet") }
-        return
+    } else {
+        tally.places.forEach { place ->
+            P { Text("Place ${place.rank}: ${place.candidateName}") }
+        }
     }
-    Table({ classes("data-table") }) {
-        Thead {
-            Tr {
-                Th { Text("place") }
-                Th { Text("candidate") }
-            }
+
+    // Detail tables (preferences, strongest paths) live on their own
+    // admin-style pages — they get wide quickly and don't belong inside the
+    // aesthetic election shell. See docs/style-guide.md.
+    Div({ classes("button-row") }) {
+        Button({ onClick { onNavigateToPreferences() } }) { Text("View Preferences") }
+        Button({ onClick { onNavigateToStrongestPaths() } }) { Text("View Strongest Paths") }
+    }
+}
+
+/**
+ * Detailed view of the pairwise preferences matrix as a flat 3-column table
+ * (winner | strength | loser), one row per ordered pair. Lives on its own
+ * admin-style page because the table grows as N(N-1) and benefits from the
+ * full browser width + horizontal scroll that `.admin-container` provides.
+ */
+@Composable
+fun ElectionPreferencesPage(
+    apiClient: ApiClient,
+    electionName: String,
+    onBack: () -> Unit,
+) {
+    val tallyFetch = rememberFetchState(
+        apiClient = apiClient,
+        key = electionName,
+        fallbackErrorMessage = "Failed to load tally",
+    ) {
+        apiClient.getTally(electionName)
+    }
+
+    Div({ classes("admin-container") }) {
+        H1 { Text("Preferences: $electionName") }
+
+        when (val state = tallyFetch.state) {
+            FetchState.Loading -> P { Text("Loading…") }
+            is FetchState.Error -> Div({ classes("error") }) { Text(state.message) }
+            is FetchState.Success -> renderPreferencesTable(state.value)
         }
-        Tbody {
-            tally.places.forEach { place ->
-                Tr {
-                    Td { Text(formatOrdinal(place.rank)) }
-                    Td { Text(place.candidateName) }
-                }
-            }
+
+        Button({ onClick { onBack() } }) { Text("Back to Election") }
+    }
+}
+
+/**
+ * Detailed view of the strongest-path matrix. Each row is the strongest path
+ * from one candidate to another, with the weakest-link strength up front and
+ * the per-hop path through intermediates. Variable-width: padded to maxHops
+ * so all rows have the same column count.
+ */
+@Composable
+fun ElectionStrongestPathsPage(
+    apiClient: ApiClient,
+    electionName: String,
+    onBack: () -> Unit,
+) {
+    val tallyFetch = rememberFetchState(
+        apiClient = apiClient,
+        key = electionName,
+        fallbackErrorMessage = "Failed to load tally",
+    ) {
+        apiClient.getTally(electionName)
+    }
+
+    Div({ classes("admin-container") }) {
+        H1 { Text("Strongest Paths: $electionName") }
+
+        when (val state = tallyFetch.state) {
+            FetchState.Loading -> P { Text("Loading…") }
+            is FetchState.Error -> Div({ classes("error") }) { Text(state.message) }
+            is FetchState.Success -> renderStrongestPathsTable(state.value)
         }
+
+        Button({ onClick { onBack() } }) { Text("Back to Election") }
     }
 }
 
 @Composable
-private fun renderPreferences(tally: Tally) {
-    H3 { Text("Preferences") }
+private fun renderPreferencesTable(tally: Tally) {
     val candidates = tally.candidateNames
     if (candidates.size < 2) {
         P { Text("Not enough candidates to compare.") }
@@ -597,8 +664,7 @@ private fun renderPreferences(tally: Tally) {
 }
 
 @Composable
-private fun renderStrongestPaths(tally: Tally) {
-    H3 { Text("Strongest Paths") }
+private fun renderStrongestPathsTable(tally: Tally) {
     val candidates = tally.candidateNames
     if (candidates.size < 2) {
         P { Text("Not enough candidates to compute paths.") }
@@ -642,16 +708,4 @@ private fun renderStrongestPaths(tally: Tally) {
             }
         }
     }
-}
-
-private fun formatOrdinal(n: Int): String {
-    val mod100 = n % 100
-    val suffix = when {
-        mod100 in 11..13 -> "th"
-        n % 10 == 1 -> "st"
-        n % 10 == 2 -> "nd"
-        n % 10 == 3 -> "rd"
-        else -> "th"
-    }
-    return "$n$suffix"
 }
