@@ -224,6 +224,16 @@ button:disabled {
 }
 
 /*
+ * Election description — owner-supplied prose shown above the tabs.
+ * `pre-line` preserves the newlines the owner typed in the textarea while
+ * still collapsing incidental runs of whitespace and wrapping long lines
+ * to the container, so the rendered text mirrors what the editor saw.
+ */
+.election-description {
+    white-space: pre-line;
+}
+
+/*
  * Elections list — same grid+display:contents pattern as the user
  * management list. Two columns (election button | owner) shared across
  * rows so the buttons line up at one width and the owner labels at one
@@ -399,12 +409,6 @@ button:disabled {
     margin-bottom: 0.5rem;
 }
 
-.ranked-ballot-undo-count {
-    font-size: 0.75rem;
-    color: #888;
-    margin-left: auto;
-}
-
 .ranked-ballot-list {
     list-style: none;
     padding: 0;
@@ -569,28 +573,6 @@ button:disabled {
     gap: 0.5rem;
     margin-top: 0.5rem;
     flex-wrap: wrap;
-}
-
-.ranked-ballot-undo-button {
-    cursor: pointer;
-    padding: 0.5rem 1rem;
-    background: white;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    color: #555;
-    font-size: 0.85rem;
-    margin-top: 0;
-}
-
-.ranked-ballot-undo-button:hover:not(:disabled) {
-    background: #f0f0f0;
-    border-color: #bbb;
-    color: #333;
-}
-
-.ranked-ballot-undo-button:disabled {
-    opacity: 0.4;
-    cursor: default;
 }
 
 .ranked-ballot-toolbar-hint {

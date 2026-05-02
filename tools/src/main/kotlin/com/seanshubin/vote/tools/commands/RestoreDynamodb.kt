@@ -17,6 +17,7 @@ import com.seanshubin.vote.backend.repository.DynamoDbSingleTableSchema
 import com.seanshubin.vote.backend.service.EventApplier
 import com.seanshubin.vote.domain.EventEnvelope
 import com.seanshubin.vote.tools.lib.DynamoClient
+import com.seanshubin.vote.tools.lib.NarrativeEvent
 import com.seanshubin.vote.tools.lib.Output
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.encodeToString
@@ -26,12 +27,12 @@ import java.nio.file.Path
 import kotlin.io.path.exists
 
 class RestoreDynamodb : CliktCommand(name = "restore-dynamodb") {
-    private val inputPath by argument(name = "file", help = "JSONL backup file produced by backup-dynamodb.")
+    private val inputPath by argument(name = "file", help = "JSONL narrative file produced by backup-dynamodb (or hand-edited).")
     private val prod by option("--prod", help = "Target real AWS DynamoDB instead of DynamoDB Local.").flag()
     private val yes by option("--yes", help = "Skip the confirmation prompt (scripted use).").flag()
 
     override fun help(context: Context) =
-        "Replay events from a backup file into vote_event_log, then rebuild vote_data. Refuses if event log is non-empty."
+        "Replay a JSONL narrative into vote_event_log (line position becomes event_id), then rebuild vote_data. Refuses if event log is non-empty."
 
     override fun run() = runBlocking {
         val file = Path.of(inputPath)
@@ -41,12 +42,19 @@ class RestoreDynamodb : CliktCommand(name = "restore-dynamodb") {
         Output.banner("Restoring event log to $target")
 
         val json = Json { ignoreUnknownKeys = true }
-        val envelopes = readEnvelopes(file, json)
-        if (envelopes.isEmpty()) Output.error("Backup file contains no events: $file")
+        val narratives = readNarratives(file, json)
+        if (narratives.isEmpty()) Output.error("Narrative file contains no events: $file")
 
-        val sorted = envelopes.sortedBy { it.eventId }
-        val maxEventId = sorted.last().eventId
-        println("Read ${sorted.size} event(s); event_id range ${sorted.first().eventId}..$maxEventId")
+        val envelopes = narratives.mapIndexed { index, narrative ->
+            EventEnvelope(
+                eventId = (index + 1).toLong(),
+                whenHappened = narrative.whenHappened,
+                authority = narrative.authority,
+                event = narrative.event,
+            )
+        }
+        val maxEventId = envelopes.last().eventId
+        println("Read ${envelopes.size} event(s); assigning event_id 1..$maxEventId from line position.")
 
         if (!yes) {
             requireConfirmation(prod)
@@ -61,8 +69,8 @@ class RestoreDynamodb : CliktCommand(name = "restore-dynamodb") {
                 )
             }
 
-            putEvents(client, sorted, json)
-            println("Wrote ${sorted.size} event(s) into ${DynamoClient.TABLE_EVENT_LOG}.")
+            putEvents(client, envelopes, json)
+            println("Wrote ${envelopes.size} event(s) into ${DynamoClient.TABLE_EVENT_LOG}.")
 
             setEventCounter(client, maxEventId)
             println("Set EVENT_COUNTER = $maxEventId.")
@@ -91,14 +99,14 @@ class RestoreDynamodb : CliktCommand(name = "restore-dynamodb") {
         }
     }
 
-    private fun readEnvelopes(file: Path, json: Json): List<EventEnvelope> {
-        val result = mutableListOf<EventEnvelope>()
+    private fun readNarratives(file: Path, json: Json): List<NarrativeEvent> {
+        val result = mutableListOf<NarrativeEvent>()
         Files.newBufferedReader(file).useLines { lines ->
             lines.forEachIndexed { index, raw ->
                 val line = raw.trim()
                 if (line.isEmpty()) return@forEachIndexed
                 try {
-                    result.add(json.decodeFromString<EventEnvelope>(line))
+                    result.add(json.decodeFromString<NarrativeEvent>(line))
                 } catch (e: Exception) {
                     Output.error("Failed to parse line ${index + 1} of $file: ${e.message}")
                 }

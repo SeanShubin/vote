@@ -549,10 +549,12 @@ class ServiceImpl(
         val candidates = queryModel.listCandidates(electionName)
         val tiers = queryModel.listTiers(electionName)
         val ballots = queryModel.listBallots(electionName)
-        // Tiers participate in the pairwise tally as if they were candidates,
-        // so the algorithm can place each real candidate relative to the tier
-        // markers ("in tier X" = beats tier X but loses to tier X-1). When
-        // there are no tiers, the call is identical to the pre-tier behavior.
+        // Tier markers participate in the pairwise tally as virtual
+        // candidates, so the algorithm can place each real candidate
+        // relative to them. A candidate's tier in the result is the
+        // hardest tier they cleared — i.e. they pairwise-beat that tier
+        // marker but not the next one above it. When there are no tiers,
+        // the call is identical to the pre-tier behavior.
         // Secret-ballot toggle dropped — tally always shows ranked ballots.
         return Tally.countBallots(
             electionName = electionName,
