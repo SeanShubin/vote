@@ -48,6 +48,7 @@ import com.seanshubin.vote.tools.commands.ServeFrontend
 import com.seanshubin.vote.tools.commands.SetupTestBallot
 import com.seanshubin.vote.tools.commands.TerminateAll
 import com.seanshubin.vote.tools.commands.TestLifecycle
+import com.seanshubin.vote.tools.commands.WorktreeSync
 
 class VoteDev : CliktCommand(name = "vote-dev") {
     override fun help(context: com.github.ajalt.clikt.core.Context) =
@@ -103,7 +104,8 @@ fun main(args: Array<String>) {
             LaunchScenarioMysql(),
             LaunchScenarioDynamodb(),
             SetupTestBallot(),
-            TestLifecycle()
+            TestLifecycle(),
+            WorktreeSync()
         )
         .main(args)
 }

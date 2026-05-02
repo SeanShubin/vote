@@ -53,6 +53,7 @@ scripts/dev inspect-mysql-all         Dump all MySQL tables
 scripts/dev inspect-mysql-raw-query   Run an arbitrary SQL query
 scripts/dev inspect-mysql-raw-schema  Show MySQL DDL, indexes, constraints
 scripts/dev inspect-dynamodb-...      Various DynamoDB inspection commands
+scripts/dev worktree-sync             Reset clean auxiliary worktrees to master; flag any with pending changes
 ```
 
 Run `scripts/dev --help` for the authoritative subcommand list.
