@@ -107,6 +107,23 @@ Resources:
                 Action:
                   - secretsmanager:GetRandomPassword
                 Resource: "*"
+        # SSM Parameter Store perms scoped to project-prefixed parameters.
+        # Required so CFN can manage AWS::SSM::Parameter resources (e.g. the
+        # invite-code parameter created by the application stack).
+        - PolicyName: SsmParameterProjectScope
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ssm:PutParameter
+                  - ssm:GetParameter
+                  - ssm:GetParameters
+                  - ssm:DeleteParameter
+                  - ssm:AddTagsToResource
+                  - ssm:RemoveTagsFromResource
+                  - ssm:ListTagsForResource
+                Resource: !Sub "arn:aws:ssm:*:${AWS::AccountId}:parameter/pairwisevote-*"
 
   # S3 bucket where CI uploads packaged Lambda artifacts. CFN's `package`
   # command rewrites local CodeUri references to s3://... pointers in this bucket.
