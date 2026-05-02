@@ -75,6 +75,38 @@ fun VoteApp(apiClient: ApiClient) {
         return
     }
 
+    // NO_ACCESS is the lock-out role: the user is registered but an admin has
+    // not granted them any permissions. Every authenticated endpoint requires
+    // VIEW_APPLICATION (≥ OBSERVER), so navigating into the app would just
+    // produce a wall of 401s. Show a dedicated stub instead, with the only
+    // actions they actually can take: log out, or self-delete their account.
+    // Public pages (login/register/password-reset) still render normally so
+    // they aren't trapped in the stub if they ended up there with stale state.
+    if (role == Role.NO_ACCESS && !isPublicPage(router.currentPage)) {
+        LockedPage(
+            apiClient = apiClient,
+            userName = userName ?: "Unknown",
+            onLogout = {
+                scope.launch {
+                    try {
+                        apiClient.logout()
+                    } catch (e: Exception) {
+                        apiClient.logErrorToServer(e)
+                    }
+                    userName = null
+                    role = null
+                    router.replace(Page.Login)
+                }
+            },
+            onAccountDeleted = {
+                userName = null
+                role = null
+                router.replace(Page.Login)
+            },
+        )
+        return
+    }
+
     when (val page = router.currentPage) {
         is Page.Login -> LoginPage(
             apiClient = apiClient,
@@ -203,5 +235,56 @@ fun VoteApp(apiClient: ApiClient) {
 private fun LoadingPage() {
     Div({ classes("container") }) {
         P { Text("Loading...") }
+    }
+}
+
+@Composable
+private fun LockedPage(
+    apiClient: ApiClient,
+    userName: String,
+    onLogout: () -> Unit,
+    onAccountDeleted: () -> Unit,
+) {
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+    val deleteAction = rememberAsyncAction(
+        apiClient = apiClient,
+        fallbackErrorMessage = "Failed to delete account",
+        onError = { errorMessage = it },
+        action = {
+            apiClient.removeUser(userName)
+            onAccountDeleted()
+        },
+    )
+
+    Div({ classes("container") }) {
+        H1 { Text("Awaiting approval") }
+        P { Text("Hello, $userName.") }
+        P {
+            Text(
+                "Your account is registered, but an administrator has not yet " +
+                    "granted you access to the application. Once they assign you " +
+                    "a role, you will be able to log in and use the app. Try " +
+                    "again in a little while."
+            )
+        }
+
+        if (errorMessage != null) {
+            Div({ classes("error") }) { Text(errorMessage!!) }
+        }
+
+        Div({ classes("button-row") }) {
+            Button({ onClick { onLogout() } }) { Text("Log out") }
+            Button({
+                if (deleteAction.isLoading) attr("disabled", "")
+                onClick {
+                    val confirmed = kotlinx.browser.window.confirm(
+                        "Delete your account? This cannot be undone."
+                    )
+                    if (confirmed) deleteAction.invoke()
+                }
+            }) {
+                Text(if (deleteAction.isLoading) "Deleting…" else "Delete Account")
+            }
+        }
     }
 }
