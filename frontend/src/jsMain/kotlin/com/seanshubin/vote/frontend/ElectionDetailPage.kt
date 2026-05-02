@@ -540,21 +540,75 @@ fun TallyView(
     }
 }
 
+/**
+ * Lets the viewer toggle individual ballots on/off and watch the Winners
+ * list recompute against the active subset. Local-only: no persisted state,
+ * no effect on other viewers — leaving the page resets to "all on". The full
+ * Tally.countBallots pipeline (Schulze strongest paths + place grouping)
+ * lives in the shared `domain` module so the frontend can rerun it directly.
+ *
+ * Only `Ballot.Revealed` ballots are toggleable: secret ballots strip the
+ * voter identity and Tally.countBallots only accepts revealed input. With the
+ * current `secretBallot = false` setting, every ballot is revealed.
+ *
+ * The toggle does not flow into the Preferences / Strongest Paths detail
+ * pages — those are separate routes that fetch their own (unfiltered) tally.
+ */
 @Composable
 private fun renderTally(
-    tally: Tally,
+    serverTally: Tally,
     onNavigateToPreferences: () -> Unit,
     onNavigateToStrongestPaths: () -> Unit,
 ) {
-    P { Text("Total Ballots: ${tally.ballots.size}") }
+    val revealed = serverTally.ballots.filterIsInstance<Ballot.Revealed>()
+    val totalToggleable = revealed.size
+
+    var active by remember(serverTally.electionName, totalToggleable) {
+        mutableStateOf(revealed.map { it.confirmation }.toSet())
+    }
+
+    val allOn = revealed.isEmpty() || active.size == totalToggleable
+    val displayTally = if (allOn) {
+        serverTally
+    } else {
+        Tally.countBallots(
+            electionName = serverTally.electionName,
+            secretBallot = serverTally.secretBallot,
+            candidates = serverTally.candidateNames,
+            ballots = revealed.filter { it.confirmation in active },
+        )
+    }
+
+    P {
+        Text(
+            if (allOn) {
+                "Total Ballots: ${serverTally.ballots.size}"
+            } else {
+                "Active Ballots: ${active.size} of $totalToggleable"
+            }
+        )
+    }
 
     H3 { Text("Winners") }
-    if (tally.places.isEmpty()) {
+    if (displayTally.places.isEmpty()) {
         P { Text("No winners yet") }
     } else {
-        tally.places.forEach { place ->
+        displayTally.places.forEach { place ->
             P { Text("Place ${place.rank}: ${place.candidateName}") }
         }
+    }
+
+    if (revealed.isNotEmpty()) {
+        renderBallotToggles(
+            ballots = revealed,
+            active = active,
+            onToggle = { confirmation ->
+                active = if (confirmation in active) active - confirmation else active + confirmation
+            },
+            onSetAll = { all ->
+                active = if (all) revealed.map { it.confirmation }.toSet() else emptySet()
+            },
+        )
     }
 
     // Detail tables (preferences, strongest paths) live on their own
@@ -563,6 +617,41 @@ private fun renderTally(
     Div({ classes("button-row") }) {
         Button({ onClick { onNavigateToPreferences() } }) { Text("View Preferences") }
         Button({ onClick { onNavigateToStrongestPaths() } }) { Text("View Strongest Paths") }
+    }
+}
+
+@Composable
+private fun renderBallotToggles(
+    ballots: List<Ballot.Revealed>,
+    active: Set<String>,
+    onToggle: (String) -> Unit,
+    onSetAll: (Boolean) -> Unit,
+) {
+    H3 { Text("Ballots") }
+    P {
+        Text(
+            "Toggle ballots off to see how the Winners would change without them. " +
+                "This only affects your view — nothing is saved."
+        )
+    }
+
+    Div({ classes("button-row") }) {
+        Button({ onClick { onSetAll(true) } }) { Text("All") }
+        Button({ onClick { onSetAll(false) } }) { Text("None") }
+    }
+
+    Div({ classes("ballot-toggle-list") }) {
+        ballots.forEach { ballot ->
+            val isOn = ballot.confirmation in active
+            Div({
+                classes("ballot-toggle-item")
+                if (!isOn) classes("is-off")
+                onClick { onToggle(ballot.confirmation) }
+            }) {
+                Span({ classes("ballot-toggle-switch") }) {}
+                Span({ classes("ballot-toggle-name") }) { Text(ballot.voterName) }
+            }
+        }
     }
 }
 
