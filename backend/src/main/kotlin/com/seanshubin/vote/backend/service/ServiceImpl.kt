@@ -148,10 +148,10 @@ class ServiceImpl(
         val event = if (role == Role.PRIMARY_ROLE) {
             DomainEvent.OwnershipTransferred(
                 fromUserName = accessToken.userName,
-                toUserName = userName,
+                toUserName = targetUser.name,
             )
         } else {
-            DomainEvent.UserRoleChanged(userName, role)
+            DomainEvent.UserRoleChanged(targetUser.name, role)
         }
         eventLog.appendEvent(accessToken.userName, clock.now(), event)
         synchronize()
@@ -161,7 +161,7 @@ class ServiceImpl(
         val targetUser = queryModel.searchUserByName(userName)
             ?: throw ServiceException(ServiceException.Category.NOT_FOUND, "User not found: $userName")
 
-        if (isSelf(accessToken, userName)) {
+        if (isSelf(accessToken, targetUser.name)) {
             // Self-delete — anyone can leave the system, with two integrity rules:
             // 1. You must delete your own elections first, so removing you can't
             //    leave orphan elections pointing at a non-existent owner.
@@ -179,7 +179,7 @@ class ServiceImpl(
                     )
                 }
             } else {
-                val ownedElections = queryModel.listElections().count { it.ownerName == userName }
+                val ownedElections = queryModel.electionsOwnedCount(targetUser.name)
                 if (ownedElections > 0) {
                     throw ServiceException(
                         ServiceException.Category.UNSUPPORTED,
@@ -197,7 +197,7 @@ class ServiceImpl(
         eventLog.appendEvent(
             accessToken.userName,
             clock.now(),
-            DomainEvent.UserRemoved(userName)
+            DomainEvent.UserRemoved(targetUser.name)
         )
         synchronize()
     }
@@ -223,8 +223,10 @@ class ServiceImpl(
         val validElectionName = Validation.validateElectionName(electionName)
         val validDescription = Validation.validateElectionDescription(description)
 
-        // Ensure user exists
-        queryModel.searchUserByName(validUserName)
+        // Ensure user exists; resolve to the canonical-case stored name so the
+        // owner_name we record matches whatever case the user registered with,
+        // even if the caller passed a different case.
+        val owner = queryModel.searchUserByName(validUserName)
             ?: throw ServiceException(ServiceException.Category.NOT_FOUND, "User not found: $validUserName")
 
         // Ensure election name is unique
@@ -236,7 +238,7 @@ class ServiceImpl(
         eventLog.appendEvent(
             accessToken.userName,
             clock.now(),
-            DomainEvent.ElectionCreated(validUserName, validElectionName, validDescription)
+            DomainEvent.ElectionCreated(owner.name, validElectionName, validDescription)
         )
         synchronize()
     }
@@ -263,7 +265,7 @@ class ServiceImpl(
         requirePermission(accessToken, Permission.USE_APPLICATION)
         val targetUser = queryModel.searchUserByName(userName)
             ?: throw ServiceException(ServiceException.Category.NOT_FOUND, "User not found: $userName")
-        if (!isSelf(accessToken, userName)) {
+        if (!isSelf(accessToken, targetUser.name)) {
             // Editing another user is a moderation action — needs MANAGE_USERS
             // and a strictly higher role than the target.
             requirePermission(accessToken, Permission.MANAGE_USERS)
@@ -274,15 +276,17 @@ class ServiceImpl(
         val validNewUserName = userUpdates.userName?.let { Validation.validateUserName(it) }
         val validNewEmail = userUpdates.email?.let { Validation.validateEmail(it) }
 
-        // Check for conflicts
+        // Conflict checks: a hit on a *different* user is a conflict; a hit on
+        // the same user (e.g. case-only rename "Alice" → "alice") is allowed.
         validNewUserName?.let { newName ->
-            require(queryModel.searchUserByName(newName) == null || newName == userName) {
+            val conflict = queryModel.searchUserByName(newName)
+            require(conflict == null || conflict.name == targetUser.name) {
                 "User name already exists: $newName"
             }
         }
         validNewEmail?.let { newEmail ->
             val existingUser = queryModel.searchUserByEmail(newEmail)
-            require(existingUser == null || existingUser.name == userName) {
+            require(existingUser == null || existingUser.name == targetUser.name) {
                 "Email already exists: $newEmail"
             }
         }
@@ -292,14 +296,14 @@ class ServiceImpl(
             eventLog.appendEvent(
                 accessToken.userName,
                 clock.now(),
-                DomainEvent.UserNameChanged(userName, it)
+                DomainEvent.UserNameChanged(targetUser.name, it)
             )
         }
         validNewEmail?.let {
             eventLog.appendEvent(
                 accessToken.userName,
                 clock.now(),
-                DomainEvent.UserEmailChanged(userName, it)
+                DomainEvent.UserEmailChanged(targetUser.name, it)
             )
         }
         synchronize()
@@ -333,7 +337,7 @@ class ServiceImpl(
                 ServiceException.Category.NOT_FOUND,
                 "Election '$electionName' not found"
             )
-        val isOwnerOfElection = election.ownerName == accessToken.userName
+        val isOwnerOfElection = election.ownerName.equals(accessToken.userName, ignoreCase = true)
         val canModerate = hasPermission(accessToken, Permission.MANAGE_USERS)
         if (!isOwnerOfElection && !canModerate) {
             throw ServiceException(
@@ -471,8 +475,10 @@ class ServiceImpl(
         val validRankings = Validation.validateRankings(rankings)
 
         // Identity check: the body's voterName ("what") must match the token's userName ("who").
+        // Compared case-insensitively because usernames are case-insensitive for lookup;
+        // the canonical case (accessToken.userName) is what gets recorded on the ballot.
         // No proxy/delegation is supported today; if it ever is, gate it on an explicit permission.
-        if (validVoterName != accessToken.userName) {
+        if (!validVoterName.equals(accessToken.userName, ignoreCase = true)) {
             throw ServiceException(
                 ServiceException.Category.UNAUTHORIZED,
                 "Cannot cast ballot as $validVoterName when authenticated as ${accessToken.userName}"
@@ -498,7 +504,7 @@ class ServiceImpl(
         eventLog.appendEvent(
             accessToken.userName,
             whenCast,
-            DomainEvent.BallotCast(validVoterName, validElectionName, validRankings, confirmation, whenCast)
+            DomainEvent.BallotCast(accessToken.userName, validElectionName, validRankings, confirmation, whenCast)
         )
         synchronize()
         return confirmation
@@ -512,8 +518,9 @@ class ServiceImpl(
         val validElectionName = Validation.validateElectionName(electionName)
 
         // Identity check mirrors castBallot: only the authenticated voter can
-        // remove their own ballot. No moderator / proxy path today.
-        if (validVoterName != accessToken.userName) {
+        // remove their own ballot. Case-insensitive to match the username
+        // semantics; canonical case is recorded on the event.
+        if (!validVoterName.equals(accessToken.userName, ignoreCase = true)) {
             throw ServiceException(
                 ServiceException.Category.UNAUTHORIZED,
                 "Cannot delete ballot for $validVoterName when authenticated as ${accessToken.userName}"
@@ -525,14 +532,14 @@ class ServiceImpl(
 
         // Idempotent: if no ballot exists, the post-condition (no ballot) already
         // holds, so emit nothing rather than throwing.
-        queryModel.searchBallot(validVoterName, validElectionName)
+        queryModel.searchBallot(accessToken.userName, validElectionName)
             ?: return
 
         // EXECUTION SECTION
         eventLog.appendEvent(
             accessToken.userName,
             clock.now(),
-            DomainEvent.BallotDeleted(validVoterName, validElectionName)
+            DomainEvent.BallotDeleted(accessToken.userName, validElectionName)
         )
         synchronize()
     }
@@ -686,7 +693,7 @@ class ServiceImpl(
     }
 
     private fun isSelf(accessToken: AccessToken, userName: String): Boolean {
-        return accessToken.userName == userName
+        return accessToken.userName.equals(userName, ignoreCase = true)
     }
 
     /**
@@ -710,7 +717,7 @@ class ServiceImpl(
                 ServiceException.Category.NOT_FOUND,
                 "Election '$electionName' not found"
             )
-        if (election.ownerName != accessToken.userName) {
+        if (!election.ownerName.equals(accessToken.userName, ignoreCase = true)) {
             throw ServiceException(
                 ServiceException.Category.UNAUTHORIZED,
                 "User ${accessToken.userName} is not the owner of election '$electionName'"

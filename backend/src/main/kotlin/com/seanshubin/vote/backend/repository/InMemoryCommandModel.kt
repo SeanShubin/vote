@@ -24,21 +24,22 @@ class InMemoryCommandModel(private val data: InMemoryData) : CommandModel {
         hash: String,
         role: Role
     ) {
-        data.users[userName] = InMemoryData.UserData(userName, email, salt, hash, role)
+        data.users[userName.lowercase()] = InMemoryData.UserData(userName, email, salt, hash, role)
     }
 
     override fun setRole(authority: String, userName: String, role: Role) {
-        val user = data.users[userName] ?: error("User not found: $userName")
-        data.users[userName] = user.copy(role = role)
+        val key = userName.lowercase()
+        val user = data.users[key] ?: error("User not found: $userName")
+        data.users[key] = user.copy(role = role)
     }
 
     override fun removeUser(authority: String, userName: String) {
-        data.users.remove(userName)
+        data.users.remove(userName.lowercase())
         // Cascade: drop any ballots this user cast (matches MySQL FK CASCADE on
         // ballots.voter_name → users(name)). Without this, removing a voter would
         // leave their ballot rows pointing at a non-existent user.
         data.ballots.entries
-            .filter { (_, ballot) -> ballot.voterName == userName }
+            .filter { (_, ballot) -> ballot.voterName.equals(userName, ignoreCase = true) }
             .map { it.key }
             .forEach { data.ballots.remove(it) }
     }
@@ -102,7 +103,7 @@ class InMemoryCommandModel(private val data: InMemoryData) : CommandModel {
         confirmation: String,
         now: Instant
     ) {
-        val key = electionName to voterName
+        val key = electionName to voterName.lowercase()
         data.ballots[key] = InMemoryData.BallotData(
             voterName = voterName,
             electionName = electionName,
@@ -132,39 +133,46 @@ class InMemoryCommandModel(private val data: InMemoryData) : CommandModel {
     }
 
     override fun deleteBallot(authority: String, voterName: String, electionName: String) {
-        data.ballots.remove(electionName to voterName)
+        data.ballots.remove(electionName to voterName.lowercase())
     }
 
     override fun setPassword(authority: String, userName: String, salt: String, hash: String) {
-        val user = data.users[userName] ?: error("User not found: $userName")
-        data.users[userName] = user.copy(salt = salt, hash = hash)
+        val key = userName.lowercase()
+        val user = data.users[key] ?: error("User not found: $userName")
+        data.users[key] = user.copy(salt = salt, hash = hash)
     }
 
     override fun setUserName(authority: String, oldUserName: String, newUserName: String) {
-        val user = data.users[oldUserName] ?: error("User not found: $oldUserName")
-        data.users.remove(oldUserName)
-        data.users[newUserName] = user.copy(name = newUserName)
+        val oldKey = oldUserName.lowercase()
+        val newKey = newUserName.lowercase()
+        val user = data.users[oldKey] ?: error("User not found: $oldUserName")
+        if (oldKey != newKey) {
+            data.users.remove(oldKey)
+        }
+        data.users[newKey] = user.copy(name = newUserName)
 
-        // Update election ownership
+        // Update election ownership — match the previous canonical name case-insensitively
+        // since stored values may differ in case from what was passed in.
         data.elections.values
-            .filter { it.ownerName == oldUserName }
+            .filter { it.ownerName.equals(oldUserName, ignoreCase = true) }
             .forEach { election ->
                 data.elections[election.electionName] = election.copy(ownerName = newUserName)
             }
 
         // Update ballots
         val ballotsToUpdate = data.ballots.entries
-            .filter { it.value.voterName == oldUserName }
+            .filter { it.value.voterName.equals(oldUserName, ignoreCase = true) }
             .toList()
         ballotsToUpdate.forEach { (key, ballot) ->
             data.ballots.remove(key)
-            val newKey = key.first to newUserName
-            data.ballots[newKey] = ballot.copy(voterName = newUserName)
+            val newBallotKey = key.first to newKey
+            data.ballots[newBallotKey] = ballot.copy(voterName = newUserName)
         }
     }
 
     override fun setEmail(authority: String, userName: String, email: String) {
-        val user = data.users[userName] ?: error("User not found: $userName")
-        data.users[userName] = user.copy(email = email)
+        val key = userName.lowercase()
+        val user = data.users[key] ?: error("User not found: $userName")
+        data.users[key] = user.copy(email = email)
     }
 }

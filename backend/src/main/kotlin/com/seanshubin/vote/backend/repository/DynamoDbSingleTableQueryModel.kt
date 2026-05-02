@@ -42,7 +42,9 @@ class DynamoDbSingleTableQueryModel(
                 tableName = DynamoDbSingleTableSchema.MAIN_TABLE
                 indexName = DynamoDbSingleTableSchema.EMAIL_INDEX
                 keyConditionExpression = "GSI1PK = :email"
-                expressionAttributeValues = mapOf(":email" to AttributeValue.S(email))
+                expressionAttributeValues = mapOf(
+                    ":email" to AttributeValue.S(DynamoDbSingleTableSchema.emailKey(email))
+                )
             })
 
             response.items?.firstOrNull()?.let { itemToUser(it) }
