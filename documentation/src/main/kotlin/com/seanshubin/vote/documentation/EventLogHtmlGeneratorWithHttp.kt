@@ -133,6 +133,11 @@ class EventLogHtmlGeneratorWithHttp(private val recorder: DocumentationRecorder)
             "Added candidates to <strong>${event.electionName}</strong>: ${event.candidateNames.joinToString(", ")}"
         is DomainEvent.CandidatesRemoved ->
             "Removed candidates from <strong>${event.electionName}</strong>: ${event.candidateNames.joinToString(", ")}"
+        is DomainEvent.TiersSet ->
+            if (event.tierNames.isEmpty())
+                "Tiers cleared for <strong>${event.electionName}</strong>"
+            else
+                "Tiers set for <strong>${event.electionName}</strong>: ${event.tierNames.joinToString(", ")}"
         is DomainEvent.BallotCast -> {
             val rankings = event.rankings.sortedBy { it.rank }.take(3)
                 .joinToString(" > ") { "${it.candidateName}" }
@@ -193,6 +198,10 @@ class EventLogHtmlGeneratorWithHttp(private val recorder: DocumentationRecorder)
         is DomainEvent.CandidatesRemoved -> """
             <div class="detail-row"><span class="label">Election:</span> ${event.electionName}</div>
             <div class="detail-row"><span class="label">Candidates:</span> ${event.candidateNames.joinToString(", ")}</div>
+        """.trimIndent()
+        is DomainEvent.TiersSet -> """
+            <div class="detail-row"><span class="label">Election:</span> ${event.electionName}</div>
+            <div class="detail-row"><span class="label">Tiers:</span> ${event.tierNames.joinToString(", ")}</div>
         """.trimIndent()
         is DomainEvent.BallotCast -> """
             <div class="detail-row"><span class="label">Voter:</span> ${event.voterName}</div>
