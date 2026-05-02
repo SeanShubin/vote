@@ -48,6 +48,42 @@ Raw storage shows how data is ACTUALLY stored:
 - `./scripts/inspect-mysql-raw-schema` - MySQL table DDL and indexes
 - `./scripts/inspect-mysql-raw-query '<sql>'` - Execute arbitrary SQL
 
+## Inspecting Production Data
+
+**Every `inspect-dynamodb-*` command accepts a `--prod` flag** that targets the
+real AWS DynamoDB tables (region `us-east-1`) instead of DynamoDB Local. Output
+includes a `Target:` line so you can tell at a glance which environment you're
+looking at.
+
+This is the primary way an AI assistant can pull live production state into the
+conversation when the user asks "why is X happening in prod?". Pipe the output
+into your context and reason from there — same data shape as local, no extra
+parsing required.
+
+```bash
+# Dump the entire prod DynamoDB single-table picture to the console
+scripts/dev inspect-dynamodb-all --prod
+
+# Just the prod event log (most useful for debugging "what got recorded?")
+scripts/dev inspect-dynamodb-event-log --prod
+
+# Raw view of a specific prod table
+scripts/dev inspect-dynamodb-raw vote_data --prod
+```
+
+**Credential expectations**: the command uses the default AWS credential chain
+(env vars, `~/.aws/credentials`, SSO). The caller must already be authenticated
+for the target account. If you see an authentication error, ask the user to log
+in — do not attempt to set credentials yourself.
+
+**No `--prod` for MySQL inspect commands**: MySQL is a local-only backend in
+this project; production runs on DynamoDB. If a user asks to inspect prod
+MySQL, point them back here.
+
+**Sister commands** that also accept `--prod`: `backup-dynamodb`,
+`restore-dynamodb`, `nuke-dynamodb`. The first is the canonical way to take a
+full event-log snapshot to a JSONL file (vs. inspect, which streams to stdout).
+
 ## Debugging Workflow
 
 ### Step 1: Identify the Problem (Admin View)

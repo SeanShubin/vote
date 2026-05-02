@@ -52,7 +52,7 @@ scripts/dev test-lifecycle            End-to-end lifecycle test
 scripts/dev inspect-mysql-all         Dump all MySQL tables
 scripts/dev inspect-mysql-raw-query   Run an arbitrary SQL query
 scripts/dev inspect-mysql-raw-schema  Show MySQL DDL, indexes, constraints
-scripts/dev inspect-dynamodb-...      Various DynamoDB inspection commands
+scripts/dev inspect-dynamodb-...      Various DynamoDB inspection commands (pass --prod to target AWS instead of local)
 scripts/dev worktree-sync             Reset clean auxiliary worktrees to master; flag any with pending changes
 ```
 
