@@ -89,7 +89,7 @@ object Validation {
             ranking.rank?.let { rank ->
                 require(rank > 0) { "Rank must be positive, was $rank for candidate: $validCandidateName" }
             }
-            Ranking(validCandidateName, ranking.rank)
+            Ranking(validCandidateName, ranking.rank, ranking.kind)
         }
     }
 

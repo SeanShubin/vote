@@ -401,34 +401,38 @@ button:disabled {
 }
 
 /*
- * Tier fieldsets — one per tier, containing the candidate rows that belong
- * to that tier. The legend doubles as the tier-select control. Selected
- * tier gets a thick accent border so it's visually unambiguous which tier
- * a chip-click will drop into.
+ * Tier cards — one per tier, containing the candidate rows that belong to
+ * that tier. The whole card is the click target for tier-select (replaces
+ * the previous fieldset/legend so the click lands reliably anywhere on the
+ * card, not just the legend text). Selected tier gets a thick accent border
+ * so it's visually unambiguous which tier a chip-click drops into; the
+ * highlight is suppressed by JS (no `-selected` class is added) once the
+ * arena is empty, since selection is meaningless then.
  */
-.ranked-ballot-tier-fieldset {
+.ranked-ballot-tier {
     border: 1px solid #d6cca0;
     border-radius: 6px;
     padding: 0.4rem 0.75rem 0.6rem;
     margin: 0.6rem 0;
     background: #fbf9f1;
+    cursor: pointer;
 }
 
-.ranked-ballot-tier-fieldset-selected {
+.ranked-ballot-tier-selected {
     border: 3px solid #2c7be5;
     padding: calc(0.4rem - 2px) calc(0.75rem - 2px) calc(0.6rem - 2px);
     background: #f0f6ff;
 }
 
-.ranked-ballot-tier-legend {
-    cursor: pointer;
-    padding: 0 0.4rem;
+.ranked-ballot-tier-title {
+    display: block;
+    padding: 0.2rem 0;
     font-weight: 600;
     color: #34495e;
     user-select: none;
 }
 
-.ranked-ballot-tier-legend:hover {
+.ranked-ballot-tier:hover .ranked-ballot-tier-title {
     color: #2c7be5;
 }
 

@@ -1,6 +1,7 @@
 package com.seanshubin.vote.backend.validation
 
 import com.seanshubin.vote.domain.Ranking
+import com.seanshubin.vote.domain.RankingKind
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -51,6 +52,22 @@ class ValidationTest {
         val rankings = listOf(Ranking("Alice", null), Ranking("Bob", 1))
         val valid = Validation.validateRankings(rankings)
         assertEquals(2, valid.size)
+    }
+
+    @Test
+    fun `validateRankings preserves the kind field`() {
+        // Regression: previously validateRankings reconstructed Ranking
+        // without `kind`, dropping every TIER marker back to CANDIDATE.
+        // That broke ballot persistence in tier mode — the frontend's
+        // reload couldn't find any tier markers and reset the ballot.
+        val rankings = listOf(
+            Ranking("Alice", 1, RankingKind.CANDIDATE),
+            Ranking("Tier 1", 2, RankingKind.TIER),
+            Ranking("Bob", 3, RankingKind.CANDIDATE),
+            Ranking("Tier 2", 4, RankingKind.TIER),
+        )
+        val valid = Validation.validateRankings(rankings)
+        assertEquals(rankings.map { it.kind }, valid.map { it.kind })
     }
 
     // validateRankingsMatchCandidates tests
