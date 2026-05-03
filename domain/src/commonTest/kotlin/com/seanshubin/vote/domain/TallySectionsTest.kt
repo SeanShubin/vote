@@ -81,11 +81,12 @@ class TallySectionsTest {
     }
 
     @Test
-    fun `tying with a tier marker means did not clear`() {
+    fun `tying with a tier marker renders between that tier and the next`() {
         // Strict-precedence rule: a candidate clears tier T iff their
         // Schulze rank is *strictly less than* T's marker rank. Alice
-        // tied with Tier1 here, so she does not clear it; she falls into
-        // the next-lower section (Tier2, which she beats strictly).
+        // tied with Tier1 here, so she does not clear it — but she also
+        // didn't fall below it. She renders in a naked row list directly
+        // after Tier1's (empty) card, visibly between Tier1 and Tier2.
         // Schulze ranks:
         //   1 Alice
         //   1 Tier1   (tied with Alice)
@@ -104,10 +105,59 @@ class TallySectionsTest {
             listOf(
                 // Tier1 is empty — Alice did not strictly clear it.
                 TallySection("Tier1", emptyList()),
-                // Tier2 contains Alice (rank 1 < 4) and Bob (rank 3 < 4).
-                TallySection("Tier2", listOf(Place(1, "Alice"), Place(2, "Bob"))),
+                // Naked row list between Tier1 and Tier2 — Alice tied at the boundary.
+                TallySection(null, listOf(Place(1, "Alice"))),
+                // Tier2 contains Bob (rank 3 < 4). Alice already claimed.
+                TallySection("Tier2", listOf(Place(2, "Bob"))),
                 // Charlie (rank 5) cleared no tier.
                 TallySection(null, listOf(Place(3, "Charlie"))),
+            ),
+            sections,
+        )
+    }
+
+    @Test
+    fun `two candidates symmetrically tied with the top tier render between cards`() {
+        // The motivating example: V1 ranks Alice > Excellent > Bob > Good,
+        // V2 ranks Bob > Excellent > Alice > Good. Schulze pairwise:
+        //   Alice ~ Bob, Alice ~ Excellent, Bob ~ Excellent
+        //   Alice > Good, Bob > Good, Excellent > Good
+        // After adjustForTies, Alice/Bob/Excellent share rank 1, Good is rank 4.
+        val places = listOf(
+            Place(1, "Alice"),
+            Place(1, "Bob"),
+            Place(1, "Excellent"),
+            Place(4, "Good"),
+        )
+        val sections = tallySections(places, tiers = listOf("Excellent", "Good"))
+        assertEquals(
+            listOf(
+                // Nobody strictly cleared Excellent.
+                TallySection("Excellent", emptyList()),
+                // Alice and Bob tied at the boundary — naked row between cards.
+                TallySection(null, listOf(Place(1, "Alice"), Place(1, "Bob"))),
+                // Nobody else cleared Good (Alice/Bob already claimed at the boundary).
+                TallySection("Good", emptyList()),
+            ),
+            sections,
+        )
+    }
+
+    @Test
+    fun `tying with the bottom tier renders after that tier's card`() {
+        val places = listOf(
+            Place(1, "Alice"),
+            Place(2, "Tier1"),
+            Place(3, "Tier2"),
+            Place(3, "Bob"),
+        )
+        val sections = tallySections(places, tiers = listOf("Tier1", "Tier2"))
+        assertEquals(
+            listOf(
+                TallySection("Tier1", listOf(Place(1, "Alice"))),
+                // Bob tied with Tier2 — emitted after Tier2's (empty) card.
+                TallySection("Tier2", emptyList()),
+                TallySection(null, listOf(Place(2, "Bob"))),
             ),
             sections,
         )

@@ -2,9 +2,13 @@ package com.seanshubin.vote.domain
 
 /**
  * One contiguous chunk of the placings on the Results view. [tierName]
- * is the tier-marker label whose card the [places] sit inside; null
- * means "below the bottom tier" (or the entire list, when no tiers
- * are configured) and renders without a tier wrapper.
+ * non-null means a tier card with that label. [tierName] null means a
+ * naked row list — used for both candidates tied with a tier boundary
+ * (the section sits between two tier cards) and candidates that
+ * cleared no tier (the trailing section, or the entire list when no
+ * tiers are configured). The renderer doesn't need to distinguish the
+ * two null cases: position in the section list communicates which is
+ * which, and the contents are formatted identically either way.
  */
 data class TallySection(val tierName: String?, val places: List<Place>)
 
@@ -23,15 +27,17 @@ data class TallySection(val tierName: String?, val places: List<Place>)
  *    in the display.
  *
  * 2. **Assign tier sections.** A candidate **clears** tier T iff
- *    their Schulze rank is *strictly less than* T's marker rank.
- *    This matches the ballot-side rule (a voter ranks a candidate
- *    *ahead of* a marker to clear it). A tie with the marker means
- *    the pairwise tally couldn't establish strict precedence either
- *    way, so by convention the candidate falls into the next-lower
- *    section. Walks [tiers] top-first (the list is given in declared,
- *    top-first order); each tier claims every still-unclaimed
- *    candidate that strictly beat its marker. Anything left lands
- *    in the trailing no-tier section ([TallySection.tierName] = null).
+ *    their Schulze rank is *strictly less than* T's marker rank,
+ *    mirroring the ballot-side rule (a voter ranks a candidate
+ *    *ahead of* a marker to clear it). A candidate **ties** with T
+ *    iff their Schulze rank *equals* T's — the pairwise tally
+ *    couldn't establish strict precedence either way. Cleared
+ *    candidates render inside that tier's card; tied candidates
+ *    render in a naked row list immediately after the card,
+ *    visibly between the tier above and the tier below. Walks
+ *    [tiers] top-first; each tier claims every still-unclaimed
+ *    candidate cleared or tied with it. Anyone unclaimed at the end
+ *    cleared no tier and lands in a trailing naked row list.
  *
  * If the election has no tiers, every candidate lands in a single
  * no-tier section, which the renderer draws as a plain row list.
@@ -66,6 +72,15 @@ fun tallySections(places: List<Place>, tiers: List<String>): List<TallySection> 
             }
             add(TallySection(tierName, cleared))
             claimed.addAll(cleared.map { it.candidateName })
+
+            val tiedAtBoundary = displayPlaces.filter {
+                it.candidateName !in claimed &&
+                    schulzeRankByName.getValue(it.candidateName) == tierRank
+            }
+            if (tiedAtBoundary.isNotEmpty()) {
+                add(TallySection(null, tiedAtBoundary))
+                claimed.addAll(tiedAtBoundary.map { it.candidateName })
+            }
         }
         val rest = displayPlaces.filter { it.candidateName !in claimed }
         if (rest.isNotEmpty()) add(TallySection(null, rest))
