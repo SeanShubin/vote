@@ -16,6 +16,7 @@ import com.seanshubin.vote.tools.commands.DbSetupMysql
 import com.seanshubin.vote.tools.commands.DbTeardown
 import com.seanshubin.vote.tools.commands.DbTeardownDynamodb
 import com.seanshubin.vote.tools.commands.DbTeardownMysql
+import com.seanshubin.vote.tools.commands.GenerateScenarioEventLog
 import com.seanshubin.vote.tools.commands.InspectDynamodbAll
 import com.seanshubin.vote.tools.commands.InspectDynamodbBallots
 import com.seanshubin.vote.tools.commands.InspectDynamodbCandidates
@@ -33,7 +34,7 @@ import com.seanshubin.vote.tools.commands.InspectMysqlRawQuery
 import com.seanshubin.vote.tools.commands.InspectMysqlRawSchema
 import com.seanshubin.vote.tools.commands.LaunchFreshDynamodb
 import com.seanshubin.vote.tools.commands.LaunchFreshMysql
-import com.seanshubin.vote.tools.commands.LaunchFromProd
+import com.seanshubin.vote.tools.commands.LaunchFromSnapshot
 import com.seanshubin.vote.tools.commands.LaunchKeepDynamodb
 import com.seanshubin.vote.tools.commands.LaunchKeepMysql
 import com.seanshubin.vote.tools.commands.LaunchScenarioDynamodb
@@ -85,7 +86,7 @@ fun main(args: Array<String>) {
             LaunchFreshDynamodb(),
             LaunchKeepMysql(),
             LaunchKeepDynamodb(),
-            LaunchFromProd(),
+            LaunchFromSnapshot(),
             RunLocal(),
             InspectMysqlAll(),
             InspectMysqlRawQuery(),
@@ -103,6 +104,7 @@ fun main(args: Array<String>) {
             InspectDynamodbRawAll(),
             InspectDynamodbRawKeys(),
             ConvertScenarios(),
+            GenerateScenarioEventLog(),
             PadTables(),
             LaunchScenarioMysql(),
             LaunchScenarioDynamodb(),

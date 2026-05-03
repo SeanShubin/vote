@@ -43,11 +43,12 @@ scripts/dev launch-fresh-mysql        Fresh MySQL launch (purge + start everythi
 scripts/dev launch-fresh-dynamodb     Fresh DynamoDB launch (purge + start everything)
 scripts/dev launch-keep-mysql         Launch MySQL keeping existing data
 scripts/dev launch-keep-dynamodb      Launch DynamoDB keeping existing data
-scripts/dev launch-from-prod          Download prod event log to .local/, replay into local DynamoDB, then launch
+scripts/dev launch-from-snapshot      Replay a JSONL snapshot into local DynamoDB and launch (--prod to download fresh, --snapshot <file> to reuse)
 scripts/dev run-local                 Convenience: launch-fresh-dynamodb
 scripts/dev launch-scenario-mysql     Launch with scenario data preloaded (MySQL)
 scripts/dev launch-scenario-dynamodb  Launch with scenario data preloaded (DynamoDB)
-scripts/dev convert-scenarios         Convert condorcet3 input.txt files to scenario JSON
+scripts/dev convert-scenarios         Convert condorcet input.txt files to scenario JSON
+scripts/dev generate-scenario-event-log  Build one JSONL event log covering every scenario in scenario-data/ (use with launch-from-snapshot)
 scripts/dev setup-test-ballot         Create test users + election + ballots
 scripts/dev test-lifecycle            End-to-end lifecycle test
 scripts/dev inspect-mysql-all         Dump all MySQL tables

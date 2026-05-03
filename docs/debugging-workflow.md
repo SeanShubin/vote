@@ -84,38 +84,70 @@ MySQL, point them back here.
 `restore-dynamodb`, `nuke-dynamodb`. The first is the canonical way to take a
 full event-log snapshot to a JSONL file (vs. inspect, which streams to stdout).
 
-## Running Locally Against a Prod Snapshot
+## Running Locally Against a Snapshot
 
 When inspecting prod isn't enough — e.g., the bug only reproduces when you
 exercise the UI/API against the data — you can stand up a full local dev
-environment seeded from production:
+environment seeded from any JSONL event-log snapshot. The snapshot can come
+from prod or be generated synthetically.
+
+`launch-from-snapshot` requires exactly one source flag:
 
 ```bash
-# Download prod event log, replay into local DynamoDB, then start backend+frontend.
-scripts/dev launch-from-prod
+# Download a fresh prod event log, replay into local DynamoDB, launch.
+scripts/dev launch-from-snapshot --prod
+
+# Or replay an existing snapshot file (no download).
+scripts/dev launch-from-snapshot --snapshot .local/prod-snapshots/prod-snapshot-20260502-153012.jsonl
 ```
 
-Snapshots land in `.local/prod-snapshots/prod-snapshot-<timestamp>.jsonl`
-(`.local` is gitignored, so prod data never gets committed). Each invocation
-downloads a fresh snapshot by default.
-
-Reuse an existing snapshot (skips the download):
-
-```bash
-scripts/dev launch-from-prod --snapshot .local/prod-snapshots/prod-snapshot-20260502-153012.jsonl
-```
+Snapshots land in `.local/` (gitignored, so prod data never gets committed):
+- `--prod` → `.local/prod-snapshots/prod-snapshot-<timestamp>.jsonl`
+- generated → `.local/scenario-snapshots/scenarios.jsonl` (see below)
 
 Under the hood this is the same flow as `launch-fresh-dynamodb` with a restore
 inserted after the purge: terminate → roll logs → purge local → restore
-snapshot → build frontend → start backend → start frontend → open browser. Same
-AWS credential expectations as `inspect-dynamodb --prod`.
+snapshot → build frontend → start backend → start frontend → open browser. The
+`--prod` path uses the default AWS credential chain (env vars,
+`~/.aws/credentials`, SSO) — the caller must already be authenticated.
 
-**When to use this vs. just `--prod` inspect commands:**
+### Generated scenario snapshots
+
+`generate-scenario-event-log` produces a single JSONL event log that loads
+every condorcet test scenario in `scenario-data/` (skipping
+`07-ballot-can-have-ties` because the app does not support tied ranks within a
+ballot). All 8 remaining scenarios are owned by a single synthetic `owner`
+account; voter names that recur across scenarios share one user (so the same
+`Alice` votes in multiple elections). Election names are prefixed with the
+scenario number for easy locating in the UI (e.g. `01 - Contrast First Past
+The Post`).
+
+```bash
+# 1. Convert condorcet test data into per-scenario JSONs (idempotent).
+scripts/dev convert-scenarios --source D:/keep/github/sean/condorcet2/jvm/src/test/resources/test-data
+
+# 2. Synthesize a single event log covering every scenario.
+scripts/dev generate-scenario-event-log
+
+# 3. Launch locally with that snapshot loaded.
+scripts/dev launch-from-snapshot --snapshot .local/scenario-snapshots/scenarios.jsonl
+```
+
+The generator runs the real `ServiceImpl` in-process (with `InMemoryEventLog`
++ `RealPasswordUtil`), so the produced events are byte-compatible with what
+`backup-dynamodb` would capture from a live backend. All accounts use the
+password `password`.
+
+**When to use this vs. inspect commands or prod snapshots:**
 - `inspect-dynamodb-* --prod` — read-only; fastest path for "what's in prod
   right now?"
-- `launch-from-prod` — when you need to *interact with* prod-shaped data
-  locally (reproduce a UI bug, replay a sequence, run a write that you'd
+- `launch-from-snapshot --prod` — when you need to *interact with* prod-shaped
+  data locally (reproduce a UI bug, replay a sequence, run a write that you'd
   never run against real prod).
+- `launch-from-snapshot --snapshot .local/scenario-snapshots/scenarios.jsonl`
+  — when you want repeatable, synthetic data covering every voting algorithm
+  edge case (Schulze cycle, tactical voting, result ties, etc.) without
+  touching prod or AWS.
 
 ## Debugging Workflow
 
