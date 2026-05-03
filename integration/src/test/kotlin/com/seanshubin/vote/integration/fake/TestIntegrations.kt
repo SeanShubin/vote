@@ -1,6 +1,5 @@
 package com.seanshubin.vote.integration.fake
 
-import com.seanshubin.vote.backend.integration.TestAwareEmailSender
 import com.seanshubin.vote.contract.*
 import kotlinx.datetime.Instant
 
@@ -11,11 +10,12 @@ class TestIntegrations(
     override val uniqueIdGenerator: UniqueIdGenerator = SequentialIdGenerator(),
     override val notifications: Notifications = FakeNotifications(),
     override val passwordUtil: PasswordUtil = FakePasswordUtil(),
-    // Held separately so tests can assert against captures, while the Integrations
-    // contract exposes the same TestAwareEmailSender wrap that ProductionIntegrations applies.
     val fakeEmailSender: FakeEmailSender = FakeEmailSender(),
 ) : Integrations {
-    override val emailSender: EmailSender = TestAwareEmailSender(fakeEmailSender)
+    // Test-user mail suppression now lives in ServiceImpl.requestPasswordReset
+    // (matching ProductionIntegrations); the integration layer passes the
+    // fake straight through.
+    override val emailSender: EmailSender = fakeEmailSender
     override val emitLine: (String) -> Unit = { line -> emitLineCapture.add(line) }
 
     // Convenience accessors with proper types for test assertions
