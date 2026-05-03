@@ -37,6 +37,11 @@ class DynamoDbSingleTableQueryModel(
     }
 
     override fun searchUserByEmail(email: String): User? {
+        // Blank email never matches anyone — users without an email are
+        // intentionally absent from the email-index GSI (createUser/setEmail
+        // omit the GSI keys when email is blank). A blank lookup would query
+        // GSI1PK = "" and return whatever junk happens to be there.
+        if (email.isEmpty()) return null
         return runBlocking {
             val response = dynamoDb.query(QueryRequest {
                 tableName = DynamoDbSingleTableSchema.MAIN_TABLE

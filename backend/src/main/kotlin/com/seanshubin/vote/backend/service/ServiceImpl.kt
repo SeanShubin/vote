@@ -68,7 +68,10 @@ class ServiceImpl(
                 "User name already exists: $validUserName"
             )
         }
-        if (queryModel.searchUserByEmail(validEmail) != null) {
+        // Blank email skips the uniqueness check — multiple users can register
+        // without an email. Each such user has no self-service reset path; an
+        // admin will have to set their password if they forget it.
+        if (validEmail.isNotEmpty() && queryModel.searchUserByEmail(validEmail) != null) {
             throw ServiceException(
                 ServiceException.Category.CONFLICT,
                 "Email already exists: $validEmail"
@@ -604,6 +607,16 @@ class ServiceImpl(
                 "No user found with username or email: $validNameOrEmail"
             )
 
+        // No email on file → no self-service reset path. Surface this with
+        // a clear, actionable message instead of silently failing or
+        // sending nowhere — the user needs to know to ask an admin.
+        if (user.email.isEmpty()) {
+            throw ServiceException(
+                ServiceException.Category.UNSUPPORTED,
+                "No email on file for ${user.name} — ask an admin to set a new password",
+            )
+        }
+
         val resetToken = tokenEncoder.encodeResetToken(user.name)
         val resetUrl = "$frontendBaseUrl/reset-password?token=$resetToken"
         val body = """
@@ -641,6 +654,55 @@ class ServiceImpl(
             "system",
             clock.now(),
             DomainEvent.UserPasswordChanged(user.name, saltAndHash.salt, saltAndHash.hash),
+        )
+        synchronize()
+    }
+
+    override fun changeMyPassword(accessToken: AccessToken, oldPassword: String, newPassword: String) {
+        val user = requireSessionUser(accessToken.userName)
+        // Verify old password matches before accepting the new one. Without
+        // this gate, an attacker who walks up to an unlocked browser could
+        // lock the legitimate user out by setting a password they don't know.
+        if (!passwordUtil.passwordMatches(oldPassword, user.salt, user.hash)) {
+            throw ServiceException(
+                ServiceException.Category.UNAUTHORIZED,
+                "Old password does not match",
+            )
+        }
+        val validPassword = Validation.validatePassword(newPassword)
+        val saltAndHash = passwordUtil.createSaltAndHash(validPassword)
+        eventLog.appendEvent(
+            accessToken.userName,
+            clock.now(),
+            DomainEvent.UserPasswordChanged(user.name, saltAndHash.salt, saltAndHash.hash),
+        )
+        synchronize()
+    }
+
+    override fun adminSetPassword(accessToken: AccessToken, userName: String, newPassword: String) {
+        val targetUser = queryModel.searchUserByName(userName)
+            ?: throw ServiceException(ServiceException.Category.NOT_FOUND, "User not found: $userName")
+
+        // Same gate as setRole / removeUser: callers can't act on themselves
+        // through the admin path (they have changeMyPassword for that, which
+        // proves possession of the old password), and they need a strictly
+        // greater role than the target — so an admin can't reset another
+        // admin's password and impersonate them.
+        if (isSelf(accessToken, targetUser.name)) {
+            throw ServiceException(
+                ServiceException.Category.UNAUTHORIZED,
+                "Use changeMyPassword to set your own password",
+            )
+        }
+        requirePermission(accessToken, Permission.MANAGE_USERS)
+        requireGreaterRole(accessToken, targetUser)
+
+        val validPassword = Validation.validatePassword(newPassword)
+        val saltAndHash = passwordUtil.createSaltAndHash(validPassword)
+        eventLog.appendEvent(
+            accessToken.userName,
+            clock.now(),
+            DomainEvent.UserPasswordChanged(targetUser.name, saltAndHash.salt, saltAndHash.hash),
         )
         synchronize()
     }

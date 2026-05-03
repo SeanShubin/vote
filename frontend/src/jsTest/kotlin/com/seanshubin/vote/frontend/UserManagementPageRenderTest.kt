@@ -30,6 +30,7 @@ class UserManagementPageRenderTest {
                 UserManagementPage(
                     apiClient = fakeClient,
                     currentUserName = "alice",
+                    currentRole = com.seanshubin.vote.domain.Role.ADMIN,
                     onSelfRoleChanged = { lastSelfRoleChange = it },
                     onBack = { backCalled = true },
                 )

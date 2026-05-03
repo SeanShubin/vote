@@ -5,7 +5,8 @@ import com.seanshubin.vote.contract.ApiClient
 import com.seanshubin.vote.contract.AuthResponse
 import com.seanshubin.vote.domain.Role
 import com.seanshubin.vote.domain.UserNameRole
-import org.jetbrains.compose.web.attributes.selected
+import kotlinx.coroutines.launch
+import org.jetbrains.compose.web.attributes.*
 import org.jetbrains.compose.web.dom.*
 import org.w3c.dom.HTMLSelectElement
 
@@ -26,12 +27,18 @@ import org.w3c.dom.HTMLSelectElement
 fun UserManagementPage(
     apiClient: ApiClient,
     currentUserName: String,
+    currentRole: Role?,
     onSelfRoleChanged: (AuthResponse) -> Unit,
     onBack: () -> Unit,
 ) {
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    var successMessage by remember { mutableStateOf<String?>(null) }
     var pendingTransfer by remember { mutableStateOf<UserNameRole?>(null) }
     var pendingRoleChange by remember { mutableStateOf<Pair<String, Role>?>(null) }
+    // Tracks which user's set-password form is currently expanded — null
+    // means no form open. Only one row at a time can be in the editing
+    // state, mirroring how the role <select> works.
+    var openSetPasswordFor by remember { mutableStateOf<String?>(null) }
 
     val usersFetch = rememberFetchState(
         apiClient = apiClient,
@@ -69,6 +76,9 @@ fun UserManagementPage(
         if (errorMessage != null) {
             Div({ classes("error") }) { Text(errorMessage!!) }
         }
+        if (successMessage != null) {
+            Div({ classes("success") }) { Text(successMessage!!) }
+        }
 
         when (val state = usersFetch.state) {
             FetchState.Loading -> P { Text("Loading users…") }
@@ -79,15 +89,42 @@ fun UserManagementPage(
                 } else {
                     Div({ classes("users-list") }) {
                         state.value.forEach { user ->
+                            // Mirror the backend gate exactly: caller can set
+                            // another user's password when their role is
+                            // strictly greater than the target's. Backend
+                            // re-checks; this just hides the form for users
+                            // the caller can't act on. Self uses the
+                            // ChangeMyPassword page.
+                            val canSetPassword = user.userName != currentUserName &&
+                                currentRole != null && currentRole > user.role
                             UserRow(
                                 user = user,
                                 isSelf = user.userName == currentUserName,
+                                canSetPassword = canSetPassword,
+                                isSetPasswordOpen = openSetPasswordFor == user.userName,
                                 onRoleSelected = { newRole ->
                                     if (newRole == user.role) return@UserRow
                                     if (newRole == Role.OWNER) {
                                         pendingTransfer = user
                                     } else {
                                         submitRoleChange(user.userName, newRole)
+                                    }
+                                },
+                                onToggleSetPassword = {
+                                    openSetPasswordFor =
+                                        if (openSetPasswordFor == user.userName) null
+                                        else user.userName
+                                },
+                                onSubmitSetPassword = { newPassword ->
+                                    successMessage = null
+                                    errorMessage = null
+                                    try {
+                                        apiClient.adminSetPassword(user.userName, newPassword)
+                                        successMessage = "Password set for ${user.userName}"
+                                        openSetPasswordFor = null
+                                    } catch (e: Exception) {
+                                        apiClient.logErrorToServer(e)
+                                        errorMessage = e.message ?: "Failed to set password"
                                     }
                                 },
                             )
@@ -121,7 +158,11 @@ fun UserManagementPage(
 private fun UserRow(
     user: UserNameRole,
     isSelf: Boolean,
+    canSetPassword: Boolean,
+    isSetPasswordOpen: Boolean,
     onRoleSelected: (Role) -> Unit,
+    onToggleSetPassword: () -> Unit,
+    onSubmitSetPassword: suspend (String) -> Unit,
 ) {
     Div({ classes("user-row") }) {
         Span({ classes("user-name") }) {
@@ -150,6 +191,85 @@ private fun UserRow(
                     }
                 }
             }
+        }
+        if (canSetPassword) {
+            Button({
+                attr("data-set-password-toggle", user.userName)
+                onClick { onToggleSetPassword() }
+            }) {
+                Text(if (isSetPasswordOpen) "Cancel" else "Set password…")
+            }
+        }
+    }
+    if (isSetPasswordOpen) {
+        AdminSetPasswordForm(
+            targetUserName = user.userName,
+            onSubmitPassword = onSubmitSetPassword,
+        )
+    }
+}
+
+/**
+ * Inline form for an admin to set another user's password. Lives directly
+ * under the user's row when expanded. No old-password field — the whole
+ * point of the admin path is recovery for users who don't know theirs.
+ * The admin shares the new password out-of-band and the user is expected
+ * to change it after logging in via [ChangeMyPasswordPage].
+ */
+@Composable
+private fun AdminSetPasswordForm(
+    targetUserName: String,
+    onSubmitPassword: suspend (String) -> Unit,
+) {
+    var newPassword by remember(targetUserName) { mutableStateOf("") }
+    var confirmPassword by remember(targetUserName) { mutableStateOf("") }
+    var localError by remember(targetUserName) { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
+    var isSubmitting by remember(targetUserName) { mutableStateOf(false) }
+
+    Form(attrs = {
+        classes("form", "admin-set-password-form")
+        onSubmit { event ->
+            event.preventDefault()
+            when {
+                newPassword.isBlank() -> localError = "Password cannot be blank"
+                newPassword != confirmPassword -> localError = "Passwords do not match"
+                else -> {
+                    localError = null
+                    isSubmitting = true
+                    scope.launch {
+                        try {
+                            onSubmitPassword(newPassword)
+                        } finally {
+                            isSubmitting = false
+                        }
+                    }
+                }
+            }
+        }
+    }) {
+        localError?.let { msg ->
+            Div({ classes("error") }) { Text(msg) }
+        }
+        Input(InputType.Password) {
+            attr("name", "newPassword-$targetUserName")
+            attr("autocomplete", "new-password")
+            placeholder("New password for $targetUserName")
+            value(newPassword)
+            onInput { newPassword = it.value }
+        }
+        Input(InputType.Password) {
+            attr("name", "confirmPassword-$targetUserName")
+            attr("autocomplete", "new-password")
+            placeholder("Confirm new password")
+            value(confirmPassword)
+            onInput { confirmPassword = it.value }
+        }
+        Button({
+            attr("type", "submit")
+            if (isSubmitting) attr("disabled", "")
+        }) {
+            Text(if (isSubmitting) "Setting…" else "Set password")
         }
     }
 }

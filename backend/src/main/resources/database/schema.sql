@@ -9,9 +9,13 @@ CREATE TABLE IF NOT EXISTS event_log (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Command Model Projection: Users
+-- email is nullable so emailless users can coexist: SQL UNIQUE permits
+-- multiple NULL rows since NULL is not equal to NULL. The MySQL repository
+-- layer translates between the Kotlin domain's empty-string sentinel ("")
+-- and SQL NULL on read and write.
 CREATE TABLE IF NOT EXISTS users (
     name VARCHAR(255) PRIMARY KEY,
-    email VARCHAR(255) NOT NULL UNIQUE,
+    email VARCHAR(255) UNIQUE,
     salt VARCHAR(255) NOT NULL,
     hash VARCHAR(255) NOT NULL,
     role VARCHAR(50) NOT NULL,

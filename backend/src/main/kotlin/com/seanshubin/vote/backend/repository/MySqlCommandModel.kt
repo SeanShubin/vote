@@ -42,7 +42,11 @@ class MySqlCommandModel(
         val sql = queryLoader.load("user-insert")
         connection.prepareStatement(sql).use { stmt ->
             stmt.setString(1, userName)
-            stmt.setString(2, email)
+            // Translate the domain's "" sentinel for "no email" to SQL NULL
+            // so the UNIQUE constraint on email permits multiple emailless
+            // users to coexist (NULL is not equal to NULL in UNIQUE).
+            if (email.isEmpty()) stmt.setNull(2, java.sql.Types.VARCHAR)
+            else stmt.setString(2, email)
             stmt.setString(3, salt)
             stmt.setString(4, hash)
             stmt.setString(5, role.name)
@@ -312,7 +316,10 @@ class MySqlCommandModel(
     override fun setEmail(authority: String, userName: String, email: String) {
         val sql = queryLoader.load("user-update-email")
         connection.prepareStatement(sql).use { stmt ->
-            stmt.setString(1, email)
+            // See createUser — empty string becomes NULL so UNIQUE permits
+            // multiple emailless users.
+            if (email.isEmpty()) stmt.setNull(1, java.sql.Types.VARCHAR)
+            else stmt.setString(1, email)
             stmt.setString(2, userName)
             stmt.executeUpdate()
         }

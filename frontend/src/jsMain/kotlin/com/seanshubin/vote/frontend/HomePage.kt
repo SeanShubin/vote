@@ -16,6 +16,7 @@ fun HomePage(
     onNavigateToRawTables: () -> Unit,
     onNavigateToDebugTables: () -> Unit,
     onNavigateToUserManagement: () -> Unit,
+    onNavigateToChangeMyPassword: () -> Unit,
     onLogout: () -> Unit,
     onAccountDeleted: () -> Unit,
 ) {
@@ -105,6 +106,12 @@ fun HomePage(
                 }) {
                     Text("Debug Tables")
                 }
+            }
+
+            Button({
+                onClick { onNavigateToChangeMyPassword() }
+            }) {
+                Text("Change Password")
             }
 
             Button({

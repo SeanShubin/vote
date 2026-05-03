@@ -147,6 +147,7 @@ fun VoteApp(apiClient: ApiClient) {
             onNavigateToRawTables = { router.navigate(Page.RawTables) },
             onNavigateToDebugTables = { router.navigate(Page.DebugTables) },
             onNavigateToUserManagement = { router.navigate(Page.UserManagement) },
+            onNavigateToChangeMyPassword = { router.navigate(Page.ChangeMyPassword) },
             onLogout = {
                 scope.launch {
                     try {
@@ -222,11 +223,17 @@ fun VoteApp(apiClient: ApiClient) {
         is Page.UserManagement -> UserManagementPage(
             apiClient = apiClient,
             currentUserName = userName ?: "",
+            currentRole = role,
             onSelfRoleChanged = { auth ->
                 userName = auth.userName
                 role = auth.role
             },
             onBack = { router.navigate(Page.Home) },
+        )
+        is Page.ChangeMyPassword -> ChangeMyPasswordPage(
+            apiClient = apiClient,
+            onSuccess = { router.navigate(Page.Home) },
+            onCancel = { router.navigate(Page.Home) },
         )
         is Page.PasswordResetRequest -> PasswordResetRequestPage(
             apiClient = apiClient,

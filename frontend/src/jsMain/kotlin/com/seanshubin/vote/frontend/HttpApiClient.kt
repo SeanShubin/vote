@@ -106,6 +106,20 @@ class HttpApiClient(
         )
     }
 
+    override suspend fun changeMyPassword(oldPassword: String, newPassword: String) {
+        putWithAuth<ChangeMyPasswordRequest, Unit>(
+            "/user/me/password",
+            ChangeMyPasswordRequest(oldPassword, newPassword),
+        )
+    }
+
+    override suspend fun adminSetPassword(userName: String, newPassword: String) {
+        putWithAuth<AdminSetPasswordRequest, Unit>(
+            "/admin/user/${encodeURIComponent(userName)}/password",
+            AdminSetPasswordRequest(newPassword),
+        )
+    }
+
     override suspend fun listElections(): List<ElectionSummary> =
         getWithAuth("/elections")
 

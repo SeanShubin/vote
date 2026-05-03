@@ -13,6 +13,8 @@ interface ScenarioBackend {
     fun setRole(token: AccessToken, targetUserName: String, newRole: Role)
     fun updateUser(token: AccessToken, userName: String, updates: UserUpdates)
     fun removeUser(token: AccessToken, targetUserName: String)
+    fun changeMyPassword(token: AccessToken, oldPassword: String, newPassword: String)
+    fun adminSetPassword(token: AccessToken, targetUserName: String, newPassword: String)
 
     // Election operations
     fun addElection(token: AccessToken, ownerName: String, electionName: String, description: String = "")

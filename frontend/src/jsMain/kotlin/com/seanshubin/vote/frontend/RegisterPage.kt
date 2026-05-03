@@ -63,7 +63,7 @@ fun RegisterPage(
             Input(InputType.Email) {
                 attr("name", "email")
                 attr("autocomplete", "email")
-                placeholder("Email")
+                placeholder("Email (optional, for password reset)")
                 value(email)
                 onInput { email = it.value }
             }
