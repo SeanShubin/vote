@@ -3,8 +3,6 @@ package com.seanshubin.vote.domain
 import com.seanshubin.vote.domain.Preference.Companion.places
 import com.seanshubin.vote.domain.Preference.Companion.strongestPaths
 import com.seanshubin.vote.domain.Ranking.Companion.prefers
-import com.seanshubin.vote.domain.Ballot.Revealed.Companion.effectiveRankings
-import com.seanshubin.vote.domain.Ballot.Revealed.Companion.matchRankingsOrderToCandidates
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -62,12 +60,14 @@ data class Tally(
                 val strongestPaths = preferences.strongestPaths()
                 val places = strongestPaths.places(candidates)
                 val whoVoted = rawBallots.map { it.voterName }.sorted()
-                val rankSortedBallots =
-                    rawBallots.effectiveRankings(candidates).matchRankingsOrderToCandidates(candidates)
+                // Ballots flow through unchanged — display sees the same data the
+                // algorithm sees. No synthesis of "last place" entries for omitted
+                // candidates: that would defeat the explicit-only pairwise rule
+                // and confuse anyone re-running the tally on a subset.
                 val ballots = if (secretBallot) {
-                    rankSortedBallots.map { it.makeSecret() }.sortedBy { it.confirmation }
+                    rawBallots.map { it.makeSecret() }.sortedBy { it.confirmation }
                 } else {
-                    rankSortedBallots.sortedBy { it.voterName }
+                    rawBallots.sortedBy { it.voterName }
                 }.sortedWith(Ballot.Companion.BallotComparator)
                 return Tally(
                     electionName,

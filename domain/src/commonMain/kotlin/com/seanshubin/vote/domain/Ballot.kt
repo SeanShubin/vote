@@ -1,7 +1,5 @@
 package com.seanshubin.vote.domain
 
-import com.seanshubin.vote.domain.Ranking.Companion.effectiveRankings
-import com.seanshubin.vote.domain.Ranking.Companion.matchOrderToCandidates
 import kotlinx.datetime.Instant
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -28,17 +26,6 @@ sealed interface Ballot {
         override val rankings: List<Ranking>
     ) : Ballot {
         fun makeSecret(): Secret = Secret(electionName, confirmation, rankings)
-
-        companion object {
-            fun List<Revealed>.matchRankingsOrderToCandidates(candidateNames: List<String>): List<Revealed> =
-                map { ballot -> ballot.copy(rankings = ballot.rankings.matchOrderToCandidates(candidateNames)) }
-
-            fun List<Revealed>.effectiveRankings(candidateNames: List<String>): List<Revealed> =
-                map { ballot ->
-                    ballot.copy(
-                        rankings = ballot.rankings.effectiveRankings(candidateNames).sortedBy { it.candidateName })
-                }
-        }
     }
 
     @Serializable
