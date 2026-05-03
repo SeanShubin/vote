@@ -1170,8 +1170,11 @@ fun ElectionPreferencesPage(
             when (val state = tallyFetch.state) {
                 FetchState.Loading -> P { Text("Loading…") }
                 is FetchState.Error -> Div({ classes("error") }) { Text(state.message) }
-                is FetchState.Success -> renderPairView(state.value) { a, b ->
-                    renderPreferencesDetail(state.value, a, b)
+                is FetchState.Success -> {
+                    val displayTally = remember(state.value) { tallyWithoutTiers(state.value) }
+                    renderPairView(displayTally) { a, b ->
+                        renderPreferencesDetail(displayTally, a, b)
+                    }
                 }
             }
         }
@@ -1209,8 +1212,11 @@ fun ElectionStrongestPathsPage(
             when (val state = tallyFetch.state) {
                 FetchState.Loading -> P { Text("Loading…") }
                 is FetchState.Error -> Div({ classes("error") }) { Text(state.message) }
-                is FetchState.Success -> renderPairView(state.value) { a, b ->
-                    renderStrongestPathsDetail(state.value, a, b)
+                is FetchState.Success -> {
+                    val displayTally = remember(state.value) { tallyWithoutTiers(state.value) }
+                    renderPairView(displayTally) { a, b ->
+                        renderStrongestPathsDetail(displayTally, a, b)
+                    }
                 }
             }
         }
@@ -1442,6 +1448,36 @@ private fun renderVoterList(voters: List<String>) {
             Span({ classes("pair-voter") }) { Text(v) }
         }
     }
+}
+
+/**
+ * Tier markers ride into [Tally] alongside real candidates because the
+ * Schulze counter treats them the same — both end up as nodes in the
+ * preferences and strongest-path matrices. The Preferences and Strongest
+ * Paths screens are about real-candidate head-to-heads, so re-run
+ * [Tally.countBallots] with the tier names stripped from the candidate list.
+ *
+ * Tier names are recovered from any ballot's [Ranking.kind] (preserved on
+ * both Revealed and Secret ballots). Recompute requires revealed ballots,
+ * since [Tally.countBallots] takes [Ballot.Revealed]; the secret-ballot
+ * fallback returns the server tally untouched and accepts the leak — the
+ * app currently runs with secret ballots disabled.
+ */
+private fun tallyWithoutTiers(tally: Tally): Tally {
+    val tierNames = tally.ballots
+        .flatMap { it.rankings }
+        .filter { it.kind == RankingKind.TIER }
+        .map { it.candidateName }
+        .toSet()
+    if (tierNames.isEmpty()) return tally
+    val revealed = tally.ballots.filterIsInstance<Ballot.Revealed>()
+    if (revealed.size != tally.ballots.size) return tally
+    return Tally.countBallots(
+        electionName = tally.electionName,
+        secretBallot = tally.secretBallot,
+        candidates = tally.candidateNames - tierNames,
+        ballots = revealed,
+    )
 }
 
 private fun votersWhoPrefer(
