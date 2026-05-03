@@ -9,9 +9,14 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
-import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
+/**
+ * Test users are designated by registering with the public marker password
+ * "test". The convention is intentionally documented: anyone can mint a
+ * test account, and the defense is the wipe endpoint at
+ * DELETE /admin/test-users that removes them in bulk.
+ */
 class TestUserTest {
     private lateinit var tester: HttpApiTester
     private val json = Json { ignoreUnknownKeys = true }
@@ -27,45 +32,51 @@ class TestUserTest {
     }
 
     @Test
-    fun `test-domain registration succeeds with shared password`() {
-        // Bootstrap an OWNER first so subsequent users register as USER, mirroring real usage.
+    fun `registration accepts the marker password with no email`() {
         tester.registerUserExpectSuccess("owner", "owner@example.com", "ownerpass")
-        val response = tester.registerUser("alice", "alice@one.test", "test")
+        val response = tester.registerUser("alice", "", "test")
         assertEquals(200, response.statusCode())
     }
 
     @Test
-    fun `test-domain registration rejects a non-shared password`() {
+    fun `registration accepts the marker password with an email`() {
         tester.registerUserExpectSuccess("owner", "owner@example.com", "ownerpass")
-        val response = tester.registerUser("mallory", "mallory@evil.test", "hunter2")
-        assertEquals(401, response.statusCode())
+        val response = tester.registerUser("alice", "alice@example.com", "test")
+        assertEquals(200, response.statusCode())
     }
 
     @Test
-    fun `real-domain registration accepts any non-empty password (existing behavior)`() {
+    fun `registration accepts any non-empty password (existing behavior)`() {
         tester.registerUserExpectSuccess("owner", "owner@example.com", "ownerpass")
         val response = tester.registerUser("bob", "bob@example.com", "bobpass")
         assertEquals(200, response.statusCode())
     }
 
     @Test
-    fun `password reset email is suppressed for test-domain user`() {
+    fun `password reset is refused for a test user even if they have an email`() {
+        // Edge case: a test user (password=marker) registered with a real
+        // email. The service refuses the reset before it reaches the email
+        // sender, so no real outbound mail is generated for an account whose
+        // password is publicly known.
         tester.registerUserExpectSuccess("owner", "owner@example.com", "ownerpass")
-        tester.registerUserExpectSuccess("alice", "alice@one.test", "test")
+        tester.registerUserExpectSuccess("alice", "alice@example.com", "test")
         tester.integrations.fakeEmailSender.reset()
 
         val response = tester.requestPasswordReset("alice")
-        assertEquals(200, response.statusCode())
-
-        // TestAwareEmailSender swallowed the call before it reached the fake.
+        // UNSUPPORTED → 501
+        assertEquals(501, response.statusCode())
+        assertTrue(
+            response.body().contains("test user", ignoreCase = true),
+            "expected test-user message; got ${response.body()}",
+        )
         assertTrue(
             tester.integrations.fakeEmailSender.sent.isEmpty(),
-            "expected no email send for .test recipient, got ${tester.integrations.fakeEmailSender.sent}",
+            "expected no email send for test user, got ${tester.integrations.fakeEmailSender.sent}",
         )
     }
 
     @Test
-    fun `password reset email still flows for real-domain user`() {
+    fun `password reset still flows for a non-test user`() {
         tester.registerUserExpectSuccess("owner", "owner@example.com", "ownerpass")
         tester.registerUserExpectSuccess("bob", "bob@example.com", "bobpass")
         tester.integrations.fakeEmailSender.reset()
@@ -80,7 +91,7 @@ class TestUserTest {
 
     @Test
     fun `wipe deletes test users plus their elections, leaves real ones`() {
-        // OWNER (real) → has MANAGE_USERS via OWNER role.
+        // OWNER (real) — has MANAGE_USERS via OWNER role.
         val ownerTokens = tester.registerUserExpectSuccess("owner", "owner@example.com", "ownerpass")
         val ownerToken = ownerTokens.accessToken
 
@@ -88,8 +99,8 @@ class TestUserTest {
         val bobTokens = tester.registerUserExpectSuccess("bob", "bob@example.com", "bobpass")
         tester.createElection("RealElection", bobTokens.accessToken)
 
-        // Test user — gets wiped along with their election.
-        val aliceTokens = tester.registerUserExpectSuccess("alice", "alice@one.test", "test")
+        // Test user — no email, marker password — gets wiped along with their election.
+        val aliceTokens = tester.registerUserExpectSuccess("alice", "", "test")
         tester.createElection("TestElection", aliceTokens.accessToken)
 
         val wipeResp = tester.wipeTestUsers(ownerToken)
@@ -98,7 +109,6 @@ class TestUserTest {
         assertEquals(1, result.usersDeleted)
         assertEquals(1, result.electionsDeleted)
 
-        // Verify the user list no longer mentions alice but still has bob and owner.
         val usersResp = tester.listUsers(ownerToken)
         assertEquals(200, usersResp.statusCode())
         val usersBody = usersResp.body()
@@ -106,7 +116,6 @@ class TestUserTest {
         assertTrue(usersBody.contains("\"userName\": \"bob\""), "bob should still exist: $usersBody")
         assertTrue(!usersBody.contains("\"userName\": \"alice\""), "alice should be gone: $usersBody")
 
-        // Verify alice's election is gone but bob's remains.
         val aliceElection = tester.getElection("TestElection", ownerToken)
         assertEquals(404, aliceElection.statusCode())
         val bobElection = tester.getElection("RealElection", ownerToken)

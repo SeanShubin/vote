@@ -78,16 +78,6 @@ class ServiceImpl(
             )
         }
 
-        // Test-domain accounts (RFC-2606 .test TLD) must use the shared test
-        // password. The convention is public; this gate stops anyone from
-        // claiming a test address with their own password.
-        if (TestUser.isTestEmail(validEmail) && validPassword != TestUser.SHARED_PASSWORD) {
-            throw ServiceException(
-                ServiceException.Category.UNAUTHORIZED,
-                "Test-domain accounts must use the shared test password"
-            )
-        }
-
         val role = if (queryModel.userCount() == 0) Role.OWNER else Role.USER
         val saltAndHash = passwordUtil.createSaltAndHash(validPassword)
 
@@ -617,6 +607,18 @@ class ServiceImpl(
             )
         }
 
+        // Test users have a publicly-known password by design. Refusing the
+        // reset here keeps a stray real-looking email on a test account from
+        // leaking outbound mail. (Most test users have no email at all and
+        // would already have been rejected above.) Reuses the same admin
+        // recovery message — admins can wipe test users via /admin/test-users.
+        if (TestUser.isTestUser(user, passwordUtil)) {
+            throw ServiceException(
+                ServiceException.Category.UNSUPPORTED,
+                "${user.name} is a test user — ask an admin to set a new password",
+            )
+        }
+
         val resetToken = tokenEncoder.encodeResetToken(user.name)
         val resetUrl = "$frontendBaseUrl/reset-password?token=$resetToken"
         val body = """
@@ -724,7 +726,9 @@ class ServiceImpl(
 
     override fun wipeTestUsers(accessToken: AccessToken): WipeTestUsersResult {
         requirePermission(accessToken, Permission.MANAGE_USERS)
-        val testUsers = queryModel.listUsers().filter { TestUser.isTestEmail(it.email) }
+        // Test user = stored credentials match the public marker password.
+        // Per-user hash check; fine for an admin operation, not a hot path.
+        val testUsers = queryModel.listUsers().filter { TestUser.isTestUser(it, passwordUtil) }
         val testUserNames = testUsers.map { it.name }.toSet()
         // Elections must go first — removeUser refuses to delete a user that
         // still owns elections.
