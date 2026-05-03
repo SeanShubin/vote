@@ -47,6 +47,19 @@ class HttpRecordingBackend(
         recorder.delete("/user/$targetUserName", token)
     }
 
+    override fun changeMyPassword(token: AccessToken, oldPassword: String, newPassword: String) {
+        val request = ChangeMyPasswordRequest(oldPassword, newPassword)
+        val body = json.encodeToString(request)
+        recorder.put("/user/me/password", body, token)
+    }
+
+    override fun adminSetPassword(token: AccessToken, targetUserName: String, newPassword: String) {
+        val request = AdminSetPasswordRequest(newPassword)
+        val body = json.encodeToString(request)
+        val encodedName = URLEncoder.encode(targetUserName, StandardCharsets.UTF_8)
+        recorder.put("/admin/user/$encodedName/password", body, token)
+    }
+
     override fun addElection(token: AccessToken, ownerName: String, electionName: String, description: String) {
         val request = AddElectionRequest(ownerName, electionName, description)
         val body = json.encodeToString(request)

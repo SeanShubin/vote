@@ -12,9 +12,15 @@ object Validation {
         return trimmed.replace(whitespacePattern, " ")
     }
 
+    /**
+     * Email is optional — blank input means "no email on file". The user
+     * will then have no self-service password-reset path; an admin will
+     * have to set their password directly. When non-blank, the same
+     * format checks as before apply, returning the trimmed value.
+     */
     fun validateEmail(email: String): String {
         val trimmed = email.trim()
-        require(trimmed.isNotEmpty()) { "Email must not be empty" }
+        if (trimmed.isEmpty()) return ""
         require(trimmed.length <= 200) { "Email must not be more than 200 characters long" }
         require(trimmed.count { it == '@' } == 1) { "Email must contain exactly one @ sign" }
         require(!trimmed.contains(whitespacePattern)) { "Email must not contain whitespace" }

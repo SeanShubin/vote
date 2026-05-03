@@ -7,9 +7,11 @@ import com.seanshubin.vote.backend.http.HttpResponse
 import com.seanshubin.vote.backend.service.ServiceException
 import com.seanshubin.vote.contract.AccessToken
 import com.seanshubin.vote.contract.AddElectionRequest
+import com.seanshubin.vote.contract.AdminSetPasswordRequest
 import com.seanshubin.vote.contract.AuthResponse
 import com.seanshubin.vote.contract.AuthenticateRequest
 import com.seanshubin.vote.contract.CastBallotRequest
+import com.seanshubin.vote.contract.ChangeMyPasswordRequest
 import com.seanshubin.vote.contract.ClientErrorRequest
 import com.seanshubin.vote.contract.ErrorResponse
 import com.seanshubin.vote.contract.PasswordResetRequest
@@ -91,6 +93,8 @@ class RequestRouter(
             target == "/logout" && method == "POST" -> handleLogout()
             target == "/password-reset-request" && method == "POST" -> handleRequestPasswordReset(req)
             target == "/password-reset" && method == "POST" -> handleResetPassword(req)
+            target == "/user/me/password" && method == "PUT" -> handleChangeMyPassword(req)
+            target.matches(Regex("/admin/user/[^/]+/password")) && method == "PUT" -> handleAdminSetPassword(req)
             target == "/me/activity" && method == "GET" -> handleGetUserActivity(req)
             target == "/users" && method == "GET" -> handleListUsers(req)
             target == "/users/count" && method == "GET" -> handleUserCount(req)
@@ -258,6 +262,24 @@ class RequestRouter(
         val request = json.decodeFromString<PasswordResetRequest>(req.body)
         service.resetPassword(request.resetToken, request.newPassword)
         return HttpResponse(200, json.encodeToString(mapOf("status" to "password reset")))
+    }
+
+    private fun handleChangeMyPassword(req: HttpRequest): HttpResponse {
+        val accessToken = extractAccessToken(req)
+        val request = json.decodeFromString<ChangeMyPasswordRequest>(req.body)
+        service.changeMyPassword(accessToken, request.oldPassword, request.newPassword)
+        return HttpResponse(200, json.encodeToString(mapOf("status" to "password changed")))
+    }
+
+    private fun handleAdminSetPassword(req: HttpRequest): HttpResponse {
+        val accessToken = extractAccessToken(req)
+        // /admin/user/{userName}/password — userName is the third path segment
+        // (parts[0] is empty due to the leading slash, parts[1]="admin", parts[2]="user").
+        val parts = req.target.split("/")
+        val userName = java.net.URLDecoder.decode(parts[3], "UTF-8")
+        val request = json.decodeFromString<AdminSetPasswordRequest>(req.body)
+        service.adminSetPassword(accessToken, userName, request.newPassword)
+        return HttpResponse(200, json.encodeToString(mapOf("status" to "password changed")))
     }
 
     private fun handleListUsers(req: HttpRequest): HttpResponse {

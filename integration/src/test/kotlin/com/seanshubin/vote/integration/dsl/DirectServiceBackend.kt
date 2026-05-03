@@ -25,6 +25,14 @@ class DirectServiceBackend(private val service: Service) : ScenarioBackend {
         service.removeUser(token, targetUserName)
     }
 
+    override fun changeMyPassword(token: AccessToken, oldPassword: String, newPassword: String) {
+        service.changeMyPassword(token, oldPassword, newPassword)
+    }
+
+    override fun adminSetPassword(token: AccessToken, targetUserName: String, newPassword: String) {
+        service.adminSetPassword(token, targetUserName, newPassword)
+    }
+
     override fun addElection(token: AccessToken, ownerName: String, electionName: String, description: String) {
         service.addElection(token, ownerName, electionName, description)
     }

@@ -50,7 +50,7 @@ class RegisterPageRenderTest {
         // Action methods
         fun enterRegistrationInfo(userName: String, email: String, password: String) {
             ComposeTestHelper.setInputByPlaceholder(testId, "Username", userName)
-            ComposeTestHelper.setInputByPlaceholder(testId, "Email", email)
+            ComposeTestHelper.setInputByPlaceholder(testId, "Email (optional, for password reset)", email)
             ComposeTestHelper.setInputByPlaceholder(testId, "Password", password)
         }
 
@@ -60,7 +60,7 @@ class RegisterPageRenderTest {
         }
 
         fun pressEnterInEmailField() {
-            ComposeTestHelper.pressEnterInInput(testId, "Email")
+            ComposeTestHelper.pressEnterInInput(testId, "Email (optional, for password reset)")
             testScope.advanceUntilIdle()
         }
 
@@ -80,7 +80,7 @@ class RegisterPageRenderTest {
 
         fun usernameInputExists() = ComposeTestHelper.inputExistsByPlaceholder(testId, "Username")
 
-        fun emailInputExists() = ComposeTestHelper.inputExistsByPlaceholder(testId, "Email")
+        fun emailInputExists() = ComposeTestHelper.inputExistsByPlaceholder(testId, "Email (optional, for password reset)")
 
         fun passwordInputExists() = ComposeTestHelper.inputExistsByPlaceholder(testId, "Password")
 

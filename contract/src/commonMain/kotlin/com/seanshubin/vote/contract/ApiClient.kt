@@ -53,6 +53,22 @@ interface ApiClient {
     /** Complete a password reset using the token from the email link. */
     suspend fun resetPassword(resetToken: String, newPassword: String)
 
+    /**
+     * Change the authenticated user's own password. The backend verifies
+     * [oldPassword] before accepting [newPassword] — protects against an
+     * attacker who walks up to an unlocked browser session.
+     */
+    suspend fun changeMyPassword(oldPassword: String, newPassword: String)
+
+    /**
+     * Admin sets another user's password directly — used when the user
+     * has forgotten theirs and either didn't provide an email or doesn't
+     * want to wait for a reset link. Gated server-side identically to
+     * setRole: caller must have MANAGE_USERS and a strictly higher role
+     * than the target.
+     */
+    suspend fun adminSetPassword(userName: String, newPassword: String)
+
     suspend fun listElections(): List<ElectionSummary>
     suspend fun createElection(electionName: String, description: String = ""): String
     suspend fun getElection(electionName: String): ElectionDetail

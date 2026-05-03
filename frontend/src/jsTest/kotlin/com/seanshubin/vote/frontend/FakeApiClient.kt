@@ -37,8 +37,12 @@ class FakeApiClient : ApiClient {
     val logoutCalls = mutableListOf<Unit>()
     var requestPasswordResetResult: Result<Unit> = Result.success(Unit)
     var resetPasswordResult: Result<Unit> = Result.success(Unit)
+    var changeMyPasswordResult: Result<Unit> = Result.success(Unit)
+    var adminSetPasswordResult: Result<Unit> = Result.success(Unit)
     val requestPasswordResetCalls = mutableListOf<String>()
     val resetPasswordCalls = mutableListOf<ResetPasswordCall>()
+    val changeMyPasswordCalls = mutableListOf<ChangeMyPasswordCall>()
+    val adminSetPasswordCalls = mutableListOf<AdminSetPasswordCall>()
     var listElectionsResult: Result<List<ElectionSummary>> = Result.success(emptyList())
     var createElectionResult: Result<String> = Result.success("")
     var getElectionResult: Result<ElectionDetail> = Result.failure(Exception("Get election not configured"))
@@ -98,6 +102,16 @@ class FakeApiClient : ApiClient {
     override suspend fun resetPassword(resetToken: String, newPassword: String) {
         resetPasswordCalls.add(ResetPasswordCall(resetToken, newPassword))
         resetPasswordResult.getOrThrow()
+    }
+
+    override suspend fun changeMyPassword(oldPassword: String, newPassword: String) {
+        changeMyPasswordCalls.add(ChangeMyPasswordCall(oldPassword, newPassword))
+        changeMyPasswordResult.getOrThrow()
+    }
+
+    override suspend fun adminSetPassword(userName: String, newPassword: String) {
+        adminSetPasswordCalls.add(AdminSetPasswordCall(userName, newPassword))
+        adminSetPasswordResult.getOrThrow()
     }
 
     override suspend fun listElections(): List<ElectionSummary> {
@@ -220,5 +234,7 @@ class FakeApiClient : ApiClient {
     data class SetElectionDescriptionCall(val electionName: String, val description: String)
     data class CastBallotCall(val electionName: String, val rankings: List<Ranking>)
     data class ResetPasswordCall(val resetToken: String, val newPassword: String)
+    data class ChangeMyPasswordCall(val oldPassword: String, val newPassword: String)
+    data class AdminSetPasswordCall(val userName: String, val newPassword: String)
     data class SetRoleCall(val userName: String, val role: Role)
 }

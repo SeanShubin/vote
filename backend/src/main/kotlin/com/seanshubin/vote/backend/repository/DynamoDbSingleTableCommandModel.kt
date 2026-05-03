@@ -56,7 +56,13 @@ class DynamoDbSingleTableCommandModel(
         runBlocking {
             dynamoDb.putItem(PutItemRequest {
                 tableName = DynamoDbSingleTableSchema.MAIN_TABLE
-                item = mapOf(
+                // GSI attributes for email lookup — keyed by lowercase email so
+                // the equality lookup is case-insensitive. Display case is the
+                // "email" attribute. Blank email skips the GSI entirely:
+                // DynamoDB simply omits items missing a GSI key from the
+                // index, so `searchUserByEmail` will never find this user
+                // (which is the desired behavior — they have no email).
+                val base = mapOf(
                     "PK" to AttributeValue.S(DynamoDbSingleTableSchema.userPK(userName)),
                     "SK" to AttributeValue.S(DynamoDbSingleTableSchema.METADATA_SK),
                     "entity_type" to AttributeValue.S("USER"),
@@ -65,11 +71,10 @@ class DynamoDbSingleTableCommandModel(
                     "salt" to AttributeValue.S(salt),
                     "hash" to AttributeValue.S(hash),
                     "role" to AttributeValue.S(role.name),
-                    // GSI attributes for email lookup — keyed by lowercase email so
-                    // the equality lookup is case-insensitive. Display case is the
-                    // "email" attribute above.
+                )
+                item = if (email.isEmpty()) base else base + mapOf(
                     "GSI1PK" to AttributeValue.S(DynamoDbSingleTableSchema.emailKey(email)),
-                    "GSI1SK" to AttributeValue.S(DynamoDbSingleTableSchema.userPK(userName))
+                    "GSI1SK" to AttributeValue.S(DynamoDbSingleTableSchema.userPK(userName)),
                 )
             })
         }
@@ -239,11 +244,21 @@ class DynamoDbSingleTableCommandModel(
                     "PK" to AttributeValue.S(DynamoDbSingleTableSchema.userPK(userName)),
                     "SK" to AttributeValue.S(DynamoDbSingleTableSchema.METADATA_SK)
                 )
-                updateExpression = "SET email = :e, GSI1PK = :gsi1pk"
-                expressionAttributeValues = mapOf(
-                    ":e" to AttributeValue.S(email),
-                    ":gsi1pk" to AttributeValue.S(DynamoDbSingleTableSchema.emailKey(email))
-                )
+                // Blank email clears both the email attribute and the GSI keys,
+                // which removes the user from the email-index. A non-blank
+                // value sets all three so the user reappears in the index
+                // under the new lowercased email.
+                if (email.isEmpty()) {
+                    updateExpression = "SET email = :e REMOVE GSI1PK, GSI1SK"
+                    expressionAttributeValues = mapOf(":e" to AttributeValue.S(""))
+                } else {
+                    updateExpression = "SET email = :e, GSI1PK = :gsi1pk, GSI1SK = :gsi1sk"
+                    expressionAttributeValues = mapOf(
+                        ":e" to AttributeValue.S(email),
+                        ":gsi1pk" to AttributeValue.S(DynamoDbSingleTableSchema.emailKey(email)),
+                        ":gsi1sk" to AttributeValue.S(DynamoDbSingleTableSchema.userPK(userName)),
+                    )
+                }
             })
         }
     }

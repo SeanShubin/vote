@@ -59,6 +59,31 @@ interface Service {
     fun resetPassword(resetToken: String, newPassword: String)
 
     /**
+     * Authenticated user changes their own password. The old password is
+     * verified before the new one is accepted, so an attacker who finds
+     * an unattended browser session can't trivially lock the user out by
+     * setting a new password without knowing the old one.
+     *
+     * Throws ServiceException(UNAUTHORIZED) when [oldPassword] doesn't
+     * match the stored hash.
+     */
+    fun changeMyPassword(accessToken: AccessToken, oldPassword: String, newPassword: String)
+
+    /**
+     * Admin sets another user's password without proving control of the
+     * old one — used when the user has forgotten theirs and there's no
+     * email recovery path (or they didn't provide an email).
+     *
+     * Gated identically to [setRole]: caller needs MANAGE_USERS, must not
+     * be acting on themselves (use [changeMyPassword]), and must have a
+     * strictly higher role than the target. Audit-trail authority on the
+     * resulting [DomainEvent.UserPasswordChanged] event is the caller's
+     * username, not "system" — so the event log records exactly which
+     * admin reset which user's password.
+     */
+    fun adminSetPassword(accessToken: AccessToken, userName: String, newPassword: String)
+
+    /**
      * Delete every user whose email lands in the .test TLD, plus every
      * election those users own. Cleanup path for the public test-user
      * convention; gated by MANAGE_USERS.

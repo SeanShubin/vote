@@ -53,6 +53,10 @@ class MySqlQueryModel(
     }
 
     override fun searchUserByEmail(email: String): User? {
+        // Blank email never matches anyone — emailless users share the
+        // empty string as their stored value, but the email-lookup path
+        // is reserved for users who actually provided one.
+        if (email.isEmpty()) return null
         val sql = queryLoader.load("user-select-by-email")
         return connection.prepareStatement(sql).use { stmt ->
             stmt.setString(1, email)
@@ -340,7 +344,10 @@ class MySqlQueryModel(
     private fun ResultSet.toUser(): User {
         return User(
             name = getString("name"),
-            email = getString("email"),
+            // SQL NULL on email represents "no email on file"; translate
+            // back to the domain's empty-string sentinel so the rest of
+            // the application treats both backends identically.
+            email = getString("email") ?: "",
             salt = getString("salt"),
             hash = getString("hash"),
             role = Role.valueOf(getString("role"))

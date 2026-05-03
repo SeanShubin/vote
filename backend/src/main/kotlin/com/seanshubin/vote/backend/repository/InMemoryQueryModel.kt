@@ -18,6 +18,11 @@ class InMemoryQueryModel(private val data: InMemoryData) : QueryModel {
     }
 
     override fun searchUserByEmail(email: String): User? {
+        // Blank email never matches anyone — users without an email all
+        // share the empty string as their stored value, but they are
+        // intentionally absent from the email-lookup path so a blank
+        // search wouldn't accidentally return one of them.
+        if (email.isEmpty()) return null
         return data.users.values.find { it.email.equals(email, ignoreCase = true) }?.toUser()
     }
 

@@ -41,6 +41,16 @@ class UserContext(
         testContext.backend.synchronize()
     }
 
+    fun changeMyPassword(oldPassword: String, newPassword: String) {
+        testContext.backend.changeMyPassword(accessToken, oldPassword, newPassword)
+        testContext.backend.synchronize()
+    }
+
+    fun adminSetPassword(targetUserName: String, newPassword: String) {
+        testContext.backend.adminSetPassword(accessToken, targetUserName, newPassword)
+        testContext.backend.synchronize()
+    }
+
     fun updateUser(newName: String? = null, newEmail: String? = null) {
         testContext.backend.updateUser(accessToken, userName, UserUpdates(userName = newName, email = newEmail))
         testContext.backend.synchronize()
