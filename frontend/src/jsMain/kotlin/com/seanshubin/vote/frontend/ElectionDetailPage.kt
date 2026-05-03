@@ -3,6 +3,7 @@ package com.seanshubin.vote.frontend
 import androidx.compose.runtime.*
 import com.seanshubin.vote.contract.ApiClient
 import com.seanshubin.vote.domain.*
+import com.seanshubin.vote.domain.Ranking.Companion.prefers
 import kotlinx.browser.window
 import org.jetbrains.compose.web.attributes.*
 import org.jetbrains.compose.web.dom.*
@@ -1137,10 +1138,16 @@ private fun renderBallotToggles(
 }
 
 /**
- * Detailed view of the pairwise preferences matrix as a flat 3-column table
- * (winner | strength | loser), one row per ordered pair. Lives on its own
- * admin-style page because the table grows as N(N-1) and benefits from the
- * full browser width + horizontal scroll that `.admin-container` provides.
+ * Pairwise preferences page. The viewer picks two candidates from a chip
+ * arena and the page renders the head-to-head between just those two: the
+ * raw count for each direction plus the actual voters whose ballots produced
+ * that count. The point is to make every pairwise total auditable — a
+ * total isn't an abstract number, it's a list of named voters you can
+ * scroll through.
+ *
+ * Selection is a rolling window of two: clicking a third candidate evicts
+ * the older of the two selections. Clicking a currently-selected candidate
+ * deselects it. With fewer than two selected the detail panel is hidden.
  */
 @Composable
 fun ElectionPreferencesPage(
@@ -1163,7 +1170,9 @@ fun ElectionPreferencesPage(
             when (val state = tallyFetch.state) {
                 FetchState.Loading -> P { Text("Loading…") }
                 is FetchState.Error -> Div({ classes("error") }) { Text(state.message) }
-                is FetchState.Success -> renderPreferencesTable(state.value)
+                is FetchState.Success -> renderPairView(state.value) { a, b ->
+                    renderPreferencesDetail(state.value, a, b)
+                }
             }
         }
 
@@ -1172,10 +1181,12 @@ fun ElectionPreferencesPage(
 }
 
 /**
- * Detailed view of the strongest-path matrix. Each row is the strongest path
- * from one candidate to another, with the weakest-link strength up front and
- * the per-hop path through intermediates. Variable-width: padded to maxHops
- * so all rows have the same column count.
+ * Strongest-paths page. Same chip-pair selector as the Preferences page,
+ * but the detail panel shows each direction's multi-hop Schulze path with
+ * a per-hop voter list under it: for a path A→C→B, the A→C card lists the
+ * voters who ranked A above C, the C→B card lists the voters who ranked
+ * C above B. Each hop's voter count IS the hop's strength, so the binding
+ * hop can be read directly off the size of its voter list.
  */
 @Composable
 fun ElectionStrongestPathsPage(
@@ -1198,7 +1209,9 @@ fun ElectionStrongestPathsPage(
             when (val state = tallyFetch.state) {
                 FetchState.Loading -> P { Text("Loading…") }
                 is FetchState.Error -> Div({ classes("error") }) { Text(state.message) }
-                is FetchState.Success -> renderStrongestPathsTable(state.value)
+                is FetchState.Success -> renderPairView(state.value) { a, b ->
+                    renderStrongestPathsDetail(state.value, a, b)
+                }
             }
         }
 
@@ -1206,30 +1219,211 @@ fun ElectionStrongestPathsPage(
     }
 }
 
+/**
+ * Chip arena + detail-panel scaffold shared by the Preferences and
+ * Strongest Paths pages. Owns the rolling-window-of-two selection state;
+ * delegates to [detailPanel] when (and only when) two candidates are
+ * selected. Resetting [selected] when the election changes prevents stale
+ * names from carrying across navigation.
+ */
 @Composable
-private fun renderPreferencesTable(tally: Tally) {
+private fun renderPairView(
+    tally: Tally,
+    detailPanel: @Composable (String, String) -> Unit,
+) {
     val candidates = tally.candidateNames
     if (candidates.size < 2) {
         P { Text("Not enough candidates to compare.") }
         return
     }
-    Table({ classes("data-table") }) {
-        Thead {
-            Tr {
-                Th { Text("winner") }
-                Th { Text("strength") }
-                Th { Text("loser") }
+    var selected by remember(tally.electionName, candidates) {
+        mutableStateOf<List<String>>(emptyList())
+    }
+    Div({ classes("pair-selector-arena") }) {
+        Span({ classes("pair-selector-hint") }) {
+            Text("Pick two candidates to compare")
+        }
+        Div({ classes("pair-selector-grid") }) {
+            candidates.forEach { name ->
+                val isSelected = name in selected
+                Button({
+                    classes("pair-selector-chip")
+                    if (isSelected) classes("pair-selector-chip-selected")
+                    onClick {
+                        selected = if (isSelected) selected - name
+                            else (selected + name).takeLast(2)
+                    }
+                }) {
+                    Text(name)
+                }
             }
         }
-        Tbody {
-            candidates.indices.forEach { i ->
-                candidates.indices.forEach { j ->
-                    if (i != j) {
-                        Tr {
-                            Td { Text(candidates[i]) }
-                            Td { Text(tally.preferences[i][j].strength.toString()) }
-                            Td { Text(candidates[j]) }
+    }
+    if (selected.size == 2) {
+        detailPanel(selected[0], selected[1])
+    } else {
+        Div({ classes("pair-selector-empty") }) {
+            Text(
+                if (selected.isEmpty())
+                    "Select two candidates above to see the comparison."
+                else
+                    "Select one more candidate."
+            )
+        }
+    }
+}
+
+@Composable
+private fun renderPreferencesDetail(tally: Tally, a: String, b: String) {
+    val candidates = tally.candidateNames
+    val ai = candidates.indexOf(a)
+    val bi = candidates.indexOf(b)
+    val aOverB = tally.preferences[ai][bi].strength
+    val bOverA = tally.preferences[bi][ai].strength
+    val aWins = aOverB > bOverA
+    val bWins = bOverA > aOverB
+    val verdict = when {
+        aWins -> "$a beats $b $aOverB to $bOverA"
+        bWins -> "$b beats $a $bOverA to $aOverB"
+        else -> "$a and $b tied at $aOverB"
+    }
+
+    val revealed = tally.ballots.filterIsInstance<Ballot.Revealed>()
+    val aVoters = votersWhoPrefer(revealed, a, b)
+    val bVoters = votersWhoPrefer(revealed, b, a)
+    val abstainVoters = votersWhoAbstainOnPair(revealed, a, b)
+
+    Div({ classes("pair-detail") }) {
+        Div({ classes("pair-detail-header") }) { Text(verdict) }
+
+        Div({ classes("pair-side-row") }) {
+            renderPairSide(name = a, voters = aVoters, count = aOverB, isWinner = aWins, isSecret = tally.secretBallot)
+            renderPairSide(name = b, voters = bVoters, count = bOverA, isWinner = bWins, isSecret = tally.secretBallot)
+        }
+
+        if (tally.secretBallot || abstainVoters.isNotEmpty()) {
+            Div({ classes("pair-abstain") }) {
+                H3 { Text("No expressed preference (${abstainVoters.size})") }
+                if (tally.secretBallot) {
+                    P({ classes("pair-secret-note") }) { Text("(ballots are secret)") }
+                } else {
+                    renderVoterList(abstainVoters)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun renderPairSide(
+    name: String,
+    voters: List<String>,
+    count: Int,
+    isWinner: Boolean,
+    isSecret: Boolean,
+) {
+    Div({
+        classes("pair-side")
+        if (isWinner) classes("pair-side-winner")
+    }) {
+        Div({ classes("pair-side-name") }) { Text(name) }
+        Div({ classes("pair-side-count") }) { Text(count.toString()) }
+        Div({ classes("pair-side-label") }) {
+            Text(if (count == 1) "vote" else "votes")
+        }
+        if (isSecret) {
+            P({ classes("pair-secret-note") }) { Text("(ballots are secret)") }
+        } else {
+            renderVoterList(voters)
+        }
+    }
+}
+
+@Composable
+private fun renderStrongestPathsDetail(tally: Tally, a: String, b: String) {
+    val candidates = tally.candidateNames
+    val ai = candidates.indexOf(a)
+    val bi = candidates.indexOf(b)
+    val forward = tally.strongestPathMatrix[ai][bi]
+    val reverse = tally.strongestPathMatrix[bi][ai]
+    val forwardWins = forward.strength > reverse.strength
+    val reverseWins = reverse.strength > forward.strength
+    val verdict = when {
+        forwardWins -> "$a beats $b on strongest path: ${forward.strength} vs ${reverse.strength}"
+        reverseWins -> "$b beats $a on strongest path: ${reverse.strength} vs ${forward.strength}"
+        else -> "$a and $b tied on strongest path at ${forward.strength}"
+    }
+    val revealed = tally.ballots.filterIsInstance<Ballot.Revealed>()
+    // Winning direction first so the claim sits above its evidence.
+    val (first, firstWins, second, secondWins) =
+        if (reverseWins) PathOrder(reverse, true, forward, false)
+        else PathOrder(forward, forwardWins, reverse, reverseWins)
+
+    Div({ classes("pair-detail") }) {
+        Div({ classes("pair-detail-header") }) { Text(verdict) }
+        renderPathBreakdown(first, isWinner = firstWins, ballots = revealed, isSecret = tally.secretBallot)
+        renderPathBreakdown(second, isWinner = secondWins, ballots = revealed, isSecret = tally.secretBallot)
+    }
+}
+
+private data class PathOrder(
+    val first: Preference,
+    val firstWins: Boolean,
+    val second: Preference,
+    val secondWins: Boolean,
+)
+
+@Composable
+private fun renderPathBreakdown(
+    pref: Preference,
+    isWinner: Boolean,
+    ballots: List<Ballot.Revealed>,
+    isSecret: Boolean,
+) {
+    val highlightBinding = pref.strengths.size > 1
+    val weakest = pref.strength
+    Div({
+        classes("pair-path")
+        if (isWinner) classes("pair-path-winner")
+    }) {
+        Div({ classes("pair-path-summary") }) {
+            Span({ classes("pair-path-name") }) { Text(pref.path[0]) }
+            pref.strengths.forEachIndexed { idx, s ->
+                Span({ classes("pair-path-arrow") }) { Text("→") }
+                val isBinding = highlightBinding && s == weakest
+                Span({
+                    classes("pair-path-strength")
+                    if (isBinding) classes("pair-path-strength-binding")
+                }) {
+                    Text(s.toString())
+                }
+                Span({ classes("pair-path-arrow") }) { Text("→") }
+                Span({ classes("pair-path-name") }) { Text(pref.path[idx + 1]) }
+            }
+            Span({ classes("pair-path-overall") }) {
+                Text("(overall strength ${pref.strength})")
+            }
+        }
+
+        Div({ classes("pair-path-hops") }) {
+            pref.strengths.forEachIndexed { idx, s ->
+                val from = pref.path[idx]
+                val to = pref.path[idx + 1]
+                val isBinding = highlightBinding && s == weakest
+                Div({
+                    classes("pair-path-hop")
+                    if (isBinding) classes("pair-path-hop-binding")
+                }) {
+                    Div({ classes("pair-path-hop-header") }) {
+                        Text("$from → $to ")
+                        Span({ classes("pair-path-hop-strength") }) {
+                            Text("$s ${if (s == 1) "voter" else "voters"}")
                         }
+                    }
+                    if (isSecret) {
+                        P({ classes("pair-secret-note") }) { Text("(ballots are secret)") }
+                    } else {
+                        renderVoterList(votersWhoPrefer(ballots, from, to))
                     }
                 }
             }
@@ -1238,51 +1432,35 @@ private fun renderPreferencesTable(tally: Tally) {
 }
 
 @Composable
-private fun renderStrongestPathsTable(tally: Tally) {
-    val candidates = tally.candidateNames
-    if (candidates.size < 2) {
-        P { Text("Not enough candidates to compute paths.") }
+private fun renderVoterList(voters: List<String>) {
+    if (voters.isEmpty()) {
+        P({ classes("pair-no-voters") }) { Text("(no voters)") }
         return
     }
-
-    // Off-diagonal entries only — diagonal is a self-loop and carries no path info.
-    val rows: List<Preference> = candidates.indices.flatMap { i ->
-        candidates.indices.mapNotNull { j ->
-            if (i == j) null else tally.strongestPathMatrix[i][j]
-        }
-    }
-    val maxHops = rows.maxOf { it.strengths.size }
-
-    Table({ classes("data-table") }) {
-        Thead {
-            Tr {
-                Th { Text("weakest link") }
-                Th { Text("id") }
-                repeat(maxHops) {
-                    Th { Text("strength") }
-                    Th { Text("id") }
-                }
-            }
-        }
-        Tbody {
-            rows.forEach { pref ->
-                Tr {
-                    Td { Text(pref.strength.toString()) }
-                    Td { Text(pref.path[0]) }
-                    pref.strengths.forEachIndexed { idx, s ->
-                        Td { Text(s.toString()) }
-                        Td { Text(pref.path[idx + 1]) }
-                    }
-                    // Pad short paths so all rows have the same column count.
-                    repeat(maxHops - pref.strengths.size) {
-                        Td { Text("") }
-                        Td { Text("") }
-                    }
-                }
-            }
+    Div({ classes("pair-voter-list") }) {
+        voters.forEach { v ->
+            Span({ classes("pair-voter") }) { Text(v) }
         }
     }
 }
+
+private fun votersWhoPrefer(
+    ballots: List<Ballot.Revealed>,
+    a: String,
+    b: String,
+): List<String> = ballots
+    .filter { it.rankings.prefers(a, b) }
+    .map { it.voterName }
+    .sorted()
+
+private fun votersWhoAbstainOnPair(
+    ballots: List<Ballot.Revealed>,
+    a: String,
+    b: String,
+): List<String> = ballots
+    .filter { !it.rankings.prefers(a, b) && !it.rankings.prefers(b, a) }
+    .map { it.voterName }
+    .sorted()
 
 // Teens (11th, 12th, 13th) take "th" even though they end in 1/2/3.
 private fun ordinal(n: Int): String {

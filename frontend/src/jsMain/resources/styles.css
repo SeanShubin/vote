@@ -728,6 +728,267 @@ tr:nth-child(even) {
     color: #333;
 }
 
+/*
+ * Preferences / Strongest Paths pages — chip-pair selector + detail panel.
+ *
+ * The viewer picks two candidates from a chip arena (rolling-window-of-two:
+ * clicking a third candidate evicts the older selection). Below the arena,
+ * the detail panel renders only when exactly two are picked. The point is
+ * to ground every pairwise total in actual ballots — the detail lists the
+ * voters whose ballots produced each direction's count, so the numbers
+ * are auditable rather than opaque.
+ *
+ * The Strongest Paths variant uses the same scaffold but the detail shows
+ * the multi-hop chain with a per-hop voter list, so the binding hop's
+ * strength can be verified by scanning the names.
+ */
+.pair-selector-arena {
+    background: #f9f9f9;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+.pair-selector-hint {
+    display: block;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: #888;
+    margin-bottom: 0.5rem;
+}
+
+.pair-selector-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.pair-selector-chip {
+    padding: 0.55rem 0.9rem;
+    background: white;
+    border: 1px solid #aab8ca;
+    border-radius: 4px;
+    color: #34495e;
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    margin-top: 0;
+    transition: background 0.1s, border-color 0.12s, color 0.1s;
+}
+
+.pair-selector-chip:hover {
+    background: #ecf2fb;
+    border-color: #3498db;
+    color: #3498db;
+}
+
+.pair-selector-chip-selected {
+    background: #2c7be5;
+    border-color: #1c5fb8;
+    color: white;
+}
+
+.pair-selector-chip-selected:hover {
+    background: #1c5fb8;
+    color: white;
+}
+
+.pair-selector-empty {
+    padding: 1.5rem 1rem;
+    color: #888;
+    font-style: italic;
+    text-align: center;
+}
+
+.pair-detail {
+    border: 1px solid #aab8ca;
+    border-radius: 6px;
+    padding: 1rem;
+    background: #f0f6ff;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.pair-detail-header {
+    font-weight: 700;
+    font-size: 1.1rem;
+    color: #1f3956;
+}
+
+.pair-side-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+}
+
+.pair-side {
+    flex: 1 1 240px;
+    border: 1px solid #aab8ca;
+    border-radius: 6px;
+    background: white;
+    padding: 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+
+/* Winning direction gets a thicker accent border so the eye lands on it
+ * first; padding compensates so the box doesn't shift size on (de)selection. */
+.pair-side-winner {
+    border: 2px solid #2c7be5;
+    padding: calc(0.75rem - 1px);
+    background: #ecf2fb;
+}
+
+.pair-side-name {
+    font-weight: 600;
+    color: #34495e;
+    font-size: 1rem;
+}
+
+.pair-side-count {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #2c7be5;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+}
+
+.pair-side-label {
+    font-size: 0.75rem;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.pair-voter-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+    margin-top: 0.3rem;
+}
+
+.pair-voter {
+    padding: 0.2rem 0.6rem;
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 12px;
+    font-size: 0.85rem;
+    color: #34495e;
+}
+
+.pair-no-voters,
+.pair-secret-note {
+    font-style: italic;
+    color: #888;
+    font-size: 0.85rem;
+    margin: 0;
+}
+
+.pair-abstain {
+    background: white;
+    border: 1px solid #aab8ca;
+    border-radius: 6px;
+    padding: 0.75rem;
+}
+
+.pair-abstain h3 {
+    margin: 0 0 0.4rem 0;
+    font-size: 0.95rem;
+    color: #6b7d8d;
+}
+
+.pair-path {
+    background: white;
+    border: 1px solid #aab8ca;
+    border-radius: 6px;
+    padding: 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+}
+
+.pair-path-winner {
+    border: 2px solid #2c7be5;
+    padding: calc(0.75rem - 1px);
+    background: #ecf2fb;
+}
+
+.pair-path-summary {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.3rem;
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    color: #1f3956;
+    font-weight: 500;
+}
+
+.pair-path-name {
+    color: #1f3956;
+}
+
+.pair-path-arrow {
+    color: #aab8ca;
+}
+
+.pair-path-strength {
+    color: #2c7be5;
+}
+
+/* Binding hop: the minimum-strength link along a multi-hop path — the one
+ * that fixes the path's overall strength. Boxed + bolded so it stands out. */
+.pair-path-strength-binding {
+    font-weight: 700;
+    background: #f0f6ff;
+    padding: 0 0.3rem;
+    border-radius: 3px;
+    color: #1c5fb8;
+}
+
+.pair-path-overall {
+    margin-left: 0.4rem;
+    color: #6b7d8d;
+    font-family: inherit;
+    font-weight: 400;
+    font-size: 0.85rem;
+}
+
+.pair-path-hops {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.pair-path-hop {
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background: #f9f9f9;
+    padding: 0.5rem 0.75rem;
+}
+
+.pair-path-hop-binding {
+    border-color: #2c7be5;
+    background: #f0f6ff;
+}
+
+.pair-path-hop-header {
+    font-weight: 500;
+    color: #34495e;
+    margin-bottom: 0.3rem;
+}
+
+.pair-path-hop-strength {
+    color: #2c7be5;
+    font-weight: 600;
+    margin-left: 0.4rem;
+    font-variant-numeric: tabular-nums;
+}
+
 .build-stamp {
     position: fixed;
     bottom: 4px;
