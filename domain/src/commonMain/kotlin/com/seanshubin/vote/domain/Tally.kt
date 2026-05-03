@@ -25,7 +25,15 @@ data class Tally(
             candidates: List<String>,
             ballots: List<Ballot.Revealed>
         ): Tally {
-            val initialTally = BallotCounter(electionName, secretBallot, candidates, ballots).countBallots()
+            // Drop candidates nobody ever ranked — they have no expressed
+            // preferences and would just appear as a noise row/column in the
+            // matrix and an unranked entry at the bottom of the places list.
+            val rankedCandidates = candidates.filter { candidate ->
+                ballots.any { ballot ->
+                    ballot.rankings.any { it.candidateName == candidate && it.rank != null }
+                }
+            }
+            val initialTally = BallotCounter(electionName, secretBallot, rankedCandidates, ballots).countBallots()
             val candidatesSortedByPlaceThenAlpha = initialTally.places.map { it.candidateName }
             val sortedTallyToMakeItEasierToExplainResults =
                 BallotCounter(electionName, secretBallot, candidatesSortedByPlaceThenAlpha, ballots).countBallots()

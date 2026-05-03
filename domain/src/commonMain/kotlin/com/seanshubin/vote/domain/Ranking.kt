@@ -17,11 +17,21 @@ data class Ranking(
     val kind: RankingKind = RankingKind.CANDIDATE,
 ) {
     companion object {
-        fun List<Ranking>.prefers(a: String, b: String): Boolean =
-            rankingFor(a) < rankingFor(b)
+        /**
+         * A ballot expresses a pairwise preference for `a` over `b` only when
+         * BOTH candidates appear on the ballot with a non-null rank, and `a`'s
+         * rank is strictly lower (better) than `b`'s. If either candidate is
+         * missing from the ballot or has `rank=null`, this ballot abstains
+         * from the (a, b) contest — neither side gets a vote.
+         */
+        fun List<Ranking>.prefers(a: String, b: String): Boolean {
+            val rankA = rankOf(a) ?: return false
+            val rankB = rankOf(b) ?: return false
+            return rankA < rankB
+        }
 
-        private fun List<Ranking>.rankingFor(candidateName: String): Int =
-            find { ranking -> ranking.candidateName == candidateName }?.rank ?: Int.MAX_VALUE
+        private fun List<Ranking>.rankOf(candidateName: String): Int? =
+            find { ranking -> ranking.candidateName == candidateName }?.rank
 
         fun List<Ranking>.listToString() =
             joinToString(" ") { (candidateName, rank) -> "$rank $candidateName" }

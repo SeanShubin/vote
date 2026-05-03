@@ -363,9 +363,10 @@ fun ElectionSetupView(
  * immediately via castBallot, so the on-screen ordering is always the
  * voter's current ballot. The wire format sends `List<Ranking>` where each
  * ranked entry gets `rank = position + 1` and a `kind` tag (CANDIDATE or
- * TIER). Unranked candidates are simply omitted; the tally treats absent
- * candidates as "least preferred, tied with each other" via
- * `rankingFor(name) ?: Int.MAX_VALUE` in `Ranking.kt`.
+ * TIER). Unranked candidates are simply omitted; the tally only counts
+ * pairwise preferences between candidates the voter actually ranked, so
+ * leaving a candidate off a ballot means "I express no opinion about
+ * this candidate" rather than "I rank this candidate last."
  *
  * Tier mode — the threshold metaphor. Tier markers are virtual candidates
  * the voter ranks alongside the real ones; ranking a candidate ahead of a
