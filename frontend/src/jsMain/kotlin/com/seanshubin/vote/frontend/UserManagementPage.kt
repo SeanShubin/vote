@@ -29,6 +29,12 @@ fun UserManagementPage(
     currentUserName: String,
     currentRole: Role?,
     onSelfRoleChanged: (AuthResponse) -> Unit,
+    // The self-row renders a "Change my password" link in the same column
+    // slot that other rows use for the admin "Set password…" button. Self
+    // can't use the admin path (the gate explicitly excludes self) so this
+    // is a discoverability shortcut to ChangeMyPasswordPage rather than a
+    // duplicated affordance.
+    onChangeMyPassword: () -> Unit,
     onBack: () -> Unit,
 ) {
     var errorMessage by remember { mutableStateOf<String?>(null) }
@@ -106,6 +112,7 @@ fun UserManagementPage(
                                 isSelf = user.userName == currentUserName,
                                 canSetPassword = canSetPassword,
                                 isSetPasswordOpen = openSetPasswordFor == user.userName,
+                                onChangeMyPassword = onChangeMyPassword,
                                 onRoleSelected = { newRole ->
                                     if (newRole == user.role) return@UserRow
                                     if (newRole == Role.OWNER) {
@@ -164,6 +171,7 @@ private fun UserRow(
     isSelf: Boolean,
     canSetPassword: Boolean,
     isSetPasswordOpen: Boolean,
+    onChangeMyPassword: () -> Unit,
     onRoleSelected: (Role) -> Unit,
     onToggleSetPassword: () -> Unit,
     onSubmitSetPassword: suspend (String) -> Unit,
@@ -196,18 +204,25 @@ private fun UserRow(
                 }
             }
         }
-        if (canSetPassword) {
-            Button({
+        // Column 3: admin Set-password for other users (when allowed), the
+        // self-service Change-my-password shortcut on the self-row, or an
+        // empty placeholder. The placeholder is required because .users-list
+        // is a 3-column grid using display: contents on the row — without
+        // it, the next user's name would land in this row's empty slot.
+        when {
+            canSetPassword -> Button({
                 attr("data-set-password-toggle", user.userName)
                 onClick { onToggleSetPassword() }
             }) {
                 Text(if (isSetPasswordOpen) "Cancel" else "Set password…")
             }
-        } else {
-            // .users-list is a 3-column grid using display: contents on the
-            // row, so we need a placeholder cell in column 3 — otherwise the
-            // next user's name would land in this row's empty slot.
-            Span({ classes("user-row-spacer") })
+            isSelf -> Button({
+                attr("data-change-my-password", "")
+                onClick { onChangeMyPassword() }
+            }) {
+                Text("Change my password")
+            }
+            else -> Span({ classes("user-row-spacer") })
         }
     }
     if (isSetPasswordOpen) {

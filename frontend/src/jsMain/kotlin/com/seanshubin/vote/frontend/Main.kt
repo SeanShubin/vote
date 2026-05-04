@@ -238,6 +238,7 @@ fun VoteApp(apiClient: ApiClient) {
                 userName = auth.userName
                 role = auth.role
             },
+            onChangeMyPassword = { router.navigate(Page.ChangeMyPassword) },
             onBack = { router.navigate(Page.Home) },
         )
         is Page.ChangeMyPassword -> ChangeMyPasswordPage(
