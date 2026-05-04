@@ -7,7 +7,6 @@ import com.seanshubin.vote.domain.Ranking.Companion.prefers
 import kotlinx.browser.window
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.launch
 import org.jetbrains.compose.web.attributes.*
 import org.jetbrains.compose.web.dom.*
 
@@ -38,25 +37,36 @@ fun ElectionDetailPage(
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var successMessage by remember { mutableStateOf<String?>(null) }
     var currentView by rememberHashTab("setup", setOf("setup", "vote", "tally"))
-    val scope = rememberCoroutineScope()
 
-    val pageFetch = rememberFetchState(
+    // Two independent fetches:
+    //   shellFetch — election + candidates, in parallel; gates the page UI.
+    //   tallyFetch — the heavier endpoint (server runs Schulze + serializes
+    //                ballots/preferences/strongest-paths), kept off the
+    //                page's critical path so the shell renders the moment
+    //                the two light fetches return. The tally streams in on
+    //                its own track and the Results tab consumes it as a
+    //                FetchState (Loading → Success). Cached for stale-while-
+    //                revalidate so revisits and post-mutation refreshes
+    //                paint instantly with the prior value while the new one
+    //                arrives.
+    val shellFetch = rememberFetchState(
         apiClient = apiClient,
         key = electionName,
         fallbackErrorMessage = "Failed to load election",
     ) {
-        // Parallel fetch — the three endpoints are independent, so awaiting
-        // them in sequence would burn extra round-trips for no reason. The
-        // tally is fetched up-front (rather than lazily on first Results
-        // click) so switching to the Results tab is instant — and so the
-        // post-mutation reload below refreshes the tally coherently with
-        // the header counts.
         coroutineScope {
             val election = async { apiClient.getElection(electionName) }
             val candidates = async { apiClient.listCandidates(electionName) }
-            val tally = async { apiClient.getTally(electionName) }
-            Triple(election.await(), candidates.await(), tally.await())
+            election.await() to candidates.await()
         }
+    }
+    val tallyFetch = rememberCachedFetchState(
+        apiClient = apiClient,
+        cacheKey = "tally:$electionName",
+        key = electionName,
+        fallbackErrorMessage = "Failed to load tally",
+    ) {
+        apiClient.getTally(electionName)
     }
 
     val deleteAction = rememberAsyncAction(
@@ -72,19 +82,20 @@ fun ElectionDetailPage(
         },
     )
 
-    val pageState = pageFetch.state
-    // Hold onto the most recent Success so a reload (which briefly flips
-    // pageState back to Loading) doesn't unmount VotingView. Without this,
-    // the user's in-progress ballot loses its remember-state every time
-    // pageFetch.reload runs — clicking a candidate and triggering the
-    // first-cast reload made the candidate "snap back" into the arena.
-    var lastLoaded by remember(electionName) {
-        mutableStateOf<Triple<ElectionDetail, List<String>, ElectionTally>?>(null)
+    val shellState = shellFetch.state
+    // Hold onto the most recent shell Success so a reload doesn't unmount
+    // VotingView. The patch callbacks below mutate this directly, but the
+    // pattern also covers the case where shellFetch.reload() is called
+    // explicitly in the future. (The original problem this guarded against:
+    // a first-cast reload would tear down VotingView's remember state and
+    // make the just-clicked candidate "snap back" into the arena.)
+    var lastLoadedShell by remember(electionName) {
+        mutableStateOf<Pair<ElectionDetail, List<String>>?>(null)
     }
-    LaunchedEffect(pageState) {
-        (pageState as? FetchState.Success)?.value?.let { lastLoaded = it }
+    LaunchedEffect(shellState) {
+        (shellState as? FetchState.Success)?.value?.let { lastLoadedShell = it }
     }
-    val loadedElection = lastLoaded?.first
+    val loadedElection = lastLoadedShell?.first
 
     Div({ classes("container") }) {
         H1 { Text("Election: $electionName") }
@@ -130,12 +141,12 @@ fun ElectionDetailPage(
         }
 
         when {
-            lastLoaded == null && pageState is FetchState.Error ->
-                Div({ classes("error") }) { Text(pageState.message) }
-            lastLoaded == null ->
+            lastLoadedShell == null && shellState is FetchState.Error ->
+                Div({ classes("error") }) { Text(shellState.message) }
+            lastLoadedShell == null ->
                 P { Text("Loading…") }
             else -> {
-                val (_, candidates, tally) = lastLoaded!!
+                val (_, candidates) = lastLoadedShell!!
 
                 // Tabs (no more Details — the header above covers it).
                 Div({ classes("tabs") }) {
@@ -162,9 +173,9 @@ fun ElectionDetailPage(
                             successMessage = "Description saved"
                             errorMessage = null
                             // Patch in place — description is independent of
-                            // candidates/tally, no refresh needed.
-                            lastLoaded = lastLoaded?.let { (e, c, t) ->
-                                Triple(e.copy(description = newDescription), c, t)
+                            // candidates and tally, no refresh needed.
+                            lastLoadedShell = lastLoadedShell?.let { (e, c) ->
+                                e.copy(description = newDescription) to c
                             }
                         },
                         onCandidatesSaved = { newCandidates ->
@@ -172,47 +183,29 @@ fun ElectionDetailPage(
                             errorMessage = null
                             // Patch the candidate list and the header count
                             // immediately so the UI feels instant. The tally
-                            // is now stale (preferences matrix is keyed on the
-                            // candidate set) so kick off a background refresh
-                            // that swaps it in once the new tally arrives —
-                            // no Loading flash because the existing tally
-                            // stays on display until then.
-                            lastLoaded = lastLoaded?.let { (e, _, t) ->
-                                Triple(e.copy(candidateCount = newCandidates.size), newCandidates, t)
+                            // is now stale (preferences matrix is keyed on
+                            // the candidate set) so reload it; the cached
+                            // helper keeps the prior tally visible during
+                            // the refetch, so the Results tab does not flash
+                            // to Loading.
+                            lastLoadedShell = lastLoadedShell?.let { (e, _) ->
+                                e.copy(candidateCount = newCandidates.size) to newCandidates
                             }
-                            scope.launch {
-                                try {
-                                    val newTally = apiClient.getTally(electionName)
-                                    lastLoaded = lastLoaded?.let { (e, c, _) ->
-                                        Triple(e, c, newTally)
-                                    }
-                                } catch (e: Exception) {
-                                    apiClient.logErrorToServer(e)
-                                }
-                            }
+                            tallyFetch.reload()
                         },
                         onTiersSaved = { newTiers ->
                             successMessage = "Tiers saved"
                             errorMessage = null
                             // Tier markers participate in strongest-path
                             // calculations, so the tally needs the same
-                            // background refresh treatment as candidates.
-                            // (Tiers are locked while ballots exist, so in
-                            // practice the tally will be empty here, but the
-                            // refresh keeps the invariant honest.)
-                            lastLoaded = lastLoaded?.let { (e, c, t) ->
-                                Triple(e.copy(tiers = newTiers), c, t)
+                            // refresh treatment as candidates. (Tiers are
+                            // locked while ballots exist, so in practice
+                            // the tally will be empty here, but the refresh
+                            // keeps the invariant honest.)
+                            lastLoadedShell = lastLoadedShell?.let { (e, c) ->
+                                e.copy(tiers = newTiers) to c
                             }
-                            scope.launch {
-                                try {
-                                    val newTally = apiClient.getTally(electionName)
-                                    lastLoaded = lastLoaded?.let { (e, c, _) ->
-                                        Triple(e, c, newTally)
-                                    }
-                                } catch (e: Exception) {
-                                    apiClient.logErrorToServer(e)
-                                }
-                            }
+                            tallyFetch.reload()
                         },
                         onError = { errorMessage = it },
                     )
@@ -221,34 +214,23 @@ fun ElectionDetailPage(
                         electionName = electionName,
                         candidates = candidates,
                         tiers = loadedElection?.tiers ?: emptyList(),
-                        // Patch the header count locally and quietly refresh
-                        // the tally in the background — same pattern as the
-                        // setup-save callbacks above. Avoids the Loading
-                        // flash that pageFetch.reload() would cause at the
-                        // moment of first interaction.
+                        // Patch the header count locally and refresh the
+                        // tally — the cached helper avoids the Loading
+                        // flash on the Results tab.
                         onBallotCountChanged = { delta ->
-                            lastLoaded = lastLoaded?.let { (e, c, t) ->
-                                Triple(e.copy(ballotCount = e.ballotCount + delta), c, t)
+                            lastLoadedShell = lastLoadedShell?.let { (e, c) ->
+                                e.copy(ballotCount = e.ballotCount + delta) to c
                             }
                             // The user's ballotsCastCount on the Home activity
                             // panel just changed — drop the cached entry so a
                             // navigation back to Home shows the updated count.
                             currentUserName?.let { PageCache.invalidate("userActivity:$it") }
-                            scope.launch {
-                                try {
-                                    val newTally = apiClient.getTally(electionName)
-                                    lastLoaded = lastLoaded?.let { (e, c, _) ->
-                                        Triple(e, c, newTally)
-                                    }
-                                } catch (e: Exception) {
-                                    apiClient.logErrorToServer(e)
-                                }
-                            }
+                            tallyFetch.reload()
                         },
                         onError = { errorMessage = it },
                     )
                     "tally" -> TallyView(
-                        serverTally = tally,
+                        state = tallyFetch.state,
                         onNavigateToPreferences = onNavigateToPreferences,
                         onNavigateToStrongestPaths = onNavigateToStrongestPaths,
                     )
@@ -1066,18 +1048,22 @@ private data class TierChunk(
 
 @Composable
 fun TallyView(
-    serverTally: ElectionTally,
+    state: FetchState<ElectionTally>,
     onNavigateToPreferences: () -> Unit,
     onNavigateToStrongestPaths: () -> Unit,
 ) {
     Div({ classes("section") }) {
         H2 { Text("Results") }
 
-        renderTally(
-            serverTally,
-            onNavigateToPreferences = onNavigateToPreferences,
-            onNavigateToStrongestPaths = onNavigateToStrongestPaths,
-        )
+        when (state) {
+            FetchState.Loading -> P { Text("Loading results…") }
+            is FetchState.Error -> Div({ classes("error") }) { Text(state.message) }
+            is FetchState.Success -> renderTally(
+                state.value,
+                onNavigateToPreferences = onNavigateToPreferences,
+                onNavigateToStrongestPaths = onNavigateToStrongestPaths,
+            )
+        }
     }
 }
 
