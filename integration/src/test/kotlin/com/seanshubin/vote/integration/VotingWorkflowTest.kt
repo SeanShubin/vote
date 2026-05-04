@@ -57,7 +57,7 @@ class VotingWorkflowTest {
         charlie.castBallot(election, "Rust" to 1, "Kotlin" to 2, "Go" to 3)
 
         val tally = election.tally()
-        assertEquals(2, tally.ballots.size)
+        assertEquals(2, tally.tally.ballots.size)
 
         val ballotEvents = testContext.events.ofType<DomainEvent.BallotCast>()
         assertEquals(2, ballotEvents.size)
@@ -89,7 +89,7 @@ class VotingWorkflowTest {
         val tally = election.tally()
 
         // Apple beats both others pairwise (2-1 each), so it should win
-        val winner = tally.places.first()
+        val winner = tally.tally.places.first()
         assertEquals(1, winner.rank)
         assertEquals("Apple", winner.candidateName)
     }

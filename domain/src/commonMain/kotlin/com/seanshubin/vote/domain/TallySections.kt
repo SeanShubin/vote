@@ -1,5 +1,7 @@
 package com.seanshubin.vote.domain
 
+import kotlinx.serialization.Serializable
+
 /**
  * One contiguous chunk of the placings on the Results view. [tierName]
  * non-null means a tier card with that label. [tierName] null means a
@@ -10,6 +12,7 @@ package com.seanshubin.vote.domain
  * two null cases: position in the section list communicates which is
  * which, and the contents are formatted identically either way.
  */
+@Serializable
 data class TallySection(val tierName: String?, val places: List<Place>)
 
 /**

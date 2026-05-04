@@ -73,6 +73,13 @@ class HttpRecordingBackend(
         recorder.put("/election/$encodedName/candidates", body, token)
     }
 
+    override fun setTiers(token: AccessToken, electionName: String, tierNames: List<String>) {
+        val request = SetTiersRequest(tierNames)
+        val body = json.encodeToString(request)
+        val encodedName = URLEncoder.encode(electionName, StandardCharsets.UTF_8)
+        recorder.put("/election/$encodedName/tiers", body, token)
+    }
+
     override fun deleteElection(token: AccessToken, electionName: String) {
         val encodedName = URLEncoder.encode(electionName, StandardCharsets.UTF_8)
         recorder.delete("/election/$encodedName", token)
@@ -97,10 +104,10 @@ class HttpRecordingBackend(
         }
     }
 
-    override fun tally(token: AccessToken, electionName: String): Tally {
+    override fun tally(token: AccessToken, electionName: String): ElectionTally {
         val encodedName = URLEncoder.encode(electionName, StandardCharsets.UTF_8)
         val response = recorder.get("/election/$encodedName/tally", token)
-        return json.decodeFromString<Tally>(response.body())
+        return json.decodeFromString<ElectionTally>(response.body())
     }
 
     override fun listUsers(token: AccessToken): List<UserNameRole> {

@@ -24,6 +24,34 @@ class ValidationIntegrationTest {
     }
 
     @Test
+    fun `setCandidates rejects names that collide with existing tiers`() {
+        val testContext = TestContext()
+        val alice = testContext.registerUser("alice")
+
+        val election = alice.createElection("Test Election")
+        election.setTiers("Pass", "Fail")
+
+        val exception = assertFailsWith<IllegalArgumentException> {
+            election.setCandidates("Alice", "Pass")
+        }
+        assertTrue(exception.message!!.contains("Pass"))
+    }
+
+    @Test
+    fun `setTiers rejects names that collide with existing candidates (case-insensitive)`() {
+        val testContext = TestContext()
+        val alice = testContext.registerUser("alice")
+
+        val election = alice.createElection("Test Election")
+        election.setCandidates("Alice", "Bob")
+
+        val exception = assertFailsWith<IllegalArgumentException> {
+            election.setTiers("Gold", "alice")
+        }
+        assertTrue(exception.message!!.contains("Alice") || exception.message!!.contains("alice"))
+    }
+
+    @Test
     fun `setCandidates rejects duplicate names`() {
         val testContext = TestContext()
         val alice = testContext.registerUser("alice")

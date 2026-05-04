@@ -109,6 +109,29 @@ object Validation {
         }
     }
 
+    /**
+     * Reject when any candidate name collides with any tier name. Comparison
+     * is case-insensitive and whitespace-insensitive (the names have already
+     * been normalized by [validateCandidateName]/[validateTierName] which
+     * collapse internal whitespace and trim ends; we lowercase here so
+     * "Pass" and "pass" still collide). Detail pages classify each name as
+     * candidate-or-tier by membership lookup, so an ambiguous name would
+     * show up incorrectly in one of the two categories.
+     */
+    fun validateCandidatesAndTiersDistinct(candidates: List<String>, tiers: List<String>) {
+        val candidateKeys = candidates.associateBy { it.lowercase() }
+        val tierKeys = tiers.associateBy { it.lowercase() }
+        val collidingKeys = candidateKeys.keys.intersect(tierKeys.keys)
+        require(collidingKeys.isEmpty()) {
+            val pairs = collidingKeys.map { key ->
+                val candidate = candidateKeys.getValue(key)
+                val tier = tierKeys.getValue(key)
+                if (candidate == tier) "'$candidate'" else "'$candidate' and '$tier'"
+            }
+            "Candidate and tier names must be distinct, found collision(s): ${pairs.joinToString()}"
+        }
+    }
+
     fun validateCandidateNames(names: List<String>): List<String> {
         // Empty list is allowed — lets an owner clear all candidates (e.g. when
         // restarting an election setup). Each individual name still has to pass

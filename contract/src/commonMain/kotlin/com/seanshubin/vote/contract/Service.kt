@@ -36,7 +36,7 @@ interface Service {
     fun castBallot(accessToken: AccessToken, voterName: String, electionName: String, rankings: List<Ranking>): String
     fun deleteBallot(accessToken: AccessToken, voterName: String, electionName: String)
     fun listRankings(accessToken: AccessToken, voterName: String, electionName: String): List<Ranking>
-    fun tally(accessToken: AccessToken, electionName: String): Tally
+    fun tally(accessToken: AccessToken, electionName: String): ElectionTally
     fun getBallot(accessToken: AccessToken, voterName: String, electionName: String): BallotSummary?
     fun sendLoginLinkByEmail(email: String, baseUri: String)
     fun getUserActivity(accessToken: AccessToken): UserActivity
