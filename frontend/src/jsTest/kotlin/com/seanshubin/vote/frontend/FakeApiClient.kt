@@ -8,7 +8,7 @@ import com.seanshubin.vote.domain.ElectionSummary
 import com.seanshubin.vote.domain.Ranking
 import com.seanshubin.vote.domain.Role
 import com.seanshubin.vote.domain.TableData
-import com.seanshubin.vote.domain.Tally
+import com.seanshubin.vote.domain.ElectionTally
 import com.seanshubin.vote.domain.UserActivity
 import com.seanshubin.vote.domain.UserNameRole
 
@@ -55,7 +55,7 @@ class FakeApiClient : ApiClient {
     var deleteMyBallotResult: Result<Unit> = Result.success(Unit)
     var myRankingsResult: Result<List<Ranking>> = Result.success(emptyList())
     val myRankingsCalls = mutableListOf<String>()
-    var getTallyResult: Result<Tally> = Result.failure(Exception("Get tally not configured"))
+    var getTallyResult: Result<ElectionTally> = Result.failure(Exception("Get tally not configured"))
     var deleteElectionResult: Result<Unit> = Result.success(Unit)
     var removeUserResult: Result<Unit> = Result.success(Unit)
     var listTablesResult: Result<List<String>> = Result.success(emptyList())
@@ -169,7 +169,7 @@ class FakeApiClient : ApiClient {
         return myRankingsResult.getOrThrow()
     }
 
-    override suspend fun getTally(electionName: String): Tally {
+    override suspend fun getTally(electionName: String): ElectionTally {
         getTallyCalls.add(electionName)
         return getTallyResult.getOrThrow()
     }
