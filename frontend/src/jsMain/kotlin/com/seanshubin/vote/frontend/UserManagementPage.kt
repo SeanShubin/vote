@@ -40,8 +40,9 @@ fun UserManagementPage(
     // state, mirroring how the role <select> works.
     var openSetPasswordFor by remember { mutableStateOf<String?>(null) }
 
-    val usersFetch = rememberFetchState(
+    val usersFetch = rememberCachedFetchState(
         apiClient = apiClient,
+        cacheKey = "users",
         fallbackErrorMessage = "Failed to load users",
     ) {
         apiClient.listUsers()
@@ -61,6 +62,9 @@ fun UserManagementPage(
             // new identity to the rest of the app via [onSelfRoleChanged].
             val refreshed = apiClient.refresh()
             if (refreshed != null) onSelfRoleChanged(refreshed)
+            // usersFetch.reload() invalidates the cache and refetches; the
+            // staleWhileRevalidate path means the row re-renders without a
+            // Loading flash even though the cache entry was dropped.
             usersFetch.reload()
         },
     )
@@ -199,6 +203,11 @@ private fun UserRow(
             }) {
                 Text(if (isSetPasswordOpen) "Cancel" else "Set password…")
             }
+        } else {
+            // .users-list is a 3-column grid using display: contents on the
+            // row, so we need a placeholder cell in column 3 — otherwise the
+            // next user's name would land in this row's empty slot.
+            Span({ classes("user-row-spacer") })
         }
     }
     if (isSetPasswordOpen) {

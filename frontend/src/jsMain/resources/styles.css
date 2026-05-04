@@ -263,14 +263,22 @@ button:disabled {
 }
 
 /*
- * User management list. Two-column grid (name | role-control) where every
- * row's role control aligns to the same x regardless of name length —
- * flex-per-row would let columns drift. .user-row uses display: contents
- * so its two children flow directly into the parent grid as cells.
+ * User management list. Three-column grid (name | role-control | optional
+ * set-password button) where every row's role control aligns to the same x
+ * regardless of name length — flex-per-row would let columns drift.
+ * .user-row uses display: contents so its three children flow directly into
+ * the parent grid as cells. Rows where the caller has no permission to
+ * set the target's password still render a placeholder cell in column 3
+ * so the grid's row-fill order doesn't bleed cells from the next user
+ * into the prior row's empty slot.
+ *
+ * The inline AdminSetPasswordForm is a sibling div that lands in the grid
+ * as another row; it spans all columns so the form input row reads as a
+ * single full-width strip under the user row that opened it.
  */
 .users-list {
     display: grid;
-    grid-template-columns: 1fr auto;
+    grid-template-columns: 1fr auto auto;
     column-gap: 1rem;
     row-gap: 0.5rem;
     align-items: center;
@@ -279,6 +287,14 @@ button:disabled {
 
 .user-row {
     display: contents;
+}
+
+.user-row-spacer {
+    /* Holds column 3 open so the next row starts at column 1. Empty otherwise. */
+}
+
+.admin-set-password-form {
+    grid-column: 1 / -1;
 }
 
 .user-name {

@@ -26,6 +26,10 @@ fun CreateElectionPage(
         action = {
             errorMessage = null
             apiClient.createElection(electionName, description)
+            // Invalidate cached list payloads that just changed so the user
+            // sees their new election the moment they navigate to either
+            // page, instead of a stale list with the new entry winking in.
+            PageCache.invalidate("elections")
         },
     )
 

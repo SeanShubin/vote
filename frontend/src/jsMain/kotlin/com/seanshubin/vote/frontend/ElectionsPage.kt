@@ -10,8 +10,9 @@ fun ElectionsPage(
     onSelectElection: (String) -> Unit,
     onBack: () -> Unit,
 ) {
-    val electionsFetch = rememberFetchState(
+    val electionsFetch = rememberCachedFetchState(
         apiClient = apiClient,
+        cacheKey = "elections",
         fallbackErrorMessage = "Failed to load elections",
     ) {
         apiClient.listElections()

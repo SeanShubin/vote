@@ -57,6 +57,9 @@ fun VoteApp(apiClient: ApiClient) {
         apiClient.onSessionLost = {
             userName = null
             role = null
+            // Drop cached list-page payloads so the next user (or this user
+            // after re-login) can't briefly see the prior session's data.
+            PageCache.clear()
             router.replace(Page.Login)
         }
         try {
@@ -106,12 +109,14 @@ fun VoteApp(apiClient: ApiClient) {
                     }
                     userName = null
                     role = null
+                    PageCache.clear()
                     router.replace(Page.Login)
                 }
             },
             onAccountDeleted = {
                 userName = null
                 role = null
+                PageCache.clear()
                 router.replace(Page.Login)
             },
         )
@@ -157,12 +162,14 @@ fun VoteApp(apiClient: ApiClient) {
                     }
                     userName = null
                     role = null
+                    PageCache.clear()
                     router.replace(Page.Login)
                 }
             },
             onAccountDeleted = {
                 userName = null
                 role = null
+                PageCache.clear()
                 router.replace(Page.Login)
             },
         )

@@ -22,8 +22,9 @@ fun HomePage(
 ) {
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
-    val activityFetch = rememberFetchState(
+    val activityFetch = rememberCachedFetchState(
         apiClient = apiClient,
+        cacheKey = "userActivity:$userName",
         key = userName,
         fallbackErrorMessage = "Failed to load activity",
     ) {
