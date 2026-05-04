@@ -19,6 +19,7 @@ interface ScenarioBackend {
     // Election operations
     fun addElection(token: AccessToken, ownerName: String, electionName: String, description: String = "")
     fun setCandidates(token: AccessToken, electionName: String, candidateNames: List<String>)
+    fun setTiers(token: AccessToken, electionName: String, tierNames: List<String>)
     fun deleteElection(token: AccessToken, electionName: String)
 
     // Ballot operations
@@ -26,7 +27,7 @@ interface ScenarioBackend {
     fun getBallot(token: AccessToken, voterName: String, electionName: String): BallotSummary?
 
     // Query operations
-    fun tally(token: AccessToken, electionName: String): Tally
+    fun tally(token: AccessToken, electionName: String): ElectionTally
 
     // User queries
     fun listUsers(token: AccessToken): List<UserNameRole>

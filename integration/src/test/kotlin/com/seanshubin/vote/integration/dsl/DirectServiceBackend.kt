@@ -41,6 +41,10 @@ class DirectServiceBackend(private val service: Service) : ScenarioBackend {
         service.setCandidates(token, electionName, candidateNames)
     }
 
+    override fun setTiers(token: AccessToken, electionName: String, tierNames: List<String>) {
+        service.setTiers(token, electionName, tierNames)
+    }
+
     override fun deleteElection(token: AccessToken, electionName: String) {
         service.deleteElection(token, electionName)
     }
@@ -53,7 +57,7 @@ class DirectServiceBackend(private val service: Service) : ScenarioBackend {
         return service.getBallot(token, voterName, electionName)
     }
 
-    override fun tally(token: AccessToken, electionName: String): Tally {
+    override fun tally(token: AccessToken, electionName: String): ElectionTally {
         return service.tally(token, electionName)
     }
 

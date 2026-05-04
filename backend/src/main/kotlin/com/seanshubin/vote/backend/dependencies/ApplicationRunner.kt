@@ -9,6 +9,7 @@ import com.seanshubin.vote.backend.router.RequestRouter
 import com.seanshubin.vote.backend.router.SimpleHttpHandler
 import com.seanshubin.vote.backend.service.ServiceImpl
 import com.seanshubin.vote.contract.Integrations
+import com.seanshubin.vote.contract.QueryModel
 import kotlinx.serialization.json.Json
 import org.eclipse.jetty.server.Server
 import java.sql.Connection
@@ -71,6 +72,13 @@ class ApplicationRunner(
             frontendBaseUrl = frontendBaseUrl,
         )
 
+        // Replay the event log into the projection so the scan below sees a
+        // consistent picture of every existing election. Subsequent service
+        // operations also synchronize, but the scan must run before any
+        // request can hit the server.
+        service.synchronize()
+        scanForCandidateTierCollisions(repositories.queryModel)
+
         val router = RequestRouter(service, json, tokenEncoder, cookieConfig)
         val httpHandler = SimpleHttpHandler(router)
         server = Server(configuration.port)
@@ -87,4 +95,35 @@ class ApplicationRunner(
 
     fun getEventLog() = repositories?.eventLog
         ?: error("ApplicationRunner not started — call run() or startNonBlocking() first")
+
+    /**
+     * Block startup if any election in the event log has a candidate name
+     * that collides (case-insensitively) with one of its tier names. The
+     * detail pages classify each name as candidate-or-tier by membership
+     * lookup, so an ambiguous name would render incorrectly. Old data
+     * predating the cross-list validation could carry such a collision —
+     * an admin must rename one of the colliding entries before the app
+     * will come back up.
+     */
+    private fun scanForCandidateTierCollisions(queryModel: QueryModel) {
+        val offenders = queryModel.listElections().mapNotNull { summary ->
+            val candidates = queryModel.listCandidates(summary.electionName)
+            val tiers = queryModel.listTiers(summary.electionName)
+            val candidateKeys = candidates.map { it.lowercase() }.toSet()
+            val tierKeys = tiers.map { it.lowercase() }.toSet()
+            val collisions = candidateKeys.intersect(tierKeys)
+            if (collisions.isEmpty()) null
+            else summary.electionName to collisions.toList().sorted()
+        }
+        if (offenders.isNotEmpty()) {
+            val report = offenders.joinToString("\n") { (electionName, keys) ->
+                "  - $electionName: ${keys.joinToString()}"
+            }
+            error(
+                "Refusing to start: ${offenders.size} election(s) have names that " +
+                    "appear as both a candidate and a tier (case-insensitive). " +
+                    "Rename one side of each collision and restart.\n$report"
+            )
+        }
+    }
 }

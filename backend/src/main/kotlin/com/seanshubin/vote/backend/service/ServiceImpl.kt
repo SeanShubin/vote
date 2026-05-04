@@ -417,6 +417,11 @@ class ServiceImpl(
 
         val validElectionName = Validation.validateElectionName(electionName)
         val validCandidateNames = Validation.validateCandidateNames(candidateNames)
+        // Detail pages classify each name as candidate-or-tier by lookup
+        // against the tier list; a name that's in both lists would render
+        // ambiguously, so reject the second-set-to-collide here.
+        val existingTiers = queryModel.listTiers(validElectionName)
+        Validation.validateCandidatesAndTiersDistinct(validCandidateNames, existingTiers)
 
         // DIFF COMPUTATION (pure logic, no side effects)
         val existing = queryModel.listCandidates(validElectionName)
@@ -439,6 +444,8 @@ class ServiceImpl(
 
         val validElectionName = Validation.validateElectionName(electionName)
         val validTierNames = Validation.validateTierNames(tierNames)
+        val existingCandidates = queryModel.listCandidates(validElectionName)
+        Validation.validateCandidatesAndTiersDistinct(existingCandidates, validTierNames)
 
         // The "no ballots" lock: tier names are part of the meaning of a
         // ranked ballot, so changing them out from under voters who have
@@ -556,7 +563,7 @@ class ServiceImpl(
         return queryModel.listRankings(voterName, electionName)
     }
 
-    override fun tally(accessToken: AccessToken, electionName: String): Tally {
+    override fun tally(accessToken: AccessToken, electionName: String): ElectionTally {
         requirePermission(accessToken, Permission.VIEW_APPLICATION)
         queryModel.searchElectionByName(electionName)
             ?: throw ServiceException(ServiceException.Category.NOT_FOUND, "Election not found: $electionName")
@@ -570,12 +577,14 @@ class ServiceImpl(
         // marker but not the next one above it. When there are no tiers,
         // the call is identical to the pre-tier behavior.
         // Secret-ballot toggle dropped — tally always shows ranked ballots.
-        return Tally.countBallots(
+        val tally = Tally.countBallots(
             electionName = electionName,
             secretBallot = false,
             candidates = candidates + tiers,
             ballots = ballots,
         )
+        val sections = tallySections(tally.places, tiers)
+        return ElectionTally(tally, tiers, sections)
     }
 
     override fun getBallot(accessToken: AccessToken, voterName: String, electionName: String): BallotSummary? {

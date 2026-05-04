@@ -796,6 +796,48 @@ tr:nth-child(even) {
     color: white;
 }
 
+/*
+ * Tier chips on the Preferences / Strongest Paths pages. The light-blue
+ * background and bold weight mirror the tier-card styling on the vote and
+ * results pages so a viewer recognizes "this is a tier marker, not a real
+ * candidate." Selected state still uses the strong blue fill from above so
+ * the selection is unambiguous regardless of chip kind.
+ */
+.pair-selector-chip-tier {
+    background: #e8eef5;
+    font-weight: 700;
+}
+
+.pair-selector-chip-tier:hover {
+    background: #dbe5f1;
+}
+
+.pair-name {
+    font-weight: 600;
+}
+
+.pair-name-tier,
+.pair-path-name-tier {
+    background: #e8eef5;
+    font-weight: 700;
+    padding: 0.05rem 0.4rem;
+    border-radius: 4px;
+}
+
+.pair-side-name-tier {
+    background: #e8eef5;
+    font-weight: 700;
+    padding: 0.15rem 0.5rem;
+    border-radius: 4px;
+    display: inline-block;
+}
+
+.pair-page-explainer {
+    color: #555;
+    font-size: 0.9rem;
+    margin: 0 0 1rem;
+}
+
 .pair-selector-empty {
     padding: 1.5rem 1rem;
     color: #888;

@@ -2,10 +2,10 @@ package com.seanshubin.vote.contract
 
 import com.seanshubin.vote.domain.ElectionDetail
 import com.seanshubin.vote.domain.ElectionSummary
+import com.seanshubin.vote.domain.ElectionTally
 import com.seanshubin.vote.domain.Ranking
 import com.seanshubin.vote.domain.Role
 import com.seanshubin.vote.domain.TableData
-import com.seanshubin.vote.domain.Tally
 import com.seanshubin.vote.domain.UserActivity
 import com.seanshubin.vote.domain.UserNameRole
 
@@ -100,7 +100,7 @@ interface ApiClient {
      */
     suspend fun getMyRankings(electionName: String): List<Ranking>
 
-    suspend fun getTally(electionName: String): Tally
+    suspend fun getTally(electionName: String): ElectionTally
 
     /** Delete an election. Allowed for the election owner or ADMIN+; rejected otherwise. */
     suspend fun deleteElection(electionName: String)

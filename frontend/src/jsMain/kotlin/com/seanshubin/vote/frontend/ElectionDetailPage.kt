@@ -159,7 +159,6 @@ fun ElectionDetailPage(
                     "tally" -> TallyView(
                         apiClient = apiClient,
                         electionName = electionName,
-                        tiers = loadedElection?.tiers ?: emptyList(),
                         onNavigateToPreferences = onNavigateToPreferences,
                         onNavigateToStrongestPaths = onNavigateToStrongestPaths,
                     )
@@ -970,7 +969,6 @@ private data class TierChunk(
 fun TallyView(
     apiClient: ApiClient,
     electionName: String,
-    tiers: List<String>,
     onNavigateToPreferences: () -> Unit,
     onNavigateToStrongestPaths: () -> Unit,
 ) {
@@ -990,7 +988,6 @@ fun TallyView(
             is FetchState.Error -> Div({ classes("error") }) { Text(state.message) }
             is FetchState.Success -> renderTally(
                 state.value,
-                tiers = tiers,
                 onNavigateToPreferences = onNavigateToPreferences,
                 onNavigateToStrongestPaths = onNavigateToStrongestPaths,
             )
@@ -1014,34 +1011,34 @@ fun TallyView(
  */
 @Composable
 private fun renderTally(
-    serverTally: Tally,
-    tiers: List<String>,
+    serverTally: ElectionTally,
     onNavigateToPreferences: () -> Unit,
     onNavigateToStrongestPaths: () -> Unit,
 ) {
-    val revealed = serverTally.ballots.filterIsInstance<Ballot.Revealed>()
+    val revealed = serverTally.tally.ballots.filterIsInstance<Ballot.Revealed>()
     val totalToggleable = revealed.size
 
-    var active by remember(serverTally.electionName, totalToggleable) {
+    var active by remember(serverTally.tally.electionName, totalToggleable) {
         mutableStateOf(revealed.map { it.confirmation }.toSet())
     }
 
     val allOn = revealed.isEmpty() || active.size == totalToggleable
-    val displayTally = if (allOn) {
-        serverTally
+    val displaySections = if (allOn) {
+        serverTally.sections
     } else {
-        Tally.countBallots(
-            electionName = serverTally.electionName,
-            secretBallot = serverTally.secretBallot,
-            candidates = serverTally.candidateNames,
+        val recomputed = Tally.countBallots(
+            electionName = serverTally.tally.electionName,
+            secretBallot = serverTally.tally.secretBallot,
+            candidates = serverTally.tally.candidateNames,
             ballots = revealed.filter { it.confirmation in active },
         )
+        tallySections(recomputed.places, serverTally.tiers)
     }
 
     P {
         Text(
             if (allOn) {
-                "Total Ballots: ${serverTally.ballots.size}"
+                "Total Ballots: ${serverTally.tally.ballots.size}"
             } else {
                 "Active Ballots: ${active.size} of $totalToggleable"
             }
@@ -1049,10 +1046,10 @@ private fun renderTally(
     }
 
     H3 { Text("Winners") }
-    if (displayTally.places.isEmpty()) {
+    if (displaySections.all { it.places.isEmpty() }) {
         P { Text("No winners yet") }
     } else {
-        val sections = tallySections(displayTally.places, tiers)
+        val sections = displaySections
 
         val renderPlaceList: @Composable (List<Place>) -> Unit = { places ->
             Ol({ classes("ranked-ballot-list") }) {
@@ -1138,16 +1135,22 @@ private fun renderBallotToggles(
 }
 
 /**
- * Pairwise preferences page. The viewer picks two candidates from a chip
- * arena and the page renders the head-to-head between just those two: the
- * raw count for each direction plus the actual voters whose ballots produced
- * that count. The point is to make every pairwise total auditable — a
- * total isn't an abstract number, it's a list of named voters you can
- * scroll through.
+ * Pairwise preferences page. The viewer picks two names from a chip arena
+ * — both real candidates and tier markers appear, with tier chips styled
+ * differently — and the page renders the head-to-head between just those
+ * two: the raw count for each direction plus the actual voters whose
+ * ballots produced that count. The point is to make every pairwise total
+ * auditable — a total isn't an abstract number, it's a list of named
+ * voters you can scroll through.
  *
- * Selection is a rolling window of two: clicking a third candidate evicts
- * the older of the two selections. Clicking a currently-selected candidate
+ * Selection is a rolling window of two: clicking a third chip evicts the
+ * older of the two selections. Clicking a currently-selected chip
  * deselects it. With fewer than two selected the detail panel is hidden.
+ *
+ * Tier markers appear here because they participate in the Schulze run
+ * as virtual candidates — pairs like (Alice, Silver) show whether voters
+ * placed Alice above or below the Silver tier, which is part of how the
+ * placings ordering is determined.
  */
 @Composable
 fun ElectionPreferencesPage(
@@ -1165,15 +1168,20 @@ fun ElectionPreferencesPage(
 
     Div({ classes("admin-container") }) {
         H1 { Text("Preferences: $electionName") }
+        P({ classes("pair-page-explainer") }) {
+            Text(
+                "Tiers appear alongside candidates. A pair like (Alice, Silver) shows " +
+                    "whether voters placed Alice above or below the Silver tier."
+            )
+        }
 
         Div({ classes("admin-table-scroll") }) {
             when (val state = tallyFetch.state) {
                 FetchState.Loading -> P { Text("Loading…") }
                 is FetchState.Error -> Div({ classes("error") }) { Text(state.message) }
                 is FetchState.Success -> {
-                    val displayTally = remember(state.value) { tallyWithoutTiers(state.value) }
-                    renderPairView(displayTally) { a, b ->
-                        renderPreferencesDetail(displayTally, a, b)
+                    renderPairView(state.value) { a, b ->
+                        renderPreferencesDetail(state.value, a, b)
                     }
                 }
             }
@@ -1190,6 +1198,11 @@ fun ElectionPreferencesPage(
  * voters who ranked A above C, the C→B card lists the voters who ranked
  * C above B. Each hop's voter count IS the hop's strength, so the binding
  * hop can be read directly off the size of its voter list.
+ *
+ * Path nodes can be either candidates or tier markers. A path through a
+ * tier marker is voters' collective judgment that one side cleared the
+ * tier and the other didn't — that's how a tied direct head-to-head
+ * between two candidates can still be broken on the strongest path.
  */
 @Composable
 fun ElectionStrongestPathsPage(
@@ -1207,15 +1220,20 @@ fun ElectionStrongestPathsPage(
 
     Div({ classes("admin-container") }) {
         H1 { Text("Strongest Paths: $electionName") }
+        P({ classes("pair-page-explainer") }) {
+            Text(
+                "Tiers appear as path nodes — a path through a tier is voters' collective " +
+                    "judgment that one side cleared it and the other didn't."
+            )
+        }
 
         Div({ classes("admin-table-scroll") }) {
             when (val state = tallyFetch.state) {
                 FetchState.Loading -> P { Text("Loading…") }
                 is FetchState.Error -> Div({ classes("error") }) { Text(state.message) }
                 is FetchState.Success -> {
-                    val displayTally = remember(state.value) { tallyWithoutTiers(state.value) }
-                    renderPairView(displayTally) { a, b ->
-                        renderStrongestPathsDetail(displayTally, a, b)
+                    renderPairView(state.value) { a, b ->
+                        renderStrongestPathsDetail(state.value, a, b)
                     }
                 }
             }
@@ -1228,32 +1246,34 @@ fun ElectionStrongestPathsPage(
 /**
  * Chip arena + detail-panel scaffold shared by the Preferences and
  * Strongest Paths pages. Owns the rolling-window-of-two selection state;
- * delegates to [detailPanel] when (and only when) two candidates are
- * selected. Resetting [selected] when the election changes prevents stale
- * names from carrying across navigation.
+ * delegates to [detailPanel] when (and only when) two names are selected.
+ * Tier markers appear as chips alongside candidates, styled differently
+ * via [tally.isTier]. Resetting [selected] when the election changes
+ * prevents stale names from carrying across navigation.
  */
 @Composable
 private fun renderPairView(
-    tally: Tally,
+    tally: ElectionTally,
     detailPanel: @Composable (String, String) -> Unit,
 ) {
-    val candidates = tally.candidateNames
-    if (candidates.size < 2) {
+    val names = tally.tally.candidateNames
+    if (names.size < 2) {
         P { Text("Not enough candidates to compare.") }
         return
     }
-    var selected by remember(tally.electionName, candidates) {
+    var selected by remember(tally.tally.electionName, names) {
         mutableStateOf<List<String>>(emptyList())
     }
     Div({ classes("pair-selector-arena") }) {
         Span({ classes("pair-selector-hint") }) {
-            Text("Pick two candidates to compare")
+            Text("Pick two to compare")
         }
         Div({ classes("pair-selector-grid") }) {
-            candidates.forEach { name ->
+            names.forEach { name ->
                 val isSelected = name in selected
                 Button({
                     classes("pair-selector-chip")
+                    if (tally.isTier(name)) classes("pair-selector-chip-tier")
                     if (isSelected) classes("pair-selector-chip-selected")
                     onClick {
                         selected = if (isSelected) selected - name
@@ -1271,28 +1291,34 @@ private fun renderPairView(
         Div({ classes("pair-selector-empty") }) {
             Text(
                 if (selected.isEmpty())
-                    "Select two candidates above to see the comparison."
+                    "Select two above to see the comparison."
                 else
-                    "Select one more candidate."
+                    "Select one more."
             )
         }
     }
 }
 
 @Composable
-private fun renderPreferencesDetail(tally: Tally, a: String, b: String) {
-    val candidates = tally.candidateNames
-    val ai = candidates.indexOf(a)
-    val bi = candidates.indexOf(b)
+private fun renderPairName(name: String, isTier: Boolean) {
+    Span({
+        classes("pair-name")
+        if (isTier) classes("pair-name-tier")
+    }) { Text(name) }
+}
+
+@Composable
+private fun renderPreferencesDetail(electionTally: ElectionTally, a: String, b: String) {
+    val tally = electionTally.tally
+    val names = tally.candidateNames
+    val ai = names.indexOf(a)
+    val bi = names.indexOf(b)
     val aOverB = tally.preferences[ai][bi].strength
     val bOverA = tally.preferences[bi][ai].strength
     val aWins = aOverB > bOverA
     val bWins = bOverA > aOverB
-    val verdict = when {
-        aWins -> "$a beats $b $aOverB to $bOverA"
-        bWins -> "$b beats $a $bOverA to $aOverB"
-        else -> "$a and $b tied at $aOverB"
-    }
+    val aIsTier = electionTally.isTier(a)
+    val bIsTier = electionTally.isTier(b)
 
     val revealed = tally.ballots.filterIsInstance<Ballot.Revealed>()
     val aVoters = votersWhoPrefer(revealed, a, b)
@@ -1300,11 +1326,26 @@ private fun renderPreferencesDetail(tally: Tally, a: String, b: String) {
     val abstainVoters = votersWhoAbstainOnPair(revealed, a, b)
 
     Div({ classes("pair-detail") }) {
-        Div({ classes("pair-detail-header") }) { Text(verdict) }
+        Div({ classes("pair-detail-header") }) {
+            when {
+                aWins -> {
+                    renderPairName(a, aIsTier); Text(" beats "); renderPairName(b, bIsTier)
+                    Text(" $aOverB to $bOverA")
+                }
+                bWins -> {
+                    renderPairName(b, bIsTier); Text(" beats "); renderPairName(a, aIsTier)
+                    Text(" $bOverA to $aOverB")
+                }
+                else -> {
+                    renderPairName(a, aIsTier); Text(" and "); renderPairName(b, bIsTier)
+                    Text(" tied at $aOverB")
+                }
+            }
+        }
 
         Div({ classes("pair-side-row") }) {
-            renderPairSide(name = a, voters = aVoters, count = aOverB, isWinner = aWins, isSecret = tally.secretBallot)
-            renderPairSide(name = b, voters = bVoters, count = bOverA, isWinner = bWins, isSecret = tally.secretBallot)
+            renderPairSide(name = a, isTier = aIsTier, voters = aVoters, count = aOverB, isWinner = aWins, isSecret = tally.secretBallot)
+            renderPairSide(name = b, isTier = bIsTier, voters = bVoters, count = bOverA, isWinner = bWins, isSecret = tally.secretBallot)
         }
 
         if (tally.secretBallot || abstainVoters.isNotEmpty()) {
@@ -1323,6 +1364,7 @@ private fun renderPreferencesDetail(tally: Tally, a: String, b: String) {
 @Composable
 private fun renderPairSide(
     name: String,
+    isTier: Boolean,
     voters: List<String>,
     count: Int,
     isWinner: Boolean,
@@ -1332,7 +1374,10 @@ private fun renderPairSide(
         classes("pair-side")
         if (isWinner) classes("pair-side-winner")
     }) {
-        Div({ classes("pair-side-name") }) { Text(name) }
+        Div({
+            classes("pair-side-name")
+            if (isTier) classes("pair-side-name-tier")
+        }) { Text(name) }
         Div({ classes("pair-side-count") }) { Text(count.toString()) }
         Div({ classes("pair-side-label") }) {
             Text(if (count == 1) "vote" else "votes")
@@ -1346,19 +1391,17 @@ private fun renderPairSide(
 }
 
 @Composable
-private fun renderStrongestPathsDetail(tally: Tally, a: String, b: String) {
-    val candidates = tally.candidateNames
-    val ai = candidates.indexOf(a)
-    val bi = candidates.indexOf(b)
+private fun renderStrongestPathsDetail(electionTally: ElectionTally, a: String, b: String) {
+    val tally = electionTally.tally
+    val names = tally.candidateNames
+    val ai = names.indexOf(a)
+    val bi = names.indexOf(b)
     val forward = tally.strongestPathMatrix[ai][bi]
     val reverse = tally.strongestPathMatrix[bi][ai]
     val forwardWins = forward.strength > reverse.strength
     val reverseWins = reverse.strength > forward.strength
-    val verdict = when {
-        forwardWins -> "$a beats $b on strongest path: ${forward.strength} vs ${reverse.strength}"
-        reverseWins -> "$b beats $a on strongest path: ${reverse.strength} vs ${forward.strength}"
-        else -> "$a and $b tied on strongest path at ${forward.strength}"
-    }
+    val aIsTier = electionTally.isTier(a)
+    val bIsTier = electionTally.isTier(b)
     val revealed = tally.ballots.filterIsInstance<Ballot.Revealed>()
     // Winning direction first so the claim sits above its evidence.
     val (first, firstWins, second, secondWins) =
@@ -1366,9 +1409,24 @@ private fun renderStrongestPathsDetail(tally: Tally, a: String, b: String) {
         else PathOrder(forward, forwardWins, reverse, reverseWins)
 
     Div({ classes("pair-detail") }) {
-        Div({ classes("pair-detail-header") }) { Text(verdict) }
-        renderPathBreakdown(first, isWinner = firstWins, ballots = revealed, isSecret = tally.secretBallot)
-        renderPathBreakdown(second, isWinner = secondWins, ballots = revealed, isSecret = tally.secretBallot)
+        Div({ classes("pair-detail-header") }) {
+            when {
+                forwardWins -> {
+                    renderPairName(a, aIsTier); Text(" beats "); renderPairName(b, bIsTier)
+                    Text(" on strongest path: ${forward.strength} vs ${reverse.strength}")
+                }
+                reverseWins -> {
+                    renderPairName(b, bIsTier); Text(" beats "); renderPairName(a, aIsTier)
+                    Text(" on strongest path: ${reverse.strength} vs ${forward.strength}")
+                }
+                else -> {
+                    renderPairName(a, aIsTier); Text(" and "); renderPairName(b, bIsTier)
+                    Text(" tied on strongest path at ${forward.strength}")
+                }
+            }
+        }
+        renderPathBreakdown(first, isWinner = firstWins, ballots = revealed, isSecret = tally.secretBallot, isTier = electionTally::isTier)
+        renderPathBreakdown(second, isWinner = secondWins, ballots = revealed, isSecret = tally.secretBallot, isTier = electionTally::isTier)
     }
 }
 
@@ -1385,6 +1443,7 @@ private fun renderPathBreakdown(
     isWinner: Boolean,
     ballots: List<Ballot.Revealed>,
     isSecret: Boolean,
+    isTier: (String) -> Boolean,
 ) {
     val highlightBinding = pref.strengths.size > 1
     val weakest = pref.strength
@@ -1393,7 +1452,7 @@ private fun renderPathBreakdown(
         if (isWinner) classes("pair-path-winner")
     }) {
         Div({ classes("pair-path-summary") }) {
-            Span({ classes("pair-path-name") }) { Text(pref.path[0]) }
+            renderPathName(pref.path[0], isTier(pref.path[0]))
             pref.strengths.forEachIndexed { idx, s ->
                 Span({ classes("pair-path-arrow") }) { Text("→") }
                 val isBinding = highlightBinding && s == weakest
@@ -1404,7 +1463,7 @@ private fun renderPathBreakdown(
                     Text(s.toString())
                 }
                 Span({ classes("pair-path-arrow") }) { Text("→") }
-                Span({ classes("pair-path-name") }) { Text(pref.path[idx + 1]) }
+                renderPathName(pref.path[idx + 1], isTier(pref.path[idx + 1]))
             }
             Span({ classes("pair-path-overall") }) {
                 Text("(overall strength ${pref.strength})")
@@ -1421,7 +1480,10 @@ private fun renderPathBreakdown(
                     if (isBinding) classes("pair-path-hop-binding")
                 }) {
                     Div({ classes("pair-path-hop-header") }) {
-                        Text("$from → $to ")
+                        renderPathName(from, isTier(from))
+                        Text(" → ")
+                        renderPathName(to, isTier(to))
+                        Text(" ")
                         Span({ classes("pair-path-hop-strength") }) {
                             Text("$s ${if (s == 1) "voter" else "voters"}")
                         }
@@ -1438,6 +1500,14 @@ private fun renderPathBreakdown(
 }
 
 @Composable
+private fun renderPathName(name: String, isTier: Boolean) {
+    Span({
+        classes("pair-path-name")
+        if (isTier) classes("pair-path-name-tier")
+    }) { Text(name) }
+}
+
+@Composable
 private fun renderVoterList(voters: List<String>) {
     if (voters.isEmpty()) {
         P({ classes("pair-no-voters") }) { Text("(no voters)") }
@@ -1448,36 +1518,6 @@ private fun renderVoterList(voters: List<String>) {
             Span({ classes("pair-voter") }) { Text(v) }
         }
     }
-}
-
-/**
- * Tier markers ride into [Tally] alongside real candidates because the
- * Schulze counter treats them the same — both end up as nodes in the
- * preferences and strongest-path matrices. The Preferences and Strongest
- * Paths screens are about real-candidate head-to-heads, so re-run
- * [Tally.countBallots] with the tier names stripped from the candidate list.
- *
- * Tier names are recovered from any ballot's [Ranking.kind] (preserved on
- * both Revealed and Secret ballots). Recompute requires revealed ballots,
- * since [Tally.countBallots] takes [Ballot.Revealed]; the secret-ballot
- * fallback returns the server tally untouched and accepts the leak — the
- * app currently runs with secret ballots disabled.
- */
-private fun tallyWithoutTiers(tally: Tally): Tally {
-    val tierNames = tally.ballots
-        .flatMap { it.rankings }
-        .filter { it.kind == RankingKind.TIER }
-        .map { it.candidateName }
-        .toSet()
-    if (tierNames.isEmpty()) return tally
-    val revealed = tally.ballots.filterIsInstance<Ballot.Revealed>()
-    if (revealed.size != tally.ballots.size) return tally
-    return Tally.countBallots(
-        electionName = tally.electionName,
-        secretBallot = tally.secretBallot,
-        candidates = tally.candidateNames - tierNames,
-        ballots = revealed,
-    )
 }
 
 private fun votersWhoPrefer(

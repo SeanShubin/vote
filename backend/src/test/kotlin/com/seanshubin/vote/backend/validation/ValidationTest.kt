@@ -233,4 +233,51 @@ class ValidationTest {
         val valid = Validation.validateCandidateName("  Python   3  ")
         assertEquals("Python 3", valid)
     }
+
+    @Test
+    fun `validateCandidatesAndTiersDistinct passes when sets are disjoint`() {
+        Validation.validateCandidatesAndTiersDistinct(
+            candidates = listOf("Alice", "Bob"),
+            tiers = listOf("Gold", "Silver"),
+        )
+    }
+
+    @Test
+    fun `validateCandidatesAndTiersDistinct passes when both lists are empty`() {
+        Validation.validateCandidatesAndTiersDistinct(emptyList(), emptyList())
+    }
+
+    @Test
+    fun `validateCandidatesAndTiersDistinct rejects exact name collision`() {
+        val ex = assertFailsWith<IllegalArgumentException> {
+            Validation.validateCandidatesAndTiersDistinct(
+                candidates = listOf("Alice", "Pass"),
+                tiers = listOf("Gold", "Pass"),
+            )
+        }
+        assertTrue(ex.message!!.contains("Pass"), "expected message to mention 'Pass', got: ${ex.message}")
+    }
+
+    @Test
+    fun `validateCandidatesAndTiersDistinct rejects case-only collision`() {
+        val ex = assertFailsWith<IllegalArgumentException> {
+            Validation.validateCandidatesAndTiersDistinct(
+                candidates = listOf("Pass"),
+                tiers = listOf("pass"),
+            )
+        }
+        assertTrue(ex.message!!.contains("Pass") && ex.message!!.contains("pass"))
+    }
+
+    @Test
+    fun `validateCandidatesAndTiersDistinct reports every collision`() {
+        val ex = assertFailsWith<IllegalArgumentException> {
+            Validation.validateCandidatesAndTiersDistinct(
+                candidates = listOf("Alice", "Bob", "Carol"),
+                tiers = listOf("Alice", "Carol"),
+            )
+        }
+        assertTrue(ex.message!!.contains("Alice"))
+        assertTrue(ex.message!!.contains("Carol"))
+    }
 }

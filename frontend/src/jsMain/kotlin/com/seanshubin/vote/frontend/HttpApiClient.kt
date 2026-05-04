@@ -183,7 +183,7 @@ class HttpApiClient(
         )
     }
 
-    override suspend fun getTally(electionName: String): Tally =
+    override suspend fun getTally(electionName: String): ElectionTally =
         getWithAuth("/election/${encodeURIComponent(electionName)}/tally")
 
     override suspend fun deleteElection(electionName: String) {

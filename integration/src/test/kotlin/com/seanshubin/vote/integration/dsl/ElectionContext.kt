@@ -1,6 +1,6 @@
 package com.seanshubin.vote.integration.dsl
 
-import com.seanshubin.vote.domain.Tally
+import com.seanshubin.vote.domain.ElectionTally
 
 class ElectionContext(
     private val testContext: TestContext,
@@ -14,6 +14,11 @@ class ElectionContext(
         testContext.backend.synchronize()
     }
 
+    fun setTiers(vararg names: String) {
+        testContext.backend.setTiers(owner.accessToken, name, names.toList())
+        testContext.backend.synchronize()
+    }
+
     fun delete() {
         testContext.backend.deleteElection(owner.accessToken, name)
         testContext.backend.synchronize()
@@ -22,7 +27,7 @@ class ElectionContext(
     val candidates: List<String>
         get() = testContext.database.listCandidates(name)
 
-    fun tally(): Tally =
+    fun tally(): ElectionTally =
         testContext.backend.tally(owner.accessToken, name)
 
     fun getDetails(): com.seanshubin.vote.domain.ElectionDetail {
