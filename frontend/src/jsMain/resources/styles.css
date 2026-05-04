@@ -797,39 +797,19 @@ tr:nth-child(even) {
 }
 
 /*
- * Tier chips on the Preferences / Strongest Paths pages. The light-blue
- * background and bold weight mirror the tier-card styling on the vote and
- * results pages so a viewer recognizes "this is a tier marker, not a real
- * candidate." Selected state still uses the strong blue fill from above so
- * the selection is unambiguous regardless of chip kind.
+ * Tier markers can appear inside strongest-path renderings as intermediate
+ * nodes (a path A → T → B uses T to show that voters placed A above the
+ * tier and B below it). Light-blue background + bold mirror the tier-card
+ * styling on the vote and results pages so the reader recognizes "this is
+ * a tier marker, not a candidate the comparison was about." Tiers are not
+ * selectable in the chip arena, so this style is only ever applied inside
+ * path-node rendering.
  */
-.pair-selector-chip-tier {
-    background: #e8eef5;
-    font-weight: 700;
-}
-
-.pair-selector-chip-tier:hover {
-    background: #dbe5f1;
-}
-
-.pair-name {
-    font-weight: 600;
-}
-
-.pair-name-tier,
 .pair-path-name-tier {
     background: #e8eef5;
     font-weight: 700;
     padding: 0.05rem 0.4rem;
     border-radius: 4px;
-}
-
-.pair-side-name-tier {
-    background: #e8eef5;
-    font-weight: 700;
-    padding: 0.15rem 0.5rem;
-    border-radius: 4px;
-    display: inline-block;
 }
 
 .pair-page-explainer {

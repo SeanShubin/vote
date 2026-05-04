@@ -131,13 +131,21 @@ class Router internal constructor(initialPath: String) {
 
     /**
      * Navigate to [page]. Pushes a new entry onto the history stack so
-     * back/forward works. No-ops if already on [page] to avoid duplicate
-     * history entries when the same nav is triggered twice.
+     * back/forward works. No-ops if the destination URL would equal the
+     * current one (same page AND same [hash]), avoiding duplicate history
+     * entries when the same nav is triggered twice.
+     *
+     * [hash] is the URL fragment to write (without leading `#`). The fragment
+     * is used by [rememberHashTab] to pick the active tab on the destination
+     * page, so passing e.g. `"tally"` to navigate back to ElectionDetail
+     * lands the user on the Results tab they likely came from.
      */
-    fun navigate(page: Page) {
-        if (page == currentPage) return
+    fun navigate(page: Page, hash: String = "") {
+        val currentHash = window.location.hash.removePrefix("#")
+        if (page == currentPage && hash == currentHash) return
         val path = pageToPath(page)
-        window.history.pushState(null, "", path)
+        val fullPath = if (hash.isNotEmpty()) "$path#$hash" else path
+        window.history.pushState(null, "", fullPath)
         currentPage = page
     }
 

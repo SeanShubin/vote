@@ -197,12 +197,15 @@ fun VoteApp(apiClient: ApiClient) {
         is Page.ElectionPreferences -> ElectionPreferencesPage(
             apiClient = apiClient,
             electionName = page.electionName,
-            onBack = { router.navigate(Page.ElectionDetail(page.electionName)) },
+            // Land on the Results tab — that's where the buttons that open
+            // this page live, so it's almost certainly where the user came
+            // from. The hash is read by rememberHashTab on the destination.
+            onBack = { router.navigate(Page.ElectionDetail(page.electionName), hash = "tally") },
         )
         is Page.ElectionStrongestPaths -> ElectionStrongestPathsPage(
             apiClient = apiClient,
             electionName = page.electionName,
-            onBack = { router.navigate(Page.ElectionDetail(page.electionName)) },
+            onBack = { router.navigate(Page.ElectionDetail(page.electionName), hash = "tally") },
         )
         is Page.RawTables -> TablesPage(
             apiClient = apiClient,
