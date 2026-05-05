@@ -4,15 +4,9 @@ import kotlinx.datetime.Instant
 import kotlinx.serialization.Serializable
 
 /**
- * EventEnvelope wraps a DomainEvent with metadata for storage in the event log.
- *
- * This is the structure stored in DynamoDB:
- * - PK = eventId (sequential)
- * - SK = whenHappened (timestamp for ordering)
- * - payload = JSON serialized EventEnvelope
- *
- * The event log is append-only. All state changes are expressed as events.
- * Both projections (MySQL + DynamoDB) rebuild state by replaying events.
+ * EventEnvelope wraps a DomainEvent with metadata for the append-only event
+ * log. All state changes are expressed as events; projections rebuild state
+ * by replaying them.
  */
 @Serializable
 data class EventEnvelope(

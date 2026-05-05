@@ -81,52 +81,75 @@ class RequestRouter(
         }
     }
 
+    /**
+     * Single source of truth for routes. Each entry is [method, pathPattern,
+     * handler]. Patterns either match exactly (e.g. `/health`) or against a
+     * regex when they contain `[^/]+` segments. Order doesn't matter — at most
+     * one entry matches any given (method, path) pair.
+     */
+    private val routes: List<Route> = listOf(
+        Route("GET", "/health", { _ -> handleHealth() }),
+        Route("POST", "/log-client-error", ::handleLogClientError),
+        Route("POST", "/register", ::handleRegister),
+        Route("POST", "/authenticate", ::handleAuthenticate),
+        Route("POST", "/refresh", ::handleRefresh),
+        Route("POST", "/logout", { _ -> handleLogout() }),
+        Route("POST", "/password-reset-request", ::handleRequestPasswordReset),
+        Route("POST", "/password-reset", ::handleResetPassword),
+        Route("PUT", "/user/me/password", ::handleChangeMyPassword),
+        Route("PUT", "/admin/user/[^/]+/password", ::handleAdminSetPassword),
+        Route("GET", "/me/activity", ::handleGetUserActivity),
+        Route("GET", "/users", ::handleListUsers),
+        Route("GET", "/users/count", ::handleUserCount),
+        Route("GET", "/user/[^/]+", ::handleGetUser),
+        Route("PUT", "/user/[^/]+", ::handleUpdateUser),
+        Route("DELETE", "/user/[^/]+", ::handleRemoveUser),
+        Route("PUT", "/user/[^/]+/role", ::handleSetRole),
+        Route("GET", "/permissions/[^/]+", ::handlePermissionsForRole),
+        Route("GET", "/tables", ::handleListTables),
+        Route("GET", "/tables/count", ::handleTableCount),
+        Route("GET", "/events/count", ::handleEventCount),
+        Route("GET", "/events", ::handleEventData),
+        Route("GET", "/table/[^/]+", ::handleTableData),
+        Route("GET", "/debug-tables", ::handleListDebugTables),
+        Route("GET", "/debug-table/[^/]+", ::handleDebugTableData),
+        Route("POST", "/election", ::handleAddElection),
+        Route("GET", "/elections", ::handleListElections),
+        Route("GET", "/elections/count", ::handleElectionCount),
+        Route("GET", "/election/[^/]+", ::handleGetElection),
+        Route("DELETE", "/election/[^/]+", ::handleDeleteElection),
+        Route("PUT", "/election/[^/]+/description", ::handleSetDescription),
+        Route("PUT", "/election/[^/]+/candidates", ::handleSetCandidates),
+        Route("GET", "/election/[^/]+/candidates", ::handleListCandidates),
+        Route("PUT", "/election/[^/]+/tiers", ::handleSetTiers),
+        Route("GET", "/election/[^/]+/tiers", ::handleListTiers),
+        Route("POST", "/election/[^/]+/ballot", ::handleCastBallot),
+        Route("GET", "/election/[^/]+/ballot/[^/]+", ::handleGetBallot),
+        Route("DELETE", "/election/[^/]+/ballot/[^/]+", ::handleDeleteBallot),
+        Route("GET", "/election/[^/]+/rankings/[^/]+", ::handleListRankings),
+        Route("GET", "/election/[^/]+/tally", ::handleTally),
+        Route("DELETE", "/admin/test-users", ::handleWipeTestUsers),
+    )
+
     private fun dispatch(req: HttpRequest): HttpResponse {
-        val target = req.target
-        val method = req.method
-        return when {
-            target == "/health" && method == "GET" -> handleHealth()
-            target == "/log-client-error" && method == "POST" -> handleLogClientError(req)
-            target == "/register" && method == "POST" -> handleRegister(req)
-            target == "/authenticate" && method == "POST" -> handleAuthenticate(req)
-            target == "/refresh" && method == "POST" -> handleRefresh(req)
-            target == "/logout" && method == "POST" -> handleLogout()
-            target == "/password-reset-request" && method == "POST" -> handleRequestPasswordReset(req)
-            target == "/password-reset" && method == "POST" -> handleResetPassword(req)
-            target == "/user/me/password" && method == "PUT" -> handleChangeMyPassword(req)
-            target.matches(Regex("/admin/user/[^/]+/password")) && method == "PUT" -> handleAdminSetPassword(req)
-            target == "/me/activity" && method == "GET" -> handleGetUserActivity(req)
-            target == "/users" && method == "GET" -> handleListUsers(req)
-            target == "/users/count" && method == "GET" -> handleUserCount(req)
-            target.matches(Regex("/user/[^/]+")) && method == "GET" -> handleGetUser(req)
-            target.matches(Regex("/user/[^/]+")) && method == "PUT" -> handleUpdateUser(req)
-            target.matches(Regex("/user/[^/]+")) && method == "DELETE" -> handleRemoveUser(req)
-            target.matches(Regex("/user/[^/]+/role")) && method == "PUT" -> handleSetRole(req)
-            target.matches(Regex("/permissions/[^/]+")) && method == "GET" -> handlePermissionsForRole(req)
-            target == "/tables" && method == "GET" -> handleListTables(req)
-            target == "/tables/count" && method == "GET" -> handleTableCount(req)
-            target == "/events/count" && method == "GET" -> handleEventCount(req)
-            target == "/events" && method == "GET" -> handleEventData(req)
-            target.matches(Regex("/table/[^/]+")) && method == "GET" -> handleTableData(req)
-            target == "/debug-tables" && method == "GET" -> handleListDebugTables(req)
-            target.matches(Regex("/debug-table/[^/]+")) && method == "GET" -> handleDebugTableData(req)
-            target == "/election" && method == "POST" -> handleAddElection(req)
-            target == "/elections" && method == "GET" -> handleListElections(req)
-            target == "/elections/count" && method == "GET" -> handleElectionCount(req)
-            target.matches(Regex("/election/[^/]+")) && method == "GET" -> handleGetElection(req)
-            target.matches(Regex("/election/[^/]+")) && method == "DELETE" -> handleDeleteElection(req)
-            target.matches(Regex("/election/[^/]+/description")) && method == "PUT" -> handleSetDescription(req)
-            target.matches(Regex("/election/[^/]+/candidates")) && method == "PUT" -> handleSetCandidates(req)
-            target.matches(Regex("/election/[^/]+/candidates")) && method == "GET" -> handleListCandidates(req)
-            target.matches(Regex("/election/[^/]+/tiers")) && method == "PUT" -> handleSetTiers(req)
-            target.matches(Regex("/election/[^/]+/tiers")) && method == "GET" -> handleListTiers(req)
-            target.matches(Regex("/election/[^/]+/ballot")) && method == "POST" -> handleCastBallot(req)
-            target.matches(Regex("/election/[^/]+/ballot/[^/]+")) && method == "GET" -> handleGetBallot(req)
-            target.matches(Regex("/election/[^/]+/ballot/[^/]+")) && method == "DELETE" -> handleDeleteBallot(req)
-            target.matches(Regex("/election/[^/]+/rankings/[^/]+")) && method == "GET" -> handleListRankings(req)
-            target.matches(Regex("/election/[^/]+/tally")) && method == "GET" -> handleTally(req)
-            target == "/admin/test-users" && method == "DELETE" -> handleWipeTestUsers(req)
-            else -> errorResponse(404, "Not found: $method $target")
+        val match = routes.firstOrNull { it.matches(req.method, req.target) }
+            ?: return errorResponse(404, "Not found: ${req.method} ${req.target}")
+        return match.handler(req)
+    }
+
+    private class Route(
+        val method: String,
+        pathPattern: String,
+        val handler: (HttpRequest) -> HttpResponse,
+    ) {
+        // Patterns with `[^/]+` are compiled to regex once; literal patterns
+        // skip regex altogether so the common exact-match case stays fast.
+        private val literalPath: String? = if ("[^/]+" in pathPattern) null else pathPattern
+        private val regex: Regex? = if (literalPath == null) Regex(pathPattern) else null
+
+        fun matches(reqMethod: String, reqTarget: String): Boolean {
+            if (reqMethod != method) return false
+            return literalPath?.let { it == reqTarget } ?: regex!!.matches(reqTarget)
         }
     }
 

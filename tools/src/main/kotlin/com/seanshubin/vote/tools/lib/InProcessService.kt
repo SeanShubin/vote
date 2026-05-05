@@ -57,6 +57,7 @@ private class ToolsIntegrations : Integrations {
     override val notifications: Notifications = NoopNotifications
     override val passwordUtil: PasswordUtil = RealPasswordUtil
     override val emailSender: EmailSender = NoopEmailSender
+    override val getEnv: (String) -> String? = { null }
 }
 
 private object SystemClock : Clock {

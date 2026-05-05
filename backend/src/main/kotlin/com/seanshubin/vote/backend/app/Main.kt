@@ -17,7 +17,7 @@ fun main(args: Array<String>) {
     // Stage 2: WIRING - Create bootstrap composition root
     val bootstrapDeps = BootstrapDependencies(integrations)
     // Stage 2: WORK - Parse configuration
-    val configuration = bootstrapDeps.bootstrap.parseConfiguration()
+    val configuration = bootstrapDeps.bootstrap.parseDevConfiguration()
 
     // Stage 3: WIRING - Create application composition root
     val appDeps = ApplicationDependencies(integrations, configuration)
