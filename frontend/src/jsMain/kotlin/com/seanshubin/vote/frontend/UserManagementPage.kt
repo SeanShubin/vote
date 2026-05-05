@@ -29,12 +29,12 @@ fun UserManagementPage(
     currentUserName: String,
     currentRole: Role?,
     onSelfRoleChanged: (AuthResponse) -> Unit,
-    // The self-row renders a "Change my password" link in the same column
-    // slot that other rows use for the admin "Set password…" button. Self
-    // can't use the admin path (the gate explicitly excludes self) so this
-    // is a discoverability shortcut to ChangeMyPasswordPage rather than a
-    // duplicated affordance.
-    onChangeMyPassword: () -> Unit,
+    // The self-row renders a "My account" link in the same column slot that
+    // other rows use for the admin "Set password…" button. Self can't use
+    // the admin path (the gate explicitly excludes self) so this is a
+    // discoverability shortcut to MyAccountPage rather than a duplicated
+    // affordance.
+    onNavigateToMyAccount: () -> Unit,
     onBack: () -> Unit,
 ) {
     var errorMessage by remember { mutableStateOf<String?>(null) }
@@ -104,7 +104,7 @@ fun UserManagementPage(
                             // strictly greater than the target's. Backend
                             // re-checks; this just hides the form for users
                             // the caller can't act on. Self uses the
-                            // ChangeMyPassword page.
+                            // MyAccount page for password changes.
                             val canSetPassword = user.userName != currentUserName &&
                                 currentRole != null && currentRole > user.role
                             UserRow(
@@ -112,7 +112,7 @@ fun UserManagementPage(
                                 isSelf = user.userName == currentUserName,
                                 canSetPassword = canSetPassword,
                                 isSetPasswordOpen = openSetPasswordFor == user.userName,
-                                onChangeMyPassword = onChangeMyPassword,
+                                onNavigateToMyAccount = onNavigateToMyAccount,
                                 onRoleSelected = { newRole ->
                                     if (newRole == user.role) return@UserRow
                                     if (newRole == Role.OWNER) {
@@ -171,7 +171,7 @@ private fun UserRow(
     isSelf: Boolean,
     canSetPassword: Boolean,
     isSetPasswordOpen: Boolean,
-    onChangeMyPassword: () -> Unit,
+    onNavigateToMyAccount: () -> Unit,
     onRoleSelected: (Role) -> Unit,
     onToggleSetPassword: () -> Unit,
     onSubmitSetPassword: suspend (String) -> Unit,
@@ -205,7 +205,7 @@ private fun UserRow(
             }
         }
         // Column 3: admin Set-password for other users (when allowed), the
-        // self-service Change-my-password shortcut on the self-row, or an
+        // self-service My-account shortcut on the self-row, or an
         // empty placeholder. The placeholder is required because .users-list
         // is a 3-column grid using display: contents on the row — without
         // it, the next user's name would land in this row's empty slot.
@@ -217,10 +217,10 @@ private fun UserRow(
                 Text(if (isSetPasswordOpen) "Cancel" else "Set password…")
             }
             isSelf -> Button({
-                attr("data-change-my-password", "")
-                onClick { onChangeMyPassword() }
+                attr("data-my-account", "")
+                onClick { onNavigateToMyAccount() }
             }) {
-                Text("Change my password")
+                Text("My account")
             }
             else -> Span({ classes("user-row-spacer") })
         }
@@ -238,7 +238,7 @@ private fun UserRow(
  * under the user's row when expanded. No old-password field — the whole
  * point of the admin path is recovery for users who don't know theirs.
  * The admin shares the new password out-of-band and the user is expected
- * to change it after logging in via [ChangeMyPasswordPage].
+ * to change it after logging in via [MyAccountPage].
  */
 @Composable
 private fun AdminSetPasswordForm(

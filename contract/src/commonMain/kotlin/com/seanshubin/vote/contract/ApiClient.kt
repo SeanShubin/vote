@@ -7,6 +7,7 @@ import com.seanshubin.vote.domain.Ranking
 import com.seanshubin.vote.domain.Role
 import com.seanshubin.vote.domain.TableData
 import com.seanshubin.vote.domain.UserActivity
+import com.seanshubin.vote.domain.UserNameEmail
 import com.seanshubin.vote.domain.UserNameRole
 
 /**
@@ -59,6 +60,16 @@ interface ApiClient {
      * attacker who walks up to an unlocked browser session.
      */
     suspend fun changeMyPassword(oldPassword: String, newPassword: String)
+
+    /** The current user's name + email (empty string when no email is on file). */
+    suspend fun getMyUser(): UserNameEmail
+
+    /**
+     * Set the current user's email. Empty string clears it (user has no
+     * email on file → no self-service password reset path). The backend
+     * rejects values that collide with another user's email.
+     */
+    suspend fun updateMyEmail(newEmail: String)
 
     /**
      * Admin sets another user's password directly — used when the user

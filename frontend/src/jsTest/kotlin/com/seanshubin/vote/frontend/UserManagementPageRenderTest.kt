@@ -32,7 +32,7 @@ class UserManagementPageRenderTest {
                     currentUserName = "alice",
                     currentRole = com.seanshubin.vote.domain.Role.ADMIN,
                     onSelfRoleChanged = { lastSelfRoleChange = it },
-                    onChangeMyPassword = {},
+                    onNavigateToMyAccount = {},
                     onBack = { backCalled = true },
                 )
             }

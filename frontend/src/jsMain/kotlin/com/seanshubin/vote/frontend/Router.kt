@@ -21,7 +21,7 @@ sealed class Page {
     object RawTables : Page()
     object DebugTables : Page()
     object UserManagement : Page()
-    object ChangeMyPassword : Page()
+    object MyAccount : Page()
     object PasswordResetRequest : Page()
     /**
      * Target of the email reset link. Carries the reset token that came back
@@ -53,7 +53,7 @@ fun pageToPath(page: Page): String = when (page) {
     is Page.RawTables -> "/admin/raw-tables"
     is Page.DebugTables -> "/admin/debug-tables"
     is Page.UserManagement -> "/admin/users"
-    is Page.ChangeMyPassword -> "/me/password"
+    is Page.MyAccount -> "/me/account"
     is Page.PasswordResetRequest -> "/password-reset-request"
     // Token belongs in the path's query string — that's the standard place
     // for one-time link parameters and matches what email clients render.
@@ -100,7 +100,7 @@ fun pathToPage(pathWithQuery: String): Page {
         normalized == "/admin/raw-tables" -> Page.RawTables
         normalized == "/admin/debug-tables" -> Page.DebugTables
         normalized == "/admin/users" -> Page.UserManagement
-        normalized == "/me/password" -> Page.ChangeMyPassword
+        normalized == "/me/account" -> Page.MyAccount
         normalized == "/password-reset-request" -> Page.PasswordResetRequest
         // Reset link from the email; missing/empty token shouldn't crash —
         // the reset page will surface a clear error to the user.

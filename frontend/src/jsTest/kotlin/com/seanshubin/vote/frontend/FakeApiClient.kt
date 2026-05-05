@@ -10,6 +10,7 @@ import com.seanshubin.vote.domain.Role
 import com.seanshubin.vote.domain.TableData
 import com.seanshubin.vote.domain.ElectionTally
 import com.seanshubin.vote.domain.UserActivity
+import com.seanshubin.vote.domain.UserNameEmail
 import com.seanshubin.vote.domain.UserNameRole
 
 class FakeApiClient : ApiClient {
@@ -39,10 +40,14 @@ class FakeApiClient : ApiClient {
     var resetPasswordResult: Result<Unit> = Result.success(Unit)
     var changeMyPasswordResult: Result<Unit> = Result.success(Unit)
     var adminSetPasswordResult: Result<Unit> = Result.success(Unit)
+    var getMyUserResult: Result<UserNameEmail> = Result.success(UserNameEmail("user", ""))
+    var updateMyEmailResult: Result<Unit> = Result.success(Unit)
     val requestPasswordResetCalls = mutableListOf<String>()
     val resetPasswordCalls = mutableListOf<ResetPasswordCall>()
     val changeMyPasswordCalls = mutableListOf<ChangeMyPasswordCall>()
     val adminSetPasswordCalls = mutableListOf<AdminSetPasswordCall>()
+    val getMyUserCalls = mutableListOf<Unit>()
+    val updateMyEmailCalls = mutableListOf<String>()
     var listElectionsResult: Result<List<ElectionSummary>> = Result.success(emptyList())
     var createElectionResult: Result<String> = Result.success("")
     var getElectionResult: Result<ElectionDetail> = Result.failure(Exception("Get election not configured"))
@@ -112,6 +117,16 @@ class FakeApiClient : ApiClient {
     override suspend fun adminSetPassword(userName: String, newPassword: String) {
         adminSetPasswordCalls.add(AdminSetPasswordCall(userName, newPassword))
         adminSetPasswordResult.getOrThrow()
+    }
+
+    override suspend fun getMyUser(): UserNameEmail {
+        getMyUserCalls.add(Unit)
+        return getMyUserResult.getOrThrow()
+    }
+
+    override suspend fun updateMyEmail(newEmail: String) {
+        updateMyEmailCalls.add(newEmail)
+        updateMyEmailResult.getOrThrow()
     }
 
     override suspend fun listElections(): List<ElectionSummary> {

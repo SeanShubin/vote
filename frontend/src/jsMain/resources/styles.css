@@ -199,6 +199,26 @@ button:disabled {
     margin-top: 0;
 }
 
+/* Self-service account page: vertical stack of email/password sections, each
+ * fenced off so the user sees them as separate concerns. */
+.my-account-sections {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    margin-top: 1rem;
+}
+
+.my-account-section {
+    padding: 1rem;
+    border: 1px solid #d6e4f0;
+    border-radius: 4px;
+    background-color: #f7fbff;
+}
+
+.my-account-section h2 {
+    margin-top: 0;
+}
+
 .tabs {
     display: flex;
     gap: 0.5rem;

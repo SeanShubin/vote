@@ -113,6 +113,19 @@ class HttpApiClient(
         )
     }
 
+    override suspend fun getMyUser(): UserNameEmail {
+        val userName = requireSession().userName
+        return getWithAuth("/user/${encodeURIComponent(userName)}")
+    }
+
+    override suspend fun updateMyEmail(newEmail: String) {
+        val userName = requireSession().userName
+        putWithAuth<UserUpdates, Unit>(
+            "/user/${encodeURIComponent(userName)}",
+            UserUpdates(email = newEmail),
+        )
+    }
+
     override suspend fun adminSetPassword(userName: String, newPassword: String) {
         putWithAuth<AdminSetPasswordRequest, Unit>(
             "/admin/user/${encodeURIComponent(userName)}/password",
