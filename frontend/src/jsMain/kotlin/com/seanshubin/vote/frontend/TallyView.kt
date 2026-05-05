@@ -1,0 +1,191 @@
+package com.seanshubin.vote.frontend
+
+import androidx.compose.runtime.*
+import com.seanshubin.vote.contract.ApiClient
+import com.seanshubin.vote.domain.Ballot
+import com.seanshubin.vote.domain.ElectionTally
+import com.seanshubin.vote.domain.Place
+import com.seanshubin.vote.domain.Tally
+import com.seanshubin.vote.domain.TallySection
+import org.jetbrains.compose.web.dom.*
+
+@Composable
+fun TallyView(
+    apiClient: ApiClient,
+    electionName: String,
+    onNavigateToPreferences: () -> Unit,
+    onNavigateToStrongestPaths: () -> Unit,
+) {
+    val tallyFetch = rememberFetchState(
+        apiClient = apiClient,
+        key = electionName,
+        fallbackErrorMessage = "Failed to load tally",
+    ) {
+        apiClient.getTally(electionName)
+    }
+
+    Div({ classes("section") }) {
+        H2 { Text("Results") }
+
+        when (val state = tallyFetch.state) {
+            FetchState.Loading -> P { Text("Loading results…") }
+            is FetchState.Error -> Div({ classes("error") }) { Text(state.message) }
+            is FetchState.Success -> renderTally(
+                state.value,
+                onNavigateToPreferences = onNavigateToPreferences,
+                onNavigateToStrongestPaths = onNavigateToStrongestPaths,
+            )
+        }
+    }
+}
+
+/**
+ * Lets the viewer toggle individual ballots on/off and watch the Winners
+ * list recompute against the active subset. Local-only: no persisted state,
+ * no effect on other viewers — leaving the page resets to "all on". The full
+ * Tally.countBallots pipeline (Schulze strongest paths + place grouping)
+ * lives in the shared `domain` module so the frontend can rerun it directly.
+ *
+ * Only `Ballot.Revealed` ballots are toggleable: secret ballots strip the
+ * voter identity and Tally.countBallots only accepts revealed input. With the
+ * current `secretBallot = false` setting, every ballot is revealed.
+ *
+ * The toggle does not flow into the Preferences / Strongest Paths detail
+ * pages — those are separate routes that fetch their own (unfiltered) tally.
+ */
+@Composable
+private fun renderTally(
+    serverTally: ElectionTally,
+    onNavigateToPreferences: () -> Unit,
+    onNavigateToStrongestPaths: () -> Unit,
+) {
+    val revealed = serverTally.tally.ballots.filterIsInstance<Ballot.Revealed>()
+    val totalToggleable = revealed.size
+
+    var active by remember(serverTally.tally.electionName, totalToggleable) {
+        mutableStateOf(revealed.map { it.confirmation }.toSet())
+    }
+
+    val allOn = revealed.isEmpty() || active.size == totalToggleable
+    val displaySections = if (allOn) {
+        serverTally.sections
+    } else {
+        val recomputed = Tally.countBallots(
+            electionName = serverTally.tally.electionName,
+            secretBallot = serverTally.tally.secretBallot,
+            candidates = serverTally.tally.candidateNames,
+            ballots = revealed.filter { it.confirmation in active },
+        )
+        TallySection.compute(recomputed.places, serverTally.tiers)
+    }
+
+    P {
+        Text(
+            if (allOn) {
+                "Total Ballots: ${serverTally.tally.ballots.size}"
+            } else {
+                "Active Ballots: ${active.size} of $totalToggleable"
+            }
+        )
+    }
+
+    H3 { Text("Winners") }
+    if (displaySections.all { it.places.isEmpty() }) {
+        P { Text("No winners yet") }
+    } else {
+        val sections = displaySections
+
+        val renderPlaceList: @Composable (List<Place>) -> Unit = { places ->
+            Ol({ classes("ranked-ballot-list") }) {
+                places.forEach { place ->
+                    Li({ classes("ranked-ballot-row") }) {
+                        Span({ classes("ranked-ballot-rank-num") }) { Text(ordinal(place.rank)) }
+                        Span({ classes("ranked-ballot-row-name") }) { Text(place.candidateName) }
+                    }
+                }
+            }
+        }
+
+        Div({ classes("tally-results") }) {
+            sections.forEach { section ->
+                val tierName = section.tierName
+                if (tierName != null) {
+                    Div({ classes("ranked-ballot-tier") }) {
+                        Span({ classes("ranked-ballot-tier-title") }) { Text(tierName) }
+                        if (section.places.isNotEmpty()) renderPlaceList(section.places)
+                    }
+                } else {
+                    renderPlaceList(section.places)
+                }
+            }
+        }
+    }
+
+    if (revealed.isNotEmpty()) {
+        renderBallotToggles(
+            ballots = revealed,
+            active = active,
+            onToggle = { confirmation ->
+                active = if (confirmation in active) active - confirmation else active + confirmation
+            },
+            onSetAll = { all ->
+                active = if (all) revealed.map { it.confirmation }.toSet() else emptySet()
+            },
+        )
+    }
+
+    // Detail tables (preferences, strongest paths) live on their own
+    // admin-style pages — they get wide quickly and don't belong inside the
+    // aesthetic election shell. See docs/style-guide.md.
+    Div({ classes("button-row") }) {
+        Button({ onClick { onNavigateToPreferences() } }) { Text("View Preferences") }
+        Button({ onClick { onNavigateToStrongestPaths() } }) { Text("View Strongest Paths") }
+    }
+}
+
+@Composable
+private fun renderBallotToggles(
+    ballots: List<Ballot.Revealed>,
+    active: Set<String>,
+    onToggle: (String) -> Unit,
+    onSetAll: (Boolean) -> Unit,
+) {
+    H3 { Text("Ballots") }
+    P {
+        Text(
+            "Toggle ballots off to see how the Winners would change without them. " +
+                "This only affects your view — nothing is saved."
+        )
+    }
+
+    Div({ classes("button-row") }) {
+        Button({ onClick { onSetAll(true) } }) { Text("All") }
+        Button({ onClick { onSetAll(false) } }) { Text("None") }
+    }
+
+    Div({ classes("ballot-toggle-list") }) {
+        ballots.forEach { ballot ->
+            val isOn = ballot.confirmation in active
+            Div({
+                classes("ballot-toggle-item")
+                if (!isOn) classes("is-off")
+                onClick { onToggle(ballot.confirmation) }
+            }) {
+                Span({ classes("ballot-toggle-switch") }) {}
+                Span({ classes("ballot-toggle-name") }) { Text(ballot.voterName) }
+            }
+        }
+    }
+}
+
+// Teens (11th, 12th, 13th) take "th" even though they end in 1/2/3.
+internal fun ordinal(n: Int): String {
+    val suffix = when {
+        n % 100 in 11..13 -> "th"
+        n % 10 == 1 -> "st"
+        n % 10 == 2 -> "nd"
+        n % 10 == 3 -> "rd"
+        else -> "th"
+    }
+    return "$n$suffix"
+}

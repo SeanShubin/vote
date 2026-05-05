@@ -38,9 +38,9 @@ class HttpRecorder(private val documentationRecorder: DocumentationRecorder? = n
         // Use staged dependency injection pattern
         val integrations = TestIntegrations()
 
-        val configuration = com.seanshubin.vote.backend.dependencies.Configuration(
+        val configuration = com.seanshubin.vote.backend.dependencies.Configuration.forTesting(
             port = port,
-            databaseConfig = DatabaseConfig.InMemory
+            databaseConfig = DatabaseConfig.InMemory,
         )
 
         val appDeps = ApplicationDependencies(integrations, configuration)

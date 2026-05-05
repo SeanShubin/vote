@@ -44,9 +44,9 @@ class HttpApiTester(private val port: Int = 9876) : AutoCloseable {
 
     init {
         integrations = TestIntegrations()
-        val configuration = com.seanshubin.vote.backend.dependencies.Configuration(
+        val configuration = com.seanshubin.vote.backend.dependencies.Configuration.forTesting(
             port = port,
-            databaseConfig = DatabaseConfig.InMemory
+            databaseConfig = DatabaseConfig.InMemory,
         )
         val appDeps = ApplicationDependencies(integrations, configuration)
         runner = appDeps.runner

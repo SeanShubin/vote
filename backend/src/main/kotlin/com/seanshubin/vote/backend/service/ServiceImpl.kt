@@ -583,7 +583,7 @@ class ServiceImpl(
             candidates = candidates + tiers,
             ballots = ballots,
         )
-        val sections = tallySections(tally.places, tiers)
+        val sections = TallySection.compute(tally.places, tiers)
         return ElectionTally(tally, tiers, sections)
     }
 

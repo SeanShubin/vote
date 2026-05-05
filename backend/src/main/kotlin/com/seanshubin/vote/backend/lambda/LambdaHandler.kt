@@ -4,20 +4,20 @@ import com.amazonaws.services.lambda.runtime.Context
 import com.amazonaws.services.lambda.runtime.RequestHandler
 import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPEvent
 import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPResponse
-import com.seanshubin.vote.backend.auth.CookieConfig
 import com.seanshubin.vote.backend.auth.InviteCodeProvider
 import com.seanshubin.vote.backend.auth.JwtCipher
 import com.seanshubin.vote.backend.auth.SsmInviteCodeProvider
 import com.seanshubin.vote.backend.auth.TokenEncoder
-import com.seanshubin.vote.backend.dependencies.Configuration
+import com.seanshubin.vote.backend.dependencies.Bootstrap
 import com.seanshubin.vote.backend.dependencies.ConnectionFactory
 import com.seanshubin.vote.backend.dependencies.DatabaseConfig
+import com.seanshubin.vote.backend.dependencies.DynamoDbStartup
 import com.seanshubin.vote.backend.dependencies.RepositoryFactory
 import com.seanshubin.vote.backend.http.HttpRequest
-import com.seanshubin.vote.backend.router.RequestRouter
 import com.seanshubin.vote.backend.http.SetCookie
 import com.seanshubin.vote.backend.integration.ProductionIntegrations
 import com.seanshubin.vote.backend.integration.SesEmailSender
+import com.seanshubin.vote.backend.router.RequestRouter
 import com.seanshubin.vote.backend.service.ServiceImpl
 import kotlinx.serialization.json.Json
 
@@ -70,55 +70,37 @@ class LambdaHandler : RequestHandler<APIGatewayV2HTTPEvent, APIGatewayV2HTTPResp
         private val router: RequestRouter = buildRouter()
 
         private fun buildRouter(): RequestRouter {
-            val region = System.getenv("AWS_REGION") ?: "us-east-1"
-            val configuration = Configuration(
-                port = 0,
-                databaseConfig = DatabaseConfig.DynamoDB(endpoint = null, region = region),
-            )
             // Production sends real emails via SES. Sender address is verified
             // out-of-band in the SES console; the Lambda role grants ses:SendEmail.
-            val sesRegion = System.getenv("AWS_REGION") ?: "us-east-1"
-            val emailFromAddress = System.getenv("EMAIL_FROM_ADDRESS")
-                ?: error("EMAIL_FROM_ADDRESS env var is required")
-            val emailSender = SesEmailSender(sesRegion, emailFromAddress)
+            // Build SES first via System.getenv (this is the bootstrap edge)
+            // so ProductionIntegrations can carry the real env accessor through
+            // for everything else, including Bootstrap.parseLambdaConfiguration.
+            val baseIntegrations = ProductionIntegrations(emptyArray())
+            val configuration = Bootstrap(baseIntegrations).parseLambdaConfiguration()
+            val region = (configuration.databaseConfig as DatabaseConfig.DynamoDB).region
+            val emailSender = SesEmailSender(region, configuration.emailFromAddress!!)
             // Test-user mail suppression now lives in ServiceImpl.requestPasswordReset
             // (skipped when TestUser.isTestUser(user)), so the integration layer
             // passes the raw SES sender straight through.
             val integrations = ProductionIntegrations(emptyArray(), emailSender)
+
             val json = Json { prettyPrint = true }
             val connectionFactory = ConnectionFactory(configuration)
-            val repositoryFactory = RepositoryFactory(integrations, configuration, json)
+            val repositoryFactory = RepositoryFactory(configuration, json)
 
-            val sqlConnection = connectionFactory.createSqlConnection()
             val dynamoDbClient = connectionFactory.createDynamoDbClient()
+            DynamoDbStartup(integrations).ensureTables(dynamoDbClient!!)
+            val sqlConnection = connectionFactory.createSqlConnection()
             val repositories = repositoryFactory.createRepositories(sqlConnection, dynamoDbClient)
 
-            // JWT secret comes from Lambda env (SecretsManager-backed). The
-            // env-var fallback exists only to allow the static init to complete
-            // when the secret isn't present — the resulting tokens won't verify
-            // correctly and that's intentional.
-            val jwtSecret = System.getenv("JWT_SECRET")
-                ?: error("JWT_SECRET env var is required")
-            val cipher = JwtCipher(jwtSecret)
-            val tokenEncoder = TokenEncoder(cipher)
-            val cookieConfig = CookieConfig(
-                domain = System.getenv("COOKIE_DOMAIN"), // e.g. ".pairwisevote.com"
-                secure = true,
-                sameSite = SetCookie.SameSite.Lax,
-                path = "/api",
-            )
-
-            // Reset emails embed this URL: https://${FRONTEND_BASE_URL}/reset-password?token=...
-            // CFN sets it to https://pairwisevote.com (the SPA origin behind CloudFront).
-            val frontendBaseUrl = System.getenv("FRONTEND_BASE_URL")
-                ?: error("FRONTEND_BASE_URL env var is required")
+            val tokenEncoder = TokenEncoder(JwtCipher(configuration.jwtSecret))
 
             // Invite-code gate. The SSM parameter name comes from CFN; if unset
             // we fall back to a no-op provider (registration is open). Operator
             // rotates the code in SSM with no redeploy; a five-minute TTL caps
             // cross-Lambda inconsistency after a rotation.
             val inviteCodeProvider: InviteCodeProvider =
-                System.getenv("INVITE_CODE_PARAMETER_NAME")?.takeIf { it.isNotBlank() }?.let { name ->
+                configuration.inviteCodeParameterName?.let { name ->
                     SsmInviteCodeProvider(parameterName = name, region = region)
                 } ?: InviteCodeProvider { null }
 
@@ -129,11 +111,11 @@ class LambdaHandler : RequestHandler<APIGatewayV2HTTPEvent, APIGatewayV2HTTPResp
                 queryModel = repositories.queryModel,
                 rawTableScanner = repositories.rawTableScanner,
                 tokenEncoder = tokenEncoder,
-                frontendBaseUrl = frontendBaseUrl,
+                frontendBaseUrl = configuration.frontendBaseUrl,
                 inviteCodeProvider = inviteCodeProvider,
             )
 
-            return RequestRouter(service, json, tokenEncoder, cookieConfig)
+            return RequestRouter(service, json, tokenEncoder, configuration.cookieConfig)
         }
     }
 }

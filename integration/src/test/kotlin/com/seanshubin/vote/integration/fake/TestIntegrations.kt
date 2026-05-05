@@ -17,6 +17,7 @@ class TestIntegrations(
     // fake straight through.
     override val emailSender: EmailSender = fakeEmailSender
     override val emitLine: (String) -> Unit = { line -> emitLineCapture.add(line) }
+    override val getEnv: (String) -> String? = { null }
 
     // Convenience accessors with proper types for test assertions
     val fakeClock: FakeClock

@@ -2,52 +2,51 @@ package com.seanshubin.vote.backend.dependencies
 
 import aws.sdk.kotlin.services.dynamodb.DynamoDbClient
 import com.seanshubin.vote.backend.repository.*
-import com.seanshubin.vote.contract.Integrations
-import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import java.sql.Connection
 
+/**
+ * Pure wiring: produces a [RepositorySet] for the configured backend.
+ * No I/O side effects beyond what's intrinsic to repository construction
+ * (e.g., AWS SDK client creation lives upstream in [ConnectionFactory]).
+ * Schema creation and other startup work runs separately in
+ * [DynamoDbStartup] so the wiring stage stays free of network calls.
+ */
 class RepositoryFactory(
-    private val integrations: Integrations,
     private val configuration: Configuration,
-    private val json: Json
+    private val json: Json,
 ) {
     fun createRepositories(
         sqlConnection: Connection?,
         dynamoDbClient: DynamoDbClient?
-    ): RepositorySet {
-        return when (configuration.databaseConfig) {
-            is DatabaseConfig.InMemory -> {
-                val eventLog = InMemoryEventLog()
-                val sharedData = InMemoryData()
-                val commandModel = InMemoryCommandModel(sharedData)
-                val queryModel = InMemoryQueryModel(sharedData)
-                RepositorySet(eventLog, commandModel, queryModel, InMemoryRawTableScanner())
-            }
-            is DatabaseConfig.MySql -> {
-                val queryLoader = QueryLoaderFromResource()
-                val eventLog = MySqlEventLog(sqlConnection!!, queryLoader, json)
-                val commandModel = MySqlCommandModel(sqlConnection, queryLoader, json)
-                val queryModel = MySqlQueryModel(sqlConnection, queryLoader, json)
+    ): RepositorySet = when (configuration.databaseConfig) {
+        is DatabaseConfig.InMemory -> {
+            val sharedData = InMemoryData()
+            RepositorySet(
+                eventLog = InMemoryEventLog(),
+                commandModel = InMemoryCommandModel(sharedData),
+                queryModel = InMemoryQueryModel(sharedData),
+                rawTableScanner = InMemoryRawTableScanner(),
+            )
+        }
+        is DatabaseConfig.MySql -> {
+            val queryLoader = QueryLoaderFromResource()
+            RepositorySet(
+                eventLog = MySqlEventLog(sqlConnection!!, queryLoader, json),
+                commandModel = MySqlCommandModel(sqlConnection, queryLoader, json),
+                queryModel = MySqlQueryModel(sqlConnection, queryLoader, json),
                 // MySQL backend has no admin raw view in this iteration.
-                RepositorySet(eventLog, commandModel, queryModel, InMemoryRawTableScanner())
-            }
-            is DatabaseConfig.DynamoDB -> {
-                runBlocking {
-                    try {
-                        DynamoDbSingleTableSchema.createTables(dynamoDbClient!!)
-                        integrations.emitLine("DynamoDB single-table schema created/verified")
-                    } catch (e: Exception) {
-                        integrations.emitLine("DynamoDB tables may already exist: ${e.message}")
-                    }
-                }
-
-                val eventLog = DynamoDbEventLog(dynamoDbClient!!, json)
-                val commandModel = DynamoDbSingleTableCommandModel(dynamoDbClient, json)
-                val queryModel = DynamoDbSingleTableQueryModel(dynamoDbClient, json)
-                val rawScanner = DynamoDbRawTableScanner(dynamoDbClient)
-                RepositorySet(eventLog, commandModel, queryModel, rawScanner)
-            }
+                rawTableScanner = InMemoryRawTableScanner(),
+            )
+        }
+        is DatabaseConfig.DynamoDB -> {
+            val client = dynamoDbClient!!
+            RepositorySet(
+                eventLog = DynamoDbEventLog(client, json),
+                commandModel = DynamoDbSingleTableCommandModel(client, json),
+                queryModel = DynamoDbSingleTableQueryModel(client, json),
+                rawTableScanner = DynamoDbRawTableScanner(client),
+            )
         }
     }
 }

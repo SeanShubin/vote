@@ -16,4 +16,5 @@ class ProductionIntegrations(
     override val uniqueIdGenerator: UniqueIdGenerator = UUIDGenerator
     override val notifications: Notifications = ConsoleNotifications
     override val passwordUtil: PasswordUtil = RealPasswordUtil
+    override val getEnv: (String) -> String? = System::getenv
 }

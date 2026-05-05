@@ -12,7 +12,7 @@ class TallySectionsTest {
             Place(2, "Bob"),
             Place(3, "Charlie"),
         )
-        val sections = tallySections(places, tiers = emptyList())
+        val sections = TallySection.compute(places, tiers = emptyList())
         assertEquals(
             listOf(
                 TallySection(
@@ -44,7 +44,7 @@ class TallySectionsTest {
             Place(4, "Tier2"),
             Place(5, "Charlie"),
         )
-        val sections = tallySections(places, tiers = listOf("Tier1", "Tier2"))
+        val sections = TallySection.compute(places, tiers = listOf("Tier1", "Tier2"))
         assertEquals(
             listOf(
                 TallySection("Tier1", listOf(Place(1, "Alice"))),
@@ -64,7 +64,7 @@ class TallySectionsTest {
             Place(1, "Bob"),
             Place(3, "Charlie"),
         )
-        val sections = tallySections(places, tiers = emptyList())
+        val sections = TallySection.compute(places, tiers = emptyList())
         assertEquals(
             listOf(
                 TallySection(
@@ -100,7 +100,7 @@ class TallySectionsTest {
             Place(4, "Tier2"),
             Place(5, "Charlie"),
         )
-        val sections = tallySections(places, tiers = listOf("Tier1", "Tier2"))
+        val sections = TallySection.compute(places, tiers = listOf("Tier1", "Tier2"))
         assertEquals(
             listOf(
                 // Tier1 is empty — Alice did not strictly clear it.
@@ -129,7 +129,7 @@ class TallySectionsTest {
             Place(1, "Excellent"),
             Place(4, "Good"),
         )
-        val sections = tallySections(places, tiers = listOf("Excellent", "Good"))
+        val sections = TallySection.compute(places, tiers = listOf("Excellent", "Good"))
         assertEquals(
             listOf(
                 // Nobody strictly cleared Excellent.
@@ -151,7 +151,7 @@ class TallySectionsTest {
             Place(3, "Tier2"),
             Place(3, "Bob"),
         )
-        val sections = tallySections(places, tiers = listOf("Tier1", "Tier2"))
+        val sections = TallySection.compute(places, tiers = listOf("Tier1", "Tier2"))
         assertEquals(
             listOf(
                 TallySection("Tier1", listOf(Place(1, "Alice"))),
@@ -170,7 +170,7 @@ class TallySectionsTest {
             Place(2, "Tier1"),
             Place(3, "Bob"),
         )
-        val sections = tallySections(places, tiers = listOf("Tier1"))
+        val sections = TallySection.compute(places, tiers = listOf("Tier1"))
         assertEquals(
             listOf(
                 TallySection("Tier1", listOf(Place(1, "Alice"))),
@@ -188,7 +188,7 @@ class TallySectionsTest {
             Place(2, "Bob"),
             Place(3, "Charlie"),
         )
-        val sections = tallySections(places, tiers = listOf("Tier1"))
+        val sections = TallySection.compute(places, tiers = listOf("Tier1"))
         assertEquals(
             listOf(
                 TallySection("Tier1", emptyList()),
@@ -208,7 +208,7 @@ class TallySectionsTest {
             Place(4, "Bob"),
             Place(4, "Charlie"),
         )
-        val sections = tallySections(places, tiers = listOf("Tier1"))
+        val sections = TallySection.compute(places, tiers = listOf("Tier1"))
         assertEquals(
             listOf(
                 TallySection("Tier1", listOf(Place(1, "Alice"))),
