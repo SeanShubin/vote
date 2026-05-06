@@ -47,6 +47,10 @@ fun VotingView(
     electionName: String,
     candidates: List<String>,
     tiers: List<String>,
+    // Used as the "Sean's Rankings" header when the voter copies their ballot
+    // as plain text. Null falls back to "Your Rankings" so the feature still
+    // works in any context where the username isn't threaded through.
+    currentUserName: String?,
     // Fired only on the transitions that actually change the server-side
     // ballot count: +1 on first cast, -1 on full-clear / explicit removal.
     // In-place rank reorderings (which auto-save but don't change the count)
@@ -67,6 +71,18 @@ fun VotingView(
     var selectedTierName by remember(electionName, tiers) { mutableStateOf<String?>(null) }
     var dragSource by remember { mutableStateOf<DragSource?>(null) }
     var isInitialized by remember(electionName, candidates, tiers) { mutableStateOf(false) }
+    // Transient "Copied!" toast next to the copy button. Cleared after a
+    // short delay; copyFeedbackToken bumps each click so a second click
+    // while the first toast is still up restarts the timer rather than
+    // letting the older coroutine clear the message early.
+    var copyFeedback by remember { mutableStateOf<String?>(null) }
+    var copyFeedbackToken by remember { mutableStateOf(0) }
+    LaunchedEffect(copyFeedbackToken) {
+        if (copyFeedback != null) {
+            kotlinx.coroutines.delay(2000)
+            copyFeedback = null
+        }
+    }
 
     // Pre-populate from any existing ballot so a returning voter sees their
     // prior pick instead of starting from scratch. New candidates added since
@@ -523,6 +539,32 @@ fun VotingView(
                         }
                     }
 
+                    // Copy-as-text uses the on-screen `ranked` (not the saved
+                    // server state) so the user can copy whatever they're
+                    // currently looking at, even mid-edit before the debounce
+                    // settles. Disabled when no candidates are ranked since
+                    // there's nothing meaningful to copy in that case.
+                    val canCopy = ranked.any { it is RankedItem.Candidate }
+                    if (canCopy) {
+                        Button({
+                            classes("ranked-ballot-copy-button")
+                            onClick {
+                                val text = buildBallotText(electionName, currentUserName, ranked)
+                                copyTextToClipboard(text)
+                                copyFeedback = "Copied!"
+                                copyFeedbackToken = copyFeedbackToken + 1
+                            }
+                        }) {
+                            Text("Copy ballot as text")
+                        }
+                    }
+
+                    if (copyFeedback != null) {
+                        Span({ classes("ranked-ballot-copy-feedback") }) {
+                            Text(copyFeedback!!)
+                        }
+                    }
+
                     Span({ classes("ranked-ballot-toolbar-hint") }) {
                         Text("Focus a row · ↑/↓ to nudge")
                     }
@@ -663,3 +705,58 @@ private data class TierChunk(
     val tierIndex: Int,
     val candidateIndices: List<Int>,
 )
+
+/**
+ * Plain-text rendering of the voter's current ballot, suitable for paste
+ * into chat / email. Plain mode is a flat dashed list of candidates in rank
+ * order. Tier mode nests each tier's candidates one indent under the tier
+ * name, using the same "candidate clears tier T iff they sit ahead of T's
+ * marker" interpretation the on-screen view uses. Empty tiers still appear
+ * as a heading so the reader can see the full ladder.
+ */
+internal fun buildBallotText(
+    electionName: String,
+    userName: String?,
+    ranked: List<RankedItem>,
+): String {
+    val ownerLine = if (userName.isNullOrBlank()) "Your Rankings" else "$userName's Rankings"
+    val hasTiers = ranked.any { it is RankedItem.TierMarker }
+    val lines = mutableListOf<String>()
+    lines += electionName
+    lines += ownerLine
+    if (!hasTiers) {
+        ranked.filterIsInstance<RankedItem.Candidate>().forEach { c ->
+            lines += "- ${c.name}"
+        }
+    } else {
+        val pending = mutableListOf<String>()
+        ranked.forEach { item ->
+            when (item) {
+                is RankedItem.Candidate -> pending += item.name
+                is RankedItem.TierMarker -> {
+                    lines += "- ${item.name}"
+                    pending.forEach { lines += "  - $it" }
+                    pending.clear()
+                }
+            }
+        }
+    }
+    return lines.joinToString("\n")
+}
+
+/**
+ * Best-effort write to the system clipboard via the async Clipboard API.
+ * Failures (permission denied, unavailable in insecure contexts) are
+ * surfaced as a console error rather than thrown — the caller has already
+ * shown a "Copied!" toast and there's no graceful in-UI recovery here.
+ */
+private fun copyTextToClipboard(text: String) {
+    try {
+        val clipboard = window.navigator.asDynamic().clipboard
+        if (clipboard != null && clipboard != js("undefined")) {
+            clipboard.writeText(text)
+        }
+    } catch (e: Throwable) {
+        console.error("Clipboard write failed:", e)
+    }
+}

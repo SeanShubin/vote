@@ -617,6 +617,11 @@ button:disabled {
     margin-left: auto;
 }
 
+.ranked-ballot-copy-feedback {
+    font-size: 0.85rem;
+    color: #2c5282;
+}
+
 table {
     width: 100%;
     border-collapse: collapse;

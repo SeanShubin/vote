@@ -213,6 +213,7 @@ fun ElectionDetailPage(
                         electionName = electionName,
                         candidates = candidates,
                         tiers = loadedElection?.tiers ?: emptyList(),
+                        currentUserName = currentUserName,
                         // Patch the header count locally and refresh the
                         // tally — the cached helper avoids the Loading
                         // flash on the Results tab.
