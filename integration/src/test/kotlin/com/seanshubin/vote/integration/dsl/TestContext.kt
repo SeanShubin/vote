@@ -68,6 +68,16 @@ class TestContext(
     fun registerUsers(vararg names: String): List<UserContext> =
         names.map { registerUser(it) }
 
+    /**
+     * Re-authenticate to pick up a role change. Existing access tokens bake
+     * the role at issue time; after `setRole`, the user needs a fresh token
+     * with the updated role claim.
+     */
+    fun authenticateAs(userName: String, password: String = "password"): UserContext {
+        val tokens = backend.authenticate(userName, password)
+        return UserContext(this, userName, tokens.accessToken)
+    }
+
     // Admin query methods using owner token
 
     fun listUsers(): List<com.seanshubin.vote.domain.UserNameRole> {

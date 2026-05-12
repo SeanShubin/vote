@@ -146,6 +146,12 @@ class HttpApiTester(private val port: Int = 9876) : AutoCloseable {
         return post("/authenticate", body)
     }
 
+    fun authenticateUserExpectSuccess(nameOrEmail: String, password: String = "password"): Tokens {
+        val response = authenticateUser(nameOrEmail, password)
+        assertEquals(200, response.statusCode())
+        return parseAuthResponse(response.body())
+    }
+
     fun requestPasswordReset(nameOrEmail: String): HttpResponse<String> {
         val body = """{"nameOrEmail":"$nameOrEmail"}"""
         return post("/password-reset-request", body)
@@ -632,7 +638,9 @@ class HttpApiTest {
         // alice = OWNER; she can delete bob's election by virtue of having
         // MANAGE_USERS (which OWNER inherits from ADMIN).
         val aliceTokens = tester.registerUserExpectSuccess("alice")
-        val bobTokens = tester.registerUserExpectSuccess("bob")
+        tester.registerUserExpectSuccess("bob")
+        tester.setUserRole("bob", "USER", aliceTokens.accessToken)
+        val bobTokens = tester.authenticateUserExpectSuccess("bob")
         tester.createElection("Bobs", bobTokens.accessToken)
 
         val response = tester.deleteElection("Bobs", aliceTokens.accessToken)
@@ -668,7 +676,7 @@ class HttpApiTest {
 
         assertEquals(200, response.statusCode())
         val body = response.body()
-        assertTrue(Regex("\"role\"\\s*:\\s*\"USER\"").containsMatchIn(body), "Expected role USER in: $body")
+        assertTrue(Regex("\"role\"\\s*:\\s*\"VOTER\"").containsMatchIn(body), "Expected role VOTER in: $body")
         assertTrue(Regex("\"electionsOwnedCount\"\\s*:\\s*0").containsMatchIn(body), "Expected 0 owned in: $body")
         assertTrue(Regex("\"ballotsCastCount\"\\s*:\\s*1").containsMatchIn(body), "Expected 1 cast in: $body")
     }
@@ -731,8 +739,10 @@ class HttpApiTest {
     fun `self-delete - regular user cannot self-delete while owning elections`() {
         // A non-owner who owns elections must clean them up first; otherwise
         // their elections would be orphans pointing at a removed user.
-        tester.registerUserExpectSuccess("alice") // OWNER
-        val bobTokens = tester.registerUserExpectSuccess("bob") // plain USER
+        val aliceTokens = tester.registerUserExpectSuccess("alice") // OWNER
+        tester.registerUserExpectSuccess("bob") // default VOTER, promoted below to create an election
+        tester.setUserRole("bob", "USER", aliceTokens.accessToken)
+        val bobTokens = tester.authenticateUserExpectSuccess("bob")
         tester.createElection("Bob's Choice", bobTokens.accessToken)
 
         val response = tester.removeUser("bob", bobTokens.accessToken)

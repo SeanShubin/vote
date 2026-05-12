@@ -40,7 +40,7 @@ class RoleManagementTest {
         // Promote bob to ADMIN so he has MANAGE_USERS but is not OWNER.
         alice.setRole("bob", Role.ADMIN)
 
-        // Bob's existing token still carries USER role, so re-authenticate to pick up ADMIN.
+        // Bob's existing token still carries the default registration role, so re-authenticate to pick up ADMIN.
         val bobAdmin = TestContextHelper.reauthenticate(testContext, bob.userName)
 
         val ex = assertFailsWith<ServiceException> {
@@ -49,7 +49,7 @@ class RoleManagementTest {
         assertEquals(ServiceException.Category.UNAUTHORIZED, ex.category)
         // Still exactly one OWNER, charlie unchanged.
         assertEquals(Role.OWNER, testContext.database.findUser("alice").role)
-        assertEquals(Role.USER, testContext.database.findUser("charlie").role)
+        assertEquals(Role.VOTER, testContext.database.findUser("charlie").role)
     }
 
     @Test

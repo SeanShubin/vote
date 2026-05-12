@@ -14,7 +14,7 @@ object Scenario {
     fun comprehensive(context: TestContext) {
         // Section 1: Initial Setup
         val alice = setupOwner(context)
-        val (bob, charlie, david) = setupUsers(context)
+        val (bob, charlie, david) = setupUsers(context, alice)
 
         // Section 2: User Management
         demonstrateUserManagement(context, alice, bob, charlie, david)
@@ -53,11 +53,22 @@ object Scenario {
         return alice
     }
 
-    private fun setupUsers(context: TestContext): Triple<UserContext, UserContext, UserContext> {
-        // Additional users (USER role by default)
-        val bob = context.registerUser("bob", "bob@example.com", "bobpass")
-        val charlie = context.registerUser("charlie", "charlie@example.com", "charliepass")
-        val david = context.registerUser("david", "david@example.com", "davidpass")
+    private fun setupUsers(context: TestContext, alice: UserContext): Triple<UserContext, UserContext, UserContext> {
+        // New registrations default to VOTER. The OWNER promotes them to USER
+        // so they can create elections, edit their own profile, etc. After
+        // promotion each user re-authenticates to get a token carrying the
+        // updated role claim (existing tokens bake the role at issue time).
+        context.registerUser("bob", "bob@example.com", "bobpass")
+        context.registerUser("charlie", "charlie@example.com", "charliepass")
+        context.registerUser("david", "david@example.com", "davidpass")
+
+        alice.setRole("bob", Role.USER)
+        alice.setRole("charlie", Role.USER)
+        alice.setRole("david", Role.USER)
+
+        val bob = context.authenticateAs("bob", "bobpass")
+        val charlie = context.authenticateAs("charlie", "charliepass")
+        val david = context.authenticateAs("david", "davidpass")
 
         return Triple(bob, charlie, david)
     }

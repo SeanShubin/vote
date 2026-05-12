@@ -15,6 +15,6 @@ enum class Role(val description: String) {
     companion object {
         val PRIMARY_ROLE = OWNER
         val SECONDARY_ROLE = AUDITOR
-        val DEFAULT_ROLE = USER
+        val DEFAULT_ROLE = VOTER
     }
 }

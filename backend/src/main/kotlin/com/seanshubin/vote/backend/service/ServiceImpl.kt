@@ -80,7 +80,7 @@ class ServiceImpl(
             )
         }
 
-        val role = if (queryModel.userCount() == 0) Role.OWNER else Role.USER
+        val role = if (queryModel.userCount() == 0) Role.PRIMARY_ROLE else Role.DEFAULT_ROLE
         val saltAndHash = passwordUtil.createSaltAndHash(validPassword)
 
         eventLog.appendEvent(

@@ -96,11 +96,15 @@ class TestUserTest {
         val ownerToken = ownerTokens.accessToken
 
         // Real user — keeps their data after the wipe.
-        val bobTokens = tester.registerUserExpectSuccess("bob", "bob@example.com", "bobpass")
+        tester.registerUserExpectSuccess("bob", "bob@example.com", "bobpass")
+        tester.setUserRole("bob", "USER", ownerToken)
+        val bobTokens = tester.authenticateUserExpectSuccess("bob", "bobpass")
         tester.createElection("RealElection", bobTokens.accessToken)
 
         // Test user — no email, marker password — gets wiped along with their election.
-        val aliceTokens = tester.registerUserExpectSuccess("alice", "", "test")
+        tester.registerUserExpectSuccess("alice", "", "test")
+        tester.setUserRole("alice", "USER", ownerToken)
+        val aliceTokens = tester.authenticateUserExpectSuccess("alice", "test")
         tester.createElection("TestElection", aliceTokens.accessToken)
 
         val wipeResp = tester.wipeTestUsers(ownerToken)

@@ -26,7 +26,7 @@ class VotingWorkflowTest {
         val aliceUser = testContext.database.findUser("alice")
         val bobUser = testContext.database.findUser("bob")
         assertEquals(Role.OWNER, aliceUser.role)
-        assertEquals(Role.USER, bobUser.role)
+        assertEquals(Role.VOTER, bobUser.role)
     }
 
     @Test
@@ -133,7 +133,7 @@ class VotingWorkflowTest {
         val testContext = TestContext()
         val (alice, _) = testContext.registerUsers("alice", "bob")
 
-        assertEquals(Role.USER, testContext.database.findUser("bob").role)
+        assertEquals(Role.VOTER, testContext.database.findUser("bob").role)
 
         alice.setRole("bob", Role.ADMIN)
 

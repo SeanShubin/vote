@@ -117,8 +117,12 @@ class CaseSensitivityTest {
     @Test
     fun `renaming to a name owned by another user is rejected even with different case`() {
         val ctx = TestContext()
-        ctx.registerUser(name = "Alice", email = "alice@example.com")
-        val bob = ctx.registerUser(name = "Bob", email = "bob@example.com")
+        val alice = ctx.registerUser(name = "Alice", email = "alice@example.com")
+        ctx.registerUser(name = "Bob", email = "bob@example.com")
+        // VOTER (the default) lacks USE_APPLICATION, so promote bob to USER before
+        // exercising the rename path; re-authenticate to pick up the new role.
+        alice.setRole("Bob", com.seanshubin.vote.domain.Role.USER)
+        val bob = ctx.authenticateAs("Bob")
 
         val ex = assertFailsWith<IllegalArgumentException> {
             bob.updateUser(newName = "ALICE")
