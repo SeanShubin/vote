@@ -71,10 +71,15 @@ fun HomePage(
         }
 
         Div({ classes("menu") }) {
-            Button({
-                onClick { onNavigateToCreateElection() }
-            }) {
-                Text("Create Election")
+            // USER+ get election creation (the floor for USE_APPLICATION).
+            // VOTER and below can vote and browse but can't create elections.
+            // UX shortcut — the backend re-checks USE_APPLICATION on every request.
+            if (role != null && role >= Role.USER) {
+                Button({
+                    onClick { onNavigateToCreateElection() }
+                }) {
+                    Text("Create Election")
+                }
             }
 
             Button({
