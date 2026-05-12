@@ -47,8 +47,10 @@ class ServiceImpl(
         // and any environment where the operator hasn't set the SSM parameter).
         // Compare with `equals`, not constant-time — leaking the code via timing
         // would still require ~10^9 attempts against a per-Lambda 5-minute cache.
+        // Case-insensitive: matches the username comparison style elsewhere and
+        // forgives users who type the code with shift held or auto-capitalized.
         val expectedInviteCode = inviteCodeProvider.current()
-        if (!expectedInviteCode.isNullOrBlank() && inviteCode != expectedInviteCode) {
+        if (!expectedInviteCode.isNullOrBlank() && !inviteCode.equals(expectedInviteCode, ignoreCase = true)) {
             throw ServiceException(
                 ServiceException.Category.UNAUTHORIZED,
                 "Invalid invite code"
