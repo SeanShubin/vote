@@ -137,6 +137,8 @@ class EventLogHtmlGeneratorWithHttp(private val recorder: DocumentationRecorder)
             "Added candidates to <strong>${event.electionName}</strong>: ${event.candidateNames.joinToString(", ")}"
         is DomainEvent.CandidatesRemoved ->
             "Removed candidates from <strong>${event.electionName}</strong>: ${event.candidateNames.joinToString(", ")}"
+        is DomainEvent.CandidateRenamed ->
+            "Renamed <strong>${event.oldName}</strong> to <strong>${event.newName}</strong> in <strong>${event.electionName}</strong>"
         is DomainEvent.TiersSet ->
             if (event.tierNames.isEmpty())
                 "Tiers cleared for <strong>${event.electionName}</strong>"
@@ -210,6 +212,11 @@ class EventLogHtmlGeneratorWithHttp(private val recorder: DocumentationRecorder)
         is DomainEvent.CandidatesRemoved -> """
             <div class="detail-row"><span class="label">Election:</span> ${event.electionName}</div>
             <div class="detail-row"><span class="label">Candidates:</span> ${event.candidateNames.joinToString(", ")}</div>
+        """.trimIndent()
+        is DomainEvent.CandidateRenamed -> """
+            <div class="detail-row"><span class="label">Election:</span> ${event.electionName}</div>
+            <div class="detail-row"><span class="label">Old Name:</span> ${event.oldName}</div>
+            <div class="detail-row"><span class="label">New Name:</span> ${event.newName}</div>
         """.trimIndent()
         is DomainEvent.TiersSet -> """
             <div class="detail-row"><span class="label">Election:</span> ${event.electionName}</div>

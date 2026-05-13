@@ -193,6 +193,17 @@ fun ElectionDetailPage(
                             }
                             tallyFetch.reload()
                         },
+                        onCandidateRenamed = { oldName, newName ->
+                            successMessage = "Renamed \"$oldName\" to \"$newName\""
+                            errorMessage = null
+                            // Patch the local candidate list in place so the
+                            // setup row re-sorts immediately; ballot counts
+                            // are refetched by ElectionSetupView itself.
+                            lastLoadedShell = lastLoadedShell?.let { (e, c) ->
+                                e to c.map { if (it == oldName) newName else it }
+                            }
+                            tallyFetch.reload()
+                        },
                         onTiersSaved = { newTiers ->
                             successMessage = "Tiers saved"
                             errorMessage = null

@@ -180,6 +180,34 @@ class DynamoDbSingleTableQueryModel(
         }
     }
 
+    override fun candidateBallotCounts(electionName: String): Map<String, Int> {
+        // Two queries — candidate list (for the zero-count entries) and the
+        // ballot list (rankings JSON contains the candidate names). The
+        // editor UI calls this once per setup-tab render, so a two-shot
+        // scan is acceptable here.
+        val candidates = listCandidates(electionName)
+        if (candidates.isEmpty()) return emptyMap()
+        val counts = candidates.associateWith { 0 }.toMutableMap()
+        runBlocking {
+            val ballotItems = dynamoDb.query(QueryRequest {
+                tableName = DynamoDbSingleTableSchema.MAIN_TABLE
+                keyConditionExpression = "PK = :pk AND begins_with(SK, :sk_prefix)"
+                expressionAttributeValues = mapOf(
+                    ":pk" to AttributeValue.S(DynamoDbSingleTableSchema.electionPK(electionName)),
+                    ":sk_prefix" to AttributeValue.S(DynamoDbSingleTableSchema.BALLOT_PREFIX)
+                )
+            }).items
+            ballotItems?.forEach { item ->
+                val rankingsJson = item["rankings"]?.asS() ?: return@forEach
+                val rankings = json.decodeFromString<List<Ranking>>(rankingsJson)
+                rankings.map { it.candidateName }.toSet().forEach { name ->
+                    if (name in counts) counts[name] = counts.getValue(name) + 1
+                }
+            }
+        }
+        return counts
+    }
+
     override fun listTiers(electionName: String): List<String> {
         // Tiers live as a list attribute on the election METADATA item — same
         // GetItem shape as searchElectionByName, just projecting only the

@@ -33,6 +33,23 @@ interface Service {
     fun eventData(accessToken: AccessToken): TableData
     fun setCandidates(accessToken: AccessToken, electionName: String, candidateNames: List<String>)
     fun listCandidates(accessToken: AccessToken, electionName: String): List<String>
+
+    /**
+     * Rename a single candidate in place. Every ranking in every cast ballot
+     * for this election is rewritten so [oldName] becomes [newName]; ballot
+     * rank values are preserved. No-op if the candidate is already named
+     * [newName]. Rejected when [oldName] doesn't exist, when [newName]
+     * collides with another candidate or any tier name, or when the caller
+     * isn't the election owner.
+     */
+    fun renameCandidate(accessToken: AccessToken, electionName: String, oldName: String, newName: String)
+
+    /**
+     * Map of candidate name → number of ballots that mention that candidate
+     * (with any rank, including null). Every candidate appears as a key,
+     * even those with zero ballots, so the UI can render a row per candidate.
+     */
+    fun candidateBallotCounts(accessToken: AccessToken, electionName: String): Map<String, Int>
     fun setTiers(accessToken: AccessToken, electionName: String, tierNames: List<String>)
     fun listTiers(accessToken: AccessToken, electionName: String): List<String>
     fun castBallot(accessToken: AccessToken, voterName: String, electionName: String, rankings: List<Ranking>): String

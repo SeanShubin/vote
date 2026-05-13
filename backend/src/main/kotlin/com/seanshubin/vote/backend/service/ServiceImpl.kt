@@ -489,6 +489,56 @@ class ServiceImpl(
         return queryModel.listCandidates(electionName)
     }
 
+    override fun renameCandidate(
+        accessToken: AccessToken,
+        electionName: String,
+        oldName: String,
+        newName: String,
+    ) {
+        // VALIDATION SECTION
+        requirePermission(accessToken, Permission.USE_APPLICATION)
+        requireIsElectionOwner(accessToken, electionName)
+
+        val validElectionName = Validation.validateElectionName(electionName)
+        val validOldName = Validation.validateCandidateName(oldName)
+        val validNewName = Validation.validateCandidateName(newName)
+
+        // Idempotent no-op: renaming a candidate to its own name doesn't need
+        // an event in the log. Match comparisons against the *normalized*
+        // names so trailing whitespace / case-only changes don't mint events
+        // either (validateCandidateName preserves case).
+        if (validOldName == validNewName) return
+
+        val existing = queryModel.listCandidates(validElectionName)
+        if (validOldName !in existing) {
+            throw ServiceException(
+                ServiceException.Category.NOT_FOUND,
+                "Candidate not found: $validOldName"
+            )
+        }
+        if (validNewName in existing) {
+            throw ServiceException(
+                ServiceException.Category.CONFLICT,
+                "Candidate already exists: $validNewName"
+            )
+        }
+        val tiers = queryModel.listTiers(validElectionName)
+        Validation.validateCandidatesAndTiersDistinct(listOf(validNewName), tiers)
+
+        // EXECUTION SECTION
+        eventLog.appendEvent(
+            accessToken.userName,
+            clock.now(),
+            DomainEvent.CandidateRenamed(validElectionName, validOldName, validNewName)
+        )
+        synchronize()
+    }
+
+    override fun candidateBallotCounts(accessToken: AccessToken, electionName: String): Map<String, Int> {
+        requirePermission(accessToken, Permission.VIEW_APPLICATION)
+        return queryModel.candidateBallotCounts(electionName)
+    }
+
     override fun setTiers(accessToken: AccessToken, electionName: String, tierNames: List<String>) {
         // VALIDATION SECTION
         requirePermission(accessToken, Permission.USE_APPLICATION)

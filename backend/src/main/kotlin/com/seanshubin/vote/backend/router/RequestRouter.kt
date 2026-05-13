@@ -17,6 +17,7 @@ import com.seanshubin.vote.contract.ErrorResponse
 import com.seanshubin.vote.contract.PasswordResetRequest
 import com.seanshubin.vote.contract.PasswordResetRequestRequest
 import com.seanshubin.vote.contract.RegisterRequest
+import com.seanshubin.vote.contract.RenameCandidateRequest
 import com.seanshubin.vote.contract.Service
 import com.seanshubin.vote.contract.SetCandidatesRequest
 import com.seanshubin.vote.contract.SetDescriptionRequest
@@ -124,6 +125,8 @@ class RequestRouter(
         Route("PUT", "/election/[^/]+/description", ::handleSetDescription),
         Route("PUT", "/election/[^/]+/candidates", ::handleSetCandidates),
         Route("GET", "/election/[^/]+/candidates", ::handleListCandidates),
+        Route("POST", "/election/[^/]+/candidate-rename", ::handleRenameCandidate),
+        Route("GET", "/election/[^/]+/candidate-ballot-counts", ::handleCandidateBallotCounts),
         Route("PUT", "/election/[^/]+/tiers", ::handleSetTiers),
         Route("GET", "/election/[^/]+/tiers", ::handleListTiers),
         Route("POST", "/election/[^/]+/ballot", ::handleCastBallot),
@@ -478,6 +481,21 @@ class RequestRouter(
         val electionName = extractElectionName(req.target)
         val candidates = service.listCandidates(accessToken, electionName)
         return HttpResponse(200, json.encodeToString(candidates))
+    }
+
+    private fun handleRenameCandidate(req: HttpRequest): HttpResponse {
+        val accessToken = extractAccessToken(req)
+        val electionName = extractElectionName(req.target)
+        val request = json.decodeFromString<RenameCandidateRequest>(req.body)
+        service.renameCandidate(accessToken, electionName, request.oldName, request.newName)
+        return HttpResponse(200, json.encodeToString(mapOf("status" to "candidate renamed")))
+    }
+
+    private fun handleCandidateBallotCounts(req: HttpRequest): HttpResponse {
+        val accessToken = extractAccessToken(req)
+        val electionName = extractElectionName(req.target)
+        val counts = service.candidateBallotCounts(accessToken, electionName)
+        return HttpResponse(200, json.encodeToString(counts))
     }
 
     private fun handleSetTiers(req: HttpRequest): HttpResponse {

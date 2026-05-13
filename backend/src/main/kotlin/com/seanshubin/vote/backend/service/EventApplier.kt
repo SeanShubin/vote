@@ -71,6 +71,9 @@ class EventApplier(
             is DomainEvent.CandidatesRemoved -> {
                 commandModel.removeCandidates(authority, event.electionName, event.candidateNames)
             }
+            is DomainEvent.CandidateRenamed -> {
+                commandModel.renameCandidate(authority, event.electionName, event.oldName, event.newName)
+            }
             is DomainEvent.TiersSet -> {
                 commandModel.setTiers(authority, event.electionName, event.tierNames)
             }

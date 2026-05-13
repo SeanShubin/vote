@@ -214,6 +214,7 @@ class DynamoToRelationalTest {
         override fun searchElectionByName(name: String): ElectionSummary? =
             elections.firstOrNull { it.electionName == name }
         override fun listTiers(electionName: String): List<String> = emptyList()
+        override fun candidateBallotCounts(electionName: String): Map<String, Int> = emptyMap()
         override fun listRankings(voterName: String, electionName: String): List<Ranking> = emptyList()
         override fun listRankings(electionName: String): List<VoterElectionCandidateRank> = emptyList()
         override fun searchBallot(voterName: String, electionName: String): BallotSummary? = null
