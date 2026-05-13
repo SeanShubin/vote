@@ -86,10 +86,16 @@ private fun renderTally(
         serverTally.sections
     } else {
         remember(serverTally, active) {
+            // The server's tally.candidateNames is real candidates + tier
+            // markers (the matrix node list). Split it back into the two
+            // inputs countBallots wants: real candidates and tiers.
+            val tierSet = serverTally.tiers.toSet()
+            val realCandidates = serverTally.tally.candidateNames.filterNot { it in tierSet }
             val recomputed = Tally.countBallots(
                 electionName = serverTally.tally.electionName,
                 secretBallot = serverTally.tally.secretBallot,
-                candidates = serverTally.tally.candidateNames,
+                candidates = realCandidates,
+                tiers = serverTally.tiers,
                 ballots = revealed.filter { it.confirmation in active },
             )
             TallySection.compute(recomputed.places, serverTally.tiers)

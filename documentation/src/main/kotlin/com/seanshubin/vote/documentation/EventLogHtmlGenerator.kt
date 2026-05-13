@@ -123,6 +123,11 @@ class EventLogHtmlGenerator(private val eventLog: EventLog) {
             <div class="detail-row"><span class="label">Election:</span> ${event.electionName}</div>
             <div class="detail-row"><span class="label">Tiers:</span> ${event.tierNames.joinToString(", ")}</div>
         """.trimIndent()
+        is DomainEvent.TierRenamed -> """
+            <div class="detail-row"><span class="label">Election:</span> ${event.electionName}</div>
+            <div class="detail-row"><span class="label">Old Name:</span> ${event.oldName}</div>
+            <div class="detail-row"><span class="label">New Name:</span> ${event.newName}</div>
+        """.trimIndent()
         is DomainEvent.BallotCast -> """
             <div class="detail-row"><span class="label">Voter:</span> ${event.voterName}</div>
             <div class="detail-row"><span class="label">Election:</span> ${event.electionName}</div>

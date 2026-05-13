@@ -233,7 +233,8 @@ class MySqlQueryModel(
                 while (rs.next()) {
                     add(Ranking(
                         candidateName = rs.getString("candidate_name"),
-                        rank = rs.getInt("rank")
+                        rank = rs.getInt("rank"),
+                        tier = rs.getString("tier"),
                     ))
                 }
             }
@@ -291,7 +292,8 @@ class MySqlQueryModel(
                 val voterName = rs.getString("voter_name")
                 val ranking = Ranking(
                     candidateName = rs.getString("candidate_name"),
-                    rank = rs.getInt("rank")
+                    rank = rs.getInt("rank"),
+                    tier = rs.getString("tier"), // null when SQL NULL
                 )
                 val metadata = BallotMetadata(
                     confirmation = rs.getString("confirmation"),

@@ -43,6 +43,7 @@ interface Service {
      * isn't the election owner.
      */
     fun renameCandidate(accessToken: AccessToken, electionName: String, oldName: String, newName: String)
+    fun renameTier(accessToken: AccessToken, electionName: String, oldName: String, newName: String)
 
     /**
      * Map of candidate name → number of ballots that mention that candidate

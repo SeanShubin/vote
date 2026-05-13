@@ -77,6 +77,9 @@ class EventApplier(
             is DomainEvent.TiersSet -> {
                 commandModel.setTiers(authority, event.electionName, event.tierNames)
             }
+            is DomainEvent.TierRenamed -> {
+                commandModel.renameTier(authority, event.electionName, event.oldName, event.newName)
+            }
             is DomainEvent.BallotCast -> {
                 commandModel.castBallot(
                     authority = authority,

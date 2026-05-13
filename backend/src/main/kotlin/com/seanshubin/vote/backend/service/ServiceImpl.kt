@@ -549,19 +549,13 @@ class ServiceImpl(
         val existingCandidates = queryModel.listCandidates(validElectionName)
         Validation.validateCandidatesAndTiersDistinct(existingCandidates, validTierNames)
 
-        // The "no ballots" lock: tier names are part of the meaning of a
-        // ranked ballot, so changing them out from under voters who have
-        // already cast would silently invalidate their vote. The lock lifts
-        // again once those ballots are gone.
-        val ballotCount = queryModel.ballotCount(validElectionName)
-        if (ballotCount > 0) {
-            throw ServiceException(
-                ServiceException.Category.CONFLICT,
-                "Cannot change tier names while ballots exist " +
-                    "($ballotCount ballot${if (ballotCount == 1) "" else "s"} cast); " +
-                    "voters have to remove their ballots first."
-            )
-        }
+        // No "no ballots" lock anymore. Rename goes through [renameTier]
+        // (cascading), so TiersSet here only ever adds/removes/reorders.
+        // Removing a tier here leaves any Ranking.tier annotation pointing
+        // at it as a dangling label; the event applier (or query-time
+        // projection) treats those as "cleared no tier" (null). That's
+        // lossy for the voter's intent on the removed tier — owners
+        // should warn-then-confirm in the UI before removing.
 
         // EXECUTION SECTION
         eventLog.appendEvent(
@@ -575,6 +569,48 @@ class ServiceImpl(
     override fun listTiers(accessToken: AccessToken, electionName: String): List<String> {
         requirePermission(accessToken, Permission.VIEW_APPLICATION)
         return queryModel.listTiers(electionName)
+    }
+
+    override fun renameTier(
+        accessToken: AccessToken,
+        electionName: String,
+        oldName: String,
+        newName: String,
+    ) {
+        // VALIDATION SECTION
+        requirePermission(accessToken, Permission.USE_APPLICATION)
+        requireIsElectionOwner(accessToken, electionName)
+
+        val validElectionName = Validation.validateElectionName(electionName)
+        val validOldName = Validation.validateTierName(oldName)
+        val validNewName = Validation.validateTierName(newName)
+
+        // Idempotent no-op: renaming to the same name doesn't earn an event.
+        if (validOldName == validNewName) return
+
+        val existing = queryModel.listTiers(validElectionName)
+        if (validOldName !in existing) {
+            throw ServiceException(
+                ServiceException.Category.NOT_FOUND,
+                "Tier not found: $validOldName"
+            )
+        }
+        if (validNewName in existing) {
+            throw ServiceException(
+                ServiceException.Category.CONFLICT,
+                "Tier already exists: $validNewName"
+            )
+        }
+        val candidates = queryModel.listCandidates(validElectionName)
+        Validation.validateCandidatesAndTiersDistinct(candidates, listOf(validNewName))
+
+        // EXECUTION SECTION
+        eventLog.appendEvent(
+            accessToken.userName,
+            clock.now(),
+            DomainEvent.TierRenamed(validElectionName, validOldName, validNewName)
+        )
+        synchronize()
     }
 
     override fun castBallot(
@@ -609,10 +645,12 @@ class ServiceImpl(
 
         val candidates = queryModel.listCandidates(validElectionName)
         val tiers = queryModel.listTiers(validElectionName)
-        // Tier markers are valid ranking targets too (they appear in ballots
-        // alongside candidates), so the "unknown candidates" check has to
-        // accept either. A truly bogus name still trips the check.
-        Validation.validateRankingsMatchCandidates(validRankings, candidates + tiers)
+        // Rankings are candidate-only in storage; each ranking carries an
+        // optional [Ranking.tier] annotation referencing one of the
+        // election's tiers. validateRankingsMatchCandidates checks both
+        // the candidate names and the tier annotations against the
+        // election's current configuration.
+        Validation.validateRankingsMatchCandidates(validRankings, candidates, tiers)
 
         // EXECUTION SECTION
         val confirmation = uniqueIdGenerator.generate()
@@ -672,17 +710,17 @@ class ServiceImpl(
         val candidates = queryModel.listCandidates(electionName)
         val tiers = queryModel.listTiers(electionName)
         val ballots = queryModel.listBallots(electionName)
-        // Tier markers participate in the pairwise tally as virtual
-        // candidates, so the algorithm can place each real candidate
-        // relative to them. A candidate's tier in the result is the
-        // hardest tier they cleared — i.e. they pairwise-beat that tier
-        // marker but not the next one above it. When there are no tiers,
-        // the call is identical to the pre-tier behavior.
+        // Tally projects each ballot into its virtual form (candidates +
+        // materialized tier markers) before running Schulze. Storage only
+        // carries candidate rankings with a tier annotation; the markers
+        // are produced at compute time so a tier rename never invalidates
+        // a recorded ballot. When tiers is empty the projection is a no-op.
         // Secret-ballot toggle dropped — tally always shows ranked ballots.
         val tally = Tally.countBallots(
             electionName = electionName,
             secretBallot = false,
-            candidates = candidates + tiers,
+            candidates = candidates,
+            tiers = tiers,
             ballots = ballots,
         )
         val sections = TallySection.compute(tally.places, tiers)

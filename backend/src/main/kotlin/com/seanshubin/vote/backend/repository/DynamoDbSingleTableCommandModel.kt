@@ -370,9 +370,28 @@ class DynamoDbSingleTableCommandModel(
         // than as separate items: reading the election (frequent path) gets
         // tiers in the same request, matching the denormalized-for-perf shape
         // of this single-table store. UpdateItem replaces the whole list
-        // atomically, which matches the "all-or-nothing while no ballots"
-        // semantics enforced one layer up in ServiceImpl.
+        // atomically.
         runBlocking {
+            // Read current tiers so we know which ones are being removed by
+            // this set. Cascade-null any Ranking.tier annotation referencing
+            // a dropped tier before overwriting — otherwise removing then
+            // re-adding a tier with the same name would resurrect stale
+            // annotations the voter no longer expects to apply.
+            val previousTiers = dynamoDb.getItem(GetItemRequest {
+                tableName = DynamoDbSingleTableSchema.MAIN_TABLE
+                key = mapOf(
+                    "PK" to AttributeValue.S(DynamoDbSingleTableSchema.electionPK(electionName)),
+                    "SK" to AttributeValue.S(DynamoDbSingleTableSchema.METADATA_SK)
+                )
+            }).item?.get("tiers")?.asLOrNull().orEmpty()
+                .mapNotNull { it.asSOrNull() }
+            val removed = previousTiers.toSet() - tierNames.toSet()
+            if (removed.isNotEmpty()) {
+                rewriteBallotRankings(electionName) { ranking ->
+                    if (ranking.tier in removed) ranking.copy(tier = null) else ranking
+                }
+            }
+
             if (tierNames.isEmpty()) {
                 dynamoDb.updateItem(UpdateItemRequest {
                     tableName = DynamoDbSingleTableSchema.MAIN_TABLE
@@ -392,6 +411,78 @@ class DynamoDbSingleTableCommandModel(
                     updateExpression = "SET tiers = :tiers"
                     expressionAttributeValues = mapOf(
                         ":tiers" to AttributeValue.L(tierNames.map { AttributeValue.S(it) })
+                    )
+                })
+            }
+        }
+    }
+
+    override fun renameTier(authority: String, electionName: String, oldName: String, newName: String) {
+        // Same shape as renameCandidate, but the tier list rides as a simple
+        // list attribute on the election METADATA item (not a row per tier),
+        // so the rename is a read-modify-write on that attribute rather than
+        // put-new + delete-old. Rewrite ballots first, then update the tier
+        // list — readers between the two see "both names exist" only if
+        // they look at the metadata after rankings and before tier swap.
+        runBlocking {
+            rewriteBallotRankings(electionName) { ranking ->
+                if (ranking.tier == oldName) ranking.copy(tier = newName) else ranking
+            }
+
+            val current = dynamoDb.getItem(GetItemRequest {
+                tableName = DynamoDbSingleTableSchema.MAIN_TABLE
+                key = mapOf(
+                    "PK" to AttributeValue.S(DynamoDbSingleTableSchema.electionPK(electionName)),
+                    "SK" to AttributeValue.S(DynamoDbSingleTableSchema.METADATA_SK)
+                )
+            }).item?.get("tiers")?.asLOrNull().orEmpty()
+                .mapNotNull { it.asSOrNull() }
+            val idx = current.indexOf(oldName)
+            if (idx < 0) return@runBlocking
+            val updated = current.toMutableList().also { it[idx] = newName }
+            dynamoDb.updateItem(UpdateItemRequest {
+                tableName = DynamoDbSingleTableSchema.MAIN_TABLE
+                key = mapOf(
+                    "PK" to AttributeValue.S(DynamoDbSingleTableSchema.electionPK(electionName)),
+                    "SK" to AttributeValue.S(DynamoDbSingleTableSchema.METADATA_SK)
+                )
+                updateExpression = "SET tiers = :tiers"
+                expressionAttributeValues = mapOf(
+                    ":tiers" to AttributeValue.L(updated.map { AttributeValue.S(it) })
+                )
+            })
+        }
+    }
+
+    /**
+     * Walk every ballot for this election, apply [transform] to each
+     * ranking, and write back any rankings list that changed. Common
+     * scaffolding for cascading renames/clears on candidate/tier fields.
+     */
+    private suspend fun rewriteBallotRankings(electionName: String, transform: (Ranking) -> Ranking) {
+        val ballotItems = dynamoDb.query(QueryRequest {
+            tableName = DynamoDbSingleTableSchema.MAIN_TABLE
+            keyConditionExpression = "PK = :pk AND begins_with(SK, :prefix)"
+            expressionAttributeValues = mapOf(
+                ":pk" to AttributeValue.S(DynamoDbSingleTableSchema.electionPK(electionName)),
+                ":prefix" to AttributeValue.S(DynamoDbSingleTableSchema.BALLOT_PREFIX),
+            )
+        }).items
+        ballotItems?.forEach { item ->
+            val sk = item["SK"]?.asS() ?: return@forEach
+            val rankingsJson = item["rankings"]?.asS() ?: return@forEach
+            val rankings = json.decodeFromString<List<Ranking>>(rankingsJson)
+            val rewritten = rankings.map(transform)
+            if (rewritten != rankings) {
+                dynamoDb.updateItem(UpdateItemRequest {
+                    tableName = DynamoDbSingleTableSchema.MAIN_TABLE
+                    key = mapOf(
+                        "PK" to AttributeValue.S(DynamoDbSingleTableSchema.electionPK(electionName)),
+                        "SK" to AttributeValue.S(sk),
+                    )
+                    updateExpression = "SET rankings = :r"
+                    expressionAttributeValues = mapOf(
+                        ":r" to AttributeValue.S(json.encodeToString(rewritten)),
                     )
                 })
             }

@@ -187,6 +187,14 @@ class HttpApiClient(
     override suspend fun listTiers(electionName: String): List<String> =
         getWithAuth("/election/${encodeURIComponent(electionName)}/tiers")
 
+    override suspend fun renameTier(electionName: String, oldName: String, newName: String) {
+        val request = RenameTierRequest(oldName, newName)
+        postWithAuth<RenameTierRequest, Unit>(
+            "/election/${encodeURIComponent(electionName)}/tier-rename",
+            request,
+        )
+    }
+
     override suspend fun castBallot(electionName: String, rankings: List<Ranking>): String {
         val voterName = requireSession().userName
         val request = CastBallotRequest(voterName, rankings)

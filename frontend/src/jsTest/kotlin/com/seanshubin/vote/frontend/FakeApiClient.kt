@@ -24,6 +24,7 @@ class FakeApiClient : ApiClient {
     val candidateBallotCountsCalls = mutableListOf<String>()
     val listCandidatesCalls = mutableListOf<String>()
     val setTiersCalls = mutableListOf<SetTiersCall>()
+    val renameTierCalls = mutableListOf<RenameTierCall>()
     val setElectionDescriptionCalls = mutableListOf<SetElectionDescriptionCall>()
     val listTiersCalls = mutableListOf<String>()
     val castBallotCalls = mutableListOf<CastBallotCall>()
@@ -59,6 +60,7 @@ class FakeApiClient : ApiClient {
     var candidateBallotCountsResult: Result<Map<String, Int>> = Result.success(emptyMap())
     var listCandidatesResult: Result<List<String>> = Result.success(emptyList())
     var setTiersResult: Result<Unit> = Result.success(Unit)
+    var renameTierResult: Result<Unit> = Result.success(Unit)
     var setElectionDescriptionResult: Result<Unit> = Result.success(Unit)
     var listTiersResult: Result<List<String>> = Result.success(emptyList())
     var castBallotResult: Result<String> = Result.success("ballot-confirmation-123")
@@ -187,6 +189,11 @@ class FakeApiClient : ApiClient {
         return listTiersResult.getOrThrow()
     }
 
+    override suspend fun renameTier(electionName: String, oldName: String, newName: String) {
+        renameTierCalls.add(RenameTierCall(electionName, oldName, newName))
+        renameTierResult.getOrThrow()
+    }
+
     override suspend fun castBallot(electionName: String, rankings: List<Ranking>): String {
         castBallotCalls.add(CastBallotCall(electionName, rankings))
         return castBallotResult.getOrThrow()
@@ -275,6 +282,7 @@ class FakeApiClient : ApiClient {
     data class SetCandidatesCall(val electionName: String, val candidates: List<String>)
     data class RenameCandidateCall(val electionName: String, val oldName: String, val newName: String)
     data class SetTiersCall(val electionName: String, val tiers: List<String>)
+    data class RenameTierCall(val electionName: String, val oldName: String, val newName: String)
     data class SetElectionDescriptionCall(val electionName: String, val description: String)
     data class CastBallotCall(val electionName: String, val rankings: List<Ranking>)
     data class ResetPasswordCall(val resetToken: String, val newPassword: String)

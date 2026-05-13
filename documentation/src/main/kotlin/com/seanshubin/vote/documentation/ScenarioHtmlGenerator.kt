@@ -112,6 +112,9 @@ class ScenarioHtmlGenerator(private val eventLog: EventLog) {
             else
                 "Tiers set: ${event.tierNames.joinToString(", ") { "<strong>$it</strong>" }}"
 
+        is DomainEvent.TierRenamed ->
+            "Renamed tier <strong>${event.oldName}</strong> to <strong>${event.newName}</strong>"
+
         is DomainEvent.BallotCast -> {
             val rankings = event.rankings.sortedBy { it.rank }.take(3)
                 .joinToString(" > ") { "${it.candidateName} (#${it.rank})" }

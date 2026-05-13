@@ -4,6 +4,7 @@ import androidx.compose.runtime.*
 import com.seanshubin.vote.contract.ApiClient
 import com.seanshubin.vote.domain.Ranking
 import com.seanshubin.vote.domain.RankingKind
+import com.seanshubin.vote.domain.projectBallot
 import kotlinx.browser.window
 import org.jetbrains.compose.web.attributes.*
 import org.jetbrains.compose.web.dom.*
@@ -99,41 +100,36 @@ fun VotingView(
             return@LaunchedEffect
         }
         val candidateSet = candidates.toSet()
-        val tierSet = tiers.toSet()
         val existing = try {
             apiClient.getMyRankings(electionName)
         } catch (e: Exception) {
             apiClient.logErrorToServer(e)
             emptyList()
         }
-        val sortedExisting = existing.filter { it.rank != null }.sortedBy { it.rank }
-        // Drop entries whose name is no longer a candidate or tier (the
-        // election may have changed since the ballot was cast). Election
-        // owners can't change tier names while ballots exist, so a tier-rank
-        // entry should always be valid; this is just defense in depth.
-        val knownExisting = sortedExisting.filter {
-            (it.kind == RankingKind.CANDIDATE && it.candidateName in candidateSet) ||
-                (it.kind == RankingKind.TIER && it.candidateName in tierSet)
-        }
+        // Server returns candidate-only rankings (tier markers are
+        // materialized at compute time, never stored). Drop any whose
+        // candidate name is no longer a candidate or whose tier annotation
+        // is no longer a configured tier — the election may have changed
+        // since the ballot was cast, and a stray reference would either
+        // refuse to load or pin a candidate to a tier that no longer exists.
+        val tierSet = tiers.toSet()
+        val knownExisting = existing
+            .filter { it.rank != null && it.candidateName in candidateSet }
+            .map { r -> if (r.tier != null && r.tier !in tierSet) r.copy(tier = null) else r }
+            .sortedBy { it.rank }
 
         val newRanked: List<RankedItem> = if (tiers.isEmpty()) {
-            knownExisting
-                .filter { it.kind == RankingKind.CANDIDATE }
-                .map { RankedItem.Candidate(it.candidateName) }
+            knownExisting.map { RankedItem.Candidate(it.candidateName) }
+        } else if (knownExisting.isEmpty()) {
+            // Fresh ballot template: just the tier markers, no candidates.
+            // The voter drags chips into the tiers from the arena.
+            tiers.map { RankedItem.TierMarker(it) }
         } else {
-            // Tier mode. If the loaded ballot has all tier markers in
-            // declared order, trust it. Otherwise reset to a fresh ballot
-            // template (just the tier markers) and surface that the prior
-            // ballot couldn't be reconstructed.
-            val tierPositions = tiers.map { tier ->
-                knownExisting.indexOfFirst { it.kind == RankingKind.TIER && it.candidateName == tier }
-            }
-            val tiersInOrder = tierPositions.none { it < 0 } && tierPositions == tierPositions.sorted()
-            if (tiersInOrder && knownExisting.any { it.kind == RankingKind.TIER }) {
-                knownExisting.map { it.toRankedItem() }
-            } else {
-                tiers.map { RankedItem.TierMarker(it) }
-            }
+            // Project the stored annotations back into the in-memory list
+            // shape (candidates interleaved with tier markers) — same
+            // function the tally pipeline uses, so what the voter sees
+            // mirrors what Schulze will compute on.
+            rankingsToRankedItems(knownExisting, tiers)
         }
         ranked = newRanked
         // savedRanked reflects the SERVER state. If the server had no ballot
@@ -173,7 +169,7 @@ fun VotingView(
                 savedRanked = emptyList()
                 onBallotCountChanged(-1)
             } else {
-                val rankings = toSave.mapIndexed { i, item -> item.toRanking(i + 1) }
+                val rankings = toSave.toRankings()
                 apiClient.castBallot(electionName, rankings)
                 val wasFirstCast = !savedHasBallot
                 savedRanked = toSave
@@ -673,14 +669,54 @@ internal sealed interface RankedItem {
     data class TierMarker(override val name: String) : RankedItem
 }
 
-internal fun RankedItem.toRanking(rank: Int): Ranking = when (this) {
-    is RankedItem.Candidate -> Ranking(name, rank, RankingKind.CANDIDATE)
-    is RankedItem.TierMarker -> Ranking(name, rank, RankingKind.TIER)
+/**
+ * Serialize the in-memory ranked list (which still carries [RankedItem.TierMarker]
+ * entries for the UI to render) into the storage form (candidate-only
+ * rankings with a per-candidate tier annotation). For each candidate we
+ * look forward in the list to the next tier marker — that marker's name is
+ * the highest tier this candidate cleared, and is what gets stored as
+ * [Ranking.tier]. Candidates with no marker after them cleared no tier
+ * (tier = null). The output's ranks are dense 1..N over the candidates
+ * only — marker positions don't consume rank values because markers aren't
+ * stored.
+ *
+ * Storage rule: [Ranking.kind] is always [RankingKind.CANDIDATE]; tier
+ * markers are materialized at tally time by [projectBallot].
+ */
+internal fun List<RankedItem>.toRankings(): List<Ranking> {
+    val result = mutableListOf<Ranking>()
+    var rank = 0
+    forEachIndexed { i, item ->
+        if (item is RankedItem.Candidate) {
+            rank++
+            val tier = subList(i + 1, size)
+                .firstOrNull { it is RankedItem.TierMarker }
+                ?.name
+            result += Ranking(item.name, rank, RankingKind.CANDIDATE, tier)
+        }
+    }
+    return result
 }
 
-internal fun Ranking.toRankedItem(): RankedItem = when (kind) {
-    RankingKind.CANDIDATE -> RankedItem.Candidate(candidateName)
-    RankingKind.TIER -> RankedItem.TierMarker(candidateName)
+/**
+ * Inverse of [toRankings] for the load path: take the candidate-only
+ * rankings the server returns (each one optionally annotated with a tier)
+ * and reconstruct the in-memory list with [RankedItem.TierMarker] entries
+ * in the right positions. Reuses [projectBallot] — the same function the
+ * tally pipeline runs on cast ballots — so the UI's reconstruction can't
+ * drift from the Schulze pipeline's interpretation.
+ */
+internal fun rankingsToRankedItems(
+    rankings: List<Ranking>,
+    electionTiers: List<String>,
+): List<RankedItem> {
+    val projected = projectBallot(rankings, electionTiers)
+    return projected.map { r ->
+        when (r.kind) {
+            RankingKind.CANDIDATE -> RankedItem.Candidate(r.candidateName)
+            RankingKind.TIER -> RankedItem.TierMarker(r.candidateName)
+        }
+    }
 }
 
 /**

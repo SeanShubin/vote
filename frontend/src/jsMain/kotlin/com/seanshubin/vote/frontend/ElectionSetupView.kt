@@ -19,6 +19,7 @@ fun ElectionSetupView(
     onCandidatesSaved: (List<String>) -> Unit,
     onCandidateRenamed: (oldName: String, newName: String) -> Unit,
     onTiersSaved: (List<String>) -> Unit,
+    onTierRenamed: (oldName: String, newName: String) -> Unit,
     onOwnerTransferred: (String) -> Unit,
     onError: (String) -> Unit,
 ) {
@@ -29,6 +30,10 @@ fun ElectionSetupView(
     var tiersText by remember(existingTiers) {
         mutableStateOf(existingTiers.joinToString("\n"))
     }
+    // Per-tier inline rename: which tier the user is currently renaming
+    // (null when no row is in edit mode) and the text they're typing.
+    var renamingTier by remember(existingTiers) { mutableStateOf<String?>(null) }
+    var renameTierText by remember(existingTiers) { mutableStateOf("") }
     var transferFilter by remember(currentOwnerName) { mutableStateOf("") }
     var transferTarget by remember(currentOwnerName) { mutableStateOf<String?>(null) }
 
@@ -124,6 +129,25 @@ fun ElectionSetupView(
             val newTiers = parseTiers()
             apiClient.setTiers(electionName, newTiers)
             onTiersSaved(newTiers)
+        },
+    )
+
+    val renameTierAction = rememberAsyncAction(
+        apiClient = apiClient,
+        fallbackErrorMessage = "Failed to rename tier",
+        onError = onError,
+        action = {
+            val oldName = renamingTier ?: return@rememberAsyncAction
+            val newName = renameTierText.trim()
+            if (newName.isBlank() || newName == oldName) {
+                renamingTier = null
+                renameTierText = ""
+                return@rememberAsyncAction
+            }
+            apiClient.renameTier(electionName, oldName, newName)
+            renamingTier = null
+            renameTierText = ""
+            onTierRenamed(oldName, newName)
         },
     )
 
@@ -238,38 +262,71 @@ fun ElectionSetupView(
         }
     }
 
-    // Tiers — separate section per requirements. Locked once any ballot has
-    // been cast: a tier name is part of the meaning of an existing ballot,
-    // so renaming it would silently invalidate votes. Empty list disables
-    // tier voting and reverts to plain candidate-only ranking.
+    // Tiers — separate section per requirements. Under the
+    // tier-as-annotation model a tier name is a label on each candidate's
+    // ranking; renaming is a cascading UPDATE so it's safe whether or not
+    // ballots exist. The textarea below replaces the whole list (adds,
+    // removes, reorders); the per-tier "Rename" button below uses the
+    // dedicated rename endpoint so ballots track the label change.
     Div({ classes("section") }) {
         H2 { Text("Tiers (optional)") }
 
-        if (ballotsExist) {
-            P {
-                Text(
-                    "Tier names are locked while ballots exist. " +
-                        "They can be edited again once all ballots have been removed."
-                )
+        // Per-tier inline rename — mirrors the candidate-rename pattern
+        // above. Fixed alphabetical-ish order? No — tiers are inherently
+        // ordered (top prestige first), so render them in declared order.
+        if (existingTiers.isNotEmpty()) {
+            Div({ classes("candidate-list") }) {
+                existingTiers.forEach { tierName ->
+                    Div({ classes("candidate-row") }) {
+                        if (renamingTier == tierName) {
+                            Input(InputType.Text) {
+                                classes("candidate-rename-input")
+                                value(renameTierText)
+                                onInput { renameTierText = it.value }
+                            }
+                            Button({
+                                if (renameTierAction.isLoading) attr("disabled", "")
+                                onClick { renameTierAction.invoke() }
+                            }) {
+                                Text(if (renameTierAction.isLoading) "Saving…" else "Save")
+                            }
+                            Button({
+                                if (renameTierAction.isLoading) attr("disabled", "")
+                                onClick {
+                                    renamingTier = null
+                                    renameTierText = ""
+                                }
+                            }) { Text("Cancel") }
+                        } else {
+                            Span({ classes("candidate-name") }) { Text(tierName) }
+                            Button({
+                                onClick {
+                                    renamingTier = tierName
+                                    renameTierText = tierName
+                                }
+                            }) { Text("Rename") }
+                        }
+                    }
+                }
             }
-        } else {
-            P {
-                Text(
-                    "Enter one tier per line, top tier first. " +
-                        "Leave blank for plain candidate-only ranking."
-                )
-            }
+        }
+
+        P {
+            Text(
+                "Enter one tier per line, top tier first. Leave blank for " +
+                    "plain candidate-only ranking. Removing a tier here clears " +
+                    "its annotation on every existing ballot ranking."
+            )
         }
 
         TextArea(tiersText) {
             classes("textarea")
             attr("rows", "4")
-            if (ballotsExist) attr("disabled", "")
             onInput { tiersText = it.value }
         }
 
         Button({
-            if (saveTiersAction.isLoading || ballotsExist) attr("disabled", "")
+            if (saveTiersAction.isLoading) attr("disabled", "")
             onClick { saveTiersAction.invoke() }
         }) {
             Text(if (saveTiersAction.isLoading) "Saving…" else "Save Tiers")

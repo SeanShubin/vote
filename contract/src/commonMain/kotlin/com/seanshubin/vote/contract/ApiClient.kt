@@ -105,12 +105,22 @@ interface ApiClient {
 
     /**
      * Set the ordered tier names for an election. Empty list disables tier
-     * support (ballots become candidate-only). Non-empty enables tier
-     * voting; rejected by the backend if the election already has ballots
-     * cast — tier names are part of the meaning of those ballots.
+     * support (ballots become candidate-only). Now safe at any time —
+     * the tier-as-annotation model means renames go through [renameTier]
+     * (cascading) and removed tiers leave each affected [Ranking.tier]
+     * as null (cleared no tier) without rewriting the ranking's rank.
      */
     suspend fun setTiers(electionName: String, tiers: List<String>)
     suspend fun listTiers(electionName: String): List<String>
+
+    /**
+     * Rename a single tier in place. Every [Ranking.tier] annotation on
+     * every cast ballot for the election is rewritten transparently; the
+     * voter's intent (which prestige tier each candidate cleared) is
+     * preserved. Use this instead of remove-then-add when an existing
+     * tier's display name needs to change without invalidating ballots.
+     */
+    suspend fun renameTier(electionName: String, oldName: String, newName: String)
     suspend fun castBallot(electionName: String, rankings: List<Ranking>): String
 
     /**

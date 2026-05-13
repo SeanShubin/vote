@@ -68,10 +68,13 @@ CREATE TABLE IF NOT EXISTS ballots (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Command Model Projection: Rankings (normalized)
+-- tier holds the highest-prestige tier each candidate cleared on this
+-- ballot, or NULL when below every tier marker.
 CREATE TABLE IF NOT EXISTS rankings (
     ballot_id BIGINT NOT NULL,
     candidate_name VARCHAR(255) NOT NULL,
     `rank` INT NOT NULL,
+    tier VARCHAR(255) NULL,
     PRIMARY KEY (ballot_id, candidate_name),
     FOREIGN KEY (ballot_id) REFERENCES ballots(ballot_id) ON DELETE CASCADE,
     INDEX idx_ballot_rank (ballot_id, `rank`)

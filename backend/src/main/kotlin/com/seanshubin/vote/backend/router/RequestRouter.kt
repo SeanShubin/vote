@@ -18,6 +18,7 @@ import com.seanshubin.vote.contract.PasswordResetRequest
 import com.seanshubin.vote.contract.PasswordResetRequestRequest
 import com.seanshubin.vote.contract.RegisterRequest
 import com.seanshubin.vote.contract.RenameCandidateRequest
+import com.seanshubin.vote.contract.RenameTierRequest
 import com.seanshubin.vote.contract.Service
 import com.seanshubin.vote.contract.SetCandidatesRequest
 import com.seanshubin.vote.contract.SetDescriptionRequest
@@ -126,6 +127,7 @@ class RequestRouter(
         Route("PUT", "/election/[^/]+/candidates", ::handleSetCandidates),
         Route("GET", "/election/[^/]+/candidates", ::handleListCandidates),
         Route("POST", "/election/[^/]+/candidate-rename", ::handleRenameCandidate),
+        Route("POST", "/election/[^/]+/tier-rename", ::handleRenameTier),
         Route("GET", "/election/[^/]+/candidate-ballot-counts", ::handleCandidateBallotCounts),
         Route("PUT", "/election/[^/]+/tiers", ::handleSetTiers),
         Route("GET", "/election/[^/]+/tiers", ::handleListTiers),
@@ -504,6 +506,14 @@ class RequestRouter(
         val setTiersRequest = json.decodeFromString<SetTiersRequest>(req.body)
         service.setTiers(accessToken, electionName, setTiersRequest.tierNames)
         return HttpResponse(200, json.encodeToString(mapOf("status" to "tiers updated")))
+    }
+
+    private fun handleRenameTier(req: HttpRequest): HttpResponse {
+        val accessToken = extractAccessToken(req)
+        val electionName = extractElectionName(req.target)
+        val request = json.decodeFromString<RenameTierRequest>(req.body)
+        service.renameTier(accessToken, electionName, request.oldName, request.newName)
+        return HttpResponse(200, json.encodeToString(mapOf("status" to "tier renamed")))
     }
 
     private fun handleSetDescription(req: HttpRequest): HttpResponse {

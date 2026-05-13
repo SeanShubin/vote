@@ -144,6 +144,8 @@ class EventLogHtmlGeneratorWithHttp(private val recorder: DocumentationRecorder)
                 "Tiers cleared for <strong>${event.electionName}</strong>"
             else
                 "Tiers set for <strong>${event.electionName}</strong>: ${event.tierNames.joinToString(", ")}"
+        is DomainEvent.TierRenamed ->
+            "Renamed tier <strong>${event.oldName}</strong> to <strong>${event.newName}</strong> in <strong>${event.electionName}</strong>"
         is DomainEvent.BallotCast -> {
             val rankings = event.rankings.sortedBy { it.rank }.take(3)
                 .joinToString(" > ") { "${it.candidateName}" }
@@ -221,6 +223,11 @@ class EventLogHtmlGeneratorWithHttp(private val recorder: DocumentationRecorder)
         is DomainEvent.TiersSet -> """
             <div class="detail-row"><span class="label">Election:</span> ${event.electionName}</div>
             <div class="detail-row"><span class="label">Tiers:</span> ${event.tierNames.joinToString(", ")}</div>
+        """.trimIndent()
+        is DomainEvent.TierRenamed -> """
+            <div class="detail-row"><span class="label">Election:</span> ${event.electionName}</div>
+            <div class="detail-row"><span class="label">Old Name:</span> ${event.oldName}</div>
+            <div class="detail-row"><span class="label">New Name:</span> ${event.newName}</div>
         """.trimIndent()
         is DomainEvent.BallotCast -> """
             <div class="detail-row"><span class="label">Voter:</span> ${event.voterName}</div>

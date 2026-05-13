@@ -208,13 +208,26 @@ fun ElectionDetailPage(
                             successMessage = "Tiers saved"
                             errorMessage = null
                             // Tier markers participate in strongest-path
-                            // calculations, so the tally needs the same
-                            // refresh treatment as candidates. (Tiers are
-                            // locked while ballots exist, so in practice
-                            // the tally will be empty here, but the refresh
-                            // keeps the invariant honest.)
+                            // calculations, so the tally needs a refresh.
+                            // The new model allows setTiers any time (the
+                            // no-ballots lock is gone), so the tally may
+                            // legitimately have non-empty rankings whose
+                            // tier annotations just got cleared by a remove.
                             lastLoadedShell = lastLoadedShell?.let { (e, c) ->
                                 e.copy(tiers = newTiers) to c
+                            }
+                            tallyFetch.reload()
+                        },
+                        onTierRenamed = { oldName, newName ->
+                            successMessage = "Renamed tier \"$oldName\" to \"$newName\""
+                            errorMessage = null
+                            // Patch the local tier list so the row re-renders
+                            // with the new label without a full shell refetch.
+                            // The rename cascaded across ballot rankings on
+                            // the server, so the tally rebuilds against the
+                            // new label too — reload to refresh.
+                            lastLoadedShell = lastLoadedShell?.let { (e, c) ->
+                                e.copy(tiers = e.tiers.map { if (it == oldName) newName else it }) to c
                             }
                             tallyFetch.reload()
                         },

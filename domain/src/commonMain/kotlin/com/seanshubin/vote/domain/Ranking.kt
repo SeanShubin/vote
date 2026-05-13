@@ -4,16 +4,29 @@ import kotlinx.serialization.Serializable
 import kotlin.math.min
 
 /**
- * One entry in a voter's ballot. [candidateName] holds either a real
- * candidate name or a tier marker name; [kind] disambiguates. The default
- * [RankingKind.CANDIDATE] keeps existing serialized events readable —
- * tier rankings are only produced when the election has tiers configured.
+ * One entry in a voter's ballot.
+ *
+ * **Storage form** (what voters cast and what the event log records):
+ * [candidateName] is always a real candidate, [kind] is always
+ * [RankingKind.CANDIDATE], and [tier] is the highest-prestige tier this
+ * candidate cleared (null = cleared none, sits below every tier marker).
+ * The voter never explicitly ranks tier markers — they pick a tier per
+ * candidate and the projection step materializes the markers.
+ *
+ * **Projected form** (what the Schulze pipeline consumes): the same
+ * candidate rankings plus synthetic [kind] = [RankingKind.TIER] entries
+ * inserted at the right cut points by [projectBallot]. The tier annotation
+ * on candidate rankings is what tells the projection where each marker goes.
+ *
+ * [tier] and [kind] both default to "plain candidate, no tier" so existing
+ * serialized events without these fields still deserialize.
  */
 @Serializable
 data class Ranking(
     val candidateName: String,
     val rank: Int?,
     val kind: RankingKind = RankingKind.CANDIDATE,
+    val tier: String? = null,
 ) {
     companion object {
         /**

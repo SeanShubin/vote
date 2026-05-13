@@ -1,6 +1,7 @@
 package com.seanshubin.vote.backend.validation
 
 import com.seanshubin.vote.domain.Ranking
+import com.seanshubin.vote.domain.RankingKind
 
 object Validation {
     private val whitespacePattern = Regex("\\s+")
@@ -95,17 +96,47 @@ object Validation {
             ranking.rank?.let { rank ->
                 require(rank > 0) { "Rank must be positive, was $rank for candidate: $validCandidateName" }
             }
-            Ranking(validCandidateName, ranking.rank, ranking.kind)
+            // Validation rule for the post-projection storage form:
+            // voters cast candidate rankings only. Tier markers are
+            // materialized by the projection at compute time, so an
+            // incoming tier-kind ranking would mean the caller skipped
+            // serialization rules — reject loudly rather than store it
+            // and trip the projection's guard at tally time.
+            require(ranking.kind == RankingKind.CANDIDATE) {
+                "Ranking must be CANDIDATE-kind; tier markers are produced by projection, not cast: $validCandidateName"
+            }
+            // rank=null means "I abstain on this candidate." That voter
+            // hasn't expressed a tier judgment about them either, so a
+            // tier annotation on a null-rank ranking is incoherent.
+            if (ranking.rank == null) {
+                require(ranking.tier == null) {
+                    "Ranking with rank=null cannot carry a tier annotation: $validCandidateName"
+                }
+            }
+            val validTier = ranking.tier?.let { validateTierName(it) }
+            Ranking(validCandidateName, ranking.rank, ranking.kind, validTier)
         }
     }
 
-    fun validateRankingsMatchCandidates(rankings: List<Ranking>, candidates: List<String>) {
+    fun validateRankingsMatchCandidates(
+        rankings: List<Ranking>,
+        candidates: List<String>,
+        tiers: List<String>,
+    ) {
         val rankedCandidates = rankings.map { it.candidateName }.toSet()
-        val validCandidates = candidates.toSet()
-
-        val unknownCandidates = rankedCandidates - validCandidates
+        val unknownCandidates = rankedCandidates - candidates.toSet()
         require(unknownCandidates.isEmpty()) {
             "Rankings contain unknown candidates: ${unknownCandidates.joinToString()}"
+        }
+        // Each per-ranking tier annotation must reference a tier configured
+        // on the election. The voter's UI picks from the election's tier
+        // list, so a mismatched annotation here means the ballot was built
+        // against a stale view of the election (or hand-crafted) — reject
+        // it so a stray label can't sneak into the projected ballot.
+        val annotatedTiers = rankings.mapNotNull { it.tier }.toSet()
+        val unknownTiers = annotatedTiers - tiers.toSet()
+        require(unknownTiers.isEmpty()) {
+            "Rankings reference unknown tiers: ${unknownTiers.joinToString()}"
         }
     }
 
