@@ -24,6 +24,7 @@ interface CommandModel {
     fun deleteElection(authority: String, electionName: String)
     fun addCandidates(authority: String, electionName: String, candidateNames: List<String>)
     fun removeCandidates(authority: String, electionName: String, candidateNames: List<String>)
+    fun renameCandidate(authority: String, electionName: String, oldName: String, newName: String)
     fun setTiers(authority: String, electionName: String, tierNames: List<String>)
 
     fun castBallot(

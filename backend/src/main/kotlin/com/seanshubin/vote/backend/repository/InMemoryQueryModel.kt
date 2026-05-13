@@ -72,6 +72,25 @@ class InMemoryQueryModel(private val data: InMemoryData) : QueryModel {
         return data.candidates[electionName]?.toList() ?: emptyList()
     }
 
+    override fun candidateBallotCounts(electionName: String): Map<String, Int> {
+        val candidateSet = data.candidates[electionName] ?: return emptyMap()
+        // Start every candidate at zero so the map's key set always matches
+        // the candidate list — callers (the editor UI) want a count for each
+        // candidate, even ones with no ballots.
+        val counts = candidateSet.associateWith { 0 }.toMutableMap()
+        data.ballots.values
+            .filter { it.electionName == electionName }
+            .forEach { ballot ->
+                ballot.rankings
+                    .map { it.candidateName }
+                    .toSet()
+                    .forEach { name ->
+                        if (name in counts) counts[name] = counts.getValue(name) + 1
+                    }
+            }
+        return counts
+    }
+
     override fun listTiers(electionName: String): List<String> {
         return data.tiers[electionName] ?: emptyList()
     }

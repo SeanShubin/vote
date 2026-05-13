@@ -165,6 +165,17 @@ class HttpApiClient(
     override suspend fun listCandidates(electionName: String): List<String> =
         getWithAuth("/election/${encodeURIComponent(electionName)}/candidates")
 
+    override suspend fun renameCandidate(electionName: String, oldName: String, newName: String) {
+        val request = RenameCandidateRequest(oldName, newName)
+        postWithAuth<RenameCandidateRequest, Unit>(
+            "/election/${encodeURIComponent(electionName)}/candidate-rename",
+            request,
+        )
+    }
+
+    override suspend fun candidateBallotCounts(electionName: String): Map<String, Int> =
+        getWithAuth("/election/${encodeURIComponent(electionName)}/candidate-ballot-counts")
+
     override suspend fun setTiers(electionName: String, tiers: List<String>) {
         val request = SetTiersRequest(tiers)
         putWithAuth<SetTiersRequest, Unit>(

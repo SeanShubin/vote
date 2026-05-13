@@ -121,6 +121,20 @@ sealed interface DomainEvent {
     ) : DomainEvent
 
     /**
+     * Rename a candidate in place. The new name takes over wherever the old
+     * name appeared — the candidate row itself plus every ranking in every
+     * cast ballot for this election. Ballots' [Ranking.rank] values are
+     * preserved; only the [Ranking.candidateName] is rewritten.
+     */
+    @Serializable
+    @SerialName("CandidateRenamed")
+    data class CandidateRenamed(
+        val electionName: String,
+        val oldName: String,
+        val newName: String,
+    ) : DomainEvent
+
+    /**
      * Tier list management. Tier names are the thresholds candidates can
      * clear — they appear as virtual candidates on every ballot. Tier
      * names are atomic: a single event replaces the entire ordered list.

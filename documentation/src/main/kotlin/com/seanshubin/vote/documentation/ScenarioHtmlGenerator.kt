@@ -100,6 +100,9 @@ class ScenarioHtmlGenerator(private val eventLog: EventLog) {
         is DomainEvent.CandidatesRemoved ->
             "Removed candidates: ${event.candidateNames.joinToString(", ") { "<strong>$it</strong>" }}"
 
+        is DomainEvent.CandidateRenamed ->
+            "Renamed candidate <strong>${event.oldName}</strong> to <strong>${event.newName}</strong>"
+
         is DomainEvent.TiersSet ->
             if (event.tierNames.isEmpty())
                 "Tiers cleared"

@@ -162,6 +162,29 @@ class MySqlCommandModel(
         }
     }
 
+    override fun renameCandidate(authority: String, electionName: String, oldName: String, newName: String) {
+        // Rewrite ranking rows first, then the candidate row. Order matters
+        // because rankings.candidate_name has no FK to candidates — if the
+        // candidate row moved first, a concurrent reader could see ranking
+        // rows referencing a candidate that no longer exists. Doing it in
+        // this order means a reader sees either the old name everywhere or
+        // the new name everywhere; never half-applied.
+        val rankingSql = queryLoader.load("ranking-rename-candidate")
+        connection.prepareStatement(rankingSql).use { stmt ->
+            stmt.setString(1, newName)
+            stmt.setString(2, electionName)
+            stmt.setString(3, oldName)
+            stmt.executeUpdate()
+        }
+        val candidateSql = queryLoader.load("candidate-rename")
+        connection.prepareStatement(candidateSql).use { stmt ->
+            stmt.setString(1, newName)
+            stmt.setString(2, electionName)
+            stmt.setString(3, oldName)
+            stmt.executeUpdate()
+        }
+    }
+
     override fun castBallot(
         authority: String,
         voterName: String,

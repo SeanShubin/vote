@@ -18,6 +18,15 @@ interface QueryModel {
     fun lastSynced(): Long?
     fun searchElectionByName(name: String): ElectionSummary?
     fun listCandidates(electionName: String): List<String>
+
+    /**
+     * For each candidate in the election, how many ballots mention that
+     * candidate (with any rank, including null). Used by the candidate
+     * editor to warn the owner about the blast radius of a rename — a
+     * rename of a 0-ballot candidate is "free", a 47-ballot rename is
+     * disruptive.
+     */
+    fun candidateBallotCounts(electionName: String): Map<String, Int>
     fun listTiers(electionName: String): List<String>
     fun listRankings(voterName: String, electionName: String): List<Ranking>
     fun listRankings(electionName: String): List<VoterElectionCandidateRank>

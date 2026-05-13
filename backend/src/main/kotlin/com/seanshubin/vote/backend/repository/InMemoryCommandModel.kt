@@ -95,6 +95,22 @@ class InMemoryCommandModel(private val data: InMemoryData) : CommandModel {
             }
     }
 
+    override fun renameCandidate(authority: String, electionName: String, oldName: String, newName: String) {
+        val candidates = data.candidates[electionName] ?: return
+        if (!candidates.remove(oldName)) return
+        candidates.add(newName)
+        data.ballots.entries
+            .filter { (_, ballot) -> ballot.electionName == electionName }
+            .forEach { (key, ballot) ->
+                val rewritten = ballot.rankings.map { ranking ->
+                    if (ranking.candidateName == oldName) ranking.copy(candidateName = newName) else ranking
+                }
+                if (rewritten != ballot.rankings) {
+                    data.ballots[key] = ballot.copy(rankings = rewritten)
+                }
+            }
+    }
+
     override fun castBallot(
         authority: String,
         voterName: String,

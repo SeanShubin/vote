@@ -88,6 +88,22 @@ interface ApiClient {
     suspend fun listCandidates(electionName: String): List<String>
 
     /**
+     * Rename a single candidate. Every ranking in every cast ballot for the
+     * election is rewritten transparently; ranks are preserved. Use this
+     * instead of remove-then-add when an existing candidate's display
+     * name needs to change without invalidating existing ballots.
+     */
+    suspend fun renameCandidate(electionName: String, oldName: String, newName: String)
+
+    /**
+     * Map of candidate name → number of ballots that reference that
+     * candidate. Every current candidate appears as a key (zero for
+     * those with no ballots), so the editor can render a row per
+     * candidate with its blast-radius count.
+     */
+    suspend fun candidateBallotCounts(electionName: String): Map<String, Int>
+
+    /**
      * Set the ordered tier names for an election. Empty list disables tier
      * support (ballots become candidate-only). Non-empty enables tier
      * voting; rejected by the backend if the election already has ballots
