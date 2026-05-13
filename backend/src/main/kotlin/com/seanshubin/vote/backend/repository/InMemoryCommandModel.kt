@@ -58,6 +58,11 @@ class InMemoryCommandModel(private val data: InMemoryData) : CommandModel {
         data.elections[electionName] = election.copy(description = description)
     }
 
+    override fun setElectionOwner(authority: String, electionName: String, newOwnerName: String) {
+        val election = data.elections[electionName] ?: error("Election not found: $electionName")
+        data.elections[electionName] = election.copy(ownerName = newOwnerName)
+    }
+
     override fun deleteElection(authority: String, electionName: String) {
         data.elections.remove(electionName)
         data.candidates.remove(electionName)

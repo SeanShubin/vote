@@ -168,6 +168,7 @@ fun ElectionDetailPage(
                         existingCandidates = candidates,
                         existingTiers = loadedElection?.tiers ?: emptyList(),
                         ballotsExist = (loadedElection?.ballotCount ?: 0) > 0,
+                        currentOwnerName = loadedElection?.ownerName ?: "",
                         onDescriptionSaved = { newDescription ->
                             successMessage = "Description saved"
                             errorMessage = null
@@ -205,6 +206,22 @@ fun ElectionDetailPage(
                                 e.copy(tiers = newTiers) to c
                             }
                             tallyFetch.reload()
+                        },
+                        onOwnerTransferred = { newOwnerName ->
+                            successMessage = "Ownership transferred to $newOwnerName"
+                            errorMessage = null
+                            // Patch the header so the new owner is reflected
+                            // immediately. The canSetup gate above is derived
+                            // from this and may flip false next render — if
+                            // the transferrer no longer matches and isn't
+                            // ADMIN+, the Setup tab disappears and the
+                            // LaunchedEffect bounces them to "vote".
+                            lastLoadedShell = lastLoadedShell?.let { (e, c) ->
+                                e.copy(ownerName = newOwnerName) to c
+                            }
+                            // The Elections list still shows the old owner —
+                            // invalidate so a navigation back picks up fresh.
+                            PageCache.invalidate("elections")
                         },
                         onError = { errorMessage = it },
                     )

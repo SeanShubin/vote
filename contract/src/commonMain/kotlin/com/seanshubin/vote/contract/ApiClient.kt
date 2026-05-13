@@ -117,11 +117,27 @@ interface ApiClient {
     suspend fun deleteElection(electionName: String)
 
     /**
+     * Hand the election off to another user. Allowed for the current election
+     * owner or ADMIN+ (same gate as [deleteElection]). The new owner gains
+     * edit/delete authority on this election; nothing else about either user
+     * changes (this is not the global OWNER-role handoff).
+     */
+    suspend fun transferElectionOwnership(electionName: String, newOwnerName: String)
+
+    /**
      * Admin: list all users with each one's current role and the roles the
      * caller is allowed to assign. The backend computes [UserNameRole.allowedRoles]
      * from the caller's authority — the UI can bind dropdowns directly to it.
      */
     suspend fun listUsers(): List<UserNameRole>
+
+    /**
+     * Lightweight name-only listing of every registered user, available to
+     * any authenticated caller (USE_APPLICATION). Backs UI affordances like
+     * the transfer-ownership picker that need a real list to pick from but
+     * shouldn't see roles or the rest of [listUsers]'s admin payload.
+     */
+    suspend fun listUserNames(): List<String>
 
     /**
      * Admin: change a user's role. Promoting another user to OWNER triggers

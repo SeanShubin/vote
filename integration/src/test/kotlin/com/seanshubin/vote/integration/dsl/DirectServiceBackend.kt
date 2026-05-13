@@ -49,6 +49,10 @@ class DirectServiceBackend(private val service: Service) : ScenarioBackend {
         service.deleteElection(token, electionName)
     }
 
+    override fun transferElectionOwnership(token: AccessToken, electionName: String, newOwnerName: String) {
+        service.transferElectionOwnership(token, electionName, newOwnerName)
+    }
+
     override fun castBallot(token: AccessToken, voterName: String, electionName: String, rankings: List<Ranking>): String {
         return service.castBallot(token, voterName, electionName, rankings)
     }

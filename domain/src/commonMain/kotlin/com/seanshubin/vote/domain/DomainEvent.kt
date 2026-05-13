@@ -92,6 +92,19 @@ sealed interface DomainEvent {
     ) : DomainEvent
 
     /**
+     * Election ownership handoff. Distinct from [OwnershipTransferred], which
+     * moves the global OWNER role between users — this just changes who owns
+     * a single election. The new owner gains the same election-edit/delete
+     * authority the previous owner had; nothing else about either user changes.
+     */
+    @Serializable
+    @SerialName("ElectionOwnerChanged")
+    data class ElectionOwnerChanged(
+        val electionName: String,
+        val newOwnerName: String,
+    ) : DomainEvent
+
+    /**
      * Description edits after creation. The owner can change the description
      * freely — unlike tier names, it isn't part of the meaning of any cast
      * ballot, so there's no "no ballots exist" lock here.

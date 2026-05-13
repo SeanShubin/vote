@@ -28,6 +28,7 @@ class FakeApiClient : ApiClient {
     val deleteMyBallotCalls = mutableListOf<String>()
     val getTallyCalls = mutableListOf<String>()
     val deleteElectionCalls = mutableListOf<String>()
+    val transferElectionOwnershipCalls = mutableListOf<TransferElectionOwnershipCall>()
     val removeUserCalls = mutableListOf<String>()
     val loggedErrors = mutableListOf<Throwable>()
 
@@ -62,6 +63,7 @@ class FakeApiClient : ApiClient {
     val myRankingsCalls = mutableListOf<String>()
     var getTallyResult: Result<ElectionTally> = Result.failure(Exception("Get tally not configured"))
     var deleteElectionResult: Result<Unit> = Result.success(Unit)
+    var transferElectionOwnershipResult: Result<Unit> = Result.success(Unit)
     var removeUserResult: Result<Unit> = Result.success(Unit)
     var listTablesResult: Result<List<String>> = Result.success(emptyList())
     var tableDataResult: Result<TableData> = Result.success(TableData("", emptyList(), emptyList()))
@@ -72,9 +74,11 @@ class FakeApiClient : ApiClient {
     val listDebugTablesCalls = mutableListOf<Unit>()
     val debugTableDataCalls = mutableListOf<String>()
     var listUsersResult: Result<List<UserNameRole>> = Result.success(emptyList())
+    var listUserNamesResult: Result<List<String>> = Result.success(emptyList())
     var setRoleResult: Result<Unit> = Result.success(Unit)
     var userActivityResult: Result<UserActivity> = Result.failure(Exception("getUserActivity not configured"))
     val listUsersCalls = mutableListOf<Unit>()
+    val listUserNamesCalls = mutableListOf<Unit>()
     val setRoleCalls = mutableListOf<SetRoleCall>()
     val userActivityCalls = mutableListOf<Unit>()
 
@@ -194,6 +198,11 @@ class FakeApiClient : ApiClient {
         deleteElectionResult.getOrThrow()
     }
 
+    override suspend fun transferElectionOwnership(electionName: String, newOwnerName: String) {
+        transferElectionOwnershipCalls.add(TransferElectionOwnershipCall(electionName, newOwnerName))
+        transferElectionOwnershipResult.getOrThrow()
+    }
+
     override suspend fun removeUser(userName: String) {
         removeUserCalls.add(userName)
         removeUserResult.getOrThrow()
@@ -224,6 +233,11 @@ class FakeApiClient : ApiClient {
         return listUsersResult.getOrThrow()
     }
 
+    override suspend fun listUserNames(): List<String> {
+        listUserNamesCalls.add(Unit)
+        return listUserNamesResult.getOrThrow()
+    }
+
     override suspend fun getUserActivity(): UserActivity {
         userActivityCalls.add(Unit)
         return userActivityResult.getOrThrow()
@@ -252,4 +266,5 @@ class FakeApiClient : ApiClient {
     data class ChangeMyPasswordCall(val oldPassword: String, val newPassword: String)
     data class AdminSetPasswordCall(val userName: String, val newPassword: String)
     data class SetRoleCall(val userName: String, val role: Role)
+    data class TransferElectionOwnershipCall(val electionName: String, val newOwnerName: String)
 }

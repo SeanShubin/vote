@@ -94,6 +94,9 @@ class ScenarioHtmlGenerator(private val eventLog: EventLog) {
         is DomainEvent.ElectionDescriptionChanged ->
             "Description updated"
 
+        is DomainEvent.ElectionOwnerChanged ->
+            "Owner changed to <strong>${event.newOwnerName}</strong>"
+
         is DomainEvent.CandidatesAdded ->
             "Added candidates: ${event.candidateNames.joinToString(", ") { "<strong>$it</strong>" }}"
 

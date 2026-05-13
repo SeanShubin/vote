@@ -296,6 +296,22 @@ class DynamoDbSingleTableCommandModel(
         }
     }
 
+    override fun setElectionOwner(authority: String, electionName: String, newOwnerName: String) {
+        runBlocking {
+            dynamoDb.updateItem(UpdateItemRequest {
+                tableName = DynamoDbSingleTableSchema.MAIN_TABLE
+                key = mapOf(
+                    "PK" to AttributeValue.S(DynamoDbSingleTableSchema.electionPK(electionName)),
+                    "SK" to AttributeValue.S(DynamoDbSingleTableSchema.METADATA_SK),
+                )
+                updateExpression = "SET owner_name = :owner"
+                expressionAttributeValues = mapOf(
+                    ":owner" to AttributeValue.S(newOwnerName),
+                )
+            })
+        }
+    }
+
     override fun deleteElection(authority: String, electionName: String) {
         runBlocking {
             // Delete election metadata

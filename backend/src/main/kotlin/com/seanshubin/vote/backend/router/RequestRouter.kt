@@ -23,6 +23,7 @@ import com.seanshubin.vote.contract.SetDescriptionRequest
 import com.seanshubin.vote.contract.SetRoleRequest
 import com.seanshubin.vote.contract.SetTiersRequest
 import com.seanshubin.vote.contract.Tokens
+import com.seanshubin.vote.contract.TransferElectionOwnershipRequest
 import com.seanshubin.vote.domain.Role
 import com.seanshubin.vote.domain.UserUpdates
 import kotlinx.serialization.encodeToString
@@ -100,6 +101,7 @@ class RequestRouter(
         Route("PUT", "/admin/user/[^/]+/password", ::handleAdminSetPassword),
         Route("GET", "/me/activity", ::handleGetUserActivity),
         Route("GET", "/users", ::handleListUsers),
+        Route("GET", "/users/names", ::handleListUserNames),
         Route("GET", "/users/count", ::handleUserCount),
         Route("GET", "/user/[^/]+", ::handleGetUser),
         Route("PUT", "/user/[^/]+", ::handleUpdateUser),
@@ -118,6 +120,7 @@ class RequestRouter(
         Route("GET", "/elections/count", ::handleElectionCount),
         Route("GET", "/election/[^/]+", ::handleGetElection),
         Route("DELETE", "/election/[^/]+", ::handleDeleteElection),
+        Route("PUT", "/election/[^/]+/owner", ::handleTransferElectionOwnership),
         Route("PUT", "/election/[^/]+/description", ::handleSetDescription),
         Route("PUT", "/election/[^/]+/candidates", ::handleSetCandidates),
         Route("GET", "/election/[^/]+/candidates", ::handleListCandidates),
@@ -311,6 +314,12 @@ class RequestRouter(
         return HttpResponse(200, json.encodeToString(users))
     }
 
+    private fun handleListUserNames(req: HttpRequest): HttpResponse {
+        val accessToken = extractAccessToken(req)
+        val names = service.listUserNames(accessToken)
+        return HttpResponse(200, json.encodeToString(names))
+    }
+
     private fun handleGetUserActivity(req: HttpRequest): HttpResponse {
         val accessToken = extractAccessToken(req)
         val activity = service.getUserActivity(accessToken)
@@ -446,6 +455,14 @@ class RequestRouter(
         val electionName = extractElectionName(req.target)
         service.deleteElection(accessToken, electionName)
         return HttpResponse(200, json.encodeToString(mapOf("status" to "election deleted")))
+    }
+
+    private fun handleTransferElectionOwnership(req: HttpRequest): HttpResponse {
+        val accessToken = extractAccessToken(req)
+        val electionName = extractElectionName(req.target)
+        val transferRequest = json.decodeFromString<TransferElectionOwnershipRequest>(req.body)
+        service.transferElectionOwnership(accessToken, electionName, transferRequest.newOwnerName)
+        return HttpResponse(200, json.encodeToString(mapOf("status" to "ownership transferred")))
     }
 
     private fun handleSetCandidates(req: HttpRequest): HttpResponse {

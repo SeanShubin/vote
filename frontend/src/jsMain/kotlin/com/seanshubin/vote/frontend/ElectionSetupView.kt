@@ -14,9 +14,11 @@ fun ElectionSetupView(
     existingCandidates: List<String>,
     existingTiers: List<String>,
     ballotsExist: Boolean,
+    currentOwnerName: String,
     onDescriptionSaved: (String) -> Unit,
     onCandidatesSaved: (List<String>) -> Unit,
     onTiersSaved: (List<String>) -> Unit,
+    onOwnerTransferred: (String) -> Unit,
     onError: (String) -> Unit,
 ) {
     var descriptionText by remember(existingDescription) {
@@ -27,6 +29,16 @@ fun ElectionSetupView(
     }
     var tiersText by remember(existingTiers) {
         mutableStateOf(existingTiers.joinToString("\n"))
+    }
+    var transferFilter by remember(currentOwnerName) { mutableStateOf("") }
+    var transferTarget by remember(currentOwnerName) { mutableStateOf<String?>(null) }
+
+    val userNamesFetch = rememberFetchState(
+        apiClient = apiClient,
+        key = currentOwnerName,
+        fallbackErrorMessage = "Failed to load user list",
+    ) {
+        apiClient.listUserNames()
     }
 
     fun parseCandidates(): List<String> =
@@ -65,6 +77,19 @@ fun ElectionSetupView(
             val newTiers = parseTiers()
             apiClient.setTiers(electionName, newTiers)
             onTiersSaved(newTiers)
+        },
+    )
+
+    val transferOwnerAction = rememberAsyncAction(
+        apiClient = apiClient,
+        fallbackErrorMessage = "Failed to transfer ownership",
+        onError = onError,
+        action = {
+            val target = transferTarget ?: return@rememberAsyncAction
+            apiClient.transferElectionOwnership(electionName, target)
+            onOwnerTransferred(target)
+            transferTarget = null
+            transferFilter = ""
         },
     )
 
@@ -165,4 +190,95 @@ fun ElectionSetupView(
             Text(if (saveTiersAction.isLoading) "Saving…" else "Save Tiers")
         }
     }
+
+    // Hand the election off to another user. After a successful transfer the
+    // current viewer loses owner-only authority on this election, so the
+    // backend's owner-or-ADMIN gate will start rejecting further edits unless
+    // the viewer has ADMIN+. The page reloads the shell after the callback
+    // fires, which will hide the Setup tab on the next render for a plain
+    // user who just transferred away their last claim to it.
+    //
+    // The picker (filter input + clickable list) replaces free-text entry so
+    // the user can only pick a real registered user — backend still validates
+    // existence, but the UI rules out typos before submission. Matching is by
+    // subsequence (each filter character must appear in order somewhere in
+    // the candidate's name), case-insensitive, so "abi" matches "Sean Shubin".
+    Div({ classes("section") }) {
+        H2 { Text("Transfer Ownership") }
+
+        P {
+            Text(
+                "Current owner: $currentOwnerName. " +
+                    "Type to filter, then click a user to transfer to them."
+            )
+        }
+
+        Input(InputType.Text) {
+            classes("input")
+            value(transferFilter)
+            placeholder("filter users")
+            onInput {
+                transferFilter = it.value
+                transferTarget = null
+            }
+        }
+
+        when (val namesState = userNamesFetch.state) {
+            FetchState.Loading -> P { Text("Loading users…") }
+            is FetchState.Error -> Div({ classes("error") }) { Text(namesState.message) }
+            is FetchState.Success -> {
+                val matches = namesState.value
+                    .filter { !it.equals(currentOwnerName, ignoreCase = true) }
+                    .filter { matchesSubsequence(it, transferFilter) }
+                if (matches.isEmpty()) {
+                    P { Text("No matching users.") }
+                } else {
+                    Div({ classes("transfer-owner-list") }) {
+                        matches.forEach { candidate ->
+                            val isPending = transferOwnerAction.isLoading &&
+                                transferTarget == candidate
+                            Button({
+                                classes("transfer-owner-item")
+                                if (transferOwnerAction.isLoading) attr("disabled", "")
+                                onClick {
+                                    val confirmed = window.confirm(
+                                        "Transfer ownership of \"$electionName\" to " +
+                                            "\"$candidate\"? You will no longer be able to " +
+                                            "edit or delete this election (unless you are an ADMIN)."
+                                    )
+                                    if (confirmed) {
+                                        transferTarget = candidate
+                                        transferOwnerAction.invoke()
+                                    }
+                                }
+                            }) {
+                                Text(if (isPending) "Transferring to $candidate…" else candidate)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Subsequence (not substring) match, case-insensitive: every character of
+ * [query] must appear in [target] in order, but not necessarily contiguously.
+ * "abi" matches "Sean Shubin" — a, b, i appear in that order. Empty query
+ * matches everything. Used by the transfer-ownership picker to narrow a
+ * potentially long user list with very little typing.
+ */
+internal fun matchesSubsequence(target: String, query: String): Boolean {
+    if (query.isEmpty()) return true
+    val haystack = target.lowercase()
+    val needle = query.lowercase()
+    var ni = 0
+    for (c in haystack) {
+        if (c == needle[ni]) {
+            ni++
+            if (ni == needle.length) return true
+        }
+    }
+    return false
 }

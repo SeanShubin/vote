@@ -244,6 +244,54 @@ button:disabled {
 }
 
 /*
+ * Transfer-ownership picker: one bordered container framing a vertical list
+ * of plain-text user rows. Per-row borders/backgrounds are intentionally
+ * stripped — the frame says "menu," hover + pointer cursor say "clickable."
+ * Hairline dividers between rows keep names from running together without
+ * adding visual weight. Height-capped + scrollable so a long roster doesn't
+ * push the rest of the Setup tab off-screen.
+ */
+.transfer-owner-list {
+    display: flex;
+    flex-direction: column;
+    margin-top: 0.5rem;
+    max-height: 18rem;
+    overflow-y: auto;
+    border: 1px solid #c4d2e1;
+    border-radius: 4px;
+    background: white;
+}
+
+.transfer-owner-item {
+    text-align: left;
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid #eef2f7;
+    padding: 0.5rem 0.75rem;
+    color: #1f3956;
+    cursor: pointer;
+    font: inherit;
+}
+
+.transfer-owner-item:last-child {
+    border-bottom: none;
+}
+
+.transfer-owner-item:hover:not([disabled]) {
+    background: #ecf2fb;
+}
+
+.transfer-owner-item:focus-visible {
+    outline: 2px solid #2c7be5;
+    outline-offset: -2px;
+}
+
+.transfer-owner-item:disabled {
+    opacity: 0.6;
+    cursor: default;
+}
+
+/*
  * Election description — owner-supplied prose shown above the tabs.
  * `pre-line` preserves the newlines the owner typed in the textarea while
  * still collapsing incidental runs of whitespace and wrapping long lines

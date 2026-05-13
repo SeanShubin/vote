@@ -211,6 +211,11 @@ class ServiceImpl(
         synchronize()
     }
 
+    override fun listUserNames(accessToken: AccessToken): List<String> {
+        requirePermission(accessToken, Permission.USE_APPLICATION)
+        return queryModel.listUsers().map { it.name }.sortedBy { it.lowercase() }
+    }
+
     override fun listUsers(accessToken: AccessToken): List<UserNameRole> {
         requirePermission(accessToken, Permission.MANAGE_USERS)
         val callerPermissions = UserRolePermissions(
@@ -358,6 +363,51 @@ class ServiceImpl(
             accessToken.userName,
             clock.now(),
             DomainEvent.ElectionDeleted(electionName)
+        )
+        synchronize()
+    }
+
+    override fun transferElectionOwnership(
+        accessToken: AccessToken,
+        electionName: String,
+        newOwnerName: String,
+    ) {
+        // Same gate as deleteElection: the current owner can hand off their
+        // own election; ADMIN+ moderators can hand off any.
+        val election = queryModel.searchElectionByName(electionName)
+            ?: throw ServiceException(
+                ServiceException.Category.NOT_FOUND,
+                "Election '$electionName' not found"
+            )
+        val isOwnerOfElection = election.ownerName.equals(accessToken.userName, ignoreCase = true)
+        val canModerate = hasPermission(accessToken, Permission.MANAGE_USERS)
+        if (!isOwnerOfElection && !canModerate) {
+            throw ServiceException(
+                ServiceException.Category.UNAUTHORIZED,
+                "Only the election owner or an ADMIN can transfer '$electionName'"
+            )
+        }
+
+        val validNewOwnerName = Validation.validateUserName(newOwnerName)
+        // Resolve to the canonical stored case so the projection records the
+        // owner exactly as the user is registered, mirroring addElection.
+        val newOwner = queryModel.searchUserByName(validNewOwnerName)
+            ?: throw ServiceException(
+                ServiceException.Category.NOT_FOUND,
+                "User not found: $validNewOwnerName"
+            )
+
+        // No-op handoff: the requested new owner already owns this election.
+        // Skipping the event keeps the audit log honest — only real changes
+        // get a row.
+        if (election.ownerName.equals(newOwner.name, ignoreCase = true)) {
+            return
+        }
+
+        eventLog.appendEvent(
+            accessToken.userName,
+            clock.now(),
+            DomainEvent.ElectionOwnerChanged(election.electionName, newOwner.name),
         )
         synchronize()
     }

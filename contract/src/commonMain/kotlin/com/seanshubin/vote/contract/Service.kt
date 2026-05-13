@@ -13,12 +13,14 @@ interface Service {
     fun setRole(accessToken: AccessToken, userName: String, role: Role)
     fun removeUser(accessToken: AccessToken, userName: String)
     fun listUsers(accessToken: AccessToken): List<UserNameRole>
+    fun listUserNames(accessToken: AccessToken): List<String>
     fun addElection(accessToken: AccessToken, userName: String, electionName: String, description: String)
     fun setElectionDescription(accessToken: AccessToken, electionName: String, description: String)
     fun updateUser(accessToken: AccessToken, userName: String, userUpdates: UserUpdates)
     fun getUser(accessToken: AccessToken, userName: String): UserNameEmail
     fun getElection(accessToken: AccessToken, electionName: String): ElectionDetail
     fun deleteElection(accessToken: AccessToken, electionName: String)
+    fun transferElectionOwnership(accessToken: AccessToken, electionName: String, newOwnerName: String)
     fun listElections(accessToken: AccessToken): List<ElectionSummary>
     fun listTables(accessToken: AccessToken): List<String>
     fun listDebugTables(accessToken: AccessToken): List<String>

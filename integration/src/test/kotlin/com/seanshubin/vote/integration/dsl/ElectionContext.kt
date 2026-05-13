@@ -24,6 +24,11 @@ class ElectionContext(
         testContext.backend.synchronize()
     }
 
+    fun transferOwnership(newOwnerName: String) {
+        testContext.backend.transferElectionOwnership(owner.accessToken, name, newOwnerName)
+        testContext.backend.synchronize()
+    }
+
     val candidates: List<String>
         get() = testContext.database.listCandidates(name)
 

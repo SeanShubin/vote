@@ -203,12 +203,23 @@ class HttpApiClient(
         deleteWithAuth("/election/${encodeURIComponent(electionName)}")
     }
 
+    override suspend fun transferElectionOwnership(electionName: String, newOwnerName: String) {
+        val request = TransferElectionOwnershipRequest(newOwnerName)
+        putWithAuth<TransferElectionOwnershipRequest, Unit>(
+            "/election/${encodeURIComponent(electionName)}/owner",
+            request,
+        )
+    }
+
     override suspend fun removeUser(userName: String) {
         deleteWithAuth("/user/${encodeURIComponent(userName)}")
     }
 
     override suspend fun listUsers(): List<UserNameRole> =
         getWithAuth("/users")
+
+    override suspend fun listUserNames(): List<String> =
+        getWithAuth("/users/names")
 
     override suspend fun getUserActivity(): UserActivity =
         getWithAuth("/me/activity")

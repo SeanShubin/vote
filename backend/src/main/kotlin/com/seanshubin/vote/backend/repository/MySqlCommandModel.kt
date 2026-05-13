@@ -90,6 +90,15 @@ class MySqlCommandModel(
         }
     }
 
+    override fun setElectionOwner(authority: String, electionName: String, newOwnerName: String) {
+        val sql = queryLoader.load("election-update-owner")
+        connection.prepareStatement(sql).use { stmt ->
+            stmt.setString(1, newOwnerName)
+            stmt.setString(2, electionName)
+            stmt.executeUpdate()
+        }
+    }
+
     override fun deleteElection(authority: String, electionName: String) {
         val sql = queryLoader.load("election-delete")
         connection.prepareStatement(sql).use { stmt ->

@@ -62,6 +62,9 @@ class EventApplier(
             is DomainEvent.ElectionDescriptionChanged -> {
                 commandModel.setElectionDescription(authority, event.electionName, event.newDescription)
             }
+            is DomainEvent.ElectionOwnerChanged -> {
+                commandModel.setElectionOwner(authority, event.electionName, event.newOwnerName)
+            }
             is DomainEvent.CandidatesAdded -> {
                 commandModel.addCandidates(authority, event.electionName, event.candidateNames)
             }
