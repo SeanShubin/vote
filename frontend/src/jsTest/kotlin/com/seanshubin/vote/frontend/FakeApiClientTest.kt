@@ -112,15 +112,26 @@ class FakeApiClientTest {
     }
 
     @Test
-    fun setCandidatesCapturesCallWithCandidateList() = runTest {
+    fun addCandidatesCapturesCallWithCandidateList() = runTest {
         val fakeClient = FakeApiClient()
         val candidates = listOf("Kotlin", "Rust", "Go")
 
-        fakeClient.setCandidates("Best Language", candidates)
+        fakeClient.addCandidates("Best Language", candidates)
 
-        assertEquals(1, fakeClient.setCandidatesCalls.size)
-        assertEquals("Best Language", fakeClient.setCandidatesCalls[0].electionName)
-        assertEquals(candidates, fakeClient.setCandidatesCalls[0].candidates)
+        assertEquals(1, fakeClient.addCandidatesCalls.size)
+        assertEquals("Best Language", fakeClient.addCandidatesCalls[0].electionName)
+        assertEquals(candidates, fakeClient.addCandidatesCalls[0].candidateNames)
+    }
+
+    @Test
+    fun removeCandidateCapturesCallWithSingleName() = runTest {
+        val fakeClient = FakeApiClient()
+
+        fakeClient.removeCandidate("Best Language", "Kotlin")
+
+        assertEquals(1, fakeClient.removeCandidateCalls.size)
+        assertEquals("Best Language", fakeClient.removeCandidateCalls[0].electionName)
+        assertEquals("Kotlin", fakeClient.removeCandidateCalls[0].candidateName)
     }
 
     @Test

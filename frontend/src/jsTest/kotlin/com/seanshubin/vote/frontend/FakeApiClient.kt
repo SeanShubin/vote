@@ -19,7 +19,8 @@ class FakeApiClient : ApiClient {
     val listElectionsCalls = mutableListOf<Unit>()
     val createElectionCalls = mutableListOf<CreateElectionCall>()
     val getElectionCalls = mutableListOf<String>()
-    val setCandidatesCalls = mutableListOf<SetCandidatesCall>()
+    val addCandidatesCalls = mutableListOf<AddCandidatesCall>()
+    val removeCandidateCalls = mutableListOf<RemoveCandidateCall>()
     val renameCandidateCalls = mutableListOf<RenameCandidateCall>()
     val candidateBallotCountsCalls = mutableListOf<String>()
     val listCandidatesCalls = mutableListOf<String>()
@@ -55,7 +56,8 @@ class FakeApiClient : ApiClient {
     var listElectionsResult: Result<List<ElectionSummary>> = Result.success(emptyList())
     var createElectionResult: Result<String> = Result.success("")
     var getElectionResult: Result<ElectionDetail> = Result.failure(Exception("Get election not configured"))
-    var setCandidatesResult: Result<Unit> = Result.success(Unit)
+    var addCandidatesResult: Result<Unit> = Result.success(Unit)
+    var removeCandidateResult: Result<Unit> = Result.success(Unit)
     var renameCandidateResult: Result<Unit> = Result.success(Unit)
     var candidateBallotCountsResult: Result<Map<String, Int>> = Result.success(emptyMap())
     var listCandidatesResult: Result<List<String>> = Result.success(emptyList())
@@ -159,9 +161,14 @@ class FakeApiClient : ApiClient {
         setElectionDescriptionResult.getOrThrow()
     }
 
-    override suspend fun setCandidates(electionName: String, candidates: List<String>) {
-        setCandidatesCalls.add(SetCandidatesCall(electionName, candidates))
-        setCandidatesResult.getOrThrow()
+    override suspend fun addCandidates(electionName: String, candidateNames: List<String>) {
+        addCandidatesCalls.add(AddCandidatesCall(electionName, candidateNames))
+        addCandidatesResult.getOrThrow()
+    }
+
+    override suspend fun removeCandidate(electionName: String, candidateName: String) {
+        removeCandidateCalls.add(RemoveCandidateCall(electionName, candidateName))
+        removeCandidateResult.getOrThrow()
     }
 
     override suspend fun listCandidates(electionName: String): List<String> {
@@ -279,7 +286,8 @@ class FakeApiClient : ApiClient {
     data class RegisterCall(val userName: String, val email: String, val password: String, val inviteCode: String = "")
     data class CreateElectionCall(val electionName: String, val description: String)
     data class AuthenticateCall(val nameOrEmail: String, val password: String)
-    data class SetCandidatesCall(val electionName: String, val candidates: List<String>)
+    data class AddCandidatesCall(val electionName: String, val candidateNames: List<String>)
+    data class RemoveCandidateCall(val electionName: String, val candidateName: String)
     data class RenameCandidateCall(val electionName: String, val oldName: String, val newName: String)
     data class SetTiersCall(val electionName: String, val tiers: List<String>)
     data class RenameTierCall(val electionName: String, val oldName: String, val newName: String)

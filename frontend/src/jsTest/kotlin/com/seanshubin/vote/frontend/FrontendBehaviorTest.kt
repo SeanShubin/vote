@@ -153,24 +153,24 @@ class FrontendBehaviorTest {
     }
 
     @Test
-    fun electionSetupSavesCandidates() = runTest {
+    fun electionSetupAddsCandidates() = runTest {
         val fakeClient = FakeApiClient()
         val candidates = listOf("Kotlin", "Rust", "Go")
 
-        fakeClient.setCandidates("Best Language", candidates)
+        fakeClient.addCandidates("Best Language", candidates)
 
-        assertEquals(1, fakeClient.setCandidatesCalls.size)
-        assertEquals("Best Language", fakeClient.setCandidatesCalls[0].electionName)
-        assertEquals(candidates, fakeClient.setCandidatesCalls[0].candidates)
+        assertEquals(1, fakeClient.addCandidatesCalls.size)
+        assertEquals("Best Language", fakeClient.addCandidatesCalls[0].electionName)
+        assertEquals(candidates, fakeClient.addCandidatesCalls[0].candidateNames)
     }
 
     @Test
-    fun electionSetupLogsErrorWhenSavingCandidatesFails() = runTest {
+    fun electionSetupLogsErrorWhenAddingCandidatesFails() = runTest {
         val fakeClient = FakeApiClient()
-        fakeClient.setCandidatesResult = Result.failure(Exception("Permission denied"))
+        fakeClient.addCandidatesResult = Result.failure(Exception("Permission denied"))
 
         val exception = assertFailsWith<Exception> {
-            fakeClient.setCandidates("Best Language", listOf("Kotlin"))
+            fakeClient.addCandidates("Best Language", listOf("Kotlin"))
         }
 
         assertEquals("Permission denied", exception.message)
@@ -230,7 +230,7 @@ class FrontendBehaviorTest {
 
         fakeClient.register("alice", "alice@example.com", "password123")
         fakeClient.createElection("Best Language")
-        fakeClient.setCandidates("Best Language", listOf("Kotlin", "Rust", "Go"))
+        fakeClient.addCandidates("Best Language", listOf("Kotlin", "Rust", "Go"))
         fakeClient.castBallot("Best Language", listOf(
             Ranking("Kotlin", 1),
             Ranking("Rust", 2),
@@ -239,7 +239,7 @@ class FrontendBehaviorTest {
 
         assertEquals(1, fakeClient.registerCalls.size)
         assertEquals(1, fakeClient.createElectionCalls.size)
-        assertEquals(1, fakeClient.setCandidatesCalls.size)
+        assertEquals(1, fakeClient.addCandidatesCalls.size)
         assertEquals(1, fakeClient.castBallotCalls.size)
     }
 }

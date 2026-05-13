@@ -84,7 +84,23 @@ interface ApiClient {
     suspend fun createElection(electionName: String, description: String = ""): String
     suspend fun getElection(electionName: String): ElectionDetail
     suspend fun setElectionDescription(electionName: String, description: String)
-    suspend fun setCandidates(electionName: String, candidates: List<String>)
+    /**
+     * Append one or more candidates to the election. Names already present
+     * are silently skipped (the backend filters to "new only" before
+     * emitting an event) — paste-a-list flows can submit a superset without
+     * worrying about duplicates. Existing ballots are unaffected.
+     */
+    suspend fun addCandidates(electionName: String, candidateNames: List<String>)
+
+    /**
+     * Remove a single candidate from the election. Cascades to every
+     * existing ballot: any ranking referencing this candidate is stripped,
+     * so the dropped name doesn't survive as a ghost reference. Per-row at
+     * the API surface so each removal is its own intent — bulk removal
+     * happens one call at a time, with the cascade documented to callers.
+     */
+    suspend fun removeCandidate(electionName: String, candidateName: String)
+
     suspend fun listCandidates(electionName: String): List<String>
 
     /**

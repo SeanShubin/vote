@@ -203,10 +203,39 @@ class HttpApiTester(private val port: Int = 9876) : AutoCloseable {
     fun removeUser(userName: String, token: AccessToken): HttpResponse<String> = delete("/user/$userName", token)
 
     // Candidates
+    // Convenience for tests: paper over the primitive add/remove API by
+    // computing the diff against the current candidate list. The fan-out
+    // is sequential (each call is its own HTTP request), so call sites
+    // that just want "the candidate list is now exactly X" stay short.
     fun setCandidates(electionName: String, candidates: List<String>, token: AccessToken): HttpResponse<String> {
+        val current = listCandidates(electionName, token).body()?.let { parseJsonStringArray(it) } ?: emptyList()
+        val toAdd = candidates.filter { it !in current }
+        val toRemove = current.filter { it !in candidates }
+        var last: HttpResponse<String> = listCandidates(electionName, token)
+        if (toAdd.isNotEmpty()) {
+            last = addCandidates(electionName, toAdd, token)
+        }
+        for (name in toRemove) {
+            last = removeCandidate(electionName, name, token)
+        }
+        return last
+    }
+
+    fun addCandidates(electionName: String, candidates: List<String>, token: AccessToken): HttpResponse<String> {
         val candidatesJson = candidates.joinToString(",") { "\"$it\"" }
         val body = """{"candidateNames":[$candidatesJson]}"""
-        return put("/election/$electionName/candidates", body, token)
+        return post("/election/$electionName/candidate-add", body, token)
+    }
+
+    fun removeCandidate(electionName: String, candidateName: String, token: AccessToken): HttpResponse<String> =
+        delete("/election/$electionName/candidate/$candidateName", token)
+
+    private fun parseJsonStringArray(body: String): List<String> {
+        // Tiny parser for `["a","b"]`-shaped responses — the test helper
+        // doesn't pull in a full JSON library.
+        val trimmed = body.trim().removeSurrounding("[", "]").trim()
+        if (trimmed.isEmpty()) return emptyList()
+        return trimmed.split(",").map { it.trim().removeSurrounding("\"") }
     }
 
     fun listCandidates(electionName: String, token: AccessToken): HttpResponse<String> =

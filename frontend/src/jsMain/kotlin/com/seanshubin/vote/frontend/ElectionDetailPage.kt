@@ -178,8 +178,9 @@ fun ElectionDetailPage(
                                 e.copy(description = newDescription) to c
                             }
                         },
-                        onCandidatesSaved = { newCandidates ->
-                            successMessage = "Candidates saved"
+                        onCandidatesAdded = { added ->
+                            successMessage = if (added.size == 1) "Added \"${added[0]}\""
+                            else "Added ${added.size} candidates"
                             errorMessage = null
                             // Patch the candidate list and the header count
                             // immediately so the UI feels instant. The tally
@@ -188,8 +189,18 @@ fun ElectionDetailPage(
                             // helper keeps the prior tally visible during
                             // the refetch, so the Results tab does not flash
                             // to Loading.
-                            lastLoadedShell = lastLoadedShell?.let { (e, _) ->
-                                e.copy(candidateCount = newCandidates.size) to newCandidates
+                            lastLoadedShell = lastLoadedShell?.let { (e, c) ->
+                                val merged = (c + added).distinct()
+                                e.copy(candidateCount = merged.size) to merged
+                            }
+                            tallyFetch.reload()
+                        },
+                        onCandidateRemoved = { removed ->
+                            successMessage = "Removed \"$removed\""
+                            errorMessage = null
+                            lastLoadedShell = lastLoadedShell?.let { (e, c) ->
+                                val remaining = c.filter { it != removed }
+                                e.copy(candidateCount = remaining.size) to remaining
                             }
                             tallyFetch.reload()
                         },

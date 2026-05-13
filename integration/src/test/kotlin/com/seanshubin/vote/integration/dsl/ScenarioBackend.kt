@@ -18,7 +18,8 @@ interface ScenarioBackend {
 
     // Election operations
     fun addElection(token: AccessToken, ownerName: String, electionName: String, description: String = "")
-    fun setCandidates(token: AccessToken, electionName: String, candidateNames: List<String>)
+    fun addCandidates(token: AccessToken, electionName: String, candidateNames: List<String>)
+    fun removeCandidate(token: AccessToken, electionName: String, candidateName: String)
     fun setTiers(token: AccessToken, electionName: String, tierNames: List<String>)
     fun deleteElection(token: AccessToken, electionName: String)
     fun transferElectionOwnership(token: AccessToken, electionName: String, newOwnerName: String)

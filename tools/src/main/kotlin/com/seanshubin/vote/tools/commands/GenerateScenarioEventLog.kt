@@ -133,7 +133,7 @@ class GenerateScenarioEventLog : CliktCommand(name = "generate-scenario-event-lo
 
         println("[${scenario.scenarioNumber}] $electionName — ${scenario.candidates.size} candidates, ${scenario.ballots.size} ballots")
         service.addElection(ownerToken, ownerName, electionName, description)
-        service.setCandidates(ownerToken, electionName, scenario.candidates.map { it.displayName })
+        service.addCandidates(ownerToken, electionName, scenario.candidates.map { it.displayName })
 
         scenario.ballots.forEach { ballot ->
             val token = voterTokens[ballot.voterDisplayName]

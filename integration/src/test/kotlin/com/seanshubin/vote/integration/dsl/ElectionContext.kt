@@ -9,8 +9,34 @@ class ElectionContext(
 ) {
     val electionName: String get() = name
 
+    /**
+     * Test-DSL convenience: set the election's candidates to exactly
+     * [names]. Backed by the new primitive-only API (one [addCandidates]
+     * call + one [removeCandidate] call per dropped name); kept on the
+     * DSL surface because most existing tests want "the candidate list is
+     * now exactly X" semantics without spelling out the diff themselves.
+     */
     fun setCandidates(vararg names: String) {
-        testContext.backend.setCandidates(owner.accessToken, name, names.toList())
+        val desired = names.toList()
+        val existing = testContext.database.listCandidates(name)
+        val toAdd = desired.filter { it !in existing }
+        val toRemove = existing.filter { it !in desired }
+        if (toAdd.isNotEmpty()) {
+            testContext.backend.addCandidates(owner.accessToken, name, toAdd)
+        }
+        for (gone in toRemove) {
+            testContext.backend.removeCandidate(owner.accessToken, name, gone)
+        }
+        testContext.backend.synchronize()
+    }
+
+    fun addCandidates(vararg names: String) {
+        testContext.backend.addCandidates(owner.accessToken, name, names.toList())
+        testContext.backend.synchronize()
+    }
+
+    fun removeCandidate(candidateName: String) {
+        testContext.backend.removeCandidate(owner.accessToken, name, candidateName)
         testContext.backend.synchronize()
     }
 

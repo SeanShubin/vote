@@ -31,7 +31,8 @@ interface Service {
     fun tableData(accessToken: AccessToken, tableName: String): TableData
     fun debugTableData(accessToken: AccessToken, tableName: String): TableData
     fun eventData(accessToken: AccessToken): TableData
-    fun setCandidates(accessToken: AccessToken, electionName: String, candidateNames: List<String>)
+    fun addCandidates(accessToken: AccessToken, electionName: String, candidateNames: List<String>)
+    fun removeCandidate(accessToken: AccessToken, electionName: String, candidateName: String)
     fun listCandidates(accessToken: AccessToken, electionName: String): List<String>
 
     /**

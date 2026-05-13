@@ -16,7 +16,8 @@ fun ElectionSetupView(
     ballotsExist: Boolean,
     currentOwnerName: String,
     onDescriptionSaved: (String) -> Unit,
-    onCandidatesSaved: (List<String>) -> Unit,
+    onCandidatesAdded: (added: List<String>) -> Unit,
+    onCandidateRemoved: (removed: String) -> Unit,
     onCandidateRenamed: (oldName: String, newName: String) -> Unit,
     onTiersSaved: (List<String>) -> Unit,
     onTierRenamed: (oldName: String, newName: String) -> Unit,
@@ -83,9 +84,9 @@ fun ElectionSetupView(
         },
     )
 
-    // Add: union the textarea entries with the existing list, then commit
-    // via setCandidates. Set-diff semantics mean any name already present
-    // is silently kept rather than emitting a duplicate add event.
+    // Add: send the parsed textarea names directly. Backend filters to
+    // "new only" so the caller can submit a superset without de-duping
+    // against the existing list first.
     val addAction = rememberAsyncAction(
         apiClient = apiClient,
         fallbackErrorMessage = "Failed to add candidates",
@@ -93,10 +94,9 @@ fun ElectionSetupView(
         action = {
             val additions = parseAddCandidates()
             if (additions.isEmpty()) return@rememberAsyncAction
-            val newCandidates = (existingCandidates + additions).distinct()
-            apiClient.setCandidates(electionName, newCandidates)
+            apiClient.addCandidates(electionName, additions)
             addCandidatesText = ""
-            onCandidatesSaved(newCandidates)
+            onCandidatesAdded(additions)
             ballotCounts = apiClient.candidateBallotCounts(electionName)
         },
     )
@@ -117,6 +117,24 @@ fun ElectionSetupView(
             renamingCandidate = null
             renameText = ""
             onCandidateRenamed(oldName, newName)
+            ballotCounts = apiClient.candidateBallotCounts(electionName)
+        },
+    )
+
+    // Which candidate is being removed right now (so we can show a
+    // "Removing…" spinner on the right row instead of greying out the
+    // whole list).
+    var removingCandidate by remember(existingCandidates) { mutableStateOf<String?>(null) }
+
+    val removeAction = rememberAsyncAction(
+        apiClient = apiClient,
+        fallbackErrorMessage = "Failed to remove candidate",
+        onError = onError,
+        action = {
+            val name = removingCandidate ?: return@rememberAsyncAction
+            apiClient.removeCandidate(electionName, name)
+            removingCandidate = null
+            onCandidateRemoved(name)
             ballotCounts = apiClient.candidateBallotCounts(electionName)
         },
     )
@@ -229,23 +247,56 @@ fun ElectionSetupView(
                                 "$n ballot${if (n == 1) "" else "s"}"
                             } ?: "…"
                             Span({ classes("candidate-ballot-count") }) { Text(countLabel) }
+                            // Rename: same per-row inline-edit pattern as before.
                             Button({
+                                val busy = renameAction.isLoading || removeAction.isLoading
+                                if (busy) attr("disabled", "")
                                 onClick {
                                     renamingCandidate = candidateName
                                     renameText = candidateName
                                 }
                             }) { Text("Rename") }
+                            // Remove: per-row Remove button. Confirms with the
+                            // ballot blast-radius so the owner sees exactly
+                            // how many ballots will be touched. Cascade on
+                            // the backend strips this candidate from every
+                            // ranking — same behavior as the old whole-list
+                            // setCandidates flow's diff-remove path.
+                            Button({
+                                val isThisRowRemoving = removeAction.isLoading && removingCandidate == candidateName
+                                val busy = renameAction.isLoading || removeAction.isLoading
+                                if (busy) attr("disabled", "")
+                                onClick {
+                                    val n = ballotCounts?.get(candidateName) ?: 0
+                                    val cascadeNote = if (n == 0) {
+                                        "No ballots reference this candidate."
+                                    } else {
+                                        "This will strip \"$candidateName\" from $n ballot" +
+                                            (if (n == 1) "" else "s") + "."
+                                    }
+                                    val confirmed = window.confirm(
+                                        "Remove \"$candidateName\" from the election? $cascadeNote"
+                                    )
+                                    if (confirmed) {
+                                        removingCandidate = candidateName
+                                        removeAction.invoke()
+                                    }
+                                }
+                            }) {
+                                val isThisRowRemoving = removeAction.isLoading && removingCandidate == candidateName
+                                Text(if (isThisRowRemoving) "Removing…" else "Remove")
+                            }
                         }
                     }
                 }
             }
         }
 
-        // Add candidates — paste one per line. Adds only; doesn't remove
-        // existing entries. The previous "save replaces the whole list"
-        // textarea was retired alongside per-row renames so the owner
-        // can't accidentally wipe ballot references by deleting a name
-        // from the textarea.
+        // Add candidates — paste one per line. The backend filters to
+        // names not already present, so submitting a list that overlaps
+        // existing candidates is a no-op for the overlap (no duplicate
+        // events). Removal lives on each row (above) where the cascade is
+        // confirmed against the ballot count for that specific candidate.
         H3 { Text("Add candidates") }
         P { Text("Enter one candidate per line:") }
         TextArea(addCandidatesText) {

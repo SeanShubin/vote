@@ -154,11 +154,17 @@ class HttpApiClient(
         )
     }
 
-    override suspend fun setCandidates(electionName: String, candidates: List<String>) {
-        val request = SetCandidatesRequest(candidates)
-        putWithAuth<SetCandidatesRequest, Unit>(
-            "/election/${encodeURIComponent(electionName)}/candidates",
+    override suspend fun addCandidates(electionName: String, candidateNames: List<String>) {
+        val request = AddCandidatesRequest(candidateNames)
+        postWithAuth<AddCandidatesRequest, Unit>(
+            "/election/${encodeURIComponent(electionName)}/candidate-add",
             request,
+        )
+    }
+
+    override suspend fun removeCandidate(electionName: String, candidateName: String) {
+        deleteWithAuth(
+            "/election/${encodeURIComponent(electionName)}/candidate/${encodeURIComponent(candidateName)}"
         )
     }
 

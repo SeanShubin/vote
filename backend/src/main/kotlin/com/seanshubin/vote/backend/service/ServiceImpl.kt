@@ -462,7 +462,7 @@ class ServiceImpl(
         return relationalProjection.project(DynamoToRelational.EVENT_LOG)
     }
 
-    override fun setCandidates(accessToken: AccessToken, electionName: String, candidateNames: List<String>) {
+    override fun addCandidates(accessToken: AccessToken, electionName: String, candidateNames: List<String>) {
         // VALIDATION SECTION
         requirePermission(accessToken, Permission.USE_APPLICATION)
         requireIsElectionOwner(accessToken, electionName)
@@ -470,17 +470,49 @@ class ServiceImpl(
         val validElectionName = Validation.validateElectionName(electionName)
         val validCandidateNames = Validation.validateCandidateNames(candidateNames)
         // Detail pages classify each name as candidate-or-tier by lookup
-        // against the tier list; a name that's in both lists would render
-        // ambiguously, so reject the second-set-to-collide here.
+        // against the tier list; a name in both lists would render
+        // ambiguously, so reject the collision before storing.
         val existingTiers = queryModel.listTiers(validElectionName)
         Validation.validateCandidatesAndTiersDistinct(validCandidateNames, existingTiers)
 
-        // DIFF COMPUTATION (pure logic, no side effects)
+        // Filter to names not already present. Letting the caller pass a
+        // superset (e.g. the user pastes a list that overlaps existing
+        // candidates) keeps the UI flow simple — no client-side diffing.
         val existing = queryModel.listCandidates(validElectionName)
-        val changes = computeCandidateChanges(validElectionName, existing, validCandidateNames)
+        val newOnly = validCandidateNames.filter { it !in existing }
+        if (newOnly.isEmpty()) return
 
         // EXECUTION SECTION
-        applyCandidateEvents(accessToken.userName, changes)
+        eventLog.appendEvent(
+            accessToken.userName,
+            clock.now(),
+            DomainEvent.CandidatesAdded(validElectionName, newOnly)
+        )
+        synchronize()
+    }
+
+    override fun removeCandidate(accessToken: AccessToken, electionName: String, candidateName: String) {
+        // VALIDATION SECTION
+        requirePermission(accessToken, Permission.USE_APPLICATION)
+        requireIsElectionOwner(accessToken, electionName)
+
+        val validElectionName = Validation.validateElectionName(electionName)
+        val validCandidateName = Validation.validateCandidateName(candidateName)
+
+        // Idempotent: removing a candidate that isn't there is a silent
+        // no-op rather than an error. Two clients hitting the button at
+        // the same time should both succeed (the second sees an empty diff).
+        val existing = queryModel.listCandidates(validElectionName)
+        if (validCandidateName !in existing) return
+
+        // EXECUTION SECTION
+        // Event stays plural to keep the audit log shape consistent with
+        // CandidatesAdded; the single-row API just wraps the name.
+        eventLog.appendEvent(
+            accessToken.userName,
+            clock.now(),
+            DomainEvent.CandidatesRemoved(validElectionName, listOf(validCandidateName))
+        )
         synchronize()
     }
 
@@ -954,38 +986,4 @@ class ServiceImpl(
         }
     }
 
-    // Helper methods for diff-based operations
-    private fun computeCandidateChanges(
-        electionName: String,
-        existing: List<String>,
-        desired: List<String>
-    ): CandidateChanges {
-        val toAdd = desired.filter { it !in existing }
-        val toRemove = existing.filter { it !in desired }
-        return CandidateChanges(electionName, toAdd, toRemove)
-    }
-
-    private fun applyCandidateEvents(authority: String, changes: CandidateChanges) {
-        if (changes.toAdd.isNotEmpty()) {
-            eventLog.appendEvent(
-                authority,
-                clock.now(),
-                DomainEvent.CandidatesAdded(changes.electionName, changes.toAdd)
-            )
-        }
-        if (changes.toRemove.isNotEmpty()) {
-            eventLog.appendEvent(
-                authority,
-                clock.now(),
-                DomainEvent.CandidatesRemoved(changes.electionName, changes.toRemove)
-            )
-        }
-    }
-
-    // Data classes for change computation
-    private data class CandidateChanges(
-        val electionName: String,
-        val toAdd: List<String>,
-        val toRemove: List<String>
-    )
 }
