@@ -197,8 +197,13 @@ private fun renderPreferencesDetail(electionTally: ElectionTally, a: String, b: 
         Div({ classes("pair-detail-header") }) { Text(verdict) }
 
         Div({ classes("pair-side-row") }) {
-            renderPairSide(name = a, voters = aVoters, count = aOverB, isWinner = aWins, isSecret = tally.secretBallot)
-            renderPairSide(name = b, voters = bVoters, count = bOverA, isWinner = bWins, isSecret = tally.secretBallot)
+            if (bWins) {
+                renderPairSide(name = b, voters = bVoters, count = bOverA, isWinner = true, isSecret = tally.secretBallot)
+                renderPairSide(name = a, voters = aVoters, count = aOverB, isWinner = false, isSecret = tally.secretBallot)
+            } else {
+                renderPairSide(name = a, voters = aVoters, count = aOverB, isWinner = aWins, isSecret = tally.secretBallot)
+                renderPairSide(name = b, voters = bVoters, count = bOverA, isWinner = false, isSecret = tally.secretBallot)
+            }
         }
 
         if (tally.secretBallot || abstainVoters.isNotEmpty()) {
