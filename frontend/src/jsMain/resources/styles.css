@@ -244,6 +244,108 @@ button:disabled {
 }
 
 /*
+ * Transfer-ownership picker: one bordered container framing a vertical list
+ * of plain-text user rows. Per-row borders/backgrounds are intentionally
+ * stripped — the frame says "menu," hover + pointer cursor say "clickable."
+ * Hairline dividers between rows keep names from running together without
+ * adding visual weight. Height-capped + scrollable so a long roster doesn't
+ * push the rest of the Setup tab off-screen.
+ */
+.transfer-owner-list {
+    display: flex;
+    flex-direction: column;
+    margin-top: 0.5rem;
+    max-height: 18rem;
+    overflow-y: auto;
+    border: 1px solid #c4d2e1;
+    border-radius: 4px;
+    background: white;
+}
+
+.transfer-owner-item {
+    text-align: left;
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid #eef2f7;
+    padding: 0.5rem 0.75rem;
+    color: #1f3956;
+    cursor: pointer;
+    font: inherit;
+}
+
+.transfer-owner-item:last-child {
+    border-bottom: none;
+}
+
+.transfer-owner-item:hover:not([disabled]) {
+    background: #ecf2fb;
+}
+
+.transfer-owner-item:focus-visible {
+    outline: 2px solid #2c7be5;
+    outline-offset: -2px;
+}
+
+.transfer-owner-item:disabled {
+    opacity: 0.6;
+    cursor: default;
+}
+
+/*
+ * Candidate editor list. Flexbox column of rows; each row is a flex line
+ * with name on the left, ballot-count badge, and rename action on the
+ * right. Reach for grid only when 2D layout demands it — this is a stack
+ * of independent rows, so plain flex + gap is the right tool.
+ */
+.candidate-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.candidate-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid #d6e4f0;
+    border-radius: 4px;
+    background-color: #f7fbff;
+}
+
+.candidate-row button {
+    margin-top: 0;
+    padding: 0.35rem 0.75rem;
+    font-size: 0.9rem;
+}
+
+.candidate-name {
+    flex: 1;
+    font-weight: 500;
+}
+
+/*
+ * Ballot-count badge — pushed to the right of the name, sits next to the
+ * Rename button. Visual weight is the same as the surrounding row so a
+ * "47 ballots" badge doesn't shout "warning"; the number itself is the
+ * signal the owner is reading.
+ */
+.candidate-ballot-count {
+    color: #5d7a99;
+    font-size: 0.9rem;
+    white-space: nowrap;
+}
+
+.candidate-rename-input {
+    flex: 1;
+    padding: 0.5rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 1rem;
+}
+
+/*
  * Election description — owner-supplied prose shown above the tabs.
  * `pre-line` preserves the newlines the owner typed in the textarea while
  * still collapsing incidental runs of whitespace and wrapping long lines

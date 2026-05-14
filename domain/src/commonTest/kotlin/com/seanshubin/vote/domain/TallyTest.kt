@@ -102,6 +102,7 @@ class TallyTest {
             electionName = "election",
             secretBallot = false,
             candidates = candidates,
+            tiers = emptyList(),
             ballots = ballots.toList(),
         )
 

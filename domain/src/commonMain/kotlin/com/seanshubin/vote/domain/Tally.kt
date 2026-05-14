@@ -21,20 +21,36 @@ data class Tally(
             electionName: String,
             secretBallot: Boolean,
             candidates: List<String>,
-            ballots: List<Ballot.Revealed>
+            tiers: List<String>,
+            ballots: List<Ballot.Revealed>,
         ): Tally {
-            // Drop candidates nobody ever ranked — they have no expressed
-            // preferences and would just appear as a noise row/column in the
-            // matrix and an unranked entry at the bottom of the places list.
-            val rankedCandidates = candidates.filter { candidate ->
-                ballots.any { ballot ->
-                    ballot.rankings.any { it.candidateName == candidate && it.rank != null }
+            // Project each cast ballot into its virtual form (candidates +
+            // materialized tier markers in one strict order). Storage carries
+            // only candidate rankings with a tier annotation; the markers
+            // exist as `kind = TIER` entries here only — at compute time —
+            // so a tier rename is just a label swap on the annotation and
+            // never breaks the recorded ballots.
+            val projectedBallots = ballots.map { ballot ->
+                ballot.copy(rankings = projectBallot(ballot.rankings, tiers))
+            }
+            // Tier markers join real candidates as nodes in the Schulze
+            // pairwise matrix — they're "virtual candidates" the algorithm
+            // uses to place real candidates relative to each tier line.
+            val allNodes = candidates + tiers
+            // Drop nodes nobody ever ranked (real or virtual) — they'd just
+            // contribute a noise row/column and a bottom-of-the-list place
+            // entry. Tier markers are produced by the projection, so they
+            // appear in every ballot the projection ran over; the filter
+            // mostly fires on candidates voters skipped.
+            val rankedNodes = allNodes.filter { name ->
+                projectedBallots.any { ballot ->
+                    ballot.rankings.any { it.candidateName == name && it.rank != null }
                 }
             }
-            val initialTally = BallotCounter(electionName, secretBallot, rankedCandidates, ballots).countBallots()
-            val candidatesSortedByPlaceThenAlpha = initialTally.places.map { it.candidateName }
+            val initialTally = BallotCounter(electionName, secretBallot, rankedNodes, ballots, projectedBallots).countBallots()
+            val nodesSortedByPlaceThenAlpha = initialTally.places.map { it.candidateName }
             val sortedTallyToMakeItEasierToExplainResults =
-                BallotCounter(electionName, secretBallot, candidatesSortedByPlaceThenAlpha, ballots).countBallots()
+                BallotCounter(electionName, secretBallot, nodesSortedByPlaceThenAlpha, ballots, projectedBallots).countBallots()
             placesBetterNotHaveChangedOrAlgorithmIsBroken(
                 initialTally.places,
                 sortedTallyToMakeItEasierToExplainResults.places
@@ -52,11 +68,16 @@ data class Tally(
             val electionName: String,
             val secretBallot: Boolean,
             val candidates: List<String>,
-            val rawBallots: List<Ballot.Revealed>
+            val rawBallots: List<Ballot.Revealed>,
+            val projectedBallots: List<Ballot.Revealed>,
         ) {
             fun countBallots(): Tally {
                 val emptyPreferences = createEmptyPreferences()
-                val preferences = rawBallots.map { it.rankings }.fold(emptyPreferences, ::accumulateRankings)
+                // Pairwise math runs on the *projected* rankings so tier
+                // markers participate as virtual candidates. The Tally's
+                // ballots field below still gets rawBallots — display sees
+                // what voters cast, not the synthesized expansion.
+                val preferences = projectedBallots.map { it.rankings }.fold(emptyPreferences, ::accumulateRankings)
                 val strongestPaths = preferences.strongestPaths()
                 val places = strongestPaths.places(candidates)
                 val whoVoted = rawBallots.map { it.voterName }.sorted()

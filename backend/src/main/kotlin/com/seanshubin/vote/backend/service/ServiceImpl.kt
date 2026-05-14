@@ -132,6 +132,11 @@ class ServiceImpl(
         synchronize()
     }
 
+    override fun listUserNames(accessToken: AccessToken): List<String> {
+        requirePermission(accessToken, Permission.USE_APPLICATION)
+        return queryModel.listUsers().map { it.name }.sortedBy { it.lowercase() }
+    }
+
     override fun listUsers(accessToken: AccessToken): List<UserNameRole> {
         requirePermission(accessToken, Permission.MANAGE_USERS)
         val callerPermissions = UserRolePermissions(
@@ -274,6 +279,51 @@ class ServiceImpl(
         synchronize()
     }
 
+    override fun transferElectionOwnership(
+        accessToken: AccessToken,
+        electionName: String,
+        newOwnerName: String,
+    ) {
+        // Same gate as deleteElection: the current owner can hand off their
+        // own election; ADMIN+ moderators can hand off any.
+        val election = queryModel.searchElectionByName(electionName)
+            ?: throw ServiceException(
+                ServiceException.Category.NOT_FOUND,
+                "Election '$electionName' not found"
+            )
+        val isOwnerOfElection = election.ownerName.equals(accessToken.userName, ignoreCase = true)
+        val canModerate = hasPermission(accessToken, Permission.MANAGE_USERS)
+        if (!isOwnerOfElection && !canModerate) {
+            throw ServiceException(
+                ServiceException.Category.UNAUTHORIZED,
+                "Only the election owner or an ADMIN can transfer '$electionName'"
+            )
+        }
+
+        val validNewOwnerName = Validation.validateUserName(newOwnerName)
+        // Resolve to the canonical stored case so the projection records the
+        // owner exactly as the user is registered, mirroring addElection.
+        val newOwner = queryModel.searchUserByName(validNewOwnerName)
+            ?: throw ServiceException(
+                ServiceException.Category.NOT_FOUND,
+                "User not found: $validNewOwnerName"
+            )
+
+        // No-op handoff: the requested new owner already owns this election.
+        // Skipping the event keeps the audit log honest — only real changes
+        // get a row.
+        if (election.ownerName.equals(newOwner.name, ignoreCase = true)) {
+            return
+        }
+
+        eventLog.appendEvent(
+            accessToken.userName,
+            clock.now(),
+            DomainEvent.ElectionOwnerChanged(election.electionName, newOwner.name),
+        )
+        synchronize()
+    }
+
     override fun listElections(accessToken: AccessToken): List<ElectionSummary> {
         requirePermission(accessToken, Permission.VIEW_APPLICATION)
         return queryModel.listElections()
@@ -324,7 +374,7 @@ class ServiceImpl(
         return relationalProjection.project(DynamoToRelational.EVENT_LOG)
     }
 
-    override fun setCandidates(accessToken: AccessToken, electionName: String, candidateNames: List<String>) {
+    override fun addCandidates(accessToken: AccessToken, electionName: String, candidateNames: List<String>) {
         // VALIDATION SECTION
         requirePermission(accessToken, Permission.USE_APPLICATION)
         requireIsElectionOwner(accessToken, electionName)
@@ -332,23 +382,105 @@ class ServiceImpl(
         val validElectionName = Validation.validateElectionName(electionName)
         val validCandidateNames = Validation.validateCandidateNames(candidateNames)
         // Detail pages classify each name as candidate-or-tier by lookup
-        // against the tier list; a name that's in both lists would render
-        // ambiguously, so reject the second-set-to-collide here.
+        // against the tier list; a name in both lists would render
+        // ambiguously, so reject the collision before storing.
         val existingTiers = queryModel.listTiers(validElectionName)
         Validation.validateCandidatesAndTiersDistinct(validCandidateNames, existingTiers)
 
-        // DIFF COMPUTATION (pure logic, no side effects)
+        // Filter to names not already present. Letting the caller pass a
+        // superset (e.g. the user pastes a list that overlaps existing
+        // candidates) keeps the UI flow simple — no client-side diffing.
         val existing = queryModel.listCandidates(validElectionName)
-        val changes = computeCandidateChanges(validElectionName, existing, validCandidateNames)
+        val newOnly = validCandidateNames.filter { it !in existing }
+        if (newOnly.isEmpty()) return
 
         // EXECUTION SECTION
-        applyCandidateEvents(accessToken.userName, changes)
+        eventLog.appendEvent(
+            accessToken.userName,
+            clock.now(),
+            DomainEvent.CandidatesAdded(validElectionName, newOnly)
+        )
+        synchronize()
+    }
+
+    override fun removeCandidate(accessToken: AccessToken, electionName: String, candidateName: String) {
+        // VALIDATION SECTION
+        requirePermission(accessToken, Permission.USE_APPLICATION)
+        requireIsElectionOwner(accessToken, electionName)
+
+        val validElectionName = Validation.validateElectionName(electionName)
+        val validCandidateName = Validation.validateCandidateName(candidateName)
+
+        // Idempotent: removing a candidate that isn't there is a silent
+        // no-op rather than an error. Two clients hitting the button at
+        // the same time should both succeed (the second sees an empty diff).
+        val existing = queryModel.listCandidates(validElectionName)
+        if (validCandidateName !in existing) return
+
+        // EXECUTION SECTION
+        // Event stays plural to keep the audit log shape consistent with
+        // CandidatesAdded; the single-row API just wraps the name.
+        eventLog.appendEvent(
+            accessToken.userName,
+            clock.now(),
+            DomainEvent.CandidatesRemoved(validElectionName, listOf(validCandidateName))
+        )
         synchronize()
     }
 
     override fun listCandidates(accessToken: AccessToken, electionName: String): List<String> {
         requirePermission(accessToken, Permission.VIEW_APPLICATION)
         return queryModel.listCandidates(electionName)
+    }
+
+    override fun renameCandidate(
+        accessToken: AccessToken,
+        electionName: String,
+        oldName: String,
+        newName: String,
+    ) {
+        // VALIDATION SECTION
+        requirePermission(accessToken, Permission.USE_APPLICATION)
+        requireIsElectionOwner(accessToken, electionName)
+
+        val validElectionName = Validation.validateElectionName(electionName)
+        val validOldName = Validation.validateCandidateName(oldName)
+        val validNewName = Validation.validateCandidateName(newName)
+
+        // Idempotent no-op: renaming a candidate to its own name doesn't need
+        // an event in the log. Match comparisons against the *normalized*
+        // names so trailing whitespace / case-only changes don't mint events
+        // either (validateCandidateName preserves case).
+        if (validOldName == validNewName) return
+
+        val existing = queryModel.listCandidates(validElectionName)
+        if (validOldName !in existing) {
+            throw ServiceException(
+                ServiceException.Category.NOT_FOUND,
+                "Candidate not found: $validOldName"
+            )
+        }
+        if (validNewName in existing) {
+            throw ServiceException(
+                ServiceException.Category.CONFLICT,
+                "Candidate already exists: $validNewName"
+            )
+        }
+        val tiers = queryModel.listTiers(validElectionName)
+        Validation.validateCandidatesAndTiersDistinct(listOf(validNewName), tiers)
+
+        // EXECUTION SECTION
+        eventLog.appendEvent(
+            accessToken.userName,
+            clock.now(),
+            DomainEvent.CandidateRenamed(validElectionName, validOldName, validNewName)
+        )
+        synchronize()
+    }
+
+    override fun candidateBallotCounts(accessToken: AccessToken, electionName: String): Map<String, Int> {
+        requirePermission(accessToken, Permission.VIEW_APPLICATION)
+        return queryModel.candidateBallotCounts(electionName)
     }
 
     override fun setTiers(accessToken: AccessToken, electionName: String, tierNames: List<String>) {
@@ -361,19 +493,13 @@ class ServiceImpl(
         val existingCandidates = queryModel.listCandidates(validElectionName)
         Validation.validateCandidatesAndTiersDistinct(existingCandidates, validTierNames)
 
-        // The "no ballots" lock: tier names are part of the meaning of a
-        // ranked ballot, so changing them out from under voters who have
-        // already cast would silently invalidate their vote. The lock lifts
-        // again once those ballots are gone.
-        val ballotCount = queryModel.ballotCount(validElectionName)
-        if (ballotCount > 0) {
-            throw ServiceException(
-                ServiceException.Category.CONFLICT,
-                "Cannot change tier names while ballots exist " +
-                    "($ballotCount ballot${if (ballotCount == 1) "" else "s"} cast); " +
-                    "voters have to remove their ballots first."
-            )
-        }
+        // No "no ballots" lock anymore. Rename goes through [renameTier]
+        // (cascading), so TiersSet here only ever adds/removes/reorders.
+        // Removing a tier here leaves any Ranking.tier annotation pointing
+        // at it as a dangling label; the event applier (or query-time
+        // projection) treats those as "cleared no tier" (null). That's
+        // lossy for the voter's intent on the removed tier — owners
+        // should warn-then-confirm in the UI before removing.
 
         // EXECUTION SECTION
         eventLog.appendEvent(
@@ -387,6 +513,48 @@ class ServiceImpl(
     override fun listTiers(accessToken: AccessToken, electionName: String): List<String> {
         requirePermission(accessToken, Permission.VIEW_APPLICATION)
         return queryModel.listTiers(electionName)
+    }
+
+    override fun renameTier(
+        accessToken: AccessToken,
+        electionName: String,
+        oldName: String,
+        newName: String,
+    ) {
+        // VALIDATION SECTION
+        requirePermission(accessToken, Permission.USE_APPLICATION)
+        requireIsElectionOwner(accessToken, electionName)
+
+        val validElectionName = Validation.validateElectionName(electionName)
+        val validOldName = Validation.validateTierName(oldName)
+        val validNewName = Validation.validateTierName(newName)
+
+        // Idempotent no-op: renaming to the same name doesn't earn an event.
+        if (validOldName == validNewName) return
+
+        val existing = queryModel.listTiers(validElectionName)
+        if (validOldName !in existing) {
+            throw ServiceException(
+                ServiceException.Category.NOT_FOUND,
+                "Tier not found: $validOldName"
+            )
+        }
+        if (validNewName in existing) {
+            throw ServiceException(
+                ServiceException.Category.CONFLICT,
+                "Tier already exists: $validNewName"
+            )
+        }
+        val candidates = queryModel.listCandidates(validElectionName)
+        Validation.validateCandidatesAndTiersDistinct(candidates, listOf(validNewName))
+
+        // EXECUTION SECTION
+        eventLog.appendEvent(
+            accessToken.userName,
+            clock.now(),
+            DomainEvent.TierRenamed(validElectionName, validOldName, validNewName)
+        )
+        synchronize()
     }
 
     override fun castBallot(
@@ -421,10 +589,12 @@ class ServiceImpl(
 
         val candidates = queryModel.listCandidates(validElectionName)
         val tiers = queryModel.listTiers(validElectionName)
-        // Tier markers are valid ranking targets too (they appear in ballots
-        // alongside candidates), so the "unknown candidates" check has to
-        // accept either. A truly bogus name still trips the check.
-        Validation.validateRankingsMatchCandidates(validRankings, candidates + tiers)
+        // Rankings are candidate-only in storage; each ranking carries an
+        // optional [Ranking.tier] annotation referencing one of the
+        // election's tiers. validateRankingsMatchCandidates checks both
+        // the candidate names and the tier annotations against the
+        // election's current configuration.
+        Validation.validateRankingsMatchCandidates(validRankings, candidates, tiers)
 
         // EXECUTION SECTION
         val confirmation = uniqueIdGenerator.generate()
@@ -484,17 +654,17 @@ class ServiceImpl(
         val candidates = queryModel.listCandidates(electionName)
         val tiers = queryModel.listTiers(electionName)
         val ballots = queryModel.listBallots(electionName)
-        // Tier markers participate in the pairwise tally as virtual
-        // candidates, so the algorithm can place each real candidate
-        // relative to them. A candidate's tier in the result is the
-        // hardest tier they cleared — i.e. they pairwise-beat that tier
-        // marker but not the next one above it. When there are no tiers,
-        // the call is identical to the pre-tier behavior.
+        // Tally projects each ballot into its virtual form (candidates +
+        // materialized tier markers) before running Schulze. Storage only
+        // carries candidate rankings with a tier annotation; the markers
+        // are produced at compute time so a tier rename never invalidates
+        // a recorded ballot. When tiers is empty the projection is a no-op.
         // Secret-ballot toggle dropped — tally always shows ranked ballots.
         val tally = Tally.countBallots(
             electionName = electionName,
             secretBallot = false,
-            candidates = candidates + tiers,
+            candidates = candidates,
+            tiers = tiers,
             ballots = ballots,
         )
         val sections = TallySection.compute(tally.places, tiers)
@@ -675,38 +845,4 @@ class ServiceImpl(
         }
     }
 
-    // Helper methods for diff-based operations
-    private fun computeCandidateChanges(
-        electionName: String,
-        existing: List<String>,
-        desired: List<String>
-    ): CandidateChanges {
-        val toAdd = desired.filter { it !in existing }
-        val toRemove = existing.filter { it !in desired }
-        return CandidateChanges(electionName, toAdd, toRemove)
-    }
-
-    private fun applyCandidateEvents(authority: String, changes: CandidateChanges) {
-        if (changes.toAdd.isNotEmpty()) {
-            eventLog.appendEvent(
-                authority,
-                clock.now(),
-                DomainEvent.CandidatesAdded(changes.electionName, changes.toAdd)
-            )
-        }
-        if (changes.toRemove.isNotEmpty()) {
-            eventLog.appendEvent(
-                authority,
-                clock.now(),
-                DomainEvent.CandidatesRemoved(changes.electionName, changes.toRemove)
-            )
-        }
-    }
-
-    // Data classes for change computation
-    private data class CandidateChanges(
-        val electionName: String,
-        val toAdd: List<String>,
-        val toRemove: List<String>
-    )
 }

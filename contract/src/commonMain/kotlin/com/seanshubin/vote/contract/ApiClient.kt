@@ -51,17 +51,59 @@ interface ApiClient {
     suspend fun createElection(electionName: String, description: String = ""): String
     suspend fun getElection(electionName: String): ElectionDetail
     suspend fun setElectionDescription(electionName: String, description: String)
-    suspend fun setCandidates(electionName: String, candidates: List<String>)
+    /**
+     * Append one or more candidates to the election. Names already present
+     * are silently skipped (the backend filters to "new only" before
+     * emitting an event) — paste-a-list flows can submit a superset without
+     * worrying about duplicates. Existing ballots are unaffected.
+     */
+    suspend fun addCandidates(electionName: String, candidateNames: List<String>)
+
+    /**
+     * Remove a single candidate from the election. Cascades to every
+     * existing ballot: any ranking referencing this candidate is stripped,
+     * so the dropped name doesn't survive as a ghost reference. Per-row at
+     * the API surface so each removal is its own intent — bulk removal
+     * happens one call at a time, with the cascade documented to callers.
+     */
+    suspend fun removeCandidate(electionName: String, candidateName: String)
+
     suspend fun listCandidates(electionName: String): List<String>
 
     /**
+     * Rename a single candidate. Every ranking in every cast ballot for the
+     * election is rewritten transparently; ranks are preserved. Use this
+     * instead of remove-then-add when an existing candidate's display
+     * name needs to change without invalidating existing ballots.
+     */
+    suspend fun renameCandidate(electionName: String, oldName: String, newName: String)
+
+    /**
+     * Map of candidate name → number of ballots that reference that
+     * candidate. Every current candidate appears as a key (zero for
+     * those with no ballots), so the editor can render a row per
+     * candidate with its blast-radius count.
+     */
+    suspend fun candidateBallotCounts(electionName: String): Map<String, Int>
+
+    /**
      * Set the ordered tier names for an election. Empty list disables tier
-     * support (ballots become candidate-only). Non-empty enables tier
-     * voting; rejected by the backend if the election already has ballots
-     * cast — tier names are part of the meaning of those ballots.
+     * support (ballots become candidate-only). Now safe at any time —
+     * the tier-as-annotation model means renames go through [renameTier]
+     * (cascading) and removed tiers leave each affected [Ranking.tier]
+     * as null (cleared no tier) without rewriting the ranking's rank.
      */
     suspend fun setTiers(electionName: String, tiers: List<String>)
     suspend fun listTiers(electionName: String): List<String>
+
+    /**
+     * Rename a single tier in place. Every [Ranking.tier] annotation on
+     * every cast ballot for the election is rewritten transparently; the
+     * voter's intent (which prestige tier each candidate cleared) is
+     * preserved. Use this instead of remove-then-add when an existing
+     * tier's display name needs to change without invalidating ballots.
+     */
+    suspend fun renameTier(electionName: String, oldName: String, newName: String)
     suspend fun castBallot(electionName: String, rankings: List<Ranking>): String
 
     /**
@@ -84,11 +126,27 @@ interface ApiClient {
     suspend fun deleteElection(electionName: String)
 
     /**
+     * Hand the election off to another user. Allowed for the current election
+     * owner or ADMIN+ (same gate as [deleteElection]). The new owner gains
+     * edit/delete authority on this election; nothing else about either user
+     * changes (this is not the global OWNER-role handoff).
+     */
+    suspend fun transferElectionOwnership(electionName: String, newOwnerName: String)
+
+    /**
      * Admin: list all users with each one's current role and the roles the
      * caller is allowed to assign. The backend computes [UserNameRole.allowedRoles]
      * from the caller's authority — the UI can bind dropdowns directly to it.
      */
     suspend fun listUsers(): List<UserNameRole>
+
+    /**
+     * Lightweight name-only listing of every registered user, available to
+     * any authenticated caller (USE_APPLICATION). Backs UI affordances like
+     * the transfer-ownership picker that need a real list to pick from but
+     * shouldn't see roles or the rest of [listUsers]'s admin payload.
+     */
+    suspend fun listUserNames(): List<String>
 
     /**
      * Admin: change a user's role. Promoting another user to OWNER triggers

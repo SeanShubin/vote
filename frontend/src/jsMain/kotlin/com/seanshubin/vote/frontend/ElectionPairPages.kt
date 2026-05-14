@@ -16,9 +16,10 @@ import org.jetbrains.compose.web.dom.*
  * total isn't an abstract number, it's a list of named voters you can
  * scroll through.
  *
- * Selection is a rolling window of two: clicking a third candidate evicts
- * the older of the two selections. Clicking a currently-selected candidate
- * deselects it. With fewer than two selected the detail panel is hidden.
+ * Selection is sticky-plus-changing: the first pick stays put and the
+ * second slot is what gets replaced when a third candidate is clicked.
+ * Clicking a currently-selected candidate deselects just that one. With
+ * fewer than two selected the detail panel is hidden.
  */
 @Composable
 fun ElectionPreferencesPage(
@@ -109,10 +110,11 @@ fun ElectionStrongestPathsPage(
 
 /**
  * Chip arena + detail-panel scaffold shared by the Preferences and
- * Strongest Paths pages. Owns the rolling-window-of-two selection state;
- * delegates to [detailPanel] when (and only when) two candidates are
- * selected. Resetting [selected] when the election changes prevents stale
- * names from carrying across navigation.
+ * Strongest Paths pages. Owns the sticky-plus-changing selection state:
+ * the first pick is sticky, the second slot rotates as the user explores
+ * other candidates against it. Delegates to [detailPanel] when (and only
+ * when) two candidates are selected. Resetting [selected] when the
+ * election changes prevents stale names from carrying across navigation.
  *
  * Tier markers are intentionally excluded from the selection chips — the
  * page is for comparing candidates. Tiers can still appear inside the
@@ -144,8 +146,11 @@ private fun renderPairView(
                     classes("pair-selector-chip")
                     if (isSelected) classes("pair-selector-chip-selected")
                     onClick {
-                        selected = if (isSelected) selected - name
-                            else (selected + name).takeLast(2)
+                        selected = when {
+                            isSelected -> selected - name
+                            selected.size < 2 -> selected + name
+                            else -> listOf(selected[0], name)
+                        }
                     }
                 }) {
                     Text(name)
@@ -192,8 +197,13 @@ private fun renderPreferencesDetail(electionTally: ElectionTally, a: String, b: 
         Div({ classes("pair-detail-header") }) { Text(verdict) }
 
         Div({ classes("pair-side-row") }) {
-            renderPairSide(name = a, voters = aVoters, count = aOverB, isWinner = aWins, isSecret = tally.secretBallot)
-            renderPairSide(name = b, voters = bVoters, count = bOverA, isWinner = bWins, isSecret = tally.secretBallot)
+            if (bWins) {
+                renderPairSide(name = b, voters = bVoters, count = bOverA, isWinner = true, isSecret = tally.secretBallot)
+                renderPairSide(name = a, voters = aVoters, count = aOverB, isWinner = false, isSecret = tally.secretBallot)
+            } else {
+                renderPairSide(name = a, voters = aVoters, count = aOverB, isWinner = aWins, isSecret = tally.secretBallot)
+                renderPairSide(name = b, voters = bVoters, count = bOverA, isWinner = false, isSecret = tally.secretBallot)
+            }
         }
 
         if (tally.secretBallot || abstainVoters.isNotEmpty()) {

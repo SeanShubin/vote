@@ -47,6 +47,11 @@ class InMemoryCommandModel(private val data: InMemoryData) : CommandModel {
         data.elections[electionName] = election.copy(description = description)
     }
 
+    override fun setElectionOwner(authority: String, electionName: String, newOwnerName: String) {
+        val election = data.elections[electionName] ?: error("Election not found: $electionName")
+        data.elections[electionName] = election.copy(ownerName = newOwnerName)
+    }
+
     override fun deleteElection(authority: String, electionName: String) {
         data.elections.remove(electionName)
         data.candidates.remove(electionName)
@@ -60,11 +65,58 @@ class InMemoryCommandModel(private val data: InMemoryData) : CommandModel {
     }
 
     override fun setTiers(authority: String, electionName: String, tierNames: List<String>) {
+        // Compute which tiers are being removed by this set: any tier that
+        // existed but is not in the new list. Cascade by nulling the
+        // [Ranking.tier] annotation on every ballot ranking that
+        // referenced one of those dropped tiers — the voter's "this
+        // candidate cleared tier X" claim no longer has a target tier.
+        // The candidate's rank is left alone; only the tier label is
+        // cleared. Without this cascade, dropped-then-re-added tiers
+        // would resurrect stale rankings.
+        val previous = data.tiers[electionName].orEmpty().toSet()
+        val removed = previous - tierNames.toSet()
         if (tierNames.isEmpty()) {
             data.tiers.remove(electionName)
         } else {
             data.tiers[electionName] = tierNames.toList()
         }
+        if (removed.isNotEmpty()) {
+            clearTierAnnotations(electionName, removed)
+        }
+    }
+
+    override fun renameTier(authority: String, electionName: String, oldName: String, newName: String) {
+        // Tier list: swap the label in place, preserving its position.
+        val tiers = data.tiers[electionName] ?: return
+        val idx = tiers.indexOf(oldName)
+        if (idx < 0) return
+        data.tiers[electionName] = tiers.toMutableList().also { it[idx] = newName }
+        // Rankings: rewrite every Ranking.tier annotation that pointed at
+        // the old label so it now points at the new label. Rank values
+        // and the rest of the ranking are untouched.
+        data.ballots.entries
+            .filter { (_, ballot) -> ballot.electionName == electionName }
+            .forEach { (key, ballot) ->
+                val rewritten = ballot.rankings.map { ranking ->
+                    if (ranking.tier == oldName) ranking.copy(tier = newName) else ranking
+                }
+                if (rewritten != ballot.rankings) {
+                    data.ballots[key] = ballot.copy(rankings = rewritten)
+                }
+            }
+    }
+
+    private fun clearTierAnnotations(electionName: String, removedTiers: Set<String>) {
+        data.ballots.entries
+            .filter { (_, ballot) -> ballot.electionName == electionName }
+            .forEach { (key, ballot) ->
+                val rewritten = ballot.rankings.map { ranking ->
+                    if (ranking.tier in removedTiers) ranking.copy(tier = null) else ranking
+                }
+                if (rewritten != ballot.rankings) {
+                    data.ballots[key] = ballot.copy(rankings = rewritten)
+                }
+            }
     }
 
     override fun removeCandidates(authority: String, electionName: String, candidateNames: List<String>) {
@@ -80,6 +132,22 @@ class InMemoryCommandModel(private val data: InMemoryData) : CommandModel {
                 val filtered = ballot.rankings.filter { it.candidateName !in removed }
                 if (filtered.size != ballot.rankings.size) {
                     data.ballots[key] = ballot.copy(rankings = filtered)
+                }
+            }
+    }
+
+    override fun renameCandidate(authority: String, electionName: String, oldName: String, newName: String) {
+        val candidates = data.candidates[electionName] ?: return
+        if (!candidates.remove(oldName)) return
+        candidates.add(newName)
+        data.ballots.entries
+            .filter { (_, ballot) -> ballot.electionName == electionName }
+            .forEach { (key, ballot) ->
+                val rewritten = ballot.rankings.map { ranking ->
+                    if (ranking.candidateName == oldName) ranking.copy(candidateName = newName) else ranking
+                }
+                if (rewritten != ballot.rankings) {
+                    data.ballots[key] = ballot.copy(rankings = rewritten)
                 }
             }
     }

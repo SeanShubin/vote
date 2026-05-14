@@ -63,14 +63,23 @@ class EventApplier(
             is DomainEvent.ElectionDescriptionChanged -> {
                 commandModel.setElectionDescription(authority, event.electionName, event.newDescription)
             }
+            is DomainEvent.ElectionOwnerChanged -> {
+                commandModel.setElectionOwner(authority, event.electionName, event.newOwnerName)
+            }
             is DomainEvent.CandidatesAdded -> {
                 commandModel.addCandidates(authority, event.electionName, event.candidateNames)
             }
             is DomainEvent.CandidatesRemoved -> {
                 commandModel.removeCandidates(authority, event.electionName, event.candidateNames)
             }
+            is DomainEvent.CandidateRenamed -> {
+                commandModel.renameCandidate(authority, event.electionName, event.oldName, event.newName)
+            }
             is DomainEvent.TiersSet -> {
                 commandModel.setTiers(authority, event.electionName, event.tierNames)
+            }
+            is DomainEvent.TierRenamed -> {
+                commandModel.renameTier(authority, event.electionName, event.oldName, event.newName)
             }
             is DomainEvent.BallotCast -> {
                 commandModel.castBallot(

@@ -85,17 +85,26 @@ class ScenarioHtmlGenerator(private val eventLog: EventLog) {
         is DomainEvent.ElectionDescriptionChanged ->
             "Description updated"
 
+        is DomainEvent.ElectionOwnerChanged ->
+            "Owner changed to <strong>${event.newOwnerName}</strong>"
+
         is DomainEvent.CandidatesAdded ->
             "Added candidates: ${event.candidateNames.joinToString(", ") { "<strong>$it</strong>" }}"
 
         is DomainEvent.CandidatesRemoved ->
             "Removed candidates: ${event.candidateNames.joinToString(", ") { "<strong>$it</strong>" }}"
 
+        is DomainEvent.CandidateRenamed ->
+            "Renamed candidate <strong>${event.oldName}</strong> to <strong>${event.newName}</strong>"
+
         is DomainEvent.TiersSet ->
             if (event.tierNames.isEmpty())
                 "Tiers cleared"
             else
                 "Tiers set: ${event.tierNames.joinToString(", ") { "<strong>$it</strong>" }}"
+
+        is DomainEvent.TierRenamed ->
+            "Renamed tier <strong>${event.oldName}</strong> to <strong>${event.newName}</strong>"
 
         is DomainEvent.BallotCast -> {
             val rankings = event.rankings.sortedBy { it.rank }.take(3)

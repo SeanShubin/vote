@@ -55,19 +55,44 @@ class ValidationTest {
     }
 
     @Test
-    fun `validateRankings preserves the kind field`() {
-        // Regression: previously validateRankings reconstructed Ranking
-        // without `kind`, dropping every TIER marker back to CANDIDATE.
-        // That broke ballot persistence in tier mode — the frontend's
-        // reload couldn't find any tier markers and reset the ballot.
+    fun `validateRankings preserves the tier annotation`() {
+        // Tier is part of what the voter chose; if validation reconstructs
+        // a Ranking without copying tier through, the projection at tally
+        // time wouldn't know which tier each candidate cleared.
         val rankings = listOf(
-            Ranking("Alice", 1, RankingKind.CANDIDATE),
-            Ranking("Tier 1", 2, RankingKind.TIER),
-            Ranking("Bob", 3, RankingKind.CANDIDATE),
-            Ranking("Tier 2", 4, RankingKind.TIER),
+            Ranking("Alice", 1, RankingKind.CANDIDATE, tier = "Gold"),
+            Ranking("Bob", 2, RankingKind.CANDIDATE, tier = "Silver"),
+            Ranking("Carol", 3, RankingKind.CANDIDATE, tier = null),
         )
         val valid = Validation.validateRankings(rankings)
-        assertEquals(rankings.map { it.kind }, valid.map { it.kind })
+        assertEquals(rankings.map { it.tier }, valid.map { it.tier })
+    }
+
+    @Test
+    fun `validateRankings rejects tier-kind rankings`() {
+        // Storage rule after the tier-as-annotation refactor: voters cast
+        // candidate rankings only. Tier markers are produced by the
+        // projection at compute time, never stored.
+        val ex = assertFailsWith<IllegalArgumentException> {
+            Validation.validateRankings(
+                listOf(
+                    Ranking("Alice", 1, RankingKind.CANDIDATE),
+                    Ranking("Gold", 2, RankingKind.TIER),
+                )
+            )
+        }
+        assertTrue(ex.message!!.contains("CANDIDATE"))
+    }
+
+    @Test
+    fun `validateRankings rejects tier annotation when rank is null`() {
+        // rank=null means the voter abstained — no tier judgment either.
+        val ex = assertFailsWith<IllegalArgumentException> {
+            Validation.validateRankings(
+                listOf(Ranking("Alice", null, RankingKind.CANDIDATE, tier = "Gold"))
+            )
+        }
+        assertTrue(ex.message!!.contains("tier"))
     }
 
     // validateRankingsMatchCandidates tests
@@ -76,7 +101,7 @@ class ValidationTest {
         val rankings = listOf(Ranking("Alice", 1), Ranking("Bob", 2))
         val candidates = listOf("Alice", "Bob", "Charlie")
         // Should not throw
-        Validation.validateRankingsMatchCandidates(rankings, candidates)
+        Validation.validateRankingsMatchCandidates(rankings, candidates, tiers = emptyList())
     }
 
     @Test
@@ -84,7 +109,7 @@ class ValidationTest {
         val rankings = listOf(Ranking("Alice", 1), Ranking("Dave", 2))
         val candidates = listOf("Alice", "Bob", "Charlie")
         val exception = assertFailsWith<IllegalArgumentException> {
-            Validation.validateRankingsMatchCandidates(rankings, candidates)
+            Validation.validateRankingsMatchCandidates(rankings, candidates, tiers = emptyList())
         }
         assertTrue(exception.message!!.contains("unknown"))
         assertTrue(exception.message!!.contains("Dave"))
@@ -95,10 +120,26 @@ class ValidationTest {
         val rankings = listOf(Ranking("Dave", 1), Ranking("Eve", 2))
         val candidates = listOf("Alice", "Bob")
         val exception = assertFailsWith<IllegalArgumentException> {
-            Validation.validateRankingsMatchCandidates(rankings, candidates)
+            Validation.validateRankingsMatchCandidates(rankings, candidates, tiers = emptyList())
         }
         assertTrue(exception.message!!.contains("Dave"))
         assertTrue(exception.message!!.contains("Eve"))
+    }
+
+    @Test
+    fun `validateRankingsMatchCandidates rejects unknown tier annotations`() {
+        // A ballot whose tier annotation doesn't match any configured
+        // tier was built against a stale view of the election; reject so
+        // the stray label can't sneak into the projected ballot.
+        val rankings = listOf(Ranking("Alice", 1, RankingKind.CANDIDATE, tier = "Platinum"))
+        val ex = assertFailsWith<IllegalArgumentException> {
+            Validation.validateRankingsMatchCandidates(
+                rankings,
+                candidates = listOf("Alice"),
+                tiers = listOf("Gold", "Silver"),
+            )
+        }
+        assertTrue(ex.message!!.contains("Platinum"))
     }
 
     // validateCandidateNames tests

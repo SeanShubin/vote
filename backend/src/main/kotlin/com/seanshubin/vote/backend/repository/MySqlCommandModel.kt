@@ -66,6 +66,15 @@ class MySqlCommandModel(
         }
     }
 
+    override fun setElectionOwner(authority: String, electionName: String, newOwnerName: String) {
+        val sql = queryLoader.load("election-update-owner")
+        connection.prepareStatement(sql).use { stmt ->
+            stmt.setString(1, newOwnerName)
+            stmt.setString(2, electionName)
+            stmt.executeUpdate()
+        }
+    }
+
     override fun deleteElection(authority: String, electionName: String) {
         val sql = queryLoader.load("election-delete")
         connection.prepareStatement(sql).use { stmt ->
@@ -88,9 +97,31 @@ class MySqlCommandModel(
     }
 
     override fun setTiers(authority: String, electionName: String, tierNames: List<String>) {
-        // Replace the entire tier list atomically: delete-then-insert. The
-        // service layer enforces that this only fires when no ballots exist,
-        // so churning the rows here can't orphan ranking data.
+        // Identify tiers being removed by this set so we can null-out
+        // their dangling [Ranking.tier] annotations before churning the
+        // tiers table. Without this cascade, dropping then re-adding a
+        // tier with the same name would resurrect stale rankings.
+        val previousTiers = connection.prepareStatement(
+            queryLoader.load("tier-select-by-election")
+        ).use { stmt ->
+            stmt.setString(1, electionName)
+            val rs = stmt.executeQuery()
+            buildList { while (rs.next()) add(rs.getString(1)) }
+        }
+        val removed = previousTiers - tierNames.toSet()
+        if (removed.isNotEmpty()) {
+            val clearSql = queryLoader.load("ranking-clear-tier-by-name")
+            connection.prepareStatement(clearSql).use { stmt ->
+                for (tierName in removed) {
+                    stmt.setString(1, electionName)
+                    stmt.setString(2, tierName)
+                    stmt.addBatch()
+                }
+                stmt.executeBatch()
+            }
+        }
+
+        // Replace the entire tier list atomically: delete-then-insert.
         val deleteSql = queryLoader.load("tier-delete-by-election")
         connection.prepareStatement(deleteSql).use { stmt ->
             stmt.setString(1, electionName)
@@ -108,6 +139,28 @@ class MySqlCommandModel(
                 stmt.addBatch()
             }
             stmt.executeBatch()
+        }
+    }
+
+    override fun renameTier(authority: String, electionName: String, oldName: String, newName: String) {
+        // Rewrite Ranking.tier annotations first, then the tier row.
+        // Same ordering rule as renameCandidate: a concurrent reader should
+        // see either the old name everywhere or the new name everywhere,
+        // never a half-applied state where the tiers row has the new label
+        // and the rankings still point at the old one (or vice-versa).
+        val rankingSql = queryLoader.load("ranking-rename-tier")
+        connection.prepareStatement(rankingSql).use { stmt ->
+            stmt.setString(1, newName)
+            stmt.setString(2, electionName)
+            stmt.setString(3, oldName)
+            stmt.executeUpdate()
+        }
+        val tierSql = queryLoader.load("tier-rename")
+        connection.prepareStatement(tierSql).use { stmt ->
+            stmt.setString(1, newName)
+            stmt.setString(2, electionName)
+            stmt.setString(3, oldName)
+            stmt.executeUpdate()
         }
     }
 
@@ -135,6 +188,29 @@ class MySqlCommandModel(
                 stmt.addBatch()
             }
             stmt.executeBatch()
+        }
+    }
+
+    override fun renameCandidate(authority: String, electionName: String, oldName: String, newName: String) {
+        // Rewrite ranking rows first, then the candidate row. Order matters
+        // because rankings.candidate_name has no FK to candidates — if the
+        // candidate row moved first, a concurrent reader could see ranking
+        // rows referencing a candidate that no longer exists. Doing it in
+        // this order means a reader sees either the old name everywhere or
+        // the new name everywhere; never half-applied.
+        val rankingSql = queryLoader.load("ranking-rename-candidate")
+        connection.prepareStatement(rankingSql).use { stmt ->
+            stmt.setString(1, newName)
+            stmt.setString(2, electionName)
+            stmt.setString(3, oldName)
+            stmt.executeUpdate()
+        }
+        val candidateSql = queryLoader.load("candidate-rename")
+        connection.prepareStatement(candidateSql).use { stmt ->
+            stmt.setString(1, newName)
+            stmt.setString(2, electionName)
+            stmt.setString(3, oldName)
+            stmt.executeUpdate()
         }
     }
 
@@ -172,7 +248,9 @@ class MySqlCommandModel(
             stmt.executeUpdate()
         }
 
-        // Insert new rankings (only those with non-null rank)
+        // Insert new rankings (only those with non-null rank). Tier
+        // annotation persists alongside rank so a future tier rename can
+        // rewrite it in place without touching the candidate's ordering.
         val validRankings = rankings.filter { it.rank != null }
         if (validRankings.isNotEmpty()) {
             val insertRankingSql = queryLoader.load("ranking-insert")
@@ -181,6 +259,7 @@ class MySqlCommandModel(
                     stmt.setLong(1, ballotId)
                     stmt.setString(2, ranking.candidateName)
                     stmt.setInt(3, ranking.rank!!) // Safe because we filtered nulls
+                    stmt.setString(4, ranking.tier) // null → SQL NULL
                     stmt.addBatch()
                 }
                 stmt.executeBatch()
@@ -205,7 +284,9 @@ class MySqlCommandModel(
             stmt.executeUpdate()
         }
 
-        // Insert new rankings (only those with non-null rank)
+        // Insert new rankings (only those with non-null rank). Tier
+        // annotation persists alongside rank so a future tier rename can
+        // rewrite it in place without touching the candidate's ordering.
         val validRankings = rankings.filter { it.rank != null }
         if (validRankings.isNotEmpty()) {
             val insertRankingSql = queryLoader.load("ranking-insert")
@@ -214,6 +295,7 @@ class MySqlCommandModel(
                     stmt.setLong(1, ballotId)
                     stmt.setString(2, ranking.candidateName)
                     stmt.setInt(3, ranking.rank!!) // Safe because we filtered nulls
+                    stmt.setString(4, ranking.tier) // null → SQL NULL
                     stmt.addBatch()
                 }
                 stmt.executeBatch()

@@ -183,6 +183,19 @@ class MySqlQueryModel(
         }
     }
 
+    override fun candidateBallotCounts(electionName: String): Map<String, Int> {
+        val sql = queryLoader.load("candidate-ballot-counts")
+        return connection.prepareStatement(sql).use { stmt ->
+            stmt.setString(1, electionName)
+            val rs = stmt.executeQuery()
+            buildMap {
+                while (rs.next()) {
+                    put(rs.getString("candidate_name"), rs.getInt("ballot_count"))
+                }
+            }
+        }
+    }
+
     override fun listTiers(electionName: String): List<String> {
         val sql = queryLoader.load("tier-select-by-election")
         return connection.prepareStatement(sql).use { stmt ->
@@ -206,7 +219,8 @@ class MySqlQueryModel(
                 while (rs.next()) {
                     add(Ranking(
                         candidateName = rs.getString("candidate_name"),
-                        rank = rs.getInt("rank")
+                        rank = rs.getInt("rank"),
+                        tier = rs.getString("tier"),
                     ))
                 }
             }
@@ -264,7 +278,8 @@ class MySqlQueryModel(
                 val voterName = rs.getString("voter_name")
                 val ranking = Ranking(
                     candidateName = rs.getString("candidate_name"),
-                    rank = rs.getInt("rank")
+                    rank = rs.getInt("rank"),
+                    tier = rs.getString("tier"), // null when SQL NULL
                 )
                 val metadata = BallotMetadata(
                     confirmation = rs.getString("confirmation"),

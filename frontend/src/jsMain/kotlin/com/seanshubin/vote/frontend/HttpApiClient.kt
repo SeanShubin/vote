@@ -104,16 +104,33 @@ class HttpApiClient(
         )
     }
 
-    override suspend fun setCandidates(electionName: String, candidates: List<String>) {
-        val request = SetCandidatesRequest(candidates)
-        putWithAuth<SetCandidatesRequest, Unit>(
-            "/election/${encodeURIComponent(electionName)}/candidates",
+    override suspend fun addCandidates(electionName: String, candidateNames: List<String>) {
+        val request = AddCandidatesRequest(candidateNames)
+        postWithAuth<AddCandidatesRequest, Unit>(
+            "/election/${encodeURIComponent(electionName)}/candidate-add",
             request,
+        )
+    }
+
+    override suspend fun removeCandidate(electionName: String, candidateName: String) {
+        deleteWithAuth(
+            "/election/${encodeURIComponent(electionName)}/candidate/${encodeURIComponent(candidateName)}"
         )
     }
 
     override suspend fun listCandidates(electionName: String): List<String> =
         getWithAuth("/election/${encodeURIComponent(electionName)}/candidates")
+
+    override suspend fun renameCandidate(electionName: String, oldName: String, newName: String) {
+        val request = RenameCandidateRequest(oldName, newName)
+        postWithAuth<RenameCandidateRequest, Unit>(
+            "/election/${encodeURIComponent(electionName)}/candidate-rename",
+            request,
+        )
+    }
+
+    override suspend fun candidateBallotCounts(electionName: String): Map<String, Int> =
+        getWithAuth("/election/${encodeURIComponent(electionName)}/candidate-ballot-counts")
 
     override suspend fun setTiers(electionName: String, tiers: List<String>) {
         val request = SetTiersRequest(tiers)
@@ -125,6 +142,14 @@ class HttpApiClient(
 
     override suspend fun listTiers(electionName: String): List<String> =
         getWithAuth("/election/${encodeURIComponent(electionName)}/tiers")
+
+    override suspend fun renameTier(electionName: String, oldName: String, newName: String) {
+        val request = RenameTierRequest(oldName, newName)
+        postWithAuth<RenameTierRequest, Unit>(
+            "/election/${encodeURIComponent(electionName)}/tier-rename",
+            request,
+        )
+    }
 
     override suspend fun castBallot(electionName: String, rankings: List<Ranking>): String {
         val voterName = requireSession().userName
@@ -153,12 +178,23 @@ class HttpApiClient(
         deleteWithAuth("/election/${encodeURIComponent(electionName)}")
     }
 
+    override suspend fun transferElectionOwnership(electionName: String, newOwnerName: String) {
+        val request = TransferElectionOwnershipRequest(newOwnerName)
+        putWithAuth<TransferElectionOwnershipRequest, Unit>(
+            "/election/${encodeURIComponent(electionName)}/owner",
+            request,
+        )
+    }
+
     override suspend fun removeUser(userName: String) {
         deleteWithAuth("/user/${encodeURIComponent(userName)}")
     }
 
     override suspend fun listUsers(): List<UserNameRole> =
         getWithAuth("/users")
+
+    override suspend fun listUserNames(): List<String> =
+        getWithAuth("/users/names")
 
     override suspend fun getUserActivity(): UserActivity =
         getWithAuth("/me/activity")

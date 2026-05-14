@@ -98,6 +98,19 @@ sealed interface DomainEvent {
     ) : DomainEvent
 
     /**
+     * Election ownership handoff. Distinct from [OwnershipTransferred], which
+     * moves the global OWNER role between users — this just changes who owns
+     * a single election. The new owner gains the same election-edit/delete
+     * authority the previous owner had; nothing else about either user changes.
+     */
+    @Serializable
+    @SerialName("ElectionOwnerChanged")
+    data class ElectionOwnerChanged(
+        val electionName: String,
+        val newOwnerName: String,
+    ) : DomainEvent
+
+    /**
      * Description edits after creation. The owner can change the description
      * freely — unlike tier names, it isn't part of the meaning of any cast
      * ballot, so there's no "no ballots exist" lock here.
@@ -127,19 +140,52 @@ sealed interface DomainEvent {
     ) : DomainEvent
 
     /**
-     * Tier list management. Tier names are the thresholds candidates can
-     * clear — they appear as virtual candidates on every ballot. Tier
-     * names are atomic: a single event replaces the entire ordered list.
-     * Empty list disables tier voting; non-empty enables it. The
-     * validation rule "tier names cannot change while ballots exist" is
-     * enforced in the service layer before this event is emitted, so the
-     * event applier can trust whatever it reads.
+     * Rename a candidate in place. The new name takes over wherever the old
+     * name appeared — the candidate row itself plus every ranking in every
+     * cast ballot for this election. Ballots' [Ranking.rank] values are
+     * preserved; only the [Ranking.candidateName] is rewritten.
+     */
+    @Serializable
+    @SerialName("CandidateRenamed")
+    data class CandidateRenamed(
+        val electionName: String,
+        val oldName: String,
+        val newName: String,
+    ) : DomainEvent
+
+    /**
+     * Tier list management. Tier names are the thresholds candidates
+     * cleared in a voter's ranking; they're projected into every ballot
+     * as virtual candidates at tally time. Empty list disables tier
+     * voting; non-empty enables it.
+     *
+     * Renames are intentionally **not** done via this event — that's
+     * [TierRenamed]. TiersSet handles add/remove (and reorder, if the
+     * resulting list is otherwise unchanged): when a tier is removed
+     * here, the projection at compute time treats rankings still
+     * annotated with that tier as `tier = null` (cleared no tier).
      */
     @Serializable
     @SerialName("TiersSet")
     data class TiersSet(
         val electionName: String,
         val tierNames: List<String>
+    ) : DomainEvent
+
+    /**
+     * Rename a tier in place. The new name takes over wherever the old
+     * one appeared — the tier row itself plus every [Ranking.tier]
+     * annotation on every cast ballot for this election. Since the
+     * voter's intent is encoded as "this candidate cleared the
+     * second-prestige tier" via the label, swapping the label preserves
+     * the intent — Schulze sees the same virtual ballot before and after.
+     */
+    @Serializable
+    @SerialName("TierRenamed")
+    data class TierRenamed(
+        val electionName: String,
+        val oldName: String,
+        val newName: String,
     ) : DomainEvent
 
     /**

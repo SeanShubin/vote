@@ -168,6 +168,7 @@ fun ElectionDetailPage(
                         existingCandidates = candidates,
                         existingTiers = loadedElection?.tiers ?: emptyList(),
                         ballotsExist = (loadedElection?.ballotCount ?: 0) > 0,
+                        currentOwnerName = loadedElection?.ownerName ?: "",
                         onDescriptionSaved = { newDescription ->
                             successMessage = "Description saved"
                             errorMessage = null
@@ -177,8 +178,9 @@ fun ElectionDetailPage(
                                 e.copy(description = newDescription) to c
                             }
                         },
-                        onCandidatesSaved = { newCandidates ->
-                            successMessage = "Candidates saved"
+                        onCandidatesAdded = { added ->
+                            successMessage = if (added.size == 1) "Added \"${added[0]}\""
+                            else "Added ${added.size} candidates"
                             errorMessage = null
                             // Patch the candidate list and the header count
                             // immediately so the UI feels instant. The tally
@@ -187,8 +189,29 @@ fun ElectionDetailPage(
                             // helper keeps the prior tally visible during
                             // the refetch, so the Results tab does not flash
                             // to Loading.
-                            lastLoadedShell = lastLoadedShell?.let { (e, _) ->
-                                e.copy(candidateCount = newCandidates.size) to newCandidates
+                            lastLoadedShell = lastLoadedShell?.let { (e, c) ->
+                                val merged = (c + added).distinct()
+                                e.copy(candidateCount = merged.size) to merged
+                            }
+                            tallyFetch.reload()
+                        },
+                        onCandidateRemoved = { removed ->
+                            successMessage = "Removed \"$removed\""
+                            errorMessage = null
+                            lastLoadedShell = lastLoadedShell?.let { (e, c) ->
+                                val remaining = c.filter { it != removed }
+                                e.copy(candidateCount = remaining.size) to remaining
+                            }
+                            tallyFetch.reload()
+                        },
+                        onCandidateRenamed = { oldName, newName ->
+                            successMessage = "Renamed \"$oldName\" to \"$newName\""
+                            errorMessage = null
+                            // Patch the local candidate list in place so the
+                            // setup row re-sorts immediately; ballot counts
+                            // are refetched by ElectionSetupView itself.
+                            lastLoadedShell = lastLoadedShell?.let { (e, c) ->
+                                e to c.map { if (it == oldName) newName else it }
                             }
                             tallyFetch.reload()
                         },
@@ -196,15 +219,44 @@ fun ElectionDetailPage(
                             successMessage = "Tiers saved"
                             errorMessage = null
                             // Tier markers participate in strongest-path
-                            // calculations, so the tally needs the same
-                            // refresh treatment as candidates. (Tiers are
-                            // locked while ballots exist, so in practice
-                            // the tally will be empty here, but the refresh
-                            // keeps the invariant honest.)
+                            // calculations, so the tally needs a refresh.
+                            // The new model allows setTiers any time (the
+                            // no-ballots lock is gone), so the tally may
+                            // legitimately have non-empty rankings whose
+                            // tier annotations just got cleared by a remove.
                             lastLoadedShell = lastLoadedShell?.let { (e, c) ->
                                 e.copy(tiers = newTiers) to c
                             }
                             tallyFetch.reload()
+                        },
+                        onTierRenamed = { oldName, newName ->
+                            successMessage = "Renamed tier \"$oldName\" to \"$newName\""
+                            errorMessage = null
+                            // Patch the local tier list so the row re-renders
+                            // with the new label without a full shell refetch.
+                            // The rename cascaded across ballot rankings on
+                            // the server, so the tally rebuilds against the
+                            // new label too — reload to refresh.
+                            lastLoadedShell = lastLoadedShell?.let { (e, c) ->
+                                e.copy(tiers = e.tiers.map { if (it == oldName) newName else it }) to c
+                            }
+                            tallyFetch.reload()
+                        },
+                        onOwnerTransferred = { newOwnerName ->
+                            successMessage = "Ownership transferred to $newOwnerName"
+                            errorMessage = null
+                            // Patch the header so the new owner is reflected
+                            // immediately. The canSetup gate above is derived
+                            // from this and may flip false next render — if
+                            // the transferrer no longer matches and isn't
+                            // ADMIN+, the Setup tab disappears and the
+                            // LaunchedEffect bounces them to "vote".
+                            lastLoadedShell = lastLoadedShell?.let { (e, c) ->
+                                e.copy(ownerName = newOwnerName) to c
+                            }
+                            // The Elections list still shows the old owner —
+                            // invalidate so a navigation back picks up fresh.
+                            PageCache.invalidate("elections")
                         },
                         onError = { errorMessage = it },
                     )

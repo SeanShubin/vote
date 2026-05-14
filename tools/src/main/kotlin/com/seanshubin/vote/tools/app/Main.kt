@@ -40,6 +40,7 @@ import com.seanshubin.vote.tools.commands.LaunchKeepDynamodb
 import com.seanshubin.vote.tools.commands.LaunchKeepMysql
 import com.seanshubin.vote.tools.commands.LaunchScenarioDynamodb
 import com.seanshubin.vote.tools.commands.LaunchScenarioMysql
+import com.seanshubin.vote.tools.commands.MigrateTiers
 import com.seanshubin.vote.tools.commands.NukeDynamodb
 import com.seanshubin.vote.tools.commands.PadTables
 import com.seanshubin.vote.tools.commands.PurgeDynamodb
@@ -107,6 +108,7 @@ fun main(args: Array<String>) {
             GenerateScenarioEventLog(),
             PadTables(),
             LaunchScenarioMysql(),
+            MigrateTiers(),
             LaunchScenarioDynamodb(),
             TestLifecycle(),
             WorktreeSync()

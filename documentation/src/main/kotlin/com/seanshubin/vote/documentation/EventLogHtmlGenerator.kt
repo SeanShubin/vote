@@ -89,6 +89,10 @@ class EventLogHtmlGenerator(private val eventLog: EventLog) {
             <div class="detail-row"><span class="label">Election:</span> ${event.electionName}</div>
             <div class="detail-row"><span class="label">New Description:</span> ${event.newDescription}</div>
         """.trimIndent()
+        is DomainEvent.ElectionOwnerChanged -> """
+            <div class="detail-row"><span class="label">Election:</span> ${event.electionName}</div>
+            <div class="detail-row"><span class="label">New Owner:</span> ${event.newOwnerName}</div>
+        """.trimIndent()
         is DomainEvent.CandidatesAdded -> """
             <div class="detail-row"><span class="label">Election:</span> ${event.electionName}</div>
             <div class="detail-row"><span class="label">Candidates:</span> ${event.candidateNames.joinToString(", ")}</div>
@@ -97,9 +101,19 @@ class EventLogHtmlGenerator(private val eventLog: EventLog) {
             <div class="detail-row"><span class="label">Election:</span> ${event.electionName}</div>
             <div class="detail-row"><span class="label">Candidates:</span> ${event.candidateNames.joinToString(", ")}</div>
         """.trimIndent()
+        is DomainEvent.CandidateRenamed -> """
+            <div class="detail-row"><span class="label">Election:</span> ${event.electionName}</div>
+            <div class="detail-row"><span class="label">Old Name:</span> ${event.oldName}</div>
+            <div class="detail-row"><span class="label">New Name:</span> ${event.newName}</div>
+        """.trimIndent()
         is DomainEvent.TiersSet -> """
             <div class="detail-row"><span class="label">Election:</span> ${event.electionName}</div>
             <div class="detail-row"><span class="label">Tiers:</span> ${event.tierNames.joinToString(", ")}</div>
+        """.trimIndent()
+        is DomainEvent.TierRenamed -> """
+            <div class="detail-row"><span class="label">Election:</span> ${event.electionName}</div>
+            <div class="detail-row"><span class="label">Old Name:</span> ${event.oldName}</div>
+            <div class="detail-row"><span class="label">New Name:</span> ${event.newName}</div>
         """.trimIndent()
         is DomainEvent.BallotCast -> """
             <div class="detail-row"><span class="label">Voter:</span> ${event.voterName}</div>

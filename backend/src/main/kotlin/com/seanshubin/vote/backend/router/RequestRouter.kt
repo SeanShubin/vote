@@ -11,12 +11,15 @@ import com.seanshubin.vote.contract.AuthResponse
 import com.seanshubin.vote.contract.CastBallotRequest
 import com.seanshubin.vote.contract.ClientErrorRequest
 import com.seanshubin.vote.contract.ErrorResponse
+import com.seanshubin.vote.contract.RenameCandidateRequest
+import com.seanshubin.vote.contract.RenameTierRequest
 import com.seanshubin.vote.contract.Service
-import com.seanshubin.vote.contract.SetCandidatesRequest
+import com.seanshubin.vote.contract.AddCandidatesRequest
 import com.seanshubin.vote.contract.SetDescriptionRequest
 import com.seanshubin.vote.contract.SetRoleRequest
 import com.seanshubin.vote.contract.SetTiersRequest
 import com.seanshubin.vote.contract.Tokens
+import com.seanshubin.vote.contract.TransferElectionOwnershipRequest
 import com.seanshubin.vote.domain.Role
 import com.seanshubin.vote.domain.UserUpdates
 import kotlinx.serialization.encodeToString
@@ -106,6 +109,7 @@ class RequestRouter(
         Route("POST", "/logout", { _ -> handleLogout() }),
         Route("GET", "/me/activity", ::handleGetUserActivity),
         Route("GET", "/users", ::handleListUsers),
+        Route("GET", "/users/names", ::handleListUserNames),
         Route("GET", "/users/count", ::handleUserCount),
         Route("GET", "/user/[^/]+", ::handleGetUser),
         Route("PUT", "/user/[^/]+", ::handleUpdateUser),
@@ -124,9 +128,14 @@ class RequestRouter(
         Route("GET", "/elections/count", ::handleElectionCount),
         Route("GET", "/election/[^/]+", ::handleGetElection),
         Route("DELETE", "/election/[^/]+", ::handleDeleteElection),
+        Route("PUT", "/election/[^/]+/owner", ::handleTransferElectionOwnership),
         Route("PUT", "/election/[^/]+/description", ::handleSetDescription),
-        Route("PUT", "/election/[^/]+/candidates", ::handleSetCandidates),
+        Route("POST", "/election/[^/]+/candidate-add", ::handleAddCandidates),
+        Route("DELETE", "/election/[^/]+/candidate/[^/]+", ::handleRemoveCandidate),
         Route("GET", "/election/[^/]+/candidates", ::handleListCandidates),
+        Route("POST", "/election/[^/]+/candidate-rename", ::handleRenameCandidate),
+        Route("POST", "/election/[^/]+/tier-rename", ::handleRenameTier),
+        Route("GET", "/election/[^/]+/candidate-ballot-counts", ::handleCandidateBallotCounts),
         Route("PUT", "/election/[^/]+/tiers", ::handleSetTiers),
         Route("GET", "/election/[^/]+/tiers", ::handleListTiers),
         Route("POST", "/election/[^/]+/ballot", ::handleCastBallot),
@@ -266,6 +275,12 @@ class RequestRouter(
         return HttpResponse(200, json.encodeToString(users))
     }
 
+    private fun handleListUserNames(req: HttpRequest): HttpResponse {
+        val accessToken = extractAccessToken(req)
+        val names = service.listUserNames(accessToken)
+        return HttpResponse(200, json.encodeToString(names))
+    }
+
     private fun handleGetUserActivity(req: HttpRequest): HttpResponse {
         val accessToken = extractAccessToken(req)
         val activity = service.getUserActivity(accessToken)
@@ -397,12 +412,32 @@ class RequestRouter(
         return HttpResponse(200, json.encodeToString(mapOf("status" to "election deleted")))
     }
 
-    private fun handleSetCandidates(req: HttpRequest): HttpResponse {
+    private fun handleTransferElectionOwnership(req: HttpRequest): HttpResponse {
         val accessToken = extractAccessToken(req)
         val electionName = extractElectionName(req.target)
-        val setCandidatesRequest = json.decodeFromString<SetCandidatesRequest>(req.body)
-        service.setCandidates(accessToken, electionName, setCandidatesRequest.candidateNames)
-        return HttpResponse(200, json.encodeToString(mapOf("status" to "candidates updated")))
+        val transferRequest = json.decodeFromString<TransferElectionOwnershipRequest>(req.body)
+        service.transferElectionOwnership(accessToken, electionName, transferRequest.newOwnerName)
+        return HttpResponse(200, json.encodeToString(mapOf("status" to "ownership transferred")))
+    }
+
+    private fun handleAddCandidates(req: HttpRequest): HttpResponse {
+        val accessToken = extractAccessToken(req)
+        val electionName = extractElectionName(req.target)
+        val request = json.decodeFromString<AddCandidatesRequest>(req.body)
+        service.addCandidates(accessToken, electionName, request.candidateNames)
+        return HttpResponse(200, json.encodeToString(mapOf("status" to "candidates added")))
+    }
+
+    private fun handleRemoveCandidate(req: HttpRequest): HttpResponse {
+        val accessToken = extractAccessToken(req)
+        // URL shape: /election/{electionName}/candidate/{candidateName}
+        // The election-name slot lives at parts[2] (post-split-on-/) where
+        // the leading "" from the prefix slash puts /election at index 1.
+        val parts = req.target.split("/")
+        val electionName = java.net.URLDecoder.decode(parts[2], "UTF-8")
+        val candidateName = java.net.URLDecoder.decode(parts[4], "UTF-8")
+        service.removeCandidate(accessToken, electionName, candidateName)
+        return HttpResponse(200, json.encodeToString(mapOf("status" to "candidate removed")))
     }
 
     private fun handleListCandidates(req: HttpRequest): HttpResponse {
@@ -412,12 +447,35 @@ class RequestRouter(
         return HttpResponse(200, json.encodeToString(candidates))
     }
 
+    private fun handleRenameCandidate(req: HttpRequest): HttpResponse {
+        val accessToken = extractAccessToken(req)
+        val electionName = extractElectionName(req.target)
+        val request = json.decodeFromString<RenameCandidateRequest>(req.body)
+        service.renameCandidate(accessToken, electionName, request.oldName, request.newName)
+        return HttpResponse(200, json.encodeToString(mapOf("status" to "candidate renamed")))
+    }
+
+    private fun handleCandidateBallotCounts(req: HttpRequest): HttpResponse {
+        val accessToken = extractAccessToken(req)
+        val electionName = extractElectionName(req.target)
+        val counts = service.candidateBallotCounts(accessToken, electionName)
+        return HttpResponse(200, json.encodeToString(counts))
+    }
+
     private fun handleSetTiers(req: HttpRequest): HttpResponse {
         val accessToken = extractAccessToken(req)
         val electionName = extractElectionName(req.target)
         val setTiersRequest = json.decodeFromString<SetTiersRequest>(req.body)
         service.setTiers(accessToken, electionName, setTiersRequest.tierNames)
         return HttpResponse(200, json.encodeToString(mapOf("status" to "tiers updated")))
+    }
+
+    private fun handleRenameTier(req: HttpRequest): HttpResponse {
+        val accessToken = extractAccessToken(req)
+        val electionName = extractElectionName(req.target)
+        val request = json.decodeFromString<RenameTierRequest>(req.body)
+        service.renameTier(accessToken, electionName, request.oldName, request.newName)
+        return HttpResponse(200, json.encodeToString(mapOf("status" to "tier renamed")))
     }
 
     private fun handleSetDescription(req: HttpRequest): HttpResponse {

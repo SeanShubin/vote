@@ -42,11 +42,17 @@ class HttpRecordingBackend(
         recorder.post("/election", body, token)
     }
 
-    override fun setCandidates(token: AccessToken, electionName: String, candidateNames: List<String>) {
-        val request = SetCandidatesRequest(candidateNames)
+    override fun addCandidates(token: AccessToken, electionName: String, candidateNames: List<String>) {
+        val request = AddCandidatesRequest(candidateNames)
         val body = json.encodeToString(request)
         val encodedName = URLEncoder.encode(electionName, StandardCharsets.UTF_8)
-        recorder.put("/election/$encodedName/candidates", body, token)
+        recorder.post("/election/$encodedName/candidate-add", body, token)
+    }
+
+    override fun removeCandidate(token: AccessToken, electionName: String, candidateName: String) {
+        val encodedElection = URLEncoder.encode(electionName, StandardCharsets.UTF_8)
+        val encodedCandidate = URLEncoder.encode(candidateName, StandardCharsets.UTF_8)
+        recorder.delete("/election/$encodedElection/candidate/$encodedCandidate", token)
     }
 
     override fun setTiers(token: AccessToken, electionName: String, tierNames: List<String>) {
@@ -59,6 +65,13 @@ class HttpRecordingBackend(
     override fun deleteElection(token: AccessToken, electionName: String) {
         val encodedName = URLEncoder.encode(electionName, StandardCharsets.UTF_8)
         recorder.delete("/election/$encodedName", token)
+    }
+
+    override fun transferElectionOwnership(token: AccessToken, electionName: String, newOwnerName: String) {
+        val request = TransferElectionOwnershipRequest(newOwnerName)
+        val body = json.encodeToString(request)
+        val encodedName = URLEncoder.encode(electionName, StandardCharsets.UTF_8)
+        recorder.put("/election/$encodedName/owner", body, token)
     }
 
     override fun castBallot(token: AccessToken, voterName: String, electionName: String, rankings: List<Ranking>): String {

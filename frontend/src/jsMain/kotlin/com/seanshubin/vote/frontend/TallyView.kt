@@ -6,6 +6,7 @@ import com.seanshubin.vote.domain.ElectionTally
 import com.seanshubin.vote.domain.Place
 import com.seanshubin.vote.domain.Tally
 import com.seanshubin.vote.domain.TallySection
+import org.jetbrains.compose.web.attributes.*
 import org.jetbrains.compose.web.dom.*
 
 @Composable
@@ -57,6 +58,23 @@ private fun renderTally(
     }
 
     val allOn = revealed.isEmpty() || active.size == totalToggleable
+    val activeBallots = revealed.filter { it.confirmation in active }
+    val totalActiveBallots = activeBallots.size
+    // Each ballot contributes at most once per candidate. A candidate "shows
+    // up on" a ballot when that ballot has a Ranking for it with a non-null
+    // rank — same predicate Tally.countBallots uses to decide a ballot
+    // expresses a preference involving the candidate.
+    val ballotsPerCandidate: Map<String, Int> = remember(serverTally, active) {
+        revealed.filter { it.confirmation in active }
+            .flatMap { ballot ->
+                ballot.rankings
+                    .filter { it.rank != null }
+                    .map { it.candidateName }
+                    .toSet()
+            }
+            .groupingBy { it }
+            .eachCount()
+    }
     // Memoize the Schulze recomputation against (serverTally, active). The
     // strongest-paths pass inside Tally.countBallots is O(n³) on the candidate
     // count, so without the remember Compose would re-run it on every
@@ -68,10 +86,16 @@ private fun renderTally(
         serverTally.sections
     } else {
         remember(serverTally, active) {
+            // The server's tally.candidateNames is real candidates + tier
+            // markers (the matrix node list). Split it back into the two
+            // inputs countBallots wants: real candidates and tiers.
+            val tierSet = serverTally.tiers.toSet()
+            val realCandidates = serverTally.tally.candidateNames.filterNot { it in tierSet }
             val recomputed = Tally.countBallots(
                 electionName = serverTally.tally.electionName,
                 secretBallot = serverTally.tally.secretBallot,
-                candidates = serverTally.tally.candidateNames,
+                candidates = realCandidates,
+                tiers = serverTally.tiers,
                 ballots = revealed.filter { it.confirmation in active },
             )
             TallySection.compute(recomputed.places, serverTally.tiers)
@@ -94,10 +118,15 @@ private fun renderTally(
     } else {
         val sections = displaySections
 
+        val ballotNoun = if (totalActiveBallots == 1) "ballot" else "ballots"
         val renderPlaceList: @Composable (List<Place>) -> Unit = { places ->
             Ol({ classes("ranked-ballot-list") }) {
                 places.forEach { place ->
-                    Li({ classes("ranked-ballot-row") }) {
+                    val appearances = ballotsPerCandidate[place.candidateName] ?: 0
+                    Li({
+                        classes("ranked-ballot-row")
+                        title("Ranked on $appearances of $totalActiveBallots $ballotNoun")
+                    }) {
                         Span({ classes("ranked-ballot-rank-num") }) { Text(ordinal(place.rank)) }
                         Span({ classes("ranked-ballot-row-name") }) { Text(place.candidateName) }
                     }
