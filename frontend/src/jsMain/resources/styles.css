@@ -252,6 +252,22 @@ button:disabled {
     background-color: #ecf0f1;
 }
 
+/*
+ * Active tab: a thick blue bottom border sits on top of the strip's grey
+ * .tabs border-bottom so the selected tab visually "owns" the content
+ * below it. The -2px margin pulls the border down to overlap the strip.
+ */
+.tabs button.active {
+    color: #2c3e50;
+    font-weight: bold;
+    border-bottom: 3px solid #2c7be5;
+    margin-bottom: -2px;
+}
+
+.tabs button.active:hover {
+    background-color: transparent;
+}
+
 .section {
     margin-top: 1rem;
 }

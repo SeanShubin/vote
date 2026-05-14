@@ -158,19 +158,29 @@ fun ElectionDetailPage(
             else -> {
                 val (_, candidates) = lastLoadedShell!!
 
-                // Tabs (no more Details — the header above covers it).
-                Div({ classes("tabs") }) {
-                    if (canSetup) {
-                        Button({ onClick { currentView = "setup" } }) { Text("Setup") }
-                    }
-                    Button({ onClick { currentView = "vote" } }) { Text("Vote") }
-                    Button({ onClick { currentView = "tally" } }) { Text("Results") }
-                }
-
                 // Defense in depth: if the LaunchedEffect above hasn't fired
                 // yet (first frame after load), treat "setup" as "vote" for
                 // viewers who can't setup so they never see the edit pane.
                 val effectiveView = if (currentView == "setup" && !canSetup) "vote" else currentView
+
+                // Tabs (no more Details — the header above covers it).
+                Div({ classes("tabs") }) {
+                    if (canSetup) {
+                        Button({
+                            if (effectiveView == "setup") classes("active")
+                            onClick { currentView = "setup" }
+                        }) { Text("Setup") }
+                    }
+                    Button({
+                        if (effectiveView == "vote") classes("active")
+                        onClick { currentView = "vote" }
+                    }) { Text("Vote") }
+                    Button({
+                        if (effectiveView == "tally") classes("active")
+                        onClick { currentView = "tally" }
+                    }) { Text("Results") }
+                }
+
                 when (effectiveView) {
                     "setup" -> ElectionSetupView(
                         apiClient = apiClient,
