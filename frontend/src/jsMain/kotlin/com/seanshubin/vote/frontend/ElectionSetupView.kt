@@ -59,6 +59,19 @@ fun ElectionSetupView(
     // shift when the numbers arrive.
     var ballotCounts by remember(existingCandidates) { mutableStateOf<Map<String, Int>?>(null) }
 
+    // Transient "Copied!" toast next to the Copy Candidates button. Cleared
+    // after a short delay; the token bumps each click so a rapid second
+    // click restarts the timer instead of the older coroutine clearing the
+    // message early.
+    var copyFeedback by remember { mutableStateOf<String?>(null) }
+    var copyFeedbackToken by remember { mutableStateOf(0) }
+    LaunchedEffect(copyFeedbackToken) {
+        if (copyFeedback != null) {
+            kotlinx.coroutines.delay(2000)
+            copyFeedback = null
+        }
+    }
+
     LaunchedEffect(electionName, existingCandidates) {
         try {
             ballotCounts = apiClient.candidateBallotCounts(electionName)
@@ -288,6 +301,23 @@ fun ElectionSetupView(
                             }
                         }
                     }
+                }
+            }
+
+            // Copy the candidate list to the clipboard, one name per line —
+            // the same format the "Add candidates" textarea parses — so an
+            // owner can paste it straight into a new election's setup.
+            Div({ classes("candidate-copy-row") }) {
+                Button({
+                    onClick {
+                        copyTextToClipboard(sorted.joinToString("\n"))
+                        copyFeedback = "Copied ${sorted.size} candidate" +
+                            (if (sorted.size == 1) "" else "s") + "!"
+                        copyFeedbackToken += 1
+                    }
+                }) { Text("Copy Candidates") }
+                if (copyFeedback != null) {
+                    Span({ classes("copy-feedback") }) { Text(copyFeedback!!) }
                 }
             }
         }

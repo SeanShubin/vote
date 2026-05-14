@@ -325,6 +325,20 @@ button:disabled {
     font-weight: 500;
 }
 
+/* Copy-candidates button + its transient "Copied!" toast, sitting just
+ * below the candidate list. */
+.candidate-copy-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.copy-feedback {
+    font-size: 0.85rem;
+    color: #2c5282;
+}
+
 /*
  * Ballot-count badge — pushed to the right of the name, sits next to the
  * Rename button. Visual weight is the same as the surrounding row so a

@@ -750,7 +750,7 @@ private data class TierChunk(
  * surfaced as a console error rather than thrown — the caller has already
  * shown a "Copied!" toast and there's no graceful in-UI recovery here.
  */
-private fun copyTextToClipboard(text: String) {
+internal fun copyTextToClipboard(text: String) {
     try {
         val clipboard = window.navigator.asDynamic().clipboard
         if (clipboard != null && clipboard != js("undefined")) {
