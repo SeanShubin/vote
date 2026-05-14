@@ -24,8 +24,13 @@ env:
   BOOTSTRAP_STACK: pairwisevote-bootstrap
   DOMAIN_NAME: pairwisevote.com
 
+# The three build jobs run in parallel on separate runners, then `deploy`
+# fans them back in. Each build job uploads its artifact; `deploy` downloads
+# them instead of rebuilding. The Gradle build cache (org.gradle.caching=true
+# in gradle.properties, persisted across runs by setup-gradle) keeps the
+# unavoidable per-job recompilation cheap on warm runs.
 jobs:
-  deploy:
+  build-backend:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -39,14 +44,30 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v3
 
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions-deploy
-          aws-region: ${{ env.AWS_REGION }}
-
       - name: Build backend shadow JAR
         run: ./gradlew :backend:shadowJar
+
+      - name: Upload backend JAR
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-jar
+          path: backend/build/libs/vote-backend-lambda.jar
+          if-no-files-found: error
+          retention-days: 1
+
+  build-frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: corretto
+          java-version: 21
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v3
 
       - name: Build frontend production bundle
         run: |
@@ -54,15 +75,74 @@ jobs:
             -Papi.base.url=/api \
             -Pgit.hash=${{ github.sha }}
 
+      - name: Upload frontend bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-bundle
+          path: frontend/build/dist/js/productionExecutable/
+          if-no-files-found: error
+          retention-days: 1
+
+  generate-docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: corretto
+          java-version: 21
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v3
+
       - name: Install graphviz (for schema diagram SVG rendering)
         run: sudo apt-get update && sudo apt-get install -y graphviz
 
       - name: Generate code-structure + documentation reports
         # Transitively runs :analyzeCodeStructure and :schema-diagram:generateSchemaDiagram.
-        # Failing this step blocks the deploy — analyzer's maximumAllowedErrorCount=0
-        # is the build gate against cycles + ancestor/descendant violations.
-        # Reports are still uploaded below (if: always()) when this fails.
+        # Failing this job blocks the deploy (deploy `needs` it) — analyzer's
+        # maximumAllowedErrorCount=0 is the build gate against cycles +
+        # ancestor/descendant violations. Reports are still uploaded below
+        # (if: always()) when this fails.
         run: ./gradlew :documentation:generateDocumentation
+
+      - name: Upload generated reports
+        if: always()  # capture partial reports even when the build step failed
+        uses: actions/upload-artifact@v4
+        with:
+          name: generated-reports-${{ github.run_number }}
+          path: generated/
+          retention-days: 14
+          if-no-files-found: warn
+
+  deploy:
+    needs: [build-backend, build-frontend, generate-docs]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions-deploy
+          aws-region: ${{ env.AWS_REGION }}
+
+      # Download the artifacts built by the parallel jobs into the same paths
+      # the build steps used to produce them, so the CFN package + S3 sync
+      # steps below are unchanged.
+      - name: Download backend JAR
+        uses: actions/download-artifact@v4
+        with:
+          name: backend-jar
+          path: backend/build/libs/
+
+      - name: Download frontend bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-bundle
+          path: frontend/build/dist/js/productionExecutable/
 
       - name: Resolve bootstrap outputs (zone + artifacts bucket)
         id: meta
@@ -155,12 +235,3 @@ jobs:
           done
           echo "Backend smoke test failed."
           exit 1
-
-      - name: Upload generated reports
-        if: always()  # capture partial reports even when an earlier step failed
-        uses: actions/upload-artifact@v4
-        with:
-          name: generated-reports-${{ github.run_number }}
-          path: generated/
-          retention-days: 14
-          if-no-files-found: warn
