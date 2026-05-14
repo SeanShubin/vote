@@ -680,8 +680,42 @@ button:disabled {
     color: #34495e;
 }
 
+/*
+ * Winners rows carry a ballot-coverage indicator (how many active ballots
+ * ranked this candidate). The row becomes a vertical stack: the rank/name/
+ * count content sits above a full-width fill bar pinned to the bottom edge.
+ * overflow:hidden clips the bar to the row's rounded corners.
+ */
 .tally-results .ranked-ballot-row {
     cursor: default;
+    flex-direction: column;
+    align-items: stretch;
+    height: auto;
+    overflow: hidden;
+}
+
+.ranked-ballot-coverage-content {
+    display: flex;
+    align-items: center;
+    height: 56px;
+}
+
+.ranked-ballot-coverage-count {
+    flex-shrink: 0;
+    padding-right: 0.75rem;
+    font-size: 0.8rem;
+    color: #7a8aa0;
+    font-variant-numeric: tabular-nums;
+}
+
+.ranked-ballot-coverage-bar {
+    height: 4px;
+    background: #e8eef5;
+}
+
+.ranked-ballot-coverage-bar-fill {
+    height: 100%;
+    background: #3498db;
 }
 
 .ranked-ballot-rank-num {

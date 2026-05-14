@@ -7,6 +7,7 @@ import com.seanshubin.vote.domain.Place
 import com.seanshubin.vote.domain.Tally
 import com.seanshubin.vote.domain.TallySection
 import org.jetbrains.compose.web.attributes.*
+import org.jetbrains.compose.web.css.*
 import org.jetbrains.compose.web.dom.*
 
 @Composable
@@ -132,12 +133,31 @@ private fun renderTally(
             Ol({ classes("ranked-ballot-list") }) {
                 places.forEach { place ->
                     val appearances = ballotsPerCandidate[place.candidateName] ?: 0
+                    // Coverage = share of active ballots that ranked this
+                    // candidate. Higher coverage means the placement rests on
+                    // more voter input, so it's more trustworthy. Shown
+                    // passively as a fill bar (scan) plus an exact count
+                    // (read), since the hover tooltip is invisible on mobile.
+                    val coveragePercent =
+                        if (totalActiveBallots == 0) 0.0
+                        else appearances * 100.0 / totalActiveBallots
                     Li({
                         classes("ranked-ballot-row")
                         title("Ranked on $appearances of $totalActiveBallots $ballotNoun")
                     }) {
-                        Span({ classes("ranked-ballot-rank-num") }) { Text(ordinal(place.rank)) }
-                        Span({ classes("ranked-ballot-row-name") }) { Text(place.candidateName) }
+                        Div({ classes("ranked-ballot-coverage-content") }) {
+                            Span({ classes("ranked-ballot-rank-num") }) { Text(ordinal(place.rank)) }
+                            Span({ classes("ranked-ballot-row-name") }) { Text(place.candidateName) }
+                            Span({ classes("ranked-ballot-coverage-count") }) {
+                                Text("$appearances/$totalActiveBallots")
+                            }
+                        }
+                        Div({ classes("ranked-ballot-coverage-bar") }) {
+                            Div({
+                                classes("ranked-ballot-coverage-bar-fill")
+                                style { width(coveragePercent.percent) }
+                            }) {}
+                        }
                     }
                 }
             }
