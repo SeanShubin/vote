@@ -111,10 +111,13 @@ live in SSM Parameter Store under `/${StackName}/discord/`:
 | `/pairwisevote-frontend/discord/guild-id`      | `String`       | Right-click the Discord server with Developer Mode on → Copy Server ID |
 | `/pairwisevote-frontend/discord/client-secret` | `SecureString` | Discord Developer Portal → Application → OAuth2 → Reset Secret         |
 
-CFN provisions the three plain-`String` parameters with placeholder values.
-`SecureString` cannot be created by CloudFormation, so the operator runs
-`aws ssm put-parameter --type SecureString --overwrite ...` once after the
-first deploy.
+All four parameters are operator-managed — they live outside the CFN
+template entirely. `template.yaml` only declares their paths in the
+Lambda's env vars and IAM policy. This decouples secret provisioning
+from deploy timing: you can create the parameters before the first
+deploy (so local-dev testing against deployed SSM works immediately),
+and re-creating the stack later doesn't trip "parameter already exists"
+errors against the values you've populated.
 
 The Lambda re-reads each value at most every 5 minutes (in-process cache),
 so rotating any of them takes effect within one TTL window — no redeploy

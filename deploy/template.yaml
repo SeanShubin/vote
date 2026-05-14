@@ -198,49 +198,22 @@ Resources:
         PasswordLength: 64
 
   # ─── Discord OAuth secrets ────────────────────────────────────────────────
-  # Public values (client id, redirect URI, guild id) ship as plain String
-  # parameters; the OAuth client secret ships as a SecureString so it's
-  # encrypted at rest with the default AWS-managed KMS key. The Lambda role
-  # below grants ssm:GetParameter on these four paths only — a compromised
-  # Lambda can't enumerate other secrets in SSM. Rotate any value with
-  # `aws ssm put-parameter --name ... --overwrite` (and `--type SecureString`
-  # for the client secret); the in-process cache picks up the new value
-  # within five minutes — no redeploy required.
+  # The four SSM parameters at /${AWS::StackName}/discord/{client-id,
+  # client-secret, redirect-uri, guild-id} are operator-managed — they live
+  # outside this template entirely. The Lambda env vars below carry only the
+  # PATHS; the actual values are read at runtime from SSM and cached for
+  # five minutes. Rotate any value with `aws ssm put-parameter --overwrite`
+  # (use `--type SecureString` for client-secret); the cache picks up the
+  # new value within one TTL window — no redeploy required.
   #
-  # SecureString is NOT supported by CloudFormation's AWS::SSM::Parameter for
-  # value creation (https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ssm-parameter.html).
-  # Create the client-secret parameter manually after the stack comes up:
-  #
-  #   aws ssm put-parameter \
-  #     --name /<stack>/discord/client-secret \
-  #     --type SecureString \
-  #     --value '<discord client secret>' \
-  #     --overwrite
-  #
-  # The three plain-String parameters (id, redirect-uri, guild-id) are
-  # provisioned here with placeholders; the operator edits them to the real
-  # values via the SSM console or `aws ssm put-parameter --overwrite`.
-  DiscordClientIdParameter:
-    Type: AWS::SSM::Parameter
-    Properties:
-      Name: !Sub "/${AWS::StackName}/discord/client-id"
-      Type: String
-      Value: change-me-after-deploy
-      Description: Discord OAuth application client id.
-  DiscordRedirectUriParameter:
-    Type: AWS::SSM::Parameter
-    Properties:
-      Name: !Sub "/${AWS::StackName}/discord/redirect-uri"
-      Type: String
-      Value: !Sub "https://${DomainName}/api/auth/discord/callback"
-      Description: Discord OAuth redirect URI — must match the value configured in the Discord application.
-  DiscordGuildIdParameter:
-    Type: AWS::SSM::Parameter
-    Properties:
-      Name: !Sub "/${AWS::StackName}/discord/guild-id"
-      Type: String
-      Value: change-me-after-deploy
-      Description: Discord guild id — only members of this guild may sign in.
+  # Provisioning them in CFN was tried and rejected: CFN can't create the
+  # SecureString client-secret at all, and CFN-managed parameters with
+  # placeholder values (a) trip "already exists" errors against
+  # parameters created out-of-band first, and (b) couple deploy timing to
+  # secret provisioning. Operator-managed via the scripts in
+  # .local/temp-scripts/ keeps secrets and infrastructure independent.
+  # The IAM policy on the Lambda function (below) grants ssm:GetParameter
+  # on these four paths only.
 
   # Hard-coded table names (vote_data, vote_event_log) match the constants
   # in DynamoDbSingleTableSchema.kt — keeps the code simple, locks the stack
@@ -337,10 +310,10 @@ Resources:
           # SSM parameter PATHS. The actual Discord secrets are fetched from
           # SSM at runtime — they never appear in this template, the Lambda
           # config, or any code file.
-          DISCORD_CLIENT_ID_PARAMETER_NAME: !Ref DiscordClientIdParameter
+          DISCORD_CLIENT_ID_PARAMETER_NAME: !Sub "/${AWS::StackName}/discord/client-id"
           DISCORD_CLIENT_SECRET_PARAMETER_NAME: !Sub "/${AWS::StackName}/discord/client-secret"
-          DISCORD_REDIRECT_URI_PARAMETER_NAME: !Ref DiscordRedirectUriParameter
-          DISCORD_GUILD_ID_PARAMETER_NAME: !Ref DiscordGuildIdParameter
+          DISCORD_REDIRECT_URI_PARAMETER_NAME: !Sub "/${AWS::StackName}/discord/redirect-uri"
+          DISCORD_GUILD_ID_PARAMETER_NAME: !Sub "/${AWS::StackName}/discord/guild-id"
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref MainTable
@@ -469,11 +442,13 @@ Outputs:
     Value: !Sub "https://${BackendApi}.execute-api.${AWS::Region}.amazonaws.com"
   BackendThroughCloudFront:
     Value: !Sub "https://${DomainName}/api"
-  DiscordClientSecretParameterName:
+  DiscordParameterPathPrefix:
     Description: >-
-      Path of the SecureString SSM parameter that must be created out-of-band
-      with the Discord OAuth client secret. SecureString values cannot be
-      created via CloudFormation, so the operator runs
-      `aws ssm put-parameter --type SecureString --overwrite ...` once after
-      stack creation.
-    Value: !Sub "/${AWS::StackName}/discord/client-secret"
+      SSM path prefix for the four operator-managed Discord OAuth
+      parameters (client-id, client-secret, redirect-uri, guild-id).
+      None are managed by this template — provision them with
+      .local/temp-scripts/set-discord-ssm-parameters.ps1 (the
+      client-secret is a SecureString; the other three are plain
+      Strings). The Lambda's IAM policy and env vars in this template
+      reference these paths directly.
+    Value: !Sub "/${AWS::StackName}/discord/"
