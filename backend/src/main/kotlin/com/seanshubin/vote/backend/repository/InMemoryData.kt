@@ -17,12 +17,11 @@ class InMemoryData {
 
     data class UserData(
         val name: String,
-        val email: String,
-        val salt: String,
-        val hash: String,
-        val role: Role
+        val role: Role,
+        val discordId: String = "",
+        val discordDisplayName: String = "",
     ) {
-        fun toUser() = User(name, email, salt, hash, role)
+        fun toUser() = User(name, role, discordId, discordDisplayName)
     }
 
     data class ElectionData(

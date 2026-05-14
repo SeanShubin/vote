@@ -1,7 +1,10 @@
 package com.seanshubin.vote.backend.dependencies
 
 import aws.sdk.kotlin.services.dynamodb.DynamoDbClient
+import com.seanshubin.vote.backend.auth.DiscordConfigProvider
+import com.seanshubin.vote.backend.auth.DiscordOAuthClient
 import com.seanshubin.vote.backend.auth.JwtCipher
+import com.seanshubin.vote.backend.auth.SsmDiscordConfigProvider
 import com.seanshubin.vote.backend.auth.TokenEncoder
 import com.seanshubin.vote.backend.router.RequestRouter
 import com.seanshubin.vote.backend.router.SimpleHttpHandler
@@ -50,6 +53,23 @@ class ApplicationRunner(
 
         val tokenEncoder = TokenEncoder(JwtCipher(configuration.jwtSecret))
 
+        // Discord login is enabled only when all four SSM parameter names are
+        // present (and the SSM lookup succeeds for each). Dev runs that don't
+        // configure Discord get the no-op provider; ServiceImpl rejects
+        // Discord login attempts with UNSUPPORTED in that case.
+        val discordConfigProvider: DiscordConfigProvider =
+            configuration.discordParameterNames?.let { names ->
+                val region = (configuration.databaseConfig as? DatabaseConfig.DynamoDB)?.region
+                    ?: "us-east-1"
+                SsmDiscordConfigProvider(
+                    clientIdParameterName = names.clientId,
+                    clientSecretParameterName = names.clientSecret,
+                    redirectUriParameterName = names.redirectUri,
+                    guildIdParameterName = names.guildId,
+                    region = region,
+                )
+            } ?: DiscordConfigProvider { null }
+
         val service = ServiceImpl(
             integrations = integrations,
             eventLog = repositories.eventLog,
@@ -57,7 +77,8 @@ class ApplicationRunner(
             queryModel = repositories.queryModel,
             rawTableScanner = repositories.rawTableScanner,
             tokenEncoder = tokenEncoder,
-            frontendBaseUrl = configuration.frontendBaseUrl,
+            discordConfigProvider = discordConfigProvider,
+            discordOAuthClient = DiscordOAuthClient(),
         )
 
         // Replay the event log into the projection so the scan below sees a
@@ -67,7 +88,13 @@ class ApplicationRunner(
         service.synchronize()
         CandidateTierCollisionCheck(repositories.queryModel).verify()
 
-        val router = RequestRouter(service, json, tokenEncoder, configuration.cookieConfig)
+        val router = RequestRouter(
+            service = service,
+            json = json,
+            tokenEncoder = tokenEncoder,
+            refreshCookie = configuration.cookieConfig,
+            frontendBaseUrl = configuration.frontendBaseUrl,
+        )
         val httpHandler = SimpleHttpHandler(router)
         server = Server(configuration.port)
         server!!.handler = httpHandler

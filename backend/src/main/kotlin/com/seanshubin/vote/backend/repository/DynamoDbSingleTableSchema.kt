@@ -6,7 +6,6 @@ import aws.sdk.kotlin.services.dynamodb.model.*
 object DynamoDbSingleTableSchema {
     const val MAIN_TABLE = "vote_data"
     const val EVENT_LOG_TABLE = "vote_event_log"
-    const val EMAIL_INDEX = "email-index"
 
     // Entity type prefixes
     const val USER_PREFIX = "USER#"
@@ -22,6 +21,9 @@ object DynamoDbSingleTableSchema {
     }
 
     private suspend fun createMainTable(dynamoDb: DynamoDbClient) {
+        // PK / SK only — the email-index GSI that supported password-flow
+        // email lookups is gone now that Discord-only login removed every
+        // by-email lookup path.
         dynamoDb.createTable(CreateTableRequest {
             tableName = MAIN_TABLE
             keySchema = listOf(
@@ -43,32 +45,6 @@ object DynamoDbSingleTableSchema {
                     attributeName = "SK"
                     attributeType = ScalarAttributeType.S
                 },
-                AttributeDefinition {
-                    attributeName = "GSI1PK"
-                    attributeType = ScalarAttributeType.S
-                },
-                AttributeDefinition {
-                    attributeName = "GSI1SK"
-                    attributeType = ScalarAttributeType.S
-                }
-            )
-            globalSecondaryIndexes = listOf(
-                GlobalSecondaryIndex {
-                    indexName = EMAIL_INDEX
-                    keySchema = listOf(
-                        KeySchemaElement {
-                            attributeName = "GSI1PK"
-                            keyType = KeyType.Hash
-                        },
-                        KeySchemaElement {
-                            attributeName = "GSI1SK"
-                            keyType = KeyType.Range
-                        }
-                    )
-                    projection = Projection {
-                        projectionType = ProjectionType.All
-                    }
-                }
             )
             billingMode = BillingMode.PayPerRequest
         })
@@ -102,5 +78,4 @@ object DynamoDbSingleTableSchema {
     fun electionPK(electionName: String) = "$ELECTION_PREFIX$electionName"
     fun candidateSK(candidateName: String) = "$CANDIDATE_PREFIX$candidateName"
     fun ballotSK(voterName: String) = "$BALLOT_PREFIX${voterName.lowercase()}"
-    fun emailKey(email: String) = email.lowercase()
 }

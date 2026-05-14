@@ -13,15 +13,6 @@ Parameters:
     Type: String
     Default: seanshubin@gmail.com
     Description: Email to receive ops alerts (Lambda errors, CLIENT ERROR log lines).
-  EmailFromAddress:
-    Type: String
-    Default: noreply@pairwisevote.com
-    Description: |
-      Sender for password-reset emails. MUST be a verified identity in AWS SES
-      before deploy. Verify via: AWS Console → SES → Verified identities. While
-      SES is in sandbox mode, you also need to verify each *recipient* address —
-      request "production access" from the SES console (free, ~1 day) before
-      sending to arbitrary user emails.
 
 Resources:
   FrontendBucket:
@@ -206,16 +197,50 @@ Resources:
         ExcludePunctuation: true
         PasswordLength: 64
 
-  # Invite code for self-service registration. Created with placeholder value;
-  # operator rotates it via `aws ssm put-parameter --name ... --overwrite`
-  # without redeploying the Lambda. Blank value disables the gate.
-  InviteCodeParameter:
+  # ─── Discord OAuth secrets ────────────────────────────────────────────────
+  # Public values (client id, redirect URI, guild id) ship as plain String
+  # parameters; the OAuth client secret ships as a SecureString so it's
+  # encrypted at rest with the default AWS-managed KMS key. The Lambda role
+  # below grants ssm:GetParameter on these four paths only — a compromised
+  # Lambda can't enumerate other secrets in SSM. Rotate any value with
+  # `aws ssm put-parameter --name ... --overwrite` (and `--type SecureString`
+  # for the client secret); the in-process cache picks up the new value
+  # within five minutes — no redeploy required.
+  #
+  # SecureString is NOT supported by CloudFormation's AWS::SSM::Parameter for
+  # value creation (https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ssm-parameter.html).
+  # Create the client-secret parameter manually after the stack comes up:
+  #
+  #   aws ssm put-parameter \
+  #     --name /<stack>/discord/client-secret \
+  #     --type SecureString \
+  #     --value '<discord client secret>' \
+  #     --overwrite
+  #
+  # The three plain-String parameters (id, redirect-uri, guild-id) are
+  # provisioned here with placeholders; the operator edits them to the real
+  # values via the SSM console or `aws ssm put-parameter --overwrite`.
+  DiscordClientIdParameter:
     Type: AWS::SSM::Parameter
     Properties:
-      Name: !Sub "/${AWS::StackName}/invite-code"
+      Name: !Sub "/${AWS::StackName}/discord/client-id"
       Type: String
-      Value: change-me-then-rotate
-      Description: Shared registration invite code; rotate with put-parameter.
+      Value: change-me-after-deploy
+      Description: Discord OAuth application client id.
+  DiscordRedirectUriParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Sub "/${AWS::StackName}/discord/redirect-uri"
+      Type: String
+      Value: !Sub "https://${DomainName}/api/auth/discord/callback"
+      Description: Discord OAuth redirect URI — must match the value configured in the Discord application.
+  DiscordGuildIdParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Sub "/${AWS::StackName}/discord/guild-id"
+      Type: String
+      Value: change-me-after-deploy
+      Description: Discord guild id — only members of this guild may sign in.
 
   # Hard-coded table names (vote_data, vote_event_log) match the constants
   # in DynamoDbSingleTableSchema.kt — keeps the code simple, locks the stack
@@ -230,24 +255,11 @@ Resources:
           AttributeType: S
         - AttributeName: SK
           AttributeType: S
-        - AttributeName: GSI1PK
-          AttributeType: S
-        - AttributeName: GSI1SK
-          AttributeType: S
       KeySchema:
         - AttributeName: PK
           KeyType: HASH
         - AttributeName: SK
           KeyType: RANGE
-      GlobalSecondaryIndexes:
-        - IndexName: email-index
-          KeySchema:
-            - AttributeName: GSI1PK
-              KeyType: HASH
-            - AttributeName: GSI1SK
-              KeyType: RANGE
-          Projection:
-            ProjectionType: ALL
       PointInTimeRecoverySpecification:
         PointInTimeRecoveryEnabled: true
 
@@ -318,35 +330,45 @@ Resources:
           # Resolved at deploy time — value is baked into the Lambda config
           # but never appears in CFN parameters or template output.
           JWT_SECRET: !Sub "{{resolve:secretsmanager:${JwtSecret}:SecretString}}"
-          # Frontend origin for reset-link URLs in password-reset emails.
-          # The SPA serves /reset-password via CloudFront's SPA fallback.
+          # Frontend origin used to build OAuth redirect URLs.
           FRONTEND_BASE_URL: !Sub "https://${DomainName}"
-          # SES sender — must be a verified identity in this region.
-          EMAIL_FROM_ADDRESS: !Ref EmailFromAddress
-          # Lambda reads this parameter at runtime (cached 5 min) so the
-          # operator can rotate the invite code without a redeploy.
-          INVITE_CODE_PARAMETER_NAME: !Ref InviteCodeParameter
+          # The four env-var names are declared as constants in
+          # backend/.../dependencies/EnvVars.kt; their VALUES point at the
+          # SSM parameter PATHS. The actual Discord secrets are fetched from
+          # SSM at runtime — they never appear in this template, the Lambda
+          # config, or any code file.
+          DISCORD_CLIENT_ID_PARAMETER_NAME: !Ref DiscordClientIdParameter
+          DISCORD_CLIENT_SECRET_PARAMETER_NAME: !Sub "/${AWS::StackName}/discord/client-secret"
+          DISCORD_REDIRECT_URI_PARAMETER_NAME: !Ref DiscordRedirectUriParameter
+          DISCORD_GUILD_ID_PARAMETER_NAME: !Ref DiscordGuildIdParameter
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref MainTable
         - DynamoDBCrudPolicy:
             TableName: !Ref EventLogTable
-        # Send password-reset emails. Scoped to this account's verified
-        # identities — SES enforces additionally that the From address must
-        # be verified before SendEmail succeeds at all.
-        - Statement:
-            - Effect: Allow
-              Action:
-                - ses:SendEmail
-                - ses:SendRawEmail
-              Resource: !Sub "arn:aws:ses:${AWS::Region}:${AWS::AccountId}:identity/*"
-        # Read the invite-code parameter. Scoped to the one parameter so a
-        # compromised Lambda can't enumerate other secrets in SSM.
+        # Read the four Discord OAuth parameters. Scoped to this stack's
+        # parameters so a compromised Lambda can't enumerate other secrets.
+        # kms:Decrypt is needed for the SecureString client-secret since it
+        # is encrypted with the default AWS-managed KMS key for SSM.
         - Statement:
             - Effect: Allow
               Action:
                 - ssm:GetParameter
-              Resource: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${AWS::StackName}/invite-code"
+              Resource:
+                - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${AWS::StackName}/discord/client-id"
+                - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${AWS::StackName}/discord/client-secret"
+                - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${AWS::StackName}/discord/redirect-uri"
+                - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${AWS::StackName}/discord/guild-id"
+            - Effect: Allow
+              Action:
+                - kms:Decrypt
+              # Default AWS-managed KMS key for SSM is referenced by alias;
+              # using the alias here means the policy stays valid even if the
+              # key id changes (e.g., region migrations or AWS rotations).
+              Resource: !Sub "arn:aws:kms:${AWS::Region}:${AWS::AccountId}:key/aws/ssm"
+              Condition:
+                StringEquals:
+                  "kms:ViaService": !Sub "ssm.${AWS::Region}.amazonaws.com"
       Events:
         Proxy:
           Type: HttpApi
@@ -447,3 +469,11 @@ Outputs:
     Value: !Sub "https://${BackendApi}.execute-api.${AWS::Region}.amazonaws.com"
   BackendThroughCloudFront:
     Value: !Sub "https://${DomainName}/api"
+  DiscordClientSecretParameterName:
+    Description: >-
+      Path of the SecureString SSM parameter that must be created out-of-band
+      with the Discord OAuth client secret. SecureString values cannot be
+      created via CloudFormation, so the operator runs
+      `aws ssm put-parameter --type SecureString --overwrite ...` once after
+      stack creation.
+    Value: !Sub "/${AWS::StackName}/discord/client-secret"

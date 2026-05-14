@@ -24,7 +24,7 @@ class ScenarioHtmlGenerator(private val eventLog: EventLog) {
 
         // Summary statistics
         appendLine("  <div class=\"stats\">")
-        val userEvents = events.count { it.event is DomainEvent.UserRegistered }
+        val userEvents = events.count { it.event is DomainEvent.UserRegisteredViaDiscord }
         val electionEvents = events.count { it.event is DomainEvent.ElectionCreated }
         val ballotEvents = events.count { it.event is DomainEvent.BallotCast }
         appendLine("    <div class=\"stat-box\">")
@@ -64,20 +64,11 @@ class ScenarioHtmlGenerator(private val eventLog: EventLog) {
     }
 
     private fun formatEvent(event: DomainEvent): String = when (event) {
-        is DomainEvent.UserRegistered ->
-            "<strong>${event.name}</strong> registered with role <strong>${event.role}</strong>"
-
         is DomainEvent.UserRoleChanged ->
             "<strong>${event.userName}</strong> role changed to <strong>${event.newRole}</strong>"
 
         is DomainEvent.OwnershipTransferred ->
             "Ownership transferred from <strong>${event.fromUserName}</strong> to <strong>${event.toUserName}</strong>"
-
-        is DomainEvent.UserPasswordChanged ->
-            "<strong>${event.userName}</strong> changed password"
-
-        is DomainEvent.UserEmailChanged ->
-            "<strong>${event.userName}</strong> changed email to <strong>${event.newEmail}</strong>"
 
         is DomainEvent.UserNameChanged ->
             "<strong>${event.oldUserName}</strong> renamed to <strong>${event.newUserName}</strong>"
@@ -125,6 +116,12 @@ class ScenarioHtmlGenerator(private val eventLog: EventLog) {
 
         is DomainEvent.BallotDeleted ->
             "<strong>${event.voterName}</strong> deleted ballot"
+
+        is DomainEvent.UserRegisteredViaDiscord ->
+            "<strong>${event.name}</strong> registered via Discord (${event.discordDisplayName}) with role <strong>${event.role}</strong>"
+
+        is DomainEvent.DiscordCredentialLinked ->
+            "Discord credential linked to <strong>${event.userName}</strong>"
     }
 
     private fun css() = """

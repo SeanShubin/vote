@@ -18,5 +18,6 @@ include(
     ":integration",
     ":schema-diagram",
     ":documentation",
-    ":tools"
+    ":tools",
+    ":discord-smoketest"
 )

@@ -18,10 +18,6 @@ class DynamoDbSingleTableQueryModel(
         return searchUserByName(name) ?: error("User not found: $name")
     }
 
-    override fun findUserByEmail(email: String): User {
-        return searchUserByEmail(email) ?: error("User not found with email: $email")
-    }
-
     override fun searchUserByName(name: String): User? {
         return runBlocking {
             val response = dynamoDb.getItem(GetItemRequest {
@@ -36,22 +32,24 @@ class DynamoDbSingleTableQueryModel(
         }
     }
 
-    override fun searchUserByEmail(email: String): User? {
-        // Blank email never matches anyone — users without an email are
-        // intentionally absent from the email-index GSI (createUser/setEmail
-        // omit the GSI keys when email is blank). A blank lookup would query
-        // GSI1PK = "" and return whatever junk happens to be there.
-        if (email.isEmpty()) return null
+    override fun searchUserByDiscordId(discordId: String): User? {
+        // Blank discordId never matches anyone — users without a Discord
+        // credential have an empty discord_id attribute.
+        if (discordId.isEmpty()) return null
+        // Scan + filter: there is no GSI on discord_id today. The user table
+        // is small (Rippaverse-gated community), so this is fine. If the user
+        // count grows materially, add a discord-index GSI mirroring the
+        // email-index pattern.
         return runBlocking {
-            val response = dynamoDb.query(QueryRequest {
+            val response = dynamoDb.scan(ScanRequest {
                 tableName = DynamoDbSingleTableSchema.MAIN_TABLE
-                indexName = DynamoDbSingleTableSchema.EMAIL_INDEX
-                keyConditionExpression = "GSI1PK = :email"
+                filterExpression = "begins_with(PK, :prefix) AND SK = :sk AND discord_id = :did"
                 expressionAttributeValues = mapOf(
-                    ":email" to AttributeValue.S(DynamoDbSingleTableSchema.emailKey(email))
+                    ":prefix" to AttributeValue.S(DynamoDbSingleTableSchema.USER_PREFIX),
+                    ":sk" to AttributeValue.S(DynamoDbSingleTableSchema.METADATA_SK),
+                    ":did" to AttributeValue.S(discordId),
                 )
             })
-
             response.items?.firstOrNull()?.let { itemToUser(it) }
         }
     }
@@ -372,10 +370,9 @@ class DynamoDbSingleTableQueryModel(
     private fun itemToUser(item: Map<String, AttributeValue>): User {
         return User(
             name = item["name"]?.asS() ?: error("Missing name"),
-            email = item["email"]?.asS() ?: error("Missing email"),
-            salt = item["salt"]?.asS() ?: error("Missing salt"),
-            hash = item["hash"]?.asS() ?: error("Missing hash"),
-            role = Role.valueOf(item["role"]?.asS() ?: error("Missing role"))
+            role = Role.valueOf(item["role"]?.asS() ?: error("Missing role")),
+            discordId = item["discord_id"]?.asS() ?: "",
+            discordDisplayName = item["discord_display_name"]?.asS() ?: "",
         )
     }
 

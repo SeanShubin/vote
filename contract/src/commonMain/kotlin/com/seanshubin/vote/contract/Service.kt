@@ -6,8 +6,6 @@ interface Service {
     fun synchronize()
     fun health(): String
     fun refresh(refreshToken: RefreshToken): Tokens
-    fun register(userName: String, email: String, password: String, inviteCode: String = ""): Tokens
-    fun authenticate(nameOrEmail: String, password: String): Tokens
     fun authenticateWithToken(accessToken: AccessToken): Tokens
     fun permissionsForRole(role: Role): List<Permission>
     fun setRole(accessToken: AccessToken, userName: String, role: Role)
@@ -38,55 +36,26 @@ interface Service {
     fun listRankings(accessToken: AccessToken, voterName: String, electionName: String): List<Ranking>
     fun tally(accessToken: AccessToken, electionName: String): ElectionTally
     fun getBallot(accessToken: AccessToken, voterName: String, electionName: String): BallotSummary?
-    fun sendLoginLinkByEmail(email: String, baseUri: String)
     fun getUserActivity(accessToken: AccessToken): UserActivity
 
     /**
-     * Send a password reset email. Looks up the user by username or email and
-     * emails them a reset link with a short-lived signed token.
+     * Returns the URL the browser should visit to start Discord OAuth,
+     * paired with the random state string. The state must be persisted
+     * (typically as an HttpOnly cookie) and verified on the callback.
      *
-     * Throws ServiceException(NOT_FOUND) when no matching user exists — the
-     * user explicitly chose honest errors over enumeration-resistance.
+     * Throws ServiceException(UNSUPPORTED) when Discord login isn't
+     * configured in this environment.
      */
-    fun requestPasswordReset(nameOrEmail: String)
+    fun discordLoginStart(): DiscordLoginStart
 
     /**
-     * Consume a reset token (from the email link) to set a new password.
-     * Throws ServiceException(UNAUTHORIZED) for a missing/expired/tampered
-     * token. Throws ServiceException(NOT_FOUND) if the user has been
-     * removed since the token was issued.
-     */
-    fun resetPassword(resetToken: String, newPassword: String)
-
-    /**
-     * Authenticated user changes their own password. The old password is
-     * verified before the new one is accepted, so an attacker who finds
-     * an unattended browser session can't trivially lock the user out by
-     * setting a new password without knowing the old one.
+     * Complete the Discord OAuth handshake. [code] is the value Discord
+     * passed back to the redirect URI. Verifies the Rippaverse guild gate,
+     * finds-or-creates the user by Discord ID, and returns Tokens.
      *
-     * Throws ServiceException(UNAUTHORIZED) when [oldPassword] doesn't
-     * match the stored hash.
+     * Throws ServiceException(UNAUTHORIZED) when Discord rejects the code,
+     * when the user is not in the Rippaverse guild, or when the auth flow
+     * otherwise fails.
      */
-    fun changeMyPassword(accessToken: AccessToken, oldPassword: String, newPassword: String)
-
-    /**
-     * Admin sets another user's password without proving control of the
-     * old one — used when the user has forgotten theirs and there's no
-     * email recovery path (or they didn't provide an email).
-     *
-     * Gated identically to [setRole]: caller needs MANAGE_USERS, must not
-     * be acting on themselves (use [changeMyPassword]), and must have a
-     * strictly higher role than the target. Audit-trail authority on the
-     * resulting [DomainEvent.UserPasswordChanged] event is the caller's
-     * username, not "system" — so the event log records exactly which
-     * admin reset which user's password.
-     */
-    fun adminSetPassword(accessToken: AccessToken, userName: String, newPassword: String)
-
-    /**
-     * Delete every user whose email lands in the .test TLD, plus every
-     * election those users own. Cleanup path for the public test-user
-     * convention; gated by MANAGE_USERS.
-     */
-    fun wipeTestUsers(accessToken: AccessToken): WipeTestUsersResult
+    fun discordLoginComplete(code: String): Tokens
 }

@@ -15,16 +15,6 @@ sealed interface DomainEvent {
      * User Management Events
      */
     @Serializable
-    @SerialName("UserRegistered")
-    data class UserRegistered(
-        val name: String,
-        val email: String,
-        val salt: String,
-        val hash: String,
-        val role: Role
-    ) : DomainEvent
-
-    @Serializable
     @SerialName("UserRoleChanged")
     data class UserRoleChanged(
         val userName: String,
@@ -51,25 +41,41 @@ sealed interface DomainEvent {
     ) : DomainEvent
 
     @Serializable
-    @SerialName("UserPasswordChanged")
-    data class UserPasswordChanged(
-        val userName: String,
-        val newSalt: String,
-        val newHash: String
-    ) : DomainEvent
-
-    @Serializable
     @SerialName("UserNameChanged")
     data class UserNameChanged(
         val oldUserName: String,
         val newUserName: String
     ) : DomainEvent
 
+    /**
+     * First-time Discord login: a Discord-authenticated principal that
+     * doesn't yet match any existing user. Lands in [Role.NO_ACCESS] —
+     * an admin then grants a role outright.
+     *
+     * [name] is derived from the Discord display name, made unique against
+     * existing users by the service.
+     */
     @Serializable
-    @SerialName("UserEmailChanged")
-    data class UserEmailChanged(
+    @SerialName("UserRegisteredViaDiscord")
+    data class UserRegisteredViaDiscord(
+        val name: String,
+        val discordId: String,
+        val discordDisplayName: String,
+        val role: Role,
+    ) : DomainEvent
+
+    /**
+     * Attaches a Discord credential to an existing user. Emitted when a
+     * Discord-authenticated user opts to add Discord to an already-
+     * authenticated session (not exposed today, but the event shape
+     * supports it).
+     */
+    @Serializable
+    @SerialName("DiscordCredentialLinked")
+    data class DiscordCredentialLinked(
         val userName: String,
-        val newEmail: String
+        val discordId: String,
+        val discordDisplayName: String,
     ) : DomainEvent
 
     /**

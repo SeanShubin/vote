@@ -2,10 +2,8 @@ package com.seanshubin.vote.frontend
 
 import androidx.compose.runtime.*
 import com.seanshubin.vote.contract.ApiClient
-import com.seanshubin.vote.contract.AuthResponse
 import com.seanshubin.vote.domain.Role
 import com.seanshubin.vote.domain.UserNameRole
-import kotlinx.coroutines.launch
 import org.jetbrains.compose.web.attributes.*
 import org.jetbrains.compose.web.dom.*
 import org.w3c.dom.HTMLSelectElement
@@ -28,12 +26,6 @@ fun UserManagementPage(
     apiClient: ApiClient,
     currentUserName: String,
     currentRole: Role?,
-    onSelfRoleChanged: (AuthResponse) -> Unit,
-    // The self-row renders a "My account" link in the same column slot that
-    // other rows use for the admin "Set password…" button. Self can't use
-    // the admin path (the gate explicitly excludes self) so this is a
-    // discoverability shortcut to MyAccountPage rather than a duplicated
-    // affordance.
     onNavigateToMyAccount: () -> Unit,
     onBack: () -> Unit,
 ) {
@@ -41,10 +33,6 @@ fun UserManagementPage(
     var successMessage by remember { mutableStateOf<String?>(null) }
     var pendingTransfer by remember { mutableStateOf<UserNameRole?>(null) }
     var pendingRoleChange by remember { mutableStateOf<Pair<String, Role>?>(null) }
-    // Tracks which user's set-password form is currently expanded — null
-    // means no form open. Only one row at a time can be in the editing
-    // state, mirroring how the role <select> works.
-    var openSetPasswordFor by remember { mutableStateOf<String?>(null) }
 
     val usersFetch = rememberCachedFetchState(
         apiClient = apiClient,
@@ -62,12 +50,10 @@ fun UserManagementPage(
             errorMessage = null
             val (userName, newRole) = pendingRoleChange ?: return@rememberAsyncAction
             apiClient.setRole(userName, newRole)
-            // The caller's access token may now be stale (most obviously after
-            // an ownership transfer demoted them to AUDITOR). Refresh so subsequent
-            // listUsers carries the caller's true current role, and surface the
-            // new identity to the rest of the app via [onSelfRoleChanged].
-            val refreshed = apiClient.refresh()
-            if (refreshed != null) onSelfRoleChanged(refreshed)
+            // The caller's access token may now be stale (most obviously
+            // after an ownership transfer demoted them to AUDITOR). Refresh
+            // so subsequent listUsers carries the caller's true current role.
+            apiClient.refresh()
             // usersFetch.reload() invalidates the cache and refetches; the
             // staleWhileRevalidate path means the row re-renders without a
             // Loading flash even though the cache entry was dropped.
@@ -99,19 +85,9 @@ fun UserManagementPage(
                 } else {
                     Div({ classes("users-list") }) {
                         state.value.forEach { user ->
-                            // Mirror the backend gate exactly: caller can set
-                            // another user's password when their role is
-                            // strictly greater than the target's. Backend
-                            // re-checks; this just hides the form for users
-                            // the caller can't act on. Self uses the
-                            // MyAccount page for password changes.
-                            val canSetPassword = user.userName != currentUserName &&
-                                currentRole != null && currentRole > user.role
                             UserRow(
                                 user = user,
                                 isSelf = user.userName == currentUserName,
-                                canSetPassword = canSetPassword,
-                                isSetPasswordOpen = openSetPasswordFor == user.userName,
                                 onNavigateToMyAccount = onNavigateToMyAccount,
                                 onRoleSelected = { newRole ->
                                     if (newRole == user.role) return@UserRow
@@ -119,23 +95,6 @@ fun UserManagementPage(
                                         pendingTransfer = user
                                     } else {
                                         submitRoleChange(user.userName, newRole)
-                                    }
-                                },
-                                onToggleSetPassword = {
-                                    openSetPasswordFor =
-                                        if (openSetPasswordFor == user.userName) null
-                                        else user.userName
-                                },
-                                onSubmitSetPassword = { newPassword ->
-                                    successMessage = null
-                                    errorMessage = null
-                                    try {
-                                        apiClient.adminSetPassword(user.userName, newPassword)
-                                        successMessage = "Password set for ${user.userName}"
-                                        openSetPasswordFor = null
-                                    } catch (e: Exception) {
-                                        apiClient.logErrorToServer(e)
-                                        errorMessage = e.message ?: "Failed to set password"
                                     }
                                 },
                             )
@@ -169,16 +128,20 @@ fun UserManagementPage(
 private fun UserRow(
     user: UserNameRole,
     isSelf: Boolean,
-    canSetPassword: Boolean,
-    isSetPasswordOpen: Boolean,
     onNavigateToMyAccount: () -> Unit,
     onRoleSelected: (Role) -> Unit,
-    onToggleSetPassword: () -> Unit,
-    onSubmitSetPassword: suspend (String) -> Unit,
 ) {
     Div({ classes("user-row") }) {
         Span({ classes("user-name") }) {
-            Text(user.userName + if (isSelf) " (you)" else "")
+            // Show the Discord display name alongside the username so admins
+            // can match a stored row to a person on the Discord server.
+            val suffix = buildString {
+                if (isSelf) append(" (you)")
+                if (user.discordDisplayName.isNotEmpty()) {
+                    append(" — Discord: ${user.discordDisplayName}")
+                }
+            }
+            Text(user.userName + suffix)
         }
         // A user with only their own role in allowedRoles can't be changed —
         // either the caller lacks authority, or it's the caller themselves.
@@ -204,96 +167,15 @@ private fun UserRow(
                 }
             }
         }
-        // Column 3: admin Set-password for other users (when allowed), the
-        // self-service My-account shortcut on the self-row, or an
-        // empty placeholder. The placeholder is required because .users-list
-        // is a 3-column grid using display: contents on the row — without
-        // it, the next user's name would land in this row's empty slot.
-        when {
-            canSetPassword -> Button({
-                attr("data-set-password-toggle", user.userName)
-                onClick { onToggleSetPassword() }
-            }) {
-                Text(if (isSetPasswordOpen) "Cancel" else "Set password…")
-            }
-            isSelf -> Button({
+        if (isSelf) {
+            Button({
                 attr("data-my-account", "")
                 onClick { onNavigateToMyAccount() }
             }) {
                 Text("My account")
             }
-            else -> Span({ classes("user-row-spacer") })
-        }
-    }
-    if (isSetPasswordOpen) {
-        AdminSetPasswordForm(
-            targetUserName = user.userName,
-            onSubmitPassword = onSubmitSetPassword,
-        )
-    }
-}
-
-/**
- * Inline form for an admin to set another user's password. Lives directly
- * under the user's row when expanded. No old-password field — the whole
- * point of the admin path is recovery for users who don't know theirs.
- * The admin shares the new password out-of-band and the user is expected
- * to change it after logging in via [MyAccountPage].
- */
-@Composable
-private fun AdminSetPasswordForm(
-    targetUserName: String,
-    onSubmitPassword: suspend (String) -> Unit,
-) {
-    var newPassword by remember(targetUserName) { mutableStateOf("") }
-    var confirmPassword by remember(targetUserName) { mutableStateOf("") }
-    var localError by remember(targetUserName) { mutableStateOf<String?>(null) }
-    val scope = rememberCoroutineScope()
-    var isSubmitting by remember(targetUserName) { mutableStateOf(false) }
-
-    Form(attrs = {
-        classes("form", "admin-set-password-form")
-        onSubmit { event ->
-            event.preventDefault()
-            when {
-                newPassword.isBlank() -> localError = "Password cannot be blank"
-                newPassword != confirmPassword -> localError = "Passwords do not match"
-                else -> {
-                    localError = null
-                    isSubmitting = true
-                    scope.launch {
-                        try {
-                            onSubmitPassword(newPassword)
-                        } finally {
-                            isSubmitting = false
-                        }
-                    }
-                }
-            }
-        }
-    }) {
-        localError?.let { msg ->
-            Div({ classes("error") }) { Text(msg) }
-        }
-        Input(InputType.Password) {
-            attr("name", "newPassword-$targetUserName")
-            attr("autocomplete", "new-password")
-            placeholder("New password for $targetUserName")
-            value(newPassword)
-            onInput { newPassword = it.value }
-        }
-        Input(InputType.Password) {
-            attr("name", "confirmPassword-$targetUserName")
-            attr("autocomplete", "new-password")
-            placeholder("Confirm new password")
-            value(confirmPassword)
-            onInput { confirmPassword = it.value }
-        }
-        Button({
-            attr("type", "submit")
-            if (isSubmitting) attr("disabled", "")
-        }) {
-            Text(if (isSubmitting) "Setting…" else "Set password")
+        } else {
+            Span({ classes("user-row-spacer") })
         }
     }
 }

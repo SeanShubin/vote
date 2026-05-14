@@ -14,8 +14,6 @@ import com.seanshubin.vote.domain.UserNameEmail
 import com.seanshubin.vote.domain.UserNameRole
 
 class FakeApiClient : ApiClient {
-    val registerCalls = mutableListOf<RegisterCall>()
-    val authenticateCalls = mutableListOf<AuthenticateCall>()
     val listElectionsCalls = mutableListOf<Unit>()
     val createElectionCalls = mutableListOf<CreateElectionCall>()
     val getElectionCalls = mutableListOf<String>()
@@ -31,23 +29,11 @@ class FakeApiClient : ApiClient {
     val removeUserCalls = mutableListOf<String>()
     val loggedErrors = mutableListOf<Throwable>()
 
-    var registerResult: Result<AuthResponse> = Result.failure(Exception("Register not configured"))
-    var authenticateResult: Result<AuthResponse> = Result.failure(Exception("Authenticate not configured"))
     var refreshResult: Result<AuthResponse?> = Result.success(null)
     val refreshCalls = mutableListOf<Unit>()
     val logoutCalls = mutableListOf<Unit>()
-    var requestPasswordResetResult: Result<Unit> = Result.success(Unit)
-    var resetPasswordResult: Result<Unit> = Result.success(Unit)
-    var changeMyPasswordResult: Result<Unit> = Result.success(Unit)
-    var adminSetPasswordResult: Result<Unit> = Result.success(Unit)
-    var getMyUserResult: Result<UserNameEmail> = Result.success(UserNameEmail("user", ""))
-    var updateMyEmailResult: Result<Unit> = Result.success(Unit)
-    val requestPasswordResetCalls = mutableListOf<String>()
-    val resetPasswordCalls = mutableListOf<ResetPasswordCall>()
-    val changeMyPasswordCalls = mutableListOf<ChangeMyPasswordCall>()
-    val adminSetPasswordCalls = mutableListOf<AdminSetPasswordCall>()
+    var getMyUserResult: Result<UserNameEmail> = Result.success(UserNameEmail("user"))
     val getMyUserCalls = mutableListOf<Unit>()
-    val updateMyEmailCalls = mutableListOf<String>()
     var listElectionsResult: Result<List<ElectionSummary>> = Result.success(emptyList())
     var createElectionResult: Result<String> = Result.success("")
     var getElectionResult: Result<ElectionDetail> = Result.failure(Exception("Get election not configured"))
@@ -78,15 +64,8 @@ class FakeApiClient : ApiClient {
     val setRoleCalls = mutableListOf<SetRoleCall>()
     val userActivityCalls = mutableListOf<Unit>()
 
-    override suspend fun register(userName: String, email: String, password: String, inviteCode: String): AuthResponse {
-        registerCalls.add(RegisterCall(userName, email, password, inviteCode))
-        return registerResult.getOrThrow()
-    }
-
-    override suspend fun authenticate(nameOrEmail: String, password: String): AuthResponse {
-        authenticateCalls.add(AuthenticateCall(nameOrEmail, password))
-        return authenticateResult.getOrThrow()
-    }
+    var discordLoginStartUrlResult: Result<String> = Result.success("https://discord.com/oauth2/authorize?fake=1")
+    val discordLoginStartUrlCalls = mutableListOf<Unit>()
 
     override suspend fun refresh(): AuthResponse? {
         refreshCalls.add(Unit)
@@ -99,34 +78,9 @@ class FakeApiClient : ApiClient {
 
     override var onSessionLost: (() -> Unit)? = null
 
-    override suspend fun requestPasswordReset(nameOrEmail: String) {
-        requestPasswordResetCalls.add(nameOrEmail)
-        requestPasswordResetResult.getOrThrow()
-    }
-
-    override suspend fun resetPassword(resetToken: String, newPassword: String) {
-        resetPasswordCalls.add(ResetPasswordCall(resetToken, newPassword))
-        resetPasswordResult.getOrThrow()
-    }
-
-    override suspend fun changeMyPassword(oldPassword: String, newPassword: String) {
-        changeMyPasswordCalls.add(ChangeMyPasswordCall(oldPassword, newPassword))
-        changeMyPasswordResult.getOrThrow()
-    }
-
-    override suspend fun adminSetPassword(userName: String, newPassword: String) {
-        adminSetPasswordCalls.add(AdminSetPasswordCall(userName, newPassword))
-        adminSetPasswordResult.getOrThrow()
-    }
-
     override suspend fun getMyUser(): UserNameEmail {
         getMyUserCalls.add(Unit)
         return getMyUserResult.getOrThrow()
-    }
-
-    override suspend fun updateMyEmail(newEmail: String) {
-        updateMyEmailCalls.add(newEmail)
-        updateMyEmailResult.getOrThrow()
     }
 
     override suspend fun listElections(): List<ElectionSummary> {
@@ -234,6 +188,11 @@ class FakeApiClient : ApiClient {
         setRoleResult.getOrThrow()
     }
 
+    override suspend fun discordLoginStartUrl(): String {
+        discordLoginStartUrlCalls.add(Unit)
+        return discordLoginStartUrlResult.getOrThrow()
+    }
+
     override fun logErrorToServer(error: Throwable) {
         // Match HttpApiClient: cancellation rethrows so callers' catch blocks
         // exit cleanly instead of recording it.
@@ -241,15 +200,10 @@ class FakeApiClient : ApiClient {
         loggedErrors.add(error)
     }
 
-    data class RegisterCall(val userName: String, val email: String, val password: String, val inviteCode: String = "")
     data class CreateElectionCall(val electionName: String, val description: String)
-    data class AuthenticateCall(val nameOrEmail: String, val password: String)
     data class SetCandidatesCall(val electionName: String, val candidates: List<String>)
     data class SetTiersCall(val electionName: String, val tiers: List<String>)
     data class SetElectionDescriptionCall(val electionName: String, val description: String)
     data class CastBallotCall(val electionName: String, val rankings: List<Ranking>)
-    data class ResetPasswordCall(val resetToken: String, val newPassword: String)
-    data class ChangeMyPasswordCall(val oldPassword: String, val newPassword: String)
-    data class AdminSetPasswordCall(val userName: String, val newPassword: String)
     data class SetRoleCall(val userName: String, val role: Role)
 }

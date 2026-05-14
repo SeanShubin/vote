@@ -15,14 +15,14 @@ import kotlin.js.json
 
 /**
  * HTTP-based ApiClient. Owns the current session state — access token,
- * username, and role — set on register/authenticate/refresh and updated
+ * username, and role — set on Discord OAuth callback / refresh and updated
  * transparently when a 401 triggers a silent refresh.
  *
  * Production: callers don't pass tokens around. They just call methods;
  * if no session is active, authenticated methods throw NotAuthenticatedException.
  *
  * Testing: pass [initialSession] in the constructor to simulate a logged-in
- * state without going through the register/authenticate dance.
+ * state without going through the Discord OAuth dance.
  */
 class HttpApiClient(
     private val baseUrl: String,
@@ -46,20 +46,6 @@ class HttpApiClient(
     override var onSessionLost: (() -> Unit)? = null
 
     data class Session(val accessToken: String, val userName: String, val role: Role)
-
-    override suspend fun register(userName: String, email: String, password: String, inviteCode: String): AuthResponse {
-        val request = RegisterRequest(userName, email, password, inviteCode)
-        val auth = post<RegisterRequest, AuthResponse>("/register", request)
-        session = Session(auth.accessToken, auth.userName, auth.role)
-        return auth
-    }
-
-    override suspend fun authenticate(nameOrEmail: String, password: String): AuthResponse {
-        val request = AuthenticateRequest(nameOrEmail, password)
-        val auth = post<AuthenticateRequest, AuthResponse>("/authenticate", request)
-        session = Session(auth.accessToken, auth.userName, auth.role)
-        return auth
-    }
 
     /**
      * The browser auto-attaches the HttpOnly Refresh cookie. If the cookie
@@ -92,45 +78,9 @@ class HttpApiClient(
         )).await()
     }
 
-    override suspend fun requestPasswordReset(nameOrEmail: String) {
-        post<PasswordResetRequestRequest, Unit>(
-            "/password-reset-request",
-            PasswordResetRequestRequest(nameOrEmail),
-        )
-    }
-
-    override suspend fun resetPassword(resetToken: String, newPassword: String) {
-        post<PasswordResetRequest, Unit>(
-            "/password-reset",
-            PasswordResetRequest(resetToken, newPassword),
-        )
-    }
-
-    override suspend fun changeMyPassword(oldPassword: String, newPassword: String) {
-        putWithAuth<ChangeMyPasswordRequest, Unit>(
-            "/user/me/password",
-            ChangeMyPasswordRequest(oldPassword, newPassword),
-        )
-    }
-
     override suspend fun getMyUser(): UserNameEmail {
         val userName = requireSession().userName
         return getWithAuth("/user/${encodeURIComponent(userName)}")
-    }
-
-    override suspend fun updateMyEmail(newEmail: String) {
-        val userName = requireSession().userName
-        putWithAuth<UserUpdates, Unit>(
-            "/user/${encodeURIComponent(userName)}",
-            UserUpdates(email = newEmail),
-        )
-    }
-
-    override suspend fun adminSetPassword(userName: String, newPassword: String) {
-        putWithAuth<AdminSetPasswordRequest, Unit>(
-            "/admin/user/${encodeURIComponent(userName)}/password",
-            AdminSetPasswordRequest(newPassword),
-        )
     }
 
     override suspend fun listElections(): List<ElectionSummary> =
@@ -230,6 +180,19 @@ class HttpApiClient(
     override suspend fun debugTableData(tableName: String): TableData =
         getWithAuth("/debug-table/${encodeURIComponent(tableName)}")
 
+    override suspend fun discordLoginStartUrl(): String {
+        // Unauthenticated POST — server sets the state cookie and returns the
+        // authorize URL. The frontend then navigates the browser to that URL.
+        val response = fetch("$baseUrl/auth/discord/start", RequestInit(
+            method = "POST",
+            headers = json("Content-Type" to "application/json"),
+            credentials = credentialsInclude,
+            body = "",
+        )).await()
+        val start = handleResponse<DiscordLoginStart>(response)
+        return start.authorizeUrl
+    }
+
     override fun logErrorToServer(error: Throwable) {
         // CancellationException isn't a real error — it's how Compose tells an
         // in-flight coroutine that the user navigated away or the composable
@@ -294,18 +257,6 @@ class HttpApiClient(
     }
 
     // --- Wire-format helpers ---
-
-    private suspend inline fun <reified TReq, reified TRes> post(path: String, body: TReq): TRes {
-        val response = fetch("$baseUrl$path", RequestInit(
-            method = "POST",
-            headers = json("Content-Type" to "application/json"),
-            // Server may return Set-Cookie (for refresh token) — credentials:include
-            // is required on register/authenticate so the browser stores the cookie.
-            credentials = credentialsInclude,
-            body = json.encodeToString(body)
-        )).await()
-        return handleResponse(response)
-    }
 
     private suspend inline fun <reified TReq, reified TRes> postWithAuth(
         path: String,
@@ -406,4 +357,4 @@ open class ApiException(message: String) : Exception(message)
 class SessionLostException : ApiException("Session is no longer valid")
 
 /** Thrown when an authenticated method is called without an active session. */
-class NotAuthenticatedException : RuntimeException("No active session. Call register() or authenticate() first.")
+class NotAuthenticatedException : RuntimeException("No active session. Sign in with Discord first.")

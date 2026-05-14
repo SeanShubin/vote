@@ -52,6 +52,9 @@ class SimpleHttpHandler(
         for (cookie in httpResponse.setCookies) {
             response.addHeader("Set-Cookie", cookie.render())
         }
+        for ((name, value) in httpResponse.headers) {
+            response.setHeader(name, value)
+        }
         response.writer.write(httpResponse.body)
     }
 }

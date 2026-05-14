@@ -63,22 +63,9 @@ class EventLogHtmlGenerator(private val eventLog: EventLog) {
     }
 
     private fun formatEventDetails(event: DomainEvent): String = when (event) {
-        is DomainEvent.UserRegistered -> """
-            <div class="detail-row"><span class="label">User:</span> ${event.name}</div>
-            <div class="detail-row"><span class="label">Email:</span> ${event.email}</div>
-            <div class="detail-row"><span class="label">Role:</span> ${event.role}</div>
-        """.trimIndent()
-        is DomainEvent.UserEmailChanged -> """
-            <div class="detail-row"><span class="label">User:</span> ${event.userName}</div>
-            <div class="detail-row"><span class="label">New Email:</span> ${event.newEmail}</div>
-        """.trimIndent()
         is DomainEvent.UserNameChanged -> """
             <div class="detail-row"><span class="label">Old Name:</span> ${event.oldUserName}</div>
             <div class="detail-row"><span class="label">New Name:</span> ${event.newUserName}</div>
-        """.trimIndent()
-        is DomainEvent.UserPasswordChanged -> """
-            <div class="detail-row"><span class="label">User:</span> ${event.userName}</div>
-            <div class="detail-row"><span class="label">Password:</span> (changed)</div>
         """.trimIndent()
         is DomainEvent.UserRoleChanged -> """
             <div class="detail-row"><span class="label">User:</span> ${event.userName}</div>
@@ -132,6 +119,15 @@ class EventLogHtmlGenerator(private val eventLog: EventLog) {
         is DomainEvent.BallotDeleted -> """
             <div class="detail-row"><span class="label">Voter:</span> ${event.voterName}</div>
             <div class="detail-row"><span class="label">Election:</span> ${event.electionName}</div>
+        """.trimIndent()
+        is DomainEvent.UserRegisteredViaDiscord -> """
+            <div class="detail-row"><span class="label">User:</span> ${event.name}</div>
+            <div class="detail-row"><span class="label">Discord:</span> ${event.discordDisplayName} (${event.discordId})</div>
+            <div class="detail-row"><span class="label">Role:</span> ${event.role}</div>
+        """.trimIndent()
+        is DomainEvent.DiscordCredentialLinked -> """
+            <div class="detail-row"><span class="label">User:</span> ${event.userName}</div>
+            <div class="detail-row"><span class="label">Discord:</span> ${event.discordDisplayName} (${event.discordId})</div>
         """.trimIndent()
     }
 

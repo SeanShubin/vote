@@ -10,4 +10,10 @@ data class HttpResponse(
     val body: String,
     val contentType: String = "application/json",
     val setCookies: List<SetCookie> = emptyList(),
+    /**
+     * Extra response headers beyond Content-Type and Set-Cookie. The Discord
+     * OAuth callback uses this for `Location` on a 302 back to the frontend
+     * after stamping the refresh cookie.
+     */
+    val headers: Map<String, String> = emptyMap(),
 )

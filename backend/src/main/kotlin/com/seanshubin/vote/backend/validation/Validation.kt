@@ -12,27 +12,6 @@ object Validation {
         return trimmed.replace(whitespacePattern, " ")
     }
 
-    /**
-     * Email is optional — blank input means "no email on file". The user
-     * will then have no self-service password-reset path; an admin will
-     * have to set their password directly. When non-blank, the same
-     * format checks as before apply, returning the trimmed value.
-     */
-    fun validateEmail(email: String): String {
-        val trimmed = email.trim()
-        if (trimmed.isEmpty()) return ""
-        require(trimmed.length <= 200) { "Email must not be more than 200 characters long" }
-        require(trimmed.count { it == '@' } == 1) { "Email must contain exactly one @ sign" }
-        require(!trimmed.contains(whitespacePattern)) { "Email must not contain whitespace" }
-        return trimmed
-    }
-
-    fun validatePassword(password: String): String {
-        require(password.isNotEmpty()) { "Password must not be empty" }
-        require(password.length <= 200) { "Password must not be more than 200 characters long" }
-        return password
-    }
-
     fun validateElectionName(electionName: String): String {
         val trimmed = electionName.trim()
         require(trimmed.isNotEmpty()) { "Election name must not be empty" }
@@ -79,12 +58,6 @@ object Validation {
         }
 
         return validNames
-    }
-
-    fun validateNameOrEmail(nameOrEmail: String): String {
-        val trimmed = nameOrEmail.trim()
-        require(trimmed.isNotEmpty()) { "Name or email must not be empty" }
-        return trimmed.replace(whitespacePattern, " ")
     }
 
     fun validateRankings(rankings: List<Ranking>): List<Ranking> {

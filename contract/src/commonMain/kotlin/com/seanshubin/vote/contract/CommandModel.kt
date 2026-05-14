@@ -8,15 +8,6 @@ interface CommandModel {
     fun setLastSynced(lastSynced: Long)
     fun initializeLastSynced(lastSynced: Long)
 
-    fun createUser(
-        authority: String,
-        userName: String,
-        email: String,
-        salt: String,
-        hash: String,
-        role: Role
-    )
-
     fun setRole(authority: String, userName: String, role: Role)
     fun removeUser(authority: String, userName: String)
     fun addElection(authority: String, owner: String, electionName: String, description: String)
@@ -38,7 +29,25 @@ interface CommandModel {
     fun setRankings(authority: String, confirmation: String, electionName: String, rankings: List<Ranking>)
     fun updateWhenCast(authority: String, confirmation: String, now: Instant)
     fun deleteBallot(authority: String, voterName: String, electionName: String)
-    fun setPassword(authority: String, userName: String, salt: String, hash: String)
     fun setUserName(authority: String, oldUserName: String, newUserName: String)
-    fun setEmail(authority: String, userName: String, email: String)
+
+    /**
+     * Create a user that authenticated via Discord. With password login
+     * retired this is the only path that brings a new user into existence.
+     */
+    fun createUserViaDiscord(
+        authority: String,
+        userName: String,
+        discordId: String,
+        discordDisplayName: String,
+        role: Role,
+    )
+
+    /** Attach a Discord credential to an existing user. */
+    fun linkDiscordCredential(
+        authority: String,
+        userName: String,
+        discordId: String,
+        discordDisplayName: String,
+    )
 }

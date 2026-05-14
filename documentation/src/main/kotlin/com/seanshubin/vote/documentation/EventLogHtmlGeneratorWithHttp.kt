@@ -111,16 +111,10 @@ class EventLogHtmlGeneratorWithHttp(private val recorder: DocumentationRecorder)
     }
 
     private fun formatEvent(event: DomainEvent): String = when (event) {
-        is DomainEvent.UserRegistered ->
-            "<strong>${event.name}</strong> registered with role <strong>${event.role}</strong>"
         is DomainEvent.UserRoleChanged ->
             "<strong>${event.userName}</strong> role changed to <strong>${event.newRole}</strong>"
         is DomainEvent.OwnershipTransferred ->
             "Ownership transferred from <strong>${event.fromUserName}</strong> to <strong>${event.toUserName}</strong>"
-        is DomainEvent.UserPasswordChanged ->
-            "<strong>${event.userName}</strong> changed password"
-        is DomainEvent.UserEmailChanged ->
-            "<strong>${event.userName}</strong> changed email to <strong>${event.newEmail}</strong>"
         is DomainEvent.UserNameChanged ->
             "<strong>${event.oldUserName}</strong> renamed to <strong>${event.newUserName}</strong>"
         is DomainEvent.UserRemoved ->
@@ -156,24 +150,16 @@ class EventLogHtmlGeneratorWithHttp(private val recorder: DocumentationRecorder)
         }
         is DomainEvent.BallotDeleted ->
             "<strong>${event.voterName}</strong> deleted ballot in <strong>${event.electionName}</strong>"
+        is DomainEvent.UserRegisteredViaDiscord ->
+            "<strong>${event.name}</strong> registered via Discord (${event.discordDisplayName}) with role <strong>${event.role}</strong>"
+        is DomainEvent.DiscordCredentialLinked ->
+            "Discord credential linked to <strong>${event.userName}</strong> (${event.discordDisplayName})"
     }
 
     private fun formatEventDetails(event: DomainEvent): String = when (event) {
-        is DomainEvent.UserRegistered -> """
-            <div class="detail-row"><span class="label">Name:</span> ${event.name}</div>
-            <div class="detail-row"><span class="label">Email:</span> ${event.email}</div>
-            <div class="detail-row"><span class="label">Role:</span> ${event.role}</div>
-        """.trimIndent()
-        is DomainEvent.UserEmailChanged -> """
-            <div class="detail-row"><span class="label">User:</span> ${event.userName}</div>
-            <div class="detail-row"><span class="label">New Email:</span> ${event.newEmail}</div>
-        """.trimIndent()
         is DomainEvent.UserNameChanged -> """
             <div class="detail-row"><span class="label">Old Name:</span> ${event.oldUserName}</div>
             <div class="detail-row"><span class="label">New Name:</span> ${event.newUserName}</div>
-        """.trimIndent()
-        is DomainEvent.UserPasswordChanged -> """
-            <div class="detail-row"><span class="label">User:</span> ${event.userName}</div>
         """.trimIndent()
         is DomainEvent.UserRoleChanged -> """
             <div class="detail-row"><span class="label">User:</span> ${event.userName}</div>
@@ -227,6 +213,15 @@ class EventLogHtmlGeneratorWithHttp(private val recorder: DocumentationRecorder)
         is DomainEvent.BallotDeleted -> """
             <div class="detail-row"><span class="label">Voter:</span> ${event.voterName}</div>
             <div class="detail-row"><span class="label">Election:</span> ${event.electionName}</div>
+        """.trimIndent()
+        is DomainEvent.UserRegisteredViaDiscord -> """
+            <div class="detail-row"><span class="label">Name:</span> ${event.name}</div>
+            <div class="detail-row"><span class="label">Discord:</span> ${event.discordDisplayName} (${event.discordId})</div>
+            <div class="detail-row"><span class="label">Role:</span> ${event.role}</div>
+        """.trimIndent()
+        is DomainEvent.DiscordCredentialLinked -> """
+            <div class="detail-row"><span class="label">User:</span> ${event.userName}</div>
+            <div class="detail-row"><span class="label">Discord:</span> ${event.discordDisplayName} (${event.discordId})</div>
         """.trimIndent()
     }
 

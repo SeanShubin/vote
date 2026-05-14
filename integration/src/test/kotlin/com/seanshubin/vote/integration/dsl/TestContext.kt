@@ -8,6 +8,9 @@ import com.seanshubin.vote.backend.repository.InMemoryEventLog
 import com.seanshubin.vote.backend.repository.InMemoryQueryModel
 import com.seanshubin.vote.backend.repository.InMemoryRawTableScanner
 import com.seanshubin.vote.backend.service.ServiceImpl
+import com.seanshubin.vote.contract.AccessToken
+import com.seanshubin.vote.domain.DomainEvent
+import com.seanshubin.vote.domain.Role
 import com.seanshubin.vote.integration.database.DatabaseProvider
 import com.seanshubin.vote.integration.fake.TestIntegrations
 
@@ -33,91 +36,114 @@ class TestContext(
     // round-trip via the same TokenEncoder the production wiring uses.
     private val tokenEncoder = TokenEncoder(JwtCipher("dev-jwt-secret-DO-NOT-USE-IN-PROD"))
 
-    // Backend abstraction - can be direct service calls or HTTP calls
-    val backend: ScenarioBackend = backend ?: DirectServiceBackend(
-        ServiceImpl(
-            integrations,
-            eventLog,
-            commandModel,
-            queryModel,
-            InMemoryRawTableScanner(),
-            tokenEncoder,
-            "http://test.example.com",
-        )
+    private val service = ServiceImpl(
+        integrations,
+        eventLog,
+        commandModel,
+        queryModel,
+        InMemoryRawTableScanner(),
+        tokenEncoder,
     )
+
+    // Backend abstraction - can be direct service calls or HTTP calls
+    val backend: ScenarioBackend = backend ?: DirectServiceBackend(service)
 
     // Test helpers
     val events = EventInspector(eventLog)
     val database = DatabaseInspector(queryModel)
 
-    // Owner token - first registered user is OWNER
-    private var ownerToken: com.seanshubin.vote.contract.AccessToken? = null
-
+    /**
+     * Seed a user via the event log directly. With Discord-only login there
+     * is no password-registration HTTP path; tests bootstrap their fixtures
+     * by appending a [DomainEvent.UserRegisteredViaDiscord] event. Each
+     * synthetic `discord_id` just needs to be unique per test user — it
+     * never leaves the in-memory event log.
+     *
+     * The first user seeded in a TestContext is promoted to PRIMARY_ROLE so
+     * subsequent admin operations have a caller. Override [role] to seed a
+     * specific role explicitly.
+     */
     fun registerUser(
         name: String = "user${integrations.sequentialIdGenerator.generate()}",
-        email: String = "$name@example.com",
-        password: String = "password"
+        role: Role = if (queryModel.userCount() == 0) Role.PRIMARY_ROLE else Role.DEFAULT_ROLE,
     ): UserContext {
-        val token = backend.registerUser(name, email, password)
-        if (ownerToken == null) {
-            ownerToken = token
-        }
-        return UserContext(this, name, token)
+        eventLog.appendEvent(
+            "system",
+            integrations.clock.now(),
+            DomainEvent.UserRegisteredViaDiscord(
+                name = name,
+                discordId = "test-discord-$name",
+                discordDisplayName = name,
+                role = role,
+            ),
+        )
+        backend.synchronize()
+        return UserContext(this, name, AccessToken(name, role))
     }
 
     fun registerUsers(vararg names: String): List<UserContext> =
         names.map { registerUser(it) }
 
     /**
-     * Re-authenticate to pick up a role change. Existing access tokens bake
-     * the role at issue time; after `setRole`, the user needs a fresh token
-     * with the updated role claim.
+     * Re-issue an access token after a role change. Existing tokens bake the
+     * role at issue time; after `setRole`, the caller needs a fresh token
+     * carrying the updated role claim.
      */
-    fun authenticateAs(userName: String, password: String = "password"): UserContext {
-        val tokens = backend.authenticate(userName, password)
-        return UserContext(this, userName, tokens.accessToken)
+    fun reissueToken(userName: String): UserContext {
+        backend.synchronize()
+        val user = queryModel.searchUserByName(userName)
+            ?: error("User not found: $userName")
+        return UserContext(this, user.name, AccessToken(user.name, user.role))
     }
 
-    // Admin query methods using owner token
+    // Admin query methods using the first seeded user's token
+    private val ownerToken: AccessToken
+        get() {
+            backend.synchronize()
+            val owners = queryModel.listUsers().sortedBy { it.role }
+            val owner = owners.lastOrNull()
+                ?: error("No users seeded — call registerUser first")
+            return AccessToken(owner.name, owner.role)
+        }
 
     fun listUsers(): List<com.seanshubin.vote.domain.UserNameRole> {
         backend.synchronize()
-        return backend.listUsers(ownerToken!!)
+        return backend.listUsers(ownerToken)
     }
 
     fun getUser(userName: String): com.seanshubin.vote.domain.UserNameEmail {
         backend.synchronize()
-        return backend.getUser(ownerToken!!, userName)
+        return backend.getUser(ownerToken, userName)
     }
 
     fun userCount(): Int {
         backend.synchronize()
-        return backend.userCount(ownerToken!!)
+        return backend.userCount(ownerToken)
     }
 
     fun electionCount(): Int {
         backend.synchronize()
-        return backend.electionCount(ownerToken!!)
+        return backend.electionCount(ownerToken)
     }
 
     fun eventCount(): Int {
         backend.synchronize()
-        return backend.eventCount(ownerToken!!)
+        return backend.eventCount(ownerToken)
     }
 
     fun listTables(): List<String> {
         backend.synchronize()
-        return backend.listTables(ownerToken!!)
+        return backend.listTables(ownerToken)
     }
 
     fun tableCount(): Int {
         backend.synchronize()
-        return backend.tableCount(ownerToken!!)
+        return backend.tableCount(ownerToken)
     }
 
     fun tableData(tableName: String): com.seanshubin.vote.domain.TableData {
         backend.synchronize()
-        return backend.tableData(ownerToken!!, tableName)
+        return backend.tableData(ownerToken, tableName)
     }
 
     fun permissionsForRole(role: com.seanshubin.vote.domain.Role): List<com.seanshubin.vote.domain.Permission> =

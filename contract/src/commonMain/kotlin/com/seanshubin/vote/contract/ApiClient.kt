@@ -16,19 +16,15 @@ import com.seanshubin.vote.domain.UserNameRole
  * FakeApiClient) are responsible for tracking the current session and, where
  * applicable, transparently refreshing on 401.
  *
- * State transitions: register / authenticate / refresh start a session;
- * logout ends one. Authenticated calls before a session is started will fail.
+ * State transitions: discordLoginStartUrl + the OAuth callback start a
+ * session; logout ends one. Authenticated calls before a session is started
+ * will fail.
  */
 interface ApiClient {
-    suspend fun register(userName: String, email: String, password: String, inviteCode: String = ""): AuthResponse
-
-    /** [nameOrEmail] is matched against username first, then email — login accepts either. */
-    suspend fun authenticate(nameOrEmail: String, password: String): AuthResponse
-
     /**
-     * Trade the refresh-token cookie (set by a prior register/authenticate)
-     * for fresh tokens. Returns null if the browser has no valid cookie —
-     * the caller should show the login screen in that case.
+     * Trade the refresh-token cookie (set by a prior Discord login) for fresh
+     * tokens. Returns null if the browser has no valid cookie — the caller
+     * should show the login screen in that case.
      */
     suspend fun refresh(): AuthResponse?
 
@@ -48,37 +44,8 @@ interface ApiClient {
      */
     var onSessionLost: (() -> Unit)?
 
-    /** Kick off a password reset — backend looks up user and emails a signed reset link. */
-    suspend fun requestPasswordReset(nameOrEmail: String)
-
-    /** Complete a password reset using the token from the email link. */
-    suspend fun resetPassword(resetToken: String, newPassword: String)
-
-    /**
-     * Change the authenticated user's own password. The backend verifies
-     * [oldPassword] before accepting [newPassword] — protects against an
-     * attacker who walks up to an unlocked browser session.
-     */
-    suspend fun changeMyPassword(oldPassword: String, newPassword: String)
-
-    /** The current user's name + email (empty string when no email is on file). */
+    /** The current user's name. */
     suspend fun getMyUser(): UserNameEmail
-
-    /**
-     * Set the current user's email. Empty string clears it (user has no
-     * email on file → no self-service password reset path). The backend
-     * rejects values that collide with another user's email.
-     */
-    suspend fun updateMyEmail(newEmail: String)
-
-    /**
-     * Admin sets another user's password directly — used when the user
-     * has forgotten theirs and either didn't provide an email or doesn't
-     * want to wait for a reset link. Gated server-side identically to
-     * setRole: caller must have MANAGE_USERS and a strictly higher role
-     * than the target.
-     */
-    suspend fun adminSetPassword(userName: String, newPassword: String)
 
     suspend fun listElections(): List<ElectionSummary>
     suspend fun createElection(electionName: String, description: String = ""): String
@@ -164,4 +131,15 @@ interface ApiClient {
      * propagates correctly up the coroutine.
      */
     fun logErrorToServer(error: Throwable)
+
+    /**
+     * Kick off Discord OAuth. Returns the URL the browser should navigate to;
+     * the backend has already set the state cookie that the callback will
+     * verify. The frontend just does `window.location.href = url`.
+     *
+     * Throws if Discord login isn't configured in this environment (e.g. dev
+     * runs without DISCORD_CLIENT_ID set) — the login page should hide the
+     * Discord button when this fails.
+     */
+    suspend fun discordLoginStartUrl(): String
 }

@@ -44,42 +44,6 @@ class DynamoDbSingleTableCommandModel(
         }
     }
 
-    // User commands
-    override fun createUser(
-        authority: String,
-        userName: String,
-        email: String,
-        salt: String,
-        hash: String,
-        role: Role
-    ) {
-        runBlocking {
-            dynamoDb.putItem(PutItemRequest {
-                tableName = DynamoDbSingleTableSchema.MAIN_TABLE
-                // GSI attributes for email lookup — keyed by lowercase email so
-                // the equality lookup is case-insensitive. Display case is the
-                // "email" attribute. Blank email skips the GSI entirely:
-                // DynamoDB simply omits items missing a GSI key from the
-                // index, so `searchUserByEmail` will never find this user
-                // (which is the desired behavior — they have no email).
-                val base = mapOf(
-                    "PK" to AttributeValue.S(DynamoDbSingleTableSchema.userPK(userName)),
-                    "SK" to AttributeValue.S(DynamoDbSingleTableSchema.METADATA_SK),
-                    "entity_type" to AttributeValue.S("USER"),
-                    "name" to AttributeValue.S(userName),
-                    "email" to AttributeValue.S(email),
-                    "salt" to AttributeValue.S(salt),
-                    "hash" to AttributeValue.S(hash),
-                    "role" to AttributeValue.S(role.name),
-                )
-                item = if (email.isEmpty()) base else base + mapOf(
-                    "GSI1PK" to AttributeValue.S(DynamoDbSingleTableSchema.emailKey(email)),
-                    "GSI1SK" to AttributeValue.S(DynamoDbSingleTableSchema.userPK(userName)),
-                )
-            })
-        }
-    }
-
     override fun setRole(authority: String, userName: String, role: Role) {
         runBlocking {
             dynamoDb.updateItem(UpdateItemRequest {
@@ -129,24 +93,6 @@ class DynamoDbSingleTableCommandModel(
         }
     }
 
-    override fun setPassword(authority: String, userName: String, salt: String, hash: String) {
-        runBlocking {
-            dynamoDb.updateItem(UpdateItemRequest {
-                tableName = DynamoDbSingleTableSchema.MAIN_TABLE
-                key = mapOf(
-                    "PK" to AttributeValue.S(DynamoDbSingleTableSchema.userPK(userName)),
-                    "SK" to AttributeValue.S(DynamoDbSingleTableSchema.METADATA_SK)
-                )
-                updateExpression = "SET salt = :s, #h = :hash"
-                expressionAttributeNames = mapOf("#h" to "hash")
-                expressionAttributeValues = mapOf(
-                    ":s" to AttributeValue.S(salt),
-                    ":hash" to AttributeValue.S(hash)
-                )
-            })
-        }
-    }
-
     override fun setUserName(authority: String, oldUserName: String, newUserName: String) {
         runBlocking {
             // Get old user item
@@ -174,7 +120,6 @@ class DynamoDbSingleTableCommandModel(
                     item = user.toMutableMap().apply {
                         this["PK"] = AttributeValue.S(DynamoDbSingleTableSchema.userPK(newUserName))
                         this["name"] = AttributeValue.S(newUserName)
-                        this["GSI1SK"] = AttributeValue.S(DynamoDbSingleTableSchema.userPK(newUserName))
                     }
                 })
             }
@@ -236,29 +181,47 @@ class DynamoDbSingleTableCommandModel(
         }
     }
 
-    override fun setEmail(authority: String, userName: String, email: String) {
+    override fun createUserViaDiscord(
+        authority: String,
+        userName: String,
+        discordId: String,
+        discordDisplayName: String,
+        role: Role,
+    ) {
+        runBlocking {
+            dynamoDb.putItem(PutItemRequest {
+                tableName = DynamoDbSingleTableSchema.MAIN_TABLE
+                item = mapOf(
+                    "PK" to AttributeValue.S(DynamoDbSingleTableSchema.userPK(userName)),
+                    "SK" to AttributeValue.S(DynamoDbSingleTableSchema.METADATA_SK),
+                    "entity_type" to AttributeValue.S("USER"),
+                    "name" to AttributeValue.S(userName),
+                    "role" to AttributeValue.S(role.name),
+                    "discord_id" to AttributeValue.S(discordId),
+                    "discord_display_name" to AttributeValue.S(discordDisplayName),
+                )
+            })
+        }
+    }
+
+    override fun linkDiscordCredential(
+        authority: String,
+        userName: String,
+        discordId: String,
+        discordDisplayName: String,
+    ) {
         runBlocking {
             dynamoDb.updateItem(UpdateItemRequest {
                 tableName = DynamoDbSingleTableSchema.MAIN_TABLE
                 key = mapOf(
                     "PK" to AttributeValue.S(DynamoDbSingleTableSchema.userPK(userName)),
-                    "SK" to AttributeValue.S(DynamoDbSingleTableSchema.METADATA_SK)
+                    "SK" to AttributeValue.S(DynamoDbSingleTableSchema.METADATA_SK),
                 )
-                // Blank email clears both the email attribute and the GSI keys,
-                // which removes the user from the email-index. A non-blank
-                // value sets all three so the user reappears in the index
-                // under the new lowercased email.
-                if (email.isEmpty()) {
-                    updateExpression = "SET email = :e REMOVE GSI1PK, GSI1SK"
-                    expressionAttributeValues = mapOf(":e" to AttributeValue.S(""))
-                } else {
-                    updateExpression = "SET email = :e, GSI1PK = :gsi1pk, GSI1SK = :gsi1sk"
-                    expressionAttributeValues = mapOf(
-                        ":e" to AttributeValue.S(email),
-                        ":gsi1pk" to AttributeValue.S(DynamoDbSingleTableSchema.emailKey(email)),
-                        ":gsi1sk" to AttributeValue.S(DynamoDbSingleTableSchema.userPK(userName)),
-                    )
-                }
+                updateExpression = "SET discord_id = :did, discord_display_name = :ddn"
+                expressionAttributeValues = mapOf(
+                    ":did" to AttributeValue.S(discordId),
+                    ":ddn" to AttributeValue.S(discordDisplayName),
+                )
             })
         }
     }

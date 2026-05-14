@@ -26,19 +26,6 @@ class MySqlQueryModel(
         }
     }
 
-    override fun findUserByEmail(email: String): User {
-        val sql = queryLoader.load("user-select-by-email")
-        return connection.prepareStatement(sql).use { stmt ->
-            stmt.setString(1, email)
-            val rs = stmt.executeQuery()
-            if (rs.next()) {
-                rs.toUser()
-            } else {
-                error("User not found with email: $email")
-            }
-        }
-    }
-
     override fun searchUserByName(name: String): User? {
         val sql = queryLoader.load("user-select-by-name")
         return connection.prepareStatement(sql).use { stmt ->
@@ -52,14 +39,13 @@ class MySqlQueryModel(
         }
     }
 
-    override fun searchUserByEmail(email: String): User? {
-        // Blank email never matches anyone — emailless users share the
-        // empty string as their stored value, but the email-lookup path
-        // is reserved for users who actually provided one.
-        if (email.isEmpty()) return null
-        val sql = queryLoader.load("user-select-by-email")
+    override fun searchUserByDiscordId(discordId: String): User? {
+        // Blank discordId never matches anyone — defensive only; every user
+        // is created via Discord OAuth and so always has a non-empty id.
+        if (discordId.isEmpty()) return null
+        val sql = queryLoader.load("user-select-by-discord-id")
         return connection.prepareStatement(sql).use { stmt ->
-            stmt.setString(1, email)
+            stmt.setString(1, discordId)
             val rs = stmt.executeQuery()
             if (rs.next()) {
                 rs.toUser()
@@ -344,13 +330,11 @@ class MySqlQueryModel(
     private fun ResultSet.toUser(): User {
         return User(
             name = getString("name"),
-            // SQL NULL on email represents "no email on file"; translate
-            // back to the domain's empty-string sentinel so the rest of
-            // the application treats both backends identically.
-            email = getString("email") ?: "",
-            salt = getString("salt"),
-            hash = getString("hash"),
-            role = Role.valueOf(getString("role"))
+            role = Role.valueOf(getString("role")),
+            // SQL NULL → empty-string sentinel translation for the Discord
+            // credential fields; the column nullability is defensive coding.
+            discordId = getString("discord_id") ?: "",
+            discordDisplayName = getString("discord_display_name") ?: "",
         )
     }
 

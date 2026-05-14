@@ -1,11 +1,12 @@
 package com.seanshubin.vote.backend.service
 
-import com.seanshubin.vote.backend.auth.InviteCodeProvider
+import com.seanshubin.vote.backend.auth.DiscordConfigProvider
+import com.seanshubin.vote.backend.auth.DiscordOAuthClient
 import com.seanshubin.vote.backend.auth.TokenEncoder
-import com.seanshubin.vote.backend.validation.TestUser
 import com.seanshubin.vote.backend.validation.Validation
 import com.seanshubin.vote.contract.*
 import com.seanshubin.vote.domain.*
+import java.security.SecureRandom
 
 class ServiceImpl(
     private val integrations: Integrations,
@@ -14,14 +15,12 @@ class ServiceImpl(
     private val queryModel: QueryModel,
     private val rawTableScanner: RawTableScanner,
     private val tokenEncoder: TokenEncoder,
-    private val frontendBaseUrl: String,
-    private val inviteCodeProvider: InviteCodeProvider = InviteCodeProvider { null },
+    private val discordConfigProvider: DiscordConfigProvider = DiscordConfigProvider { null },
+    private val discordOAuthClient: DiscordOAuthClient = DiscordOAuthClient(),
 ) : Service {
+    private val secureRandom = SecureRandom()
     private val clock = integrations.clock
     private val uniqueIdGenerator = integrations.uniqueIdGenerator
-    private val notifications = integrations.notifications
-    private val passwordUtil = integrations.passwordUtil
-    private val emailSender = integrations.emailSender
     private val relationalProjection = DynamoToRelational(queryModel, eventLog)
     private val eventApplier = EventApplier(eventLog, commandModel, queryModel)
 
@@ -39,84 +38,6 @@ class ServiceImpl(
     override fun refresh(refreshToken: RefreshToken): Tokens {
         val user = requireSessionUser(refreshToken.userName)
         val accessToken = AccessToken(user.name, user.role)
-        return Tokens(accessToken, refreshToken)
-    }
-
-    override fun register(userName: String, email: String, password: String, inviteCode: String): Tokens {
-        // Invite-code gate. Provider returning null/blank disables it (dev/tests
-        // and any environment where the operator hasn't set the SSM parameter).
-        // Compare with `equals`, not constant-time — leaking the code via timing
-        // would still require ~10^9 attempts against a per-Lambda 5-minute cache.
-        // Case-insensitive: matches the username comparison style elsewhere and
-        // forgives users who type the code with shift held or auto-capitalized.
-        val expectedInviteCode = inviteCodeProvider.current()
-        if (!expectedInviteCode.isNullOrBlank() && !inviteCode.equals(expectedInviteCode, ignoreCase = true)) {
-            throw ServiceException(
-                ServiceException.Category.UNAUTHORIZED,
-                "Invalid invite code"
-            )
-        }
-
-        val validUserName = Validation.validateUserName(userName)
-        val validEmail = Validation.validateEmail(email)
-        val validPassword = Validation.validatePassword(password)
-
-        // CONFLICT (409) — the request is well-formed but the resource already
-        // exists. Telling the user *which* field collides is intentional: the
-        // user explicitly asked for honest errors over enumeration-resistance.
-        if (queryModel.searchUserByName(validUserName) != null) {
-            throw ServiceException(
-                ServiceException.Category.CONFLICT,
-                "User name already exists: $validUserName"
-            )
-        }
-        // Blank email skips the uniqueness check — multiple users can register
-        // without an email. Each such user has no self-service reset path; an
-        // admin will have to set their password if they forget it.
-        if (validEmail.isNotEmpty() && queryModel.searchUserByEmail(validEmail) != null) {
-            throw ServiceException(
-                ServiceException.Category.CONFLICT,
-                "Email already exists: $validEmail"
-            )
-        }
-
-        val role = if (queryModel.userCount() == 0) Role.PRIMARY_ROLE else Role.DEFAULT_ROLE
-        val saltAndHash = passwordUtil.createSaltAndHash(validPassword)
-
-        eventLog.appendEvent(
-            "system",
-            clock.now(),
-            DomainEvent.UserRegistered(validUserName, validEmail, saltAndHash.salt, saltAndHash.hash, role)
-        )
-        synchronize()
-
-        val user = queryModel.findUserByName(validUserName)
-        val accessToken = AccessToken(user.name, user.role)
-        val refreshToken = RefreshToken(user.name)
-        return Tokens(accessToken, refreshToken)
-    }
-
-    override fun authenticate(nameOrEmail: String, password: String): Tokens {
-        val validNameOrEmail = Validation.validateNameOrEmail(nameOrEmail)
-        // Try as username first, then email — login accepts either form.
-        // Distinguishing "no such user" (NOT_FOUND) from "wrong password"
-        // (UNAUTHORIZED) is intentional honesty per the user's preference.
-        val user = queryModel.searchUserByName(validNameOrEmail)
-            ?: queryModel.searchUserByEmail(validNameOrEmail)
-            ?: throw ServiceException(
-                ServiceException.Category.NOT_FOUND,
-                "No user found with username or email: $validNameOrEmail"
-            )
-
-        if (!passwordUtil.passwordMatches(password, user.salt, user.hash)) {
-            throw ServiceException(
-                ServiceException.Category.UNAUTHORIZED,
-                "Wrong password for user: ${user.name}"
-            )
-        }
-
-        val accessToken = AccessToken(user.name, user.role)
-        val refreshToken = RefreshToken(user.name)
         return Tokens(accessToken, refreshToken)
     }
 
@@ -220,7 +141,13 @@ class ServiceImpl(
         )
         return queryModel.listUsers().map { user ->
             val target = UserRole(user.name, user.role)
-            UserNameRole(user.name, user.role, callerPermissions.listedRolesFor(target))
+            UserNameRole(
+                userName = user.name,
+                role = user.role,
+                allowedRoles = callerPermissions.listedRolesFor(target),
+                discordId = user.discordId,
+                discordDisplayName = user.discordDisplayName,
+            )
         }
     }
 
@@ -233,7 +160,7 @@ class ServiceImpl(
         val validDescription = Validation.validateElectionDescription(description)
 
         // Ensure user exists; resolve to the canonical-case stored name so the
-        // owner_name we record matches whatever case the user registered with,
+        // owner_name we record matches whatever case the user is stored under,
         // even if the caller passed a different case.
         val owner = queryModel.searchUserByName(validUserName)
             ?: throw ServiceException(ServiceException.Category.NOT_FOUND, "User not found: $validUserName")
@@ -281,22 +208,14 @@ class ServiceImpl(
             requireGreaterRole(accessToken, targetUser)
         }
 
-        // Validate new values if provided
         val validNewUserName = userUpdates.userName?.let { Validation.validateUserName(it) }
-        val validNewEmail = userUpdates.email?.let { Validation.validateEmail(it) }
 
-        // Conflict checks: a hit on a *different* user is a conflict; a hit on
+        // Conflict check: a hit on a *different* user is a conflict; a hit on
         // the same user (e.g. case-only rename "Alice" → "alice") is allowed.
         validNewUserName?.let { newName ->
             val conflict = queryModel.searchUserByName(newName)
             require(conflict == null || conflict.name == targetUser.name) {
                 "User name already exists: $newName"
-            }
-        }
-        validNewEmail?.let { newEmail ->
-            val existingUser = queryModel.searchUserByEmail(newEmail)
-            require(existingUser == null || existingUser.name == targetUser.name) {
-                "Email already exists: $newEmail"
             }
         }
 
@@ -308,24 +227,17 @@ class ServiceImpl(
                 DomainEvent.UserNameChanged(targetUser.name, it)
             )
         }
-        validNewEmail?.let {
-            eventLog.appendEvent(
-                accessToken.userName,
-                clock.now(),
-                DomainEvent.UserEmailChanged(targetUser.name, it)
-            )
-        }
         synchronize()
     }
 
     override fun getUser(accessToken: AccessToken, userName: String): UserNameEmail {
-        // Returns email (PII). Allowed for self (you can always look up your
-        // own email) or for ADMIN+ moderators. Anyone else is rejected.
+        // Allowed for self (you can always look up your own profile) or for
+        // ADMIN+ moderators. Anyone else is rejected.
         if (!isSelf(accessToken, userName)) {
             requirePermission(accessToken, Permission.MANAGE_USERS)
         }
         val user = queryModel.findUserByName(userName)
-        return UserNameEmail(user.name, user.email)
+        return with(UserNameEmail.Companion) { user.toUserNameEmail() }
     }
 
     override fun getElection(accessToken: AccessToken, electionName: String): ElectionDetail {
@@ -594,132 +506,6 @@ class ServiceImpl(
         return queryModel.searchBallot(voterName, electionName)
     }
 
-    override fun sendLoginLinkByEmail(email: String, baseUri: String) {
-        notifications.sendMailEvent(email, "Login link")
-    }
-
-    override fun requestPasswordReset(nameOrEmail: String) {
-        val validNameOrEmail = Validation.validateNameOrEmail(nameOrEmail)
-        // Same lookup pattern as authenticate(): match by username first, then email.
-        val user = queryModel.searchUserByName(validNameOrEmail)
-            ?: queryModel.searchUserByEmail(validNameOrEmail)
-            ?: throw ServiceException(
-                ServiceException.Category.NOT_FOUND,
-                "No user found with username or email: $validNameOrEmail"
-            )
-
-        // No email on file → no self-service reset path. Surface this with
-        // a clear, actionable message instead of silently failing or
-        // sending nowhere — the user needs to know to ask an admin.
-        if (user.email.isEmpty()) {
-            throw ServiceException(
-                ServiceException.Category.UNSUPPORTED,
-                "No email on file for ${user.name} — ask an admin to set a new password",
-            )
-        }
-
-        // Test users have a publicly-known password by design. Refusing the
-        // reset here keeps a stray real-looking email on a test account from
-        // leaking outbound mail. (Most test users have no email at all and
-        // would already have been rejected above.) Reuses the same admin
-        // recovery message — admins can wipe test users via /admin/test-users.
-        if (TestUser.isTestUser(user, passwordUtil)) {
-            throw ServiceException(
-                ServiceException.Category.UNSUPPORTED,
-                "${user.name} is a test user — ask an admin to set a new password",
-            )
-        }
-
-        val resetToken = tokenEncoder.encodeResetToken(user.name)
-        val resetUrl = "$frontendBaseUrl/reset-password?token=$resetToken"
-        val body = """
-            Hello ${user.name},
-
-            Use the link below to set a new password. The link expires in 1 hour.
-
-            $resetUrl
-
-            If you didn't request this, you can ignore this email — your password
-            won't change unless someone follows the link.
-        """.trimIndent()
-        emailSender.send(user.email, "Reset your password", body)
-        notifications.sendMailEvent(user.email, "Reset your password")
-    }
-
-    override fun resetPassword(resetToken: String, newPassword: String) {
-        val userName = tokenEncoder.decodeResetToken(resetToken)
-            ?: throw ServiceException(
-                ServiceException.Category.UNAUTHORIZED,
-                "Reset token is missing, expired, or invalid"
-            )
-        val user = queryModel.searchUserByName(userName)
-            ?: throw ServiceException(
-                ServiceException.Category.NOT_FOUND,
-                "User no longer exists: $userName"
-            )
-
-        val validPassword = Validation.validatePassword(newPassword)
-        val saltAndHash = passwordUtil.createSaltAndHash(validPassword)
-        // The reset itself is the authority for the password-change event —
-        // there's no logged-in actor at this point. Authority "system" plus the
-        // token's userName claim is the closest honest representation.
-        eventLog.appendEvent(
-            "system",
-            clock.now(),
-            DomainEvent.UserPasswordChanged(user.name, saltAndHash.salt, saltAndHash.hash),
-        )
-        synchronize()
-    }
-
-    override fun changeMyPassword(accessToken: AccessToken, oldPassword: String, newPassword: String) {
-        val user = requireSessionUser(accessToken.userName)
-        // Verify old password matches before accepting the new one. Without
-        // this gate, an attacker who walks up to an unlocked browser could
-        // lock the legitimate user out by setting a password they don't know.
-        if (!passwordUtil.passwordMatches(oldPassword, user.salt, user.hash)) {
-            throw ServiceException(
-                ServiceException.Category.UNAUTHORIZED,
-                "Old password does not match",
-            )
-        }
-        val validPassword = Validation.validatePassword(newPassword)
-        val saltAndHash = passwordUtil.createSaltAndHash(validPassword)
-        eventLog.appendEvent(
-            accessToken.userName,
-            clock.now(),
-            DomainEvent.UserPasswordChanged(user.name, saltAndHash.salt, saltAndHash.hash),
-        )
-        synchronize()
-    }
-
-    override fun adminSetPassword(accessToken: AccessToken, userName: String, newPassword: String) {
-        val targetUser = queryModel.searchUserByName(userName)
-            ?: throw ServiceException(ServiceException.Category.NOT_FOUND, "User not found: $userName")
-
-        // Same gate as setRole / removeUser: callers can't act on themselves
-        // through the admin path (they have changeMyPassword for that, which
-        // proves possession of the old password), and they need a strictly
-        // greater role than the target — so an admin can't reset another
-        // admin's password and impersonate them.
-        if (isSelf(accessToken, targetUser.name)) {
-            throw ServiceException(
-                ServiceException.Category.UNAUTHORIZED,
-                "Use changeMyPassword to set your own password",
-            )
-        }
-        requirePermission(accessToken, Permission.MANAGE_USERS)
-        requireGreaterRole(accessToken, targetUser)
-
-        val validPassword = Validation.validatePassword(newPassword)
-        val saltAndHash = passwordUtil.createSaltAndHash(validPassword)
-        eventLog.appendEvent(
-            accessToken.userName,
-            clock.now(),
-            DomainEvent.UserPasswordChanged(targetUser.name, saltAndHash.salt, saltAndHash.hash),
-        )
-        synchronize()
-    }
-
     override fun getUserActivity(accessToken: AccessToken): UserActivity {
         // Re-fetch the user's role from the projection rather than trusting
         // the access token: tokens are 10-min lived, so a recent role change
@@ -735,21 +521,94 @@ class ServiceImpl(
         )
     }
 
-    override fun wipeTestUsers(accessToken: AccessToken): WipeTestUsersResult {
-        requirePermission(accessToken, Permission.MANAGE_USERS)
-        // Test user = stored credentials match the public marker password.
-        // Per-user hash check; fine for an admin operation, not a hot path.
-        val testUsers = queryModel.listUsers().filter { TestUser.isTestUser(it, passwordUtil) }
-        val testUserNames = testUsers.map { it.name }.toSet()
-        // Elections must go first — removeUser refuses to delete a user that
-        // still owns elections.
-        val testElections = queryModel.listElections().filter { it.ownerName in testUserNames }
-        testElections.forEach { deleteElection(accessToken, it.electionName) }
-        testUsers.forEach { removeUser(accessToken, it.name) }
-        return WipeTestUsersResult(
-            usersDeleted = testUsers.size,
-            electionsDeleted = testElections.size,
+    override fun discordLoginStart(): DiscordLoginStart {
+        val config = discordConfigProvider.current()
+            ?: throw ServiceException(
+                ServiceException.Category.UNSUPPORTED,
+                "Discord login is not configured in this environment",
+            )
+        // 16 random bytes (128 bits) is overkill for a 5-minute CSRF nonce
+        // but cheap. Hex-encoded so it survives URL transit unmodified.
+        val state = randomHex(16)
+        return DiscordLoginStart(
+            authorizeUrl = discordOAuthClient.buildAuthorizeUrl(config, state),
+            state = state,
         )
+    }
+
+    override fun discordLoginComplete(code: String): Tokens {
+        val config = discordConfigProvider.current()
+            ?: throw ServiceException(
+                ServiceException.Category.UNSUPPORTED,
+                "Discord login is not configured in this environment",
+            )
+        val identity = when (val result = discordOAuthClient.authenticate(config, code)) {
+            is DiscordOAuthClient.AuthResult.Ok -> result.identity
+            is DiscordOAuthClient.AuthResult.NotInGuild -> throw ServiceException(
+                ServiceException.Category.UNAUTHORIZED,
+                "You must be a member of The Rippaverse Discord server to use this app",
+            )
+            is DiscordOAuthClient.AuthResult.Error -> throw ServiceException(
+                ServiceException.Category.UNAUTHORIZED,
+                "Discord authorization failed: ${result.reason}",
+            )
+        }
+
+        // Find-or-create by Discord ID. The id is a Discord snowflake — stable
+        // across username changes — so it's the right join key. We never key
+        // off display name; that's mutable.
+        val existing = queryModel.searchUserByDiscordId(identity.discordId)
+        val resolvedUser: User = existing ?: createDiscordStubUser(identity)
+        val accessToken = AccessToken(resolvedUser.name, resolvedUser.role)
+        val refreshToken = RefreshToken(resolvedUser.name)
+        return Tokens(accessToken, refreshToken)
+    }
+
+    private fun createDiscordStubUser(identity: DiscordOAuthClient.DiscordIdentity): User {
+        // First-ever Discord login lands as NO_ACCESS with the Discord display
+        // name as the suggested username (deconflicted if it collides). The
+        // owner has to be promoted from NO_ACCESS to PRIMARY_ROLE by an
+        // existing operator — there is no automatic "first user becomes
+        // owner" rule under Discord-only login.
+        val candidateName = uniqueUserName(identity.displayName)
+        eventLog.appendEvent(
+            "system",
+            clock.now(),
+            DomainEvent.UserRegisteredViaDiscord(
+                name = candidateName,
+                discordId = identity.discordId,
+                discordDisplayName = identity.displayName,
+                role = Role.NO_ACCESS,
+            ),
+        )
+        synchronize()
+        return queryModel.findUserByName(candidateName)
+    }
+
+    /**
+     * Generate a username that doesn't collide with an existing one, derived
+     * from [base]. Tries [base], then [base]-2, [base]-3, ... — stops as soon
+     * as the candidate is free. Bounded to keep a malicious display name from
+     * blowing up the search; in practice the first attempt almost always works
+     * for a community-gated app where "Sean" + "Sean-2" + "Sean-3" is plenty.
+     */
+    private fun uniqueUserName(base: String): String {
+        val cleaned = Validation.validateUserName(base.ifBlank { "user" })
+        if (queryModel.searchUserByName(cleaned) == null) return cleaned
+        for (suffix in 2..1000) {
+            val candidate = "$cleaned-$suffix"
+            if (queryModel.searchUserByName(candidate) == null) return candidate
+        }
+        // 999 collisions on a single Discord display name is implausible —
+        // appending a random suffix in the unreachable-tail case is defensive
+        // belt-and-braces, not a feature we expect to fire.
+        return "$cleaned-${randomHex(4)}"
+    }
+
+    private fun randomHex(byteCount: Int): String {
+        val bytes = ByteArray(byteCount)
+        secureRandom.nextBytes(bytes)
+        return bytes.joinToString("") { "%02x".format(it) }
     }
 
     /**
