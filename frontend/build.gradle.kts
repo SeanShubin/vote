@@ -111,3 +111,11 @@ val addCacheBusting by tasks.registering {
 tasks.named("assemble") {
     dependsOn(addCacheBusting)
 }
+
+// The jsTest source set currently holds only test helpers (FakeApiClient,
+// ComposeTestHelper) — the @Test classes were removed with the Discord-only
+// login change. Gradle 9 fails a test task that discovers zero tests, so
+// allow it until frontend tests are re-added against the helpers.
+tasks.named<AbstractTestTask>("jsBrowserTest") {
+    failOnNoDiscoveredTests = false
+}
