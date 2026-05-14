@@ -5,7 +5,6 @@ import com.seanshubin.vote.contract.QueryLoader
 import com.seanshubin.vote.domain.Ranking
 import com.seanshubin.vote.domain.Role
 import kotlinx.datetime.Instant
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.sql.Connection
 import java.sql.Timestamp
@@ -27,29 +26,6 @@ class MySqlCommandModel(
         val sql = queryLoader.load("sync-state-upsert")
         connection.prepareStatement(sql).use { stmt ->
             stmt.setLong(1, lastSynced)
-            stmt.executeUpdate()
-        }
-    }
-
-    override fun createUser(
-        authority: String,
-        userName: String,
-        email: String,
-        salt: String,
-        hash: String,
-        role: Role
-    ) {
-        val sql = queryLoader.load("user-insert")
-        connection.prepareStatement(sql).use { stmt ->
-            stmt.setString(1, userName)
-            // Translate the domain's "" sentinel for "no email" to SQL NULL
-            // so the UNIQUE constraint on email permits multiple emailless
-            // users to coexist (NULL is not equal to NULL in UNIQUE).
-            if (email.isEmpty()) stmt.setNull(2, java.sql.Types.VARCHAR)
-            else stmt.setString(2, email)
-            stmt.setString(3, salt)
-            stmt.setString(4, hash)
-            stmt.setString(5, role.name)
             stmt.executeUpdate()
         }
     }
@@ -362,16 +338,6 @@ class MySqlCommandModel(
         }
     }
 
-    override fun setPassword(authority: String, userName: String, salt: String, hash: String) {
-        val sql = queryLoader.load("user-update-password")
-        connection.prepareStatement(sql).use { stmt ->
-            stmt.setString(1, salt)
-            stmt.setString(2, hash)
-            stmt.setString(3, userName)
-            stmt.executeUpdate()
-        }
-    }
-
     override fun setUserName(authority: String, oldUserName: String, newUserName: String) {
         val updateUser = queryLoader.load("user-update-name")
         connection.prepareStatement(updateUser).use { stmt ->
@@ -395,14 +361,34 @@ class MySqlCommandModel(
         }
     }
 
-    override fun setEmail(authority: String, userName: String, email: String) {
-        val sql = queryLoader.load("user-update-email")
+    override fun createUserViaDiscord(
+        authority: String,
+        userName: String,
+        discordId: String,
+        discordDisplayName: String,
+        role: Role,
+    ) {
+        val sql = queryLoader.load("user-insert-discord")
         connection.prepareStatement(sql).use { stmt ->
-            // See createUser — empty string becomes NULL so UNIQUE permits
-            // multiple emailless users.
-            if (email.isEmpty()) stmt.setNull(1, java.sql.Types.VARCHAR)
-            else stmt.setString(1, email)
-            stmt.setString(2, userName)
+            stmt.setString(1, userName)
+            stmt.setString(2, role.name)
+            stmt.setString(3, discordId)
+            stmt.setString(4, discordDisplayName)
+            stmt.executeUpdate()
+        }
+    }
+
+    override fun linkDiscordCredential(
+        authority: String,
+        userName: String,
+        discordId: String,
+        discordDisplayName: String,
+    ) {
+        val sql = queryLoader.load("user-update-link-discord")
+        connection.prepareStatement(sql).use { stmt ->
+            stmt.setString(1, discordId)
+            stmt.setString(2, discordDisplayName)
+            stmt.setString(3, userName)
             stmt.executeUpdate()
         }
     }

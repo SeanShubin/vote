@@ -22,16 +22,6 @@ class EventApplier(
 
     fun apply(authority: String, event: DomainEvent) {
         when (event) {
-            is DomainEvent.UserRegistered -> {
-                commandModel.createUser(
-                    authority = authority,
-                    userName = event.name,
-                    email = event.email,
-                    salt = event.salt,
-                    hash = event.hash,
-                    role = event.role
-                )
-            }
             is DomainEvent.UserRoleChanged -> {
                 commandModel.setRole(authority, event.userName, event.newRole)
             }
@@ -44,14 +34,25 @@ class EventApplier(
             is DomainEvent.UserRemoved -> {
                 commandModel.removeUser(authority, event.userName)
             }
-            is DomainEvent.UserPasswordChanged -> {
-                commandModel.setPassword(authority, event.userName, event.newSalt, event.newHash)
-            }
             is DomainEvent.UserNameChanged -> {
                 commandModel.setUserName(authority, event.oldUserName, event.newUserName)
             }
-            is DomainEvent.UserEmailChanged -> {
-                commandModel.setEmail(authority, event.userName, event.newEmail)
+            is DomainEvent.UserRegisteredViaDiscord -> {
+                commandModel.createUserViaDiscord(
+                    authority = authority,
+                    userName = event.name,
+                    discordId = event.discordId,
+                    discordDisplayName = event.discordDisplayName,
+                    role = event.role,
+                )
+            }
+            is DomainEvent.DiscordCredentialLinked -> {
+                commandModel.linkDiscordCredential(
+                    authority = authority,
+                    userName = event.userName,
+                    discordId = event.discordId,
+                    discordDisplayName = event.discordDisplayName,
+                )
             }
             is DomainEvent.ElectionCreated -> {
                 commandModel.addElection(authority, event.ownerName, event.electionName, event.description)

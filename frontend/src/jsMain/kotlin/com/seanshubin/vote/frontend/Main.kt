@@ -67,8 +67,8 @@ fun VoteApp(apiClient: ApiClient) {
             if (auth != null) {
                 userName = auth.userName
                 role = auth.role
-                // Bookmarked /login or /register but already authenticated?
-                // Nudge them to Home — they don't need to log in again.
+                // Bookmarked /login but already authenticated? Nudge them
+                // to Home — they don't need to sign in again.
                 if (isPublicPage(router.currentPage)) {
                     router.replace(Page.Home)
                 }
@@ -89,13 +89,13 @@ fun VoteApp(apiClient: ApiClient) {
         return
     }
 
-    // NO_ACCESS is the lock-out role: the user is registered but an admin has
-    // not granted them any permissions. Every authenticated endpoint requires
-    // VIEW_APPLICATION (≥ OBSERVER), so navigating into the app would just
-    // produce a wall of 401s. Show a dedicated stub instead, with the only
-    // actions they actually can take: log out, or self-delete their account.
-    // Public pages (login/register/password-reset) still render normally so
-    // they aren't trapped in the stub if they ended up there with stale state.
+    // NO_ACCESS is the lock-out role: the user signed in via Discord but an
+    // admin has not granted them any permissions. Every authenticated
+    // endpoint requires VIEW_APPLICATION (≥ OBSERVER), so navigating into
+    // the app would just produce a wall of 401s. Show a dedicated stub
+    // instead, with the only actions they actually can take: log out, or
+    // self-delete their account. Public pages still render normally so they
+    // aren't trapped in the stub if they ended up there with stale state.
     if (role == Role.NO_ACCESS && !isPublicPage(router.currentPage)) {
         LockedPage(
             apiClient = apiClient,
@@ -124,25 +124,7 @@ fun VoteApp(apiClient: ApiClient) {
     }
 
     when (val page = router.currentPage) {
-        is Page.Login -> LoginPage(
-            apiClient = apiClient,
-            onLoginSuccess = { user, userRole ->
-                userName = user
-                role = userRole
-                router.replace(Page.Home)
-            },
-            onNavigateToRegister = { router.navigate(Page.Register) },
-            onNavigateToForgotPassword = { router.navigate(Page.PasswordResetRequest) }
-        )
-        is Page.Register -> RegisterPage(
-            apiClient = apiClient,
-            onLoginSuccess = { user, userRole ->
-                userName = user
-                role = userRole
-                router.replace(Page.Home)
-            },
-            onNavigateToLogin = { router.navigate(Page.Login) }
-        )
+        is Page.Login -> LoginPage(apiClient = apiClient)
         is Page.Home -> HomePage(
             apiClient = apiClient,
             userName = userName ?: "Unknown",
@@ -234,27 +216,12 @@ fun VoteApp(apiClient: ApiClient) {
             apiClient = apiClient,
             currentUserName = userName ?: "",
             currentRole = role,
-            onSelfRoleChanged = { auth ->
-                userName = auth.userName
-                role = auth.role
-            },
             onNavigateToMyAccount = { router.navigate(Page.MyAccount) },
             onBack = { router.navigate(Page.Home) },
         )
         is Page.MyAccount -> MyAccountPage(
             apiClient = apiClient,
             onCancel = { router.navigate(Page.Home) },
-        )
-        is Page.PasswordResetRequest -> PasswordResetRequestPage(
-            apiClient = apiClient,
-            onNavigateToLogin = { router.navigate(Page.Login) },
-        )
-        is Page.PasswordReset -> PasswordResetPage(
-            apiClient = apiClient,
-            resetToken = page.resetToken,
-            // Successful reset → go to Login so user can sign in fresh.
-            onResetComplete = { router.replace(Page.Login) },
-            onNavigateToLogin = { router.navigate(Page.Login) },
         )
     }
 }
@@ -289,10 +256,10 @@ private fun LockedPage(
         P { Text("Hello, $userName.") }
         P {
             Text(
-                "Your account is registered, but an administrator has not yet " +
-                    "granted you access to the application. Once they assign you " +
-                    "a role, you will be able to log in and use the app. Try " +
-                    "again in a little while."
+                "You've signed in with Discord, but an administrator has not " +
+                    "yet granted you access to the application. Once they " +
+                    "assign you a role, you will be able to use the app. " +
+                    "Try again in a little while."
             )
         }
 

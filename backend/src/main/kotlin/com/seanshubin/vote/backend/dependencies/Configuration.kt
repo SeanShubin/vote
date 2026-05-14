@@ -15,9 +15,20 @@ data class Configuration(
     val jwtSecret: String,
     val frontendBaseUrl: String,
     val cookieConfig: CookieConfig,
-    val emailFromAddress: String?,
-    val inviteCodeParameterName: String?,
+    val discordParameterNames: DiscordParameterNames? = null,
 ) {
+    /**
+     * SSM parameter names for the four Discord OAuth values. All four must be
+     * set to enable Discord login; null means Discord login is disabled in
+     * this environment (which is the dev/test default).
+     */
+    data class DiscordParameterNames(
+        val clientId: String,
+        val clientSecret: String,
+        val redirectUri: String,
+        val guildId: String,
+    )
+
     companion object {
         /**
          * Convenience for tests and one-off recorders that just need a
@@ -31,8 +42,7 @@ data class Configuration(
                 jwtSecret = Bootstrap.DEV_JWT_SECRET,
                 frontendBaseUrl = Bootstrap.DEV_FRONTEND_BASE_URL,
                 cookieConfig = CookieConfig(secure = false, path = "/"),
-                emailFromAddress = null,
-                inviteCodeParameterName = null,
+                discordParameterNames = null,
             )
     }
 }

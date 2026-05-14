@@ -4,6 +4,7 @@ import androidx.compose.runtime.*
 import com.seanshubin.vote.contract.ApiClient
 import com.seanshubin.vote.domain.Ranking
 import com.seanshubin.vote.domain.RankingKind
+import com.seanshubin.vote.domain.buildBallotText
 import com.seanshubin.vote.domain.projectBallot
 import kotlinx.browser.window
 import org.jetbrains.compose.web.attributes.*
@@ -545,7 +546,8 @@ fun VotingView(
                         Button({
                             classes("ranked-ballot-copy-button")
                             onClick {
-                                val text = buildBallotText(electionName, currentUserName, ranked)
+                                val rankings = ranked.toRankings()
+                                val text = buildBallotText(electionName, currentUserName, rankings)
                                 copyTextToClipboard(text)
                                 copyFeedback = "Copied!"
                                 copyFeedbackToken = copyFeedbackToken + 1
@@ -741,44 +743,6 @@ private data class TierChunk(
     val tierIndex: Int,
     val candidateIndices: List<Int>,
 )
-
-/**
- * Plain-text rendering of the voter's current ballot, suitable for paste
- * into chat / email. Plain mode is a flat dashed list of candidates in rank
- * order. Tier mode nests each tier's candidates one indent under the tier
- * name, using the same "candidate clears tier T iff they sit ahead of T's
- * marker" interpretation the on-screen view uses. Empty tiers still appear
- * as a heading so the reader can see the full ladder.
- */
-internal fun buildBallotText(
-    electionName: String,
-    userName: String?,
-    ranked: List<RankedItem>,
-): String {
-    val ownerLine = if (userName.isNullOrBlank()) "Your Rankings" else "$userName's Rankings"
-    val hasTiers = ranked.any { it is RankedItem.TierMarker }
-    val lines = mutableListOf<String>()
-    lines += electionName
-    lines += ownerLine
-    if (!hasTiers) {
-        ranked.filterIsInstance<RankedItem.Candidate>().forEach { c ->
-            lines += "- ${c.name}"
-        }
-    } else {
-        val pending = mutableListOf<String>()
-        ranked.forEach { item ->
-            when (item) {
-                is RankedItem.Candidate -> pending += item.name
-                is RankedItem.TierMarker -> {
-                    lines += "- ${item.name}"
-                    pending.forEach { lines += "  - $it" }
-                    pending.clear()
-                }
-            }
-        }
-    }
-    return lines.joinToString("\n")
-}
 
 /**
  * Best-effort write to the system clipboard via the async Clipboard API.

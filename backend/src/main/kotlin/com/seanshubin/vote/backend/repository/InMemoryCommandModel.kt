@@ -16,17 +16,6 @@ class InMemoryCommandModel(private val data: InMemoryData) : CommandModel {
         }
     }
 
-    override fun createUser(
-        authority: String,
-        userName: String,
-        email: String,
-        salt: String,
-        hash: String,
-        role: Role
-    ) {
-        data.users[userName.lowercase()] = InMemoryData.UserData(userName, email, salt, hash, role)
-    }
-
     override fun setRole(authority: String, userName: String, role: Role) {
         val key = userName.lowercase()
         val user = data.users[key] ?: error("User not found: $userName")
@@ -204,12 +193,6 @@ class InMemoryCommandModel(private val data: InMemoryData) : CommandModel {
         data.ballots.remove(electionName to voterName.lowercase())
     }
 
-    override fun setPassword(authority: String, userName: String, salt: String, hash: String) {
-        val key = userName.lowercase()
-        val user = data.users[key] ?: error("User not found: $userName")
-        data.users[key] = user.copy(salt = salt, hash = hash)
-    }
-
     override fun setUserName(authority: String, oldUserName: String, newUserName: String) {
         val oldKey = oldUserName.lowercase()
         val newKey = newUserName.lowercase()
@@ -238,9 +221,32 @@ class InMemoryCommandModel(private val data: InMemoryData) : CommandModel {
         }
     }
 
-    override fun setEmail(authority: String, userName: String, email: String) {
+    override fun createUserViaDiscord(
+        authority: String,
+        userName: String,
+        discordId: String,
+        discordDisplayName: String,
+        role: Role,
+    ) {
+        data.users[userName.lowercase()] = InMemoryData.UserData(
+            name = userName,
+            role = role,
+            discordId = discordId,
+            discordDisplayName = discordDisplayName,
+        )
+    }
+
+    override fun linkDiscordCredential(
+        authority: String,
+        userName: String,
+        discordId: String,
+        discordDisplayName: String,
+    ) {
         val key = userName.lowercase()
         val user = data.users[key] ?: error("User not found: $userName")
-        data.users[key] = user.copy(email = email)
+        data.users[key] = user.copy(
+            discordId = discordId,
+            discordDisplayName = discordDisplayName,
+        )
     }
 }

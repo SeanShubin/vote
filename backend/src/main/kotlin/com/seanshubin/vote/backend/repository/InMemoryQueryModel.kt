@@ -8,22 +8,15 @@ class InMemoryQueryModel(private val data: InMemoryData) : QueryModel {
         return data.users[name.lowercase()]?.toUser() ?: error("User not found: $name")
     }
 
-    override fun findUserByEmail(email: String): User {
-        return data.users.values.find { it.email.equals(email, ignoreCase = true) }?.toUser()
-            ?: error("User not found with email: $email")
-    }
-
     override fun searchUserByName(name: String): User? {
         return data.users[name.lowercase()]?.toUser()
     }
 
-    override fun searchUserByEmail(email: String): User? {
-        // Blank email never matches anyone — users without an email all
-        // share the empty string as their stored value, but they are
-        // intentionally absent from the email-lookup path so a blank
-        // search wouldn't accidentally return one of them.
-        if (email.isEmpty()) return null
-        return data.users.values.find { it.email.equals(email, ignoreCase = true) }?.toUser()
+    override fun searchUserByDiscordId(discordId: String): User? {
+        // Blank discordId never matches anyone — defensive only; every user
+        // is created via Discord OAuth and so always has a non-empty id.
+        if (discordId.isEmpty()) return null
+        return data.users.values.find { it.discordId == discordId }?.toUser()
     }
 
     override fun userCount(): Int = data.users.size

@@ -34,9 +34,9 @@ class DynamoToRelational(
     }
 
     private fun projectUsers(): TableData {
-        val columns = listOf("name", "email", "salt", "hash", "role")
+        val columns = listOf("name", "role", "discord_id", "discord_display_name")
         val rows = queryModel.listUsers().map { u ->
-            listOf<String?>(u.name, u.email, u.salt, u.hash, u.role.name)
+            listOf<String?>(u.name, u.role.name, u.discordId, u.discordDisplayName)
         }
         return TableData(USERS, columns, rows)
     }

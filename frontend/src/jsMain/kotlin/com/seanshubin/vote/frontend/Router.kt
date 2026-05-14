@@ -14,7 +14,6 @@ import org.w3c.dom.events.Event
  */
 sealed class Page {
     object Login : Page()
-    object Register : Page()
     object Home : Page()
     object CreateElection : Page()
     object Elections : Page()
@@ -22,13 +21,6 @@ sealed class Page {
     object DebugTables : Page()
     object UserManagement : Page()
     object MyAccount : Page()
-    object PasswordResetRequest : Page()
-    /**
-     * Target of the email reset link. Carries the reset token that came back
-     * in the URL's `?token=` query string — the page presents new-password
-     * input and submits both to the backend.
-     */
-    data class PasswordReset(val resetToken: String) : Page()
     data class ElectionDetail(val electionName: String) : Page()
     data class ElectionPreferences(val electionName: String) : Page()
     data class ElectionStrongestPaths(val electionName: String) : Page()
@@ -43,7 +35,6 @@ sealed class Page {
  */
 fun pageToPath(page: Page): String = when (page) {
     is Page.Login -> "/login"
-    is Page.Register -> "/register"
     is Page.Home -> "/"
     is Page.Elections -> "/elections"
     is Page.CreateElection -> "/elections/new"
@@ -54,10 +45,6 @@ fun pageToPath(page: Page): String = when (page) {
     is Page.DebugTables -> "/admin/debug-tables"
     is Page.UserManagement -> "/admin/users"
     is Page.MyAccount -> "/me/account"
-    is Page.PasswordResetRequest -> "/password-reset-request"
-    // Token belongs in the path's query string — that's the standard place
-    // for one-time link parameters and matches what email clients render.
-    is Page.PasswordReset -> "/reset-password?token=${encodeUriComponent(page.resetToken)}"
 }
 
 /**
@@ -71,15 +58,13 @@ fun pageToPath(page: Page): String = when (page) {
  * "view election named 'new'".
  */
 fun pathToPage(pathWithQuery: String): Page {
-    // Split path from query so the path matchers don't have to know about ?token=...
+    // Split path from query; the path matchers don't depend on the query.
     val queryStart = pathWithQuery.indexOf('?')
     val path = if (queryStart >= 0) pathWithQuery.substring(0, queryStart) else pathWithQuery
-    val query = if (queryStart >= 0) pathWithQuery.substring(queryStart + 1) else ""
     val normalized = path.trimEnd('/').ifEmpty { "/" }
     return when {
         normalized == "/" -> Page.Home
         normalized == "/login" -> Page.Login
-        normalized == "/register" -> Page.Register
         normalized == "/elections" -> Page.Elections
         normalized == "/elections/new" -> Page.CreateElection
         normalized.startsWith("/elections/") -> {
@@ -101,20 +86,8 @@ fun pathToPage(pathWithQuery: String): Page {
         normalized == "/admin/debug-tables" -> Page.DebugTables
         normalized == "/admin/users" -> Page.UserManagement
         normalized == "/me/account" -> Page.MyAccount
-        normalized == "/password-reset-request" -> Page.PasswordResetRequest
-        // Reset link from the email; missing/empty token shouldn't crash —
-        // the reset page will surface a clear error to the user.
-        normalized == "/reset-password" -> Page.PasswordReset(parseQueryParam(query, "token") ?: "")
         else -> Page.Home
     }
-}
-
-private fun parseQueryParam(query: String, name: String): String? {
-    if (query.isEmpty()) return null
-    return query.split("&")
-        .map { it.split("=", limit = 2) }
-        .firstOrNull { it.size == 2 && it[0] == name }
-        ?.let { decodeUriComponent(it[1]) }
 }
 
 /**
@@ -187,11 +160,7 @@ fun rememberRouter(): Router {
 }
 
 /** Pages that don't require authentication. Anything else bounces to /login on auth fail. */
-fun isPublicPage(page: Page): Boolean =
-    page is Page.Login ||
-        page is Page.Register ||
-        page is Page.PasswordResetRequest ||
-        page is Page.PasswordReset
+fun isPublicPage(page: Page): Boolean = page is Page.Login
 
 private fun encodeUriComponent(s: String): String =
     js("encodeURIComponent")(s) as String

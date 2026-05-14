@@ -47,7 +47,7 @@ class ElectionOwnershipTransferTest {
         testContext.registerUser("charlie")
         // Promote bob to ADMIN so he has MANAGE_USERS — the moderation gate.
         alice.setRole("bob", Role.ADMIN)
-        val bobAdmin = testContext.authenticateAs("bob")
+        val bobAdmin = testContext.reissueToken("bob")
 
         val election = alice.createElection("Best Color")
         testContext.backend.transferElectionOwnership(bobAdmin.accessToken, election.name, "charlie")

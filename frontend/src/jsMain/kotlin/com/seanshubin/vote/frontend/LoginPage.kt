@@ -2,39 +2,45 @@ package com.seanshubin.vote.frontend
 
 import androidx.compose.runtime.*
 import com.seanshubin.vote.contract.ApiClient
-import com.seanshubin.vote.domain.Role
+import kotlinx.browser.window
 import kotlinx.coroutines.CoroutineScope
-import org.jetbrains.compose.web.attributes.*
 import org.jetbrains.compose.web.dom.*
 
+/**
+ * Sign-in screen. Discord OAuth is the only path — there is no password
+ * form, no registration, no forgot-password link. Clicking the button hits
+ * the backend to set the OAuth state cookie, then redirects the browser to
+ * Discord. The /auth/discord/callback handler completes the round-trip.
+ */
 @Composable
 fun LoginPage(
     apiClient: ApiClient,
-    // The ApiClient stores the token internally on success — we just relay
-    // identity (user, role) up so the SPA can drive UI display.
-    onLoginSuccess: (userName: String, role: Role) -> Unit,
-    onNavigateToRegister: () -> Unit,
-    onNavigateToForgotPassword: () -> Unit = {},
     coroutineScope: CoroutineScope = rememberCoroutineScope(),
 ) {
-    var nameOrEmail by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
+    // The Discord OAuth callback redirects here with ?error=… on failure
+    // (state mismatch, user not in the Rippaverse guild, Discord rejected
+    // the code). Read it once on first composition and surface a friendly
+    // version of each known code; unknown codes fall through to a generic
+    // message so an operator-introduced new code still shows *something*.
+    var errorMessage by remember { mutableStateOf<String?>(discordErrorMessage()) }
 
-    val loginAction = rememberAsyncAction(
+    val discordLoginAction = rememberAsyncAction(
         apiClient = apiClient,
-        fallbackErrorMessage = "Login failed",
+        fallbackErrorMessage = "Could not start Discord login",
         onError = { errorMessage = it },
         coroutineScope = coroutineScope,
         action = {
             errorMessage = null
-            val auth = apiClient.authenticate(nameOrEmail, password)
-            onLoginSuccess(auth.userName, auth.role)
+            val url = apiClient.discordLoginStartUrl()
+            // Hand the browser off to Discord for the OAuth handshake. The
+            // backend has already set the state cookie that the callback will
+            // verify, so we just need to navigate.
+            window.location.href = url
         },
     )
 
     Div({ classes("container") }) {
-        H1 { Text("Vote - Login") }
+        H1 { Text("Vote — Login") }
 
         if (errorMessage != null) {
             Div({ classes("error") }) {
@@ -42,63 +48,38 @@ fun LoginPage(
             }
         }
 
-        // Wrapping in <form> + giving each field a name + autocomplete value is
-        // what browsers and password managers (1Password, Bitwarden, browser
-        // built-ins) need to offer fill-saved-credentials and save-on-success.
-        // current-password tells managers "fill the saved one" — distinct from
-        // RegisterPage's new-password ("the user is creating a credential").
-        Form(attrs = {
-            classes("form")
-            attr("autocomplete", "on")
-            onSubmit { event ->
-                event.preventDefault()
-                loginAction.invoke()
-            }
-        }) {
-            // Backend's authenticate() tries the value as a username first, then
-            // falls back to email — so users can log in either way. The HTML name
-            // and autocomplete tokens stay "username" so the browser/password
-            // manager keys saved credentials by that stable identifier even if
-            // the UI label changes.
-            Input(InputType.Text) {
-                attr("name", "username")
-                attr("autocomplete", "username")
-                placeholder("Username or email")
-                value(nameOrEmail)
-                onInput { nameOrEmail = it.value }
-            }
-
-            Input(InputType.Password) {
-                attr("name", "password")
-                attr("autocomplete", "current-password")
-                placeholder("Password")
-                value(password)
-                onInput { password = it.value }
-            }
-
-            // type=submit so Enter / button-click triggers the form's onSubmit,
-            // which is the path password managers watch for "save credential?".
-            Button({
-                attr("type", "submit")
-                if (loginAction.isLoading) attr("disabled", "")
-            }) {
-                Text(if (loginAction.isLoading) "Logging in…" else "Login")
-            }
-
-            // type=button so these don't accidentally submit the form.
+        Div({ classes("form") }) {
             Button({
                 attr("type", "button")
-                onClick { onNavigateToRegister() }
+                if (discordLoginAction.isLoading) attr("disabled", "")
+                onClick { discordLoginAction.invoke() }
             }) {
-                Text("Register")
-            }
-
-            Button({
-                attr("type", "button")
-                onClick { onNavigateToForgotPassword() }
-            }) {
-                Text("Forgot password?")
+                Text(if (discordLoginAction.isLoading) "Redirecting…" else "Sign in with Discord")
             }
         }
+    }
+}
+
+/**
+ * Read `?error=…` from the current URL and translate the known codes the
+ * Discord OAuth callback sets. Returns null when there's no error param.
+ *
+ * The codes ("state_mismatch", "not_in_guild", "discord_failed",
+ * "missing_code") are deliberately opaque on the wire — the backend logs
+ * the detail; the user gets a sentence they can act on.
+ */
+private fun discordErrorMessage(): String? {
+    val search = window.location.search
+    if (!search.contains("error=")) return null
+    val code = search.substringAfter("error=").substringBefore("&")
+    return when (code) {
+        "not_in_guild" ->
+            "Your Discord account isn't a member of The Rippaverse server. " +
+                "Join Rippaverse and try again."
+        "state_mismatch", "missing_code" ->
+            "Discord login was interrupted. Please try again."
+        "discord_failed" ->
+            "Discord rejected the login. Please try again."
+        else -> "Login failed (code: $code)."
     }
 }

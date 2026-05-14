@@ -2,7 +2,6 @@ package com.seanshubin.vote.tools.lib
 
 import com.seanshubin.vote.backend.auth.JwtCipher
 import com.seanshubin.vote.backend.auth.TokenEncoder
-import com.seanshubin.vote.backend.crypto.RealPasswordUtil
 import com.seanshubin.vote.backend.repository.InMemoryCommandModel
 import com.seanshubin.vote.backend.repository.InMemoryData
 import com.seanshubin.vote.backend.repository.InMemoryEventLog
@@ -10,10 +9,8 @@ import com.seanshubin.vote.backend.repository.InMemoryQueryModel
 import com.seanshubin.vote.backend.repository.InMemoryRawTableScanner
 import com.seanshubin.vote.backend.service.ServiceImpl
 import com.seanshubin.vote.contract.Clock
-import com.seanshubin.vote.contract.EmailSender
 import com.seanshubin.vote.contract.Integrations
 import com.seanshubin.vote.contract.Notifications
-import com.seanshubin.vote.contract.PasswordUtil
 import com.seanshubin.vote.contract.Service
 import com.seanshubin.vote.contract.UniqueIdGenerator
 import kotlinx.datetime.Instant
@@ -22,12 +19,13 @@ import java.util.UUID
 /**
  * Spins up an entirely in-memory [Service] backed by [InMemoryEventLog] /
  * [InMemoryCommandModel] / [InMemoryQueryModel]. Lets tools-side commands
- * exercise the real registration / election / ballot flows without standing
+ * exercise the real Discord login / election / ballot flows without standing
  * up a backend process, and then read out the resulting events for export.
  *
- * This mirrors the wiring used by integration tests (see TestContext) but
- * uses real password hashing and a system clock so the produced event log
- * is byte-compatible with one captured from a live backend.
+ * Discord OAuth is not configured here — the in-process service rejects
+ * Discord login attempts with UNSUPPORTED. Tooling that needs users in
+ * place seeds them by appending [com.seanshubin.vote.domain.DomainEvent.UserRegisteredViaDiscord]
+ * events to the event log directly.
  */
 class InProcessService {
     private val data = InMemoryData()
@@ -45,7 +43,6 @@ class InProcessService {
         queryModel = queryModel,
         rawTableScanner = rawTableScanner,
         tokenEncoder = tokenEncoder,
-        frontendBaseUrl = "http://localhost:3000",
     )
 }
 
@@ -55,8 +52,6 @@ private class ToolsIntegrations : Integrations {
     override val clock: Clock = SystemClock
     override val uniqueIdGenerator: UniqueIdGenerator = UuidGenerator
     override val notifications: Notifications = NoopNotifications
-    override val passwordUtil: PasswordUtil = RealPasswordUtil
-    override val emailSender: EmailSender = NoopEmailSender
     override val getEnv: (String) -> String? = { null }
 }
 
@@ -77,8 +72,4 @@ private object NoopNotifications : Notifications {
     override fun topLevelException(message: String, stackTrace: String) = Unit
     override fun sqlException(name: String, sqlCode: String, message: String) = Unit
     override fun sendMailEvent(to: String, subject: String) = Unit
-}
-
-private object NoopEmailSender : EmailSender {
-    override fun send(to: String, subject: String, body: String) = Unit
 }

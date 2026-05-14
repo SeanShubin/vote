@@ -8,11 +8,14 @@ import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.option
 import com.seanshubin.vote.contract.AccessToken
+import com.seanshubin.vote.domain.DomainEvent
 import com.seanshubin.vote.domain.Ranking
+import com.seanshubin.vote.domain.Role
 import com.seanshubin.vote.tools.lib.InProcessService
 import com.seanshubin.vote.tools.lib.NarrativeEvent
 import com.seanshubin.vote.tools.lib.Output
 import com.seanshubin.vote.tools.lib.ProjectPaths
+import kotlinx.datetime.Clock
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.nio.file.Files
@@ -27,7 +30,6 @@ class GenerateScenarioEventLog : CliktCommand(name = "generate-scenario-event-lo
     private val outputArg: String? by argument(name = "output", help = "Path to write the JSONL event-log file. Defaults to .local/scenario-snapshots/scenarios.jsonl.").optional()
     private val force by option("--force", help = "Overwrite the output file if it already exists.").flag()
     private val ownerName by option("--owner", help = "Username of the synthetic owner that hosts every election (default: owner).").default("owner")
-    private val ownerEmail by option("--owner-email", help = "Email of the synthetic owner (default: owner@example.com).").default("owner@example.com")
 
     override fun help(context: Context) =
         "Build a single JSONL event log that demonstrates every condorcet scenario in scenario-data/. " +
@@ -68,9 +70,15 @@ class GenerateScenarioEventLog : CliktCommand(name = "generate-scenario-event-lo
 
         val host = InProcessService()
         val service = host.service
-
-        val ownerToken = registerOwner(service)
-        val voterTokens = registerAllVoters(service, parsedScenarios)
+        // Seed users by appending UserRegisteredViaDiscord events directly to
+        // the event log — the password-registration path is gone with the
+        // Discord-only login refactor, and the in-process service has no
+        // Discord OAuth configured to issue tokens. The synthetic discord_id
+        // values just need to be unique per user; they never leave this
+        // generator.
+        val ownerToken = seedOwner(host)
+        val voterTokens = seedAllVoters(host, parsedScenarios)
+        service.synchronize()
 
         parsedScenarios.forEach { scenario ->
             loadScenario(service, scenario, ownerToken, voterTokens)
@@ -94,14 +102,23 @@ class GenerateScenarioEventLog : CliktCommand(name = "generate-scenario-event-lo
         return dir.resolve("scenarios.jsonl")
     }
 
-    private fun registerOwner(service: com.seanshubin.vote.contract.Service): AccessToken {
-        println("Registering owner ($ownerName)...")
-        val tokens = service.register(ownerName, ownerEmail, OWNER_PASSWORD)
-        return tokens.accessToken
+    private fun seedOwner(host: InProcessService): AccessToken {
+        println("Seeding owner ($ownerName)...")
+        host.eventLog.appendEvent(
+            "system",
+            Clock.System.now(),
+            DomainEvent.UserRegisteredViaDiscord(
+                name = ownerName,
+                discordId = SYNTHETIC_DISCORD_PREFIX + ownerName,
+                discordDisplayName = ownerName,
+                role = Role.PRIMARY_ROLE,
+            ),
+        )
+        return AccessToken(ownerName, Role.PRIMARY_ROLE)
     }
 
-    private fun registerAllVoters(
-        service: com.seanshubin.vote.contract.Service,
+    private fun seedAllVoters(
+        host: InProcessService,
         scenarios: List<Scenario>,
     ): Map<String, AccessToken> {
         // De-dupe by voter display name across all scenarios. The same Alice
@@ -110,13 +127,22 @@ class GenerateScenarioEventLog : CliktCommand(name = "generate-scenario-event-lo
             .flatMap { it.voters }
             .distinctBy { it.displayName }
 
-        println("Registering ${uniqueVoters.size} unique voter(s) across ${scenarios.size} scenarios...")
+        println("Seeding ${uniqueVoters.size} unique voter(s) across ${scenarios.size} scenarios...")
         val tokens = mutableMapOf<String, AccessToken>()
         uniqueVoters.forEach { voter ->
-            val response = service.register(voter.displayName, voter.email, VOTER_PASSWORD)
-            tokens[voter.displayName] = response.accessToken
+            host.eventLog.appendEvent(
+                "system",
+                Clock.System.now(),
+                DomainEvent.UserRegisteredViaDiscord(
+                    name = voter.displayName,
+                    discordId = SYNTHETIC_DISCORD_PREFIX + voter.displayName,
+                    discordDisplayName = voter.displayName,
+                    role = Role.VOTER,
+                ),
+            )
+            tokens[voter.displayName] = AccessToken(voter.displayName, Role.VOTER)
         }
-        Output.success("Registered owner + ${tokens.size} voters")
+        Output.success("Seeded owner + ${tokens.size} voters")
         return tokens
     }
 
@@ -169,9 +195,9 @@ class GenerateScenarioEventLog : CliktCommand(name = "generate-scenario-event-lo
     }
 
     companion object {
-        // Static passwords — these snapshots are for local dev only. Anyone running
-        // the snapshot can log in as any user with these creds.
-        private const val OWNER_PASSWORD = "password"
-        private const val VOTER_PASSWORD = "password"
+        // Discord IDs are normally snowflakes from Discord. For synthetic
+        // scenario data we just need any unique-per-user value; the prefix
+        // makes the fakery legible if anyone inspects the projection.
+        private const val SYNTHETIC_DISCORD_PREFIX = "synthetic-"
     }
 }

@@ -7,6 +7,7 @@ import com.seanshubin.vote.tools.commands.BackupDynamodb
 import com.seanshubin.vote.tools.commands.CheckJava
 import com.seanshubin.vote.tools.commands.ConvertScenarios
 import com.seanshubin.vote.tools.commands.DbInitDynamodb
+import com.seanshubin.vote.tools.commands.DownloadBallots
 import com.seanshubin.vote.tools.commands.DbReset
 import com.seanshubin.vote.tools.commands.DbResetDynamodb
 import com.seanshubin.vote.tools.commands.DbResetMysql
@@ -48,8 +49,6 @@ import com.seanshubin.vote.tools.commands.RestoreDynamodb
 import com.seanshubin.vote.tools.commands.RollLogs
 import com.seanshubin.vote.tools.commands.RunLocal
 import com.seanshubin.vote.tools.commands.ServeFrontend
-import com.seanshubin.vote.tools.commands.SetInviteCode
-import com.seanshubin.vote.tools.commands.SetupTestBallot
 import com.seanshubin.vote.tools.commands.TerminateAll
 import com.seanshubin.vote.tools.commands.TestLifecycle
 import com.seanshubin.vote.tools.commands.WorktreeSync
@@ -105,13 +104,12 @@ fun main(args: Array<String>) {
             InspectDynamodbRawAll(),
             InspectDynamodbRawKeys(),
             ConvertScenarios(),
+            DownloadBallots(),
             GenerateScenarioEventLog(),
             PadTables(),
             LaunchScenarioMysql(),
             MigrateTiers(),
             LaunchScenarioDynamodb(),
-            SetupTestBallot(),
-            SetInviteCode(),
             TestLifecycle(),
             WorktreeSync()
         )

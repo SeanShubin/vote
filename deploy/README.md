@@ -99,20 +99,35 @@ ls backend/build/libs/vote-backend-lambda.jar
 ls frontend/build/dist/js/productionExecutable/
 ```
 
-## Rotating the invite code
+## Discord OAuth secrets
 
-The shared registration invite code lives in SSM Parameter Store at
-`/${StackName}/invite-code` (e.g., `/pairwisevote-frontend/invite-code`).
-The Lambda re-reads it at most every 5 minutes, so a rotation takes
-effect within one TTL window — no redeploy needed.
+Sign-in is Discord-only. The four OAuth values the Lambda needs at runtime
+live in SSM Parameter Store under `/${StackName}/discord/`:
 
-```bash
-aws ssm put-parameter \
-    --name /pairwisevote-frontend/invite-code \
-    --value "new-code-here" \
-    --type String \
-    --overwrite \
-    --region us-east-1
-```
+| Path                                           | Type           | Source                                                                 |
+| ---------------------------------------------- | -------------- | ---------------------------------------------------------------------- |
+| `/pairwisevote-frontend/discord/client-id`     | `String`       | Discord Developer Portal → Application → General                       |
+| `/pairwisevote-frontend/discord/redirect-uri`  | `String`       | `https://pairwisevote.com/api/auth/discord/callback`                   |
+| `/pairwisevote-frontend/discord/guild-id`      | `String`       | Right-click the Discord server with Developer Mode on → Copy Server ID |
+| `/pairwisevote-frontend/discord/client-secret` | `SecureString` | Discord Developer Portal → Application → OAuth2 → Reset Secret         |
 
-Setting the value to a blank string disables the gate (registration is open).
+CFN provisions the three plain-`String` parameters with placeholder values.
+`SecureString` cannot be created by CloudFormation, so the operator runs
+`aws ssm put-parameter --type SecureString --overwrite ...` once after the
+first deploy.
+
+The Lambda re-reads each value at most every 5 minutes (in-process cache),
+so rotating any of them takes effect within one TTL window — no redeploy
+needed.
+
+The IAM policy on the Lambda function grants `ssm:GetParameter` on these
+four paths only, plus `kms:Decrypt` against the AWS-managed SSM key (the
+default KMS key for `SecureString`). A compromised Lambda can't enumerate
+other secrets in SSM.
+
+For the one-time setup (first deploy + secret rotation), see the
+PowerShell scripts in `.local/temp-scripts/`:
+
+- `set-discord-ssm-parameters.ps1` — push all four values into SSM
+- `verify-discord-ssm-parameters.ps1` — read them back (SecureString masked)
+- `set-local-dev-discord-env.ps1` — point a local dev shell at the deployed SSM

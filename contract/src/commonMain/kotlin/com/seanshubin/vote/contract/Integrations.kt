@@ -6,8 +6,6 @@ interface Integrations {
     val clock: Clock
     val uniqueIdGenerator: UniqueIdGenerator
     val notifications: Notifications
-    val passwordUtil: PasswordUtil
-    val emailSender: EmailSender
 
     /**
      * Reads a process-level configuration value (typically an environment

@@ -9,10 +9,6 @@ import com.seanshubin.vote.domain.*
  * Used for event log, SQL, and DynamoDB documentation generation.
  */
 class DirectServiceBackend(private val service: Service) : ScenarioBackend {
-    override fun registerUser(name: String, email: String, password: String): AccessToken {
-        return service.register(name, email, password).accessToken
-    }
-
     override fun setRole(token: AccessToken, targetUserName: String, newRole: Role) {
         service.setRole(token, targetUserName, newRole)
     }
@@ -23,14 +19,6 @@ class DirectServiceBackend(private val service: Service) : ScenarioBackend {
 
     override fun removeUser(token: AccessToken, targetUserName: String) {
         service.removeUser(token, targetUserName)
-    }
-
-    override fun changeMyPassword(token: AccessToken, oldPassword: String, newPassword: String) {
-        service.changeMyPassword(token, oldPassword, newPassword)
-    }
-
-    override fun adminSetPassword(token: AccessToken, targetUserName: String, newPassword: String) {
-        service.adminSetPassword(token, targetUserName, newPassword)
     }
 
     override fun addElection(token: AccessToken, ownerName: String, electionName: String, description: String) {
@@ -127,14 +115,6 @@ class DirectServiceBackend(private val service: Service) : ScenarioBackend {
 
     override fun authenticateWithToken(accessToken: AccessToken): com.seanshubin.vote.contract.Tokens {
         return service.authenticateWithToken(accessToken)
-    }
-
-    override fun authenticate(nameOrEmail: String, password: String): com.seanshubin.vote.contract.Tokens {
-        return service.authenticate(nameOrEmail, password)
-    }
-
-    override fun sendLoginLinkByEmail(email: String, baseUri: String) {
-        service.sendLoginLinkByEmail(email, baseUri)
     }
 
     override fun synchronize() {

@@ -9,24 +9,19 @@ CREATE TABLE IF NOT EXISTS event_log (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Command Model Projection: Users
--- email is nullable so emailless users can coexist: SQL UNIQUE permits
--- multiple NULL rows since NULL is not equal to NULL. The MySQL repository
--- layer translates between the Kotlin domain's empty-string sentinel ("")
--- and SQL NULL on read and write.
+-- Discord-only authentication: every user has a Discord credential. The
+-- columns are nullable for the same reason name uniqueness is
+-- case-insensitive — defensive coding only. UNIQUE on discord_id prevents
+-- two users from claiming the same Discord identity.
 CREATE TABLE IF NOT EXISTS users (
     name VARCHAR(255) PRIMARY KEY,
-    email VARCHAR(255) UNIQUE,
-    salt VARCHAR(255) NOT NULL,
-    hash VARCHAR(255) NOT NULL,
     role VARCHAR(50) NOT NULL,
-    INDEX idx_email (email)
+    discord_id VARCHAR(255) UNIQUE,
+    discord_display_name VARCHAR(255),
+    INDEX idx_discord_id (discord_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Command Model Projection: Elections
--- Simplified to just name + owner. The previous toggles (secret_ballot, allow_edit,
--- allow_vote, no_voting_before/after) and the eligible_voters table were dropped:
--- elections are live as soon as they exist, anyone can vote, and the only
--- moderation is delete-by-owner-or-ADMIN.
 CREATE TABLE IF NOT EXISTS elections (
     election_name VARCHAR(255) PRIMARY KEY,
     owner_name VARCHAR(255) NOT NULL,

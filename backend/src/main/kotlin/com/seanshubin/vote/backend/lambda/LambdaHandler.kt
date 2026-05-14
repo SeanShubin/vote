@@ -4,9 +4,10 @@ import com.amazonaws.services.lambda.runtime.Context
 import com.amazonaws.services.lambda.runtime.RequestHandler
 import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPEvent
 import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPResponse
-import com.seanshubin.vote.backend.auth.InviteCodeProvider
+import com.seanshubin.vote.backend.auth.DiscordConfigProvider
+import com.seanshubin.vote.backend.auth.DiscordOAuthClient
 import com.seanshubin.vote.backend.auth.JwtCipher
-import com.seanshubin.vote.backend.auth.SsmInviteCodeProvider
+import com.seanshubin.vote.backend.auth.SsmDiscordConfigProvider
 import com.seanshubin.vote.backend.auth.TokenEncoder
 import com.seanshubin.vote.backend.dependencies.Bootstrap
 import com.seanshubin.vote.backend.dependencies.ConnectionFactory
@@ -16,7 +17,6 @@ import com.seanshubin.vote.backend.dependencies.RepositoryFactory
 import com.seanshubin.vote.backend.http.HttpRequest
 import com.seanshubin.vote.backend.http.SetCookie
 import com.seanshubin.vote.backend.integration.ProductionIntegrations
-import com.seanshubin.vote.backend.integration.SesEmailSender
 import com.seanshubin.vote.backend.router.RequestRouter
 import com.seanshubin.vote.backend.service.ServiceImpl
 import kotlinx.serialization.json.Json
@@ -57,7 +57,11 @@ class LambdaHandler : RequestHandler<APIGatewayV2HTTPEvent, APIGatewayV2HTTPResp
 
         val builder = APIGatewayV2HTTPResponse.builder()
             .withStatusCode(response.status)
-            .withHeaders(mapOf("Content-Type" to response.contentType))
+            // Merge contentType in with any extra headers set on the response
+            // (e.g., Location for the Discord OAuth callback's 302 redirect).
+            // Extra headers go last so a route that genuinely needs to override
+            // Content-Type can do so by including it in `headers`.
+            .withHeaders(mapOf("Content-Type" to response.contentType) + response.headers)
             .withBody(response.body)
 
         if (response.setCookies.isNotEmpty()) {
@@ -70,19 +74,9 @@ class LambdaHandler : RequestHandler<APIGatewayV2HTTPEvent, APIGatewayV2HTTPResp
         private val router: RequestRouter = buildRouter()
 
         private fun buildRouter(): RequestRouter {
-            // Production sends real emails via SES. Sender address is verified
-            // out-of-band in the SES console; the Lambda role grants ses:SendEmail.
-            // Build SES first via System.getenv (this is the bootstrap edge)
-            // so ProductionIntegrations can carry the real env accessor through
-            // for everything else, including Bootstrap.parseLambdaConfiguration.
-            val baseIntegrations = ProductionIntegrations(emptyArray())
-            val configuration = Bootstrap(baseIntegrations).parseLambdaConfiguration()
+            val integrations = ProductionIntegrations(emptyArray())
+            val configuration = Bootstrap(integrations).parseLambdaConfiguration()
             val region = (configuration.databaseConfig as DatabaseConfig.DynamoDB).region
-            val emailSender = SesEmailSender(region, configuration.emailFromAddress!!)
-            // Test-user mail suppression now lives in ServiceImpl.requestPasswordReset
-            // (skipped when TestUser.isTestUser(user)), so the integration layer
-            // passes the raw SES sender straight through.
-            val integrations = ProductionIntegrations(emptyArray(), emailSender)
 
             val json = Json { prettyPrint = true }
             val connectionFactory = ConnectionFactory(configuration)
@@ -95,14 +89,20 @@ class LambdaHandler : RequestHandler<APIGatewayV2HTTPEvent, APIGatewayV2HTTPResp
 
             val tokenEncoder = TokenEncoder(JwtCipher(configuration.jwtSecret))
 
-            // Invite-code gate. The SSM parameter name comes from CFN; if unset
-            // we fall back to a no-op provider (registration is open). Operator
-            // rotates the code in SSM with no redeploy; a five-minute TTL caps
-            // cross-Lambda inconsistency after a rotation.
-            val inviteCodeProvider: InviteCodeProvider =
-                configuration.inviteCodeParameterName?.let { name ->
-                    SsmInviteCodeProvider(parameterName = name, region = region)
-                } ?: InviteCodeProvider { null }
+            // Discord login is on only when CFN configures all four SSM
+            // parameter names AND each parameter resolves to a non-blank
+            // value at runtime. Anything else disables the feature and
+            // ServiceImpl rejects Discord login attempts with UNSUPPORTED.
+            val discordConfigProvider: DiscordConfigProvider =
+                configuration.discordParameterNames?.let { names ->
+                    SsmDiscordConfigProvider(
+                        clientIdParameterName = names.clientId,
+                        clientSecretParameterName = names.clientSecret,
+                        redirectUriParameterName = names.redirectUri,
+                        guildIdParameterName = names.guildId,
+                        region = region,
+                    )
+                } ?: DiscordConfigProvider { null }
 
             val service = ServiceImpl(
                 integrations = integrations,
@@ -111,11 +111,17 @@ class LambdaHandler : RequestHandler<APIGatewayV2HTTPEvent, APIGatewayV2HTTPResp
                 queryModel = repositories.queryModel,
                 rawTableScanner = repositories.rawTableScanner,
                 tokenEncoder = tokenEncoder,
-                frontendBaseUrl = configuration.frontendBaseUrl,
-                inviteCodeProvider = inviteCodeProvider,
+                discordConfigProvider = discordConfigProvider,
+                discordOAuthClient = DiscordOAuthClient(),
             )
 
-            return RequestRouter(service, json, tokenEncoder, configuration.cookieConfig)
+            return RequestRouter(
+                service = service,
+                json = json,
+                tokenEncoder = tokenEncoder,
+                refreshCookie = configuration.cookieConfig,
+                frontendBaseUrl = configuration.frontendBaseUrl,
+            )
         }
     }
 }

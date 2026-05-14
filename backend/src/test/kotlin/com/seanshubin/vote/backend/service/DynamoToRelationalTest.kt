@@ -23,8 +23,8 @@ class DynamoToRelationalTest {
     fun `users projection includes all User fields with role rendered as name`() {
         val qm = stubQueryModel(
             users = listOf(
-                User("alice", "alice@x.com", "salt-a", "hash-a", Role.OWNER),
-                User("bob", "bob@x.com", "salt-b", "hash-b", Role.USER),
+                User("alice", Role.OWNER, discordId = "a-id", discordDisplayName = "Alice"),
+                User("bob", Role.USER, discordId = "12345", discordDisplayName = "Bobby"),
             ),
         )
         val sut = DynamoToRelational(qm, stubEventLog())
@@ -32,10 +32,19 @@ class DynamoToRelationalTest {
         val data = sut.project(DynamoToRelational.USERS)
 
         assertEquals(DynamoToRelational.USERS, data.name)
-        assertEquals(listOf("name", "email", "salt", "hash", "role"), data.columnNames)
+        assertEquals(
+            listOf("name", "role", "discord_id", "discord_display_name"),
+            data.columnNames,
+        )
         assertEquals(2, data.rows.size)
-        assertEquals(listOf("alice", "alice@x.com", "salt-a", "hash-a", "OWNER"), data.rows[0])
-        assertEquals(listOf("bob", "bob@x.com", "salt-b", "hash-b", "USER"), data.rows[1])
+        assertEquals(
+            listOf("alice", "OWNER", "a-id", "Alice"),
+            data.rows[0],
+        )
+        assertEquals(
+            listOf("bob", "USER", "12345", "Bobby"),
+            data.rows[1],
+        )
     }
 
     @Test
@@ -138,7 +147,12 @@ class DynamoToRelationalTest {
                 eventId = 1L,
                 whenHappened = Instant.fromEpochMilliseconds(100),
                 authority = "alice",
-                event = DomainEvent.UserRegistered("alice", "a@x.com", "s", "h", Role.OWNER),
+                event = DomainEvent.UserRegisteredViaDiscord(
+                    name = "alice",
+                    discordId = "discord-1",
+                    discordDisplayName = "Alice",
+                    role = Role.OWNER,
+                ),
             ),
         )
         val sut = DynamoToRelational(stubQueryModel(), stubEventLog(events))
@@ -155,7 +169,7 @@ class DynamoToRelationalTest {
         assertEquals("2", data.rows[0][0])
         assertEquals("ElectionCreated", data.rows[0][3])
         assertEquals("1", data.rows[1][0])
-        assertEquals("UserRegistered", data.rows[1][3])
+        assertEquals("UserRegisteredViaDiscord", data.rows[1][3])
     }
 
     @Test
@@ -198,9 +212,8 @@ class DynamoToRelationalTest {
 
         // Unused by DynamoToRelational — tests only call the methods above.
         override fun findUserByName(name: String): User = error("unused")
-        override fun findUserByEmail(email: String): User = error("unused")
         override fun searchUserByName(name: String): User? = null
-        override fun searchUserByEmail(email: String): User? = null
+        override fun searchUserByDiscordId(discordId: String): User? = null
         override fun userCount() = users.size
         override fun electionsOwnedCount(userName: String): Int =
             elections.count { it.ownerName == userName }

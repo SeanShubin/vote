@@ -4,9 +4,15 @@ import com.seanshubin.vote.domain.*
 
 interface QueryModel {
     fun findUserByName(name: String): User
-    fun findUserByEmail(email: String): User
     fun searchUserByName(name: String): User?
-    fun searchUserByEmail(email: String): User?
+
+    /**
+     * Look up the user whose Discord credential matches [discordId]. Returns
+     * null when no user has linked that Discord ID — that is the trigger for
+     * "first-time Discord login → create stub user". Discord IDs are immutable
+     * snowflakes, so this is a stable lookup that survives username changes.
+     */
+    fun searchUserByDiscordId(discordId: String): User?
     fun userCount(): Int
     fun electionCount(): Int
     fun candidateCount(electionName: String): Int
