@@ -249,4 +249,14 @@ class InMemoryCommandModel(private val data: InMemoryData) : CommandModel {
             discordDisplayName = discordDisplayName,
         )
     }
+
+    override fun setDiscordDisplayName(
+        authority: String,
+        userName: String,
+        discordDisplayName: String,
+    ) {
+        val key = userName.lowercase()
+        val user = data.users[key] ?: error("User not found: $userName")
+        data.users[key] = user.copy(discordDisplayName = discordDisplayName)
+    }
 }

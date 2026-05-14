@@ -79,6 +79,20 @@ sealed interface DomainEvent {
     ) : DomainEvent
 
     /**
+     * A returning Discord user's display name changed on Discord's side
+     * since their last login. The display name is observational only —
+     * identity is the immutable [discordId] snowflake, and ballots key off
+     * the app username — so this just refreshes what other users see. The
+     * old value is discarded; only [newDiscordDisplayName] is recorded.
+     */
+    @Serializable
+    @SerialName("DiscordDisplayNameChanged")
+    data class DiscordDisplayNameChanged(
+        val userName: String,
+        val newDiscordDisplayName: String,
+    ) : DomainEvent
+
+    /**
      * Election Management Events
      */
     @Serializable

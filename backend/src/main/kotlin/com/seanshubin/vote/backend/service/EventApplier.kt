@@ -54,6 +54,13 @@ class EventApplier(
                     discordDisplayName = event.discordDisplayName,
                 )
             }
+            is DomainEvent.DiscordDisplayNameChanged -> {
+                commandModel.setDiscordDisplayName(
+                    authority = authority,
+                    userName = event.userName,
+                    discordDisplayName = event.newDiscordDisplayName,
+                )
+            }
             is DomainEvent.ElectionCreated -> {
                 commandModel.addElection(authority, event.ownerName, event.electionName, event.description)
             }

@@ -131,6 +131,9 @@ class ScenarioHtmlGenerator(private val eventLog: EventLog) {
 
         is DomainEvent.DiscordCredentialLinked ->
             "Discord credential linked to <strong>${event.userName}</strong>"
+
+        is DomainEvent.DiscordDisplayNameChanged ->
+            "Discord display name updated for <strong>${event.userName}</strong> to <strong>${event.newDiscordDisplayName}</strong>"
     }
 
     private fun css() = """

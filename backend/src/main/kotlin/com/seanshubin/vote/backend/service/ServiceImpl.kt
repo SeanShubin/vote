@@ -732,10 +732,33 @@ class ServiceImpl(
         // across username changes — so it's the right join key. We never key
         // off display name; that's mutable.
         val existing = queryModel.searchUserByDiscordId(identity.discordId)
-        val resolvedUser: User = existing ?: createDiscordStubUser(identity)
+        val resolvedUser: User = if (existing == null) {
+            createDiscordStubUser(identity)
+        } else {
+            refreshDiscordDisplayName(existing, identity.displayName)
+        }
         val accessToken = AccessToken(resolvedUser.name, resolvedUser.role)
         val refreshToken = RefreshToken(resolvedUser.name)
         return Tokens(accessToken, refreshToken)
+    }
+
+    /**
+     * A returning Discord user may have changed their Discord display name
+     * since their last login. Propagate the current value so other users see
+     * the up-to-date name. The display name is observational only — identity
+     * is the immutable Discord snowflake and ballots key off the app
+     * username — so this changes nothing about ballot content. No-op (and no
+     * event minted) when the name is unchanged.
+     */
+    private fun refreshDiscordDisplayName(user: User, currentDisplayName: String): User {
+        if (user.discordDisplayName == currentDisplayName) return user
+        eventLog.appendEvent(
+            user.name,
+            clock.now(),
+            DomainEvent.DiscordDisplayNameChanged(user.name, currentDisplayName),
+        )
+        synchronize()
+        return queryModel.findUserByName(user.name)
     }
 
     private fun createDiscordStubUser(identity: DiscordOAuthClient.DiscordIdentity): User {

@@ -226,6 +226,26 @@ class DynamoDbSingleTableCommandModel(
         }
     }
 
+    override fun setDiscordDisplayName(
+        authority: String,
+        userName: String,
+        discordDisplayName: String,
+    ) {
+        runBlocking {
+            dynamoDb.updateItem(UpdateItemRequest {
+                tableName = DynamoDbSingleTableSchema.MAIN_TABLE
+                key = mapOf(
+                    "PK" to AttributeValue.S(DynamoDbSingleTableSchema.userPK(userName)),
+                    "SK" to AttributeValue.S(DynamoDbSingleTableSchema.METADATA_SK),
+                )
+                updateExpression = "SET discord_display_name = :ddn"
+                expressionAttributeValues = mapOf(
+                    ":ddn" to AttributeValue.S(discordDisplayName),
+                )
+            })
+        }
+    }
+
     // Election commands
     override fun addElection(authority: String, owner: String, electionName: String, description: String) {
         runBlocking {

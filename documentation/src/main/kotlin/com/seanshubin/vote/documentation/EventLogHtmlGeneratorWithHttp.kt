@@ -160,6 +160,8 @@ class EventLogHtmlGeneratorWithHttp(private val recorder: DocumentationRecorder)
             "<strong>${event.name}</strong> registered via Discord (${event.discordDisplayName}) with role <strong>${event.role}</strong>"
         is DomainEvent.DiscordCredentialLinked ->
             "Discord credential linked to <strong>${event.userName}</strong> (${event.discordDisplayName})"
+        is DomainEvent.DiscordDisplayNameChanged ->
+            "Discord display name for <strong>${event.userName}</strong> updated to <strong>${event.newDiscordDisplayName}</strong>"
     }
 
     private fun formatEventDetails(event: DomainEvent): String = when (event) {
@@ -242,6 +244,10 @@ class EventLogHtmlGeneratorWithHttp(private val recorder: DocumentationRecorder)
         is DomainEvent.DiscordCredentialLinked -> """
             <div class="detail-row"><span class="label">User:</span> ${event.userName}</div>
             <div class="detail-row"><span class="label">Discord:</span> ${event.discordDisplayName} (${event.discordId})</div>
+        """.trimIndent()
+        is DomainEvent.DiscordDisplayNameChanged -> """
+            <div class="detail-row"><span class="label">User:</span> ${event.userName}</div>
+            <div class="detail-row"><span class="label">New Discord Name:</span> ${event.newDiscordDisplayName}</div>
         """.trimIndent()
     }
 

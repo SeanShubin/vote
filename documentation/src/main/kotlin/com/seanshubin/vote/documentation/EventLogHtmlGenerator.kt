@@ -143,6 +143,10 @@ class EventLogHtmlGenerator(private val eventLog: EventLog) {
             <div class="detail-row"><span class="label">User:</span> ${event.userName}</div>
             <div class="detail-row"><span class="label">Discord:</span> ${event.discordDisplayName} (${event.discordId})</div>
         """.trimIndent()
+        is DomainEvent.DiscordDisplayNameChanged -> """
+            <div class="detail-row"><span class="label">User:</span> ${event.userName}</div>
+            <div class="detail-row"><span class="label">New Discord Name:</span> ${event.newDiscordDisplayName}</div>
+        """.trimIndent()
     }
 
     private fun getEventColor(eventType: String): String = when {

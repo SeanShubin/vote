@@ -53,4 +53,11 @@ interface CommandModel {
         discordId: String,
         discordDisplayName: String,
     )
+
+    /** Refresh the cached Discord display name for an existing user. */
+    fun setDiscordDisplayName(
+        authority: String,
+        userName: String,
+        discordDisplayName: String,
+    )
 }

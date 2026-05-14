@@ -392,4 +392,17 @@ class MySqlCommandModel(
             stmt.executeUpdate()
         }
     }
+
+    override fun setDiscordDisplayName(
+        authority: String,
+        userName: String,
+        discordDisplayName: String,
+    ) {
+        val sql = queryLoader.load("user-update-discord-display-name")
+        connection.prepareStatement(sql).use { stmt ->
+            stmt.setString(1, discordDisplayName)
+            stmt.setString(2, userName)
+            stmt.executeUpdate()
+        }
+    }
 }
