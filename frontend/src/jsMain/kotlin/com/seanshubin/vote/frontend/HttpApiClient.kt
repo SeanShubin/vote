@@ -78,6 +78,21 @@ class HttpApiClient(
         )).await()
     }
 
+    /**
+     * Unauthenticated GET — no Authorization header, so it skips the
+     * fetchWithAutoRefresh path entirely. The polling loop calls this on a
+     * timer; keeping it off the auth path means a poll can never itself
+     * trigger a token refresh or a session-lost cascade.
+     */
+    override suspend fun version(): Long {
+        val response = fetch("$baseUrl/version", RequestInit(
+            method = "GET",
+            headers = json("Content-Type" to "application/json"),
+        )).await()
+        val body = handleResponse<Map<String, Long>>(response)
+        return body["version"] ?: 0
+    }
+
     override suspend fun getMyUser(): UserNameEmail {
         val userName = requireSession().userName
         return getWithAuth("/user/${encodeURIComponent(userName)}")

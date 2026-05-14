@@ -32,6 +32,15 @@ interface ApiClient {
     suspend fun logout()
 
     /**
+     * Monotonic version of the server's read model. Unchanged value means
+     * nothing has changed anywhere; a higher value means at least one write
+     * landed. Cheap to call — backs the client-side polling that decides when
+     * a page's real data is worth refetching. Unauthenticated, so it works
+     * without an active session and never triggers a token refresh.
+     */
+    suspend fun version(): Long
+
+    /**
      * Set by the SPA shell to perform "you are now logged out" UX (clear
      * userName/role, route to /login). Implementations invoke it exactly when
      * an authenticated request can't be recovered via refresh — e.g. the user

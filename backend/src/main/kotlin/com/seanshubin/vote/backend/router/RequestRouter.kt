@@ -104,6 +104,7 @@ class RequestRouter(
      */
     private val routes: List<Route> = listOf(
         Route("GET", "/health", { _ -> handleHealth() }),
+        Route("GET", "/version", { _ -> handleVersion() }),
         Route("POST", "/log-client-error", ::handleLogClientError),
         Route("POST", "/refresh", ::handleRefresh),
         Route("POST", "/logout", { _ -> handleLogout() }),
@@ -230,6 +231,17 @@ class RequestRouter(
     private fun handleHealth(): HttpResponse {
         val result = service.health()
         return HttpResponse(200, json.encodeToString(mapOf("status" to result)))
+    }
+
+    /**
+     * Read-model version for client-side polling. Unauthenticated like
+     * /health — the value is an opaque monotonic counter that reveals nothing
+     * sensitive, and keeping it auth-free means the poll never has to ride the
+     * token-refresh path.
+     */
+    private fun handleVersion(): HttpResponse {
+        val version = service.version()
+        return HttpResponse(200, json.encodeToString(mapOf("version" to version)))
     }
 
     private fun handleLogClientError(req: HttpRequest): HttpResponse {

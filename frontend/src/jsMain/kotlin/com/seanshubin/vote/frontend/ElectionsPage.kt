@@ -18,6 +18,13 @@ fun ElectionsPage(
         apiClient.listElections()
     }
 
+    // Pick up elections created (or deleted) by other users without a manual
+    // refresh. The cached fetch keeps the current list painted while the
+    // refetch runs, so the list never flashes to Loading.
+    rememberVersionPolling(apiClient) {
+        electionsFetch.reload()
+    }
+
     Div({ classes("container") }) {
         H1 { Text("Elections") }
 

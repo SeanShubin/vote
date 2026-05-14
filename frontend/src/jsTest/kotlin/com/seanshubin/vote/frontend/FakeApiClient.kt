@@ -37,6 +37,8 @@ class FakeApiClient : ApiClient {
     var refreshResult: Result<AuthResponse?> = Result.success(null)
     val refreshCalls = mutableListOf<Unit>()
     val logoutCalls = mutableListOf<Unit>()
+    var versionResult: Result<Long> = Result.success(0L)
+    val versionCalls = mutableListOf<Unit>()
     var getMyUserResult: Result<UserNameEmail> = Result.success(UserNameEmail("user"))
     val getMyUserCalls = mutableListOf<Unit>()
     var listElectionsResult: Result<List<ElectionSummary>> = Result.success(emptyList())
@@ -86,6 +88,11 @@ class FakeApiClient : ApiClient {
 
     override suspend fun logout() {
         logoutCalls.add(Unit)
+    }
+
+    override suspend fun version(): Long {
+        versionCalls.add(Unit)
+        return versionResult.getOrThrow()
     }
 
     override var onSessionLost: (() -> Unit)? = null

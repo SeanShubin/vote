@@ -81,6 +81,17 @@ fun ElectionDetailPage(
         },
     )
 
+    // Keep this page live: when someone else casts a ballot (or edits the
+    // election), the server version moves and we refetch. Both fetches are
+    // reloaded — the shell carries the header ballot count, the tally carries
+    // the results. tallyFetch is the cached variant so the Results tab keeps
+    // the prior tally on screen during the refetch instead of flashing to
+    // Loading; shellFetch is guarded the same way by lastLoadedShell below.
+    rememberVersionPolling(apiClient) {
+        shellFetch.reload()
+        tallyFetch.reload()
+    }
+
     val shellState = shellFetch.state
     // Hold onto the most recent shell Success so a reload doesn't unmount
     // VotingView. The patch callbacks below mutate this directly, but the

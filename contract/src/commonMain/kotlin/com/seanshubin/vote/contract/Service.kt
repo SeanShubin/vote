@@ -5,6 +5,14 @@ import com.seanshubin.vote.domain.*
 interface Service {
     fun synchronize()
     fun health(): String
+
+    /**
+     * Monotonic version of the read model — the id of the last event projected
+     * into the query tables. Every write advances it; if it hasn't moved, no
+     * data anywhere has changed. Clients poll this to decide whether a refetch
+     * is worth doing. 0 before the first event is ever applied.
+     */
+    fun version(): Long
     fun refresh(refreshToken: RefreshToken): Tokens
     fun authenticateWithToken(accessToken: AccessToken): Tokens
     fun permissionsForRole(role: Role): List<Permission>

@@ -52,10 +52,19 @@ private fun renderTally(
 ) {
     val revealed = serverTally.tally.ballots.filterIsInstance<Ballot.Revealed>()
     val totalToggleable = revealed.size
+    val currentConfirmations = revealed.map { it.confirmation }.toSet()
 
-    var active by remember(serverTally.tally.electionName, totalToggleable) {
-        mutableStateOf(revealed.map { it.confirmation }.toSet())
+    // Track the ballots the viewer has explicitly toggled *off*, not the ones
+    // left on. Storing the excluded set means a refetch (e.g. a poll picking
+    // up a ballot cast by someone else) reconciles for free: a new ballot is
+    // absent from `excluded` so it shows on, a removed ballot just falls out
+    // of `active` below, and every existing on/off choice survives untouched.
+    // Keyed on election name only — switching elections clears it; a changing
+    // ballot count no longer wipes the viewer's selection mid-analysis.
+    var excluded by remember(serverTally.tally.electionName) {
+        mutableStateOf(emptySet<String>())
     }
+    val active = currentConfirmations - excluded
 
     val allOn = revealed.isEmpty() || active.size == totalToggleable
     val activeBallots = revealed.filter { it.confirmation in active }
@@ -154,10 +163,10 @@ private fun renderTally(
             ballots = revealed,
             active = active,
             onToggle = { confirmation ->
-                active = if (confirmation in active) active - confirmation else active + confirmation
+                excluded = if (confirmation in excluded) excluded - confirmation else excluded + confirmation
             },
             onSetAll = { all ->
-                active = if (all) revealed.map { it.confirmation }.toSet() else emptySet()
+                excluded = if (all) emptySet() else currentConfirmations
             },
         )
     }

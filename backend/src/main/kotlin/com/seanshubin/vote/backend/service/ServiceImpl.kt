@@ -26,6 +26,10 @@ class ServiceImpl(
 
     override fun synchronize() = eventApplier.synchronize()
 
+    // queryModel.lastSynced() is null only before the very first event is
+    // applied; 0 is the right "nothing has happened yet" sentinel for clients.
+    override fun version(): Long = queryModel.lastSynced() ?: 0
+
     override fun health(): String {
         return try {
             queryModel.userCount()
