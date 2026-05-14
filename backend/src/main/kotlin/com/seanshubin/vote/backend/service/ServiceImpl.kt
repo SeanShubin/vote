@@ -735,11 +735,10 @@ class ServiceImpl(
     }
 
     private fun createDiscordStubUser(identity: DiscordOAuthClient.DiscordIdentity): User {
-        // First-ever Discord login lands as NO_ACCESS with the Discord display
-        // name as the suggested username (deconflicted if it collides). The
-        // owner has to be promoted from NO_ACCESS to PRIMARY_ROLE by an
-        // existing operator — there is no automatic "first user becomes
-        // owner" rule under Discord-only login.
+        // The first user to ever register claims ownership; everyone after
+        // them lands as a VOTER. Under Discord-only login there's no separate
+        // admin bootstrap step, so first-in becomes OWNER automatically.
+        val role = if (queryModel.userCount() == 0) Role.PRIMARY_ROLE else Role.DEFAULT_ROLE
         val candidateName = uniqueUserName(identity.displayName)
         eventLog.appendEvent(
             "system",
@@ -748,7 +747,7 @@ class ServiceImpl(
                 name = candidateName,
                 discordId = identity.discordId,
                 discordDisplayName = identity.displayName,
-                role = Role.NO_ACCESS,
+                role = role,
             ),
         )
         synchronize()

@@ -49,8 +49,8 @@ sealed interface DomainEvent {
 
     /**
      * First-time Discord login: a Discord-authenticated principal that
-     * doesn't yet match any existing user. Lands in [Role.NO_ACCESS] —
-     * an admin then grants a role outright.
+     * doesn't yet match any existing user. The very first user to register
+     * lands as OWNER; everyone after them lands as VOTER.
      *
      * [name] is derived from the Discord display name, made unique against
      * existing users by the service.
