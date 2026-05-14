@@ -1,14 +1,23 @@
 package com.seanshubin.vote.integration.dsl
 
 import com.seanshubin.vote.contract.AccessToken
+import com.seanshubin.vote.contract.EventLog
 import com.seanshubin.vote.contract.Service
 import com.seanshubin.vote.domain.*
+import kotlinx.datetime.Instant
 
 /**
  * Backend that executes operations by directly calling the Service implementation.
  * Used for event log, SQL, and DynamoDB documentation generation.
  */
-class DirectServiceBackend(private val service: Service) : ScenarioBackend {
+class DirectServiceBackend(
+    private val service: Service,
+    private val eventLog: EventLog,
+) : ScenarioBackend {
+    override fun seedEvent(authority: String, whenHappened: Instant, event: DomainEvent) {
+        eventLog.appendEvent(authority, whenHappened, event)
+    }
+
     override fun setRole(token: AccessToken, targetUserName: String, newRole: Role) {
         service.setRole(token, targetUserName, newRole)
     }

@@ -10,6 +10,7 @@ import com.seanshubin.vote.backend.router.RequestRouter
 import com.seanshubin.vote.backend.router.SimpleHttpHandler
 import com.seanshubin.vote.backend.service.ServiceImpl
 import com.seanshubin.vote.contract.Integrations
+import com.seanshubin.vote.contract.Service
 import kotlinx.serialization.json.Json
 import org.eclipse.jetty.server.Server
 import java.sql.Connection
@@ -29,6 +30,9 @@ class ApplicationRunner(
     // running Service is writing to. Without this, repositoryFactory creates
     // fresh (empty) InMemory* instances on every call.
     private var repositories: RepositorySet? = null
+    // Cached so test harnesses that seed the event log directly (see
+    // getEventLog()) can force the projection to catch up.
+    private var service: Service? = null
 
     fun run() {
         bootstrap()
@@ -80,6 +84,7 @@ class ApplicationRunner(
             discordConfigProvider = discordConfigProvider,
             discordOAuthClient = DiscordOAuthClient(),
         )
+        this.service = service
 
         // Replay the event log into the projection so the scan below sees a
         // consistent picture of every existing election. Subsequent service
@@ -110,4 +115,13 @@ class ApplicationRunner(
 
     fun getEventLog() = repositories?.eventLog
         ?: error("ApplicationRunner not started — call run() or startNonBlocking() first")
+
+    /**
+     * Project any unsynced events into the read models. Service mutations
+     * already self-synchronize; this is for test harnesses that append to
+     * the event log directly via [getEventLog].
+     */
+    fun synchronize() = (service
+        ?: error("ApplicationRunner not started — call run() or startNonBlocking() first"))
+        .synchronize()
 }

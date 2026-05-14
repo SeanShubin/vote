@@ -5,7 +5,9 @@ import com.seanshubin.vote.backend.auth.TokenEncoder
 import com.seanshubin.vote.backend.dependencies.ApplicationDependencies
 import com.seanshubin.vote.backend.dependencies.DatabaseConfig
 import com.seanshubin.vote.contract.AccessToken
+import com.seanshubin.vote.domain.DomainEvent
 import com.seanshubin.vote.integration.fake.TestIntegrations
+import kotlinx.datetime.Instant
 import kotlinx.serialization.json.Json
 import java.net.URI
 import java.net.http.HttpClient
@@ -67,6 +69,19 @@ class HttpRecorder(private val documentationRecorder: DocumentationRecorder? = n
 
     fun stopServer() {
         runner.stop()
+    }
+
+    /**
+     * Append [event] straight to the in-process server's event log and
+     * project it. Test bootstrap only — there is no HTTP registration path
+     * under Discord-only login, so seeded users must be written to the
+     * server's own log rather than the test harness's separate in-memory
+     * log. The explicit [ApplicationRunner.synchronize] is required because,
+     * unlike a service mutation, a direct append triggers no auto-sync.
+     */
+    fun seedEvent(authority: String, whenHappened: Instant, event: DomainEvent) {
+        runner.getEventLog().appendEvent(authority, whenHappened, event)
+        runner.synchronize()
     }
 
     fun getExchanges(): List<HttpExchange> = exchanges.toList()

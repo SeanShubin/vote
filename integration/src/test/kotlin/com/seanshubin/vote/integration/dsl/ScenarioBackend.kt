@@ -2,6 +2,7 @@ package com.seanshubin.vote.integration.dsl
 
 import com.seanshubin.vote.contract.AccessToken
 import com.seanshubin.vote.domain.*
+import kotlinx.datetime.Instant
 
 /**
  * Abstraction over how scenario operations are executed.
@@ -13,6 +14,14 @@ import com.seanshubin.vote.domain.*
  * HTTP backend mocks Discord OAuth at the service edge.
  */
 interface ScenarioBackend {
+    /**
+     * Test bootstrap: append [event] directly to the event log this backend
+     * reads from, bypassing the public API. Used to seed users — under
+     * Discord-only login there is no HTTP registration path, and an HTTP
+     * backend's server keeps its own event log separate from the test's.
+     */
+    fun seedEvent(authority: String, whenHappened: Instant, event: DomainEvent)
+
     fun setRole(token: AccessToken, targetUserName: String, newRole: Role)
     fun updateUser(token: AccessToken, userName: String, updates: UserUpdates)
     fun removeUser(token: AccessToken, targetUserName: String)

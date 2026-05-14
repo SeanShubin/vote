@@ -46,7 +46,7 @@ class TestContext(
     )
 
     // Backend abstraction - can be direct service calls or HTTP calls
-    val backend: ScenarioBackend = backend ?: DirectServiceBackend(service)
+    val backend: ScenarioBackend = backend ?: DirectServiceBackend(service, eventLog)
 
     // Test helpers
     val events = EventInspector(eventLog)
@@ -59,6 +59,10 @@ class TestContext(
      * synthetic `discord_id` just needs to be unique per test user — it
      * never leaves the in-memory event log.
      *
+     * Routed through [backend] so the event lands in the log the backend
+     * actually reads from: the test's own log for [DirectServiceBackend],
+     * the in-process server's log for an HTTP backend.
+     *
      * The first user seeded in a TestContext is promoted to PRIMARY_ROLE so
      * subsequent admin operations have a caller. Override [role] to seed a
      * specific role explicitly.
@@ -67,7 +71,7 @@ class TestContext(
         name: String = "user${integrations.sequentialIdGenerator.generate()}",
         role: Role = if (queryModel.userCount() == 0) Role.PRIMARY_ROLE else Role.DEFAULT_ROLE,
     ): UserContext {
-        eventLog.appendEvent(
+        backend.seedEvent(
             "system",
             integrations.clock.now(),
             DomainEvent.UserRegisteredViaDiscord(

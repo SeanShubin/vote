@@ -3,6 +3,7 @@ package com.seanshubin.vote.documentation
 import com.seanshubin.vote.contract.*
 import com.seanshubin.vote.domain.*
 import com.seanshubin.vote.integration.dsl.ScenarioBackend
+import kotlinx.datetime.Instant
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.net.URLEncoder
@@ -19,6 +20,10 @@ class HttpRecordingBackend(
     private val json = Json {
         ignoreUnknownKeys = true
         prettyPrint = true
+    }
+
+    override fun seedEvent(authority: String, whenHappened: Instant, event: DomainEvent) {
+        recorder.seedEvent(authority, whenHappened, event)
     }
 
     override fun setRole(token: AccessToken, targetUserName: String, newRole: Role) {
