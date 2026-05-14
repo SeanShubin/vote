@@ -546,7 +546,7 @@ fun VotingView(
                         Button({
                             classes("ranked-ballot-copy-button")
                             onClick {
-                                val rankings = ranked.mapIndexed { i, item -> item.toRanking(i + 1) }
+                                val rankings = ranked.toRankings()
                                 val text = buildBallotText(electionName, currentUserName, rankings)
                                 copyTextToClipboard(text)
                                 copyFeedback = "Copied!"
