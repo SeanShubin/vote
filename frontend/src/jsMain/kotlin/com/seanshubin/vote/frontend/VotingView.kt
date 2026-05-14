@@ -385,6 +385,11 @@ fun VotingView(
     Div({ classes("section") }) {
         H2 { Text("Vote") }
 
+        Div({ classes("ballot-public-notice") }) {
+            Span({ classes("ballot-public-notice-lead") }) { Text("This is a public ballot. ") }
+            Text("Everyone will be able to see how you voted.")
+        }
+
         if (candidates.isEmpty()) {
             P { Text("No candidates yet — the election owner can add them via the Setup tab.") }
             return@Div

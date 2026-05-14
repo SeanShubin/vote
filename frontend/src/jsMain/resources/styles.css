@@ -188,6 +188,19 @@ button:disabled {
     margin-bottom: 1rem;
 }
 
+.ballot-public-notice {
+    padding: 0.75rem 1rem;
+    background-color: #ecf2fb;
+    border: 1px solid #b8d0f0;
+    border-radius: 4px;
+    color: #2c3e50;
+    margin-bottom: 1rem;
+}
+
+.ballot-public-notice-lead {
+    font-weight: bold;
+}
+
 .menu {
     display: flex;
     flex-direction: column;
