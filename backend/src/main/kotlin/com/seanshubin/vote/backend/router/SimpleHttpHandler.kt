@@ -42,6 +42,7 @@ class SimpleHttpHandler(
                 target = target,
                 rawHeaders = headers,
                 body = body,
+                queryString = request.queryString ?: "",
             )
         )
 

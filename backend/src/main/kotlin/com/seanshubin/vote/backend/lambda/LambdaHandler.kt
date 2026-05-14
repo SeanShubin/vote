@@ -47,11 +47,14 @@ class LambdaHandler : RequestHandler<APIGatewayV2HTTPEvent, APIGatewayV2HTTPResp
 
         // Path arrives as /api/health (CloudFront → APIGW → Lambda) — RequestRouter
         // strips the /api prefix uniformly for both Lambda and Jetty entry points.
+        // rawPath excludes the query string; APIGW v2 delivers it separately as
+        // rawQueryString — needed for the Discord OAuth callback's code/state.
         val request = HttpRequest(
             method = event.requestContext?.http?.method ?: "GET",
             target = event.rawPath ?: "/",
             rawHeaders = headers,
             body = event.body ?: "",
+            queryString = event.rawQueryString ?: "",
         )
         val response = router.route(request)
 

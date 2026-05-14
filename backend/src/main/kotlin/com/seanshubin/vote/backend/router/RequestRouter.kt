@@ -546,7 +546,7 @@ class RequestRouter(
         // Discord redirects the browser here after the user authorizes the app.
         // Query string carries `code` (the auth code we exchange) and `state`
         // (echoed back from the authorize URL — must match the cookie).
-        val params = parseQuery(req.target)
+        val params = parseQuery(req.queryString)
         val code = params["code"]
         val callbackState = params["state"]
         val cookieState = readCookie(req, discordStateCookie.name)
@@ -593,10 +593,9 @@ class RequestRouter(
             headers = mapOf("Location" to "$frontendBaseUrl/login?error=$code"),
         )
 
-    private fun parseQuery(target: String): Map<String, String> {
-        val q = target.substringAfter('?', "")
-        if (q.isEmpty()) return emptyMap()
-        return q.split('&').mapNotNull { pair ->
+    private fun parseQuery(queryString: String): Map<String, String> {
+        if (queryString.isEmpty()) return emptyMap()
+        return queryString.split('&').mapNotNull { pair ->
             val idx = pair.indexOf('=')
             if (idx < 0) null
             else java.net.URLDecoder.decode(pair.substring(0, idx), "UTF-8") to
