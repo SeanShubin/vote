@@ -86,6 +86,50 @@ fun VotingView(
         }
     }
 
+    // Auto-scroll the page when a drag nears the top/bottom of the viewport.
+    // Native HTML5 drag-and-drop never scrolls the document on its own, so a
+    // drop target below the fold is otherwise unreachable mid-drag. While a
+    // drag is active (dragSource != null) a window-level `dragover` listener
+    // tracks the cursor's Y, and a requestAnimationFrame loop scrolls whenever
+    // the cursor sits inside a hot zone near either edge. Scroll speed ramps
+    // linearly with how deep into the zone the cursor is. Both the listener
+    // and the rAF loop are torn down the moment the drag ends.
+    DisposableEffect(dragSource != null) {
+        if (dragSource == null) {
+            onDispose { }
+        } else {
+            val edgeZone = 60.0   // px from an edge that triggers scrolling
+            val maxSpeed = 20.0   // px per frame at the very edge
+            var pointerY = -1.0
+            var rafId = 0
+
+            fun step(timestamp: Double) {
+                val viewportH = window.innerHeight.toDouble()
+                val delta = when {
+                    pointerY < 0 -> 0.0
+                    pointerY < edgeZone ->
+                        -maxSpeed * ((edgeZone - pointerY) / edgeZone).coerceIn(0.0, 1.0)
+                    pointerY > viewportH - edgeZone ->
+                        maxSpeed * ((pointerY - (viewportH - edgeZone)) / edgeZone).coerceIn(0.0, 1.0)
+                    else -> 0.0
+                }
+                if (delta != 0.0) window.scrollBy(0.0, delta)
+                rafId = window.requestAnimationFrame(::step)
+            }
+
+            val onDragOver: (org.w3c.dom.events.Event) -> Unit = { event ->
+                pointerY = (event as org.w3c.dom.events.MouseEvent).clientY.toDouble()
+            }
+            window.addEventListener("dragover", onDragOver)
+            rafId = window.requestAnimationFrame(::step)
+
+            onDispose {
+                window.cancelAnimationFrame(rafId)
+                window.removeEventListener("dragover", onDragOver)
+            }
+        }
+    }
+
     // Pre-populate from any existing ballot so a returning voter sees their
     // prior pick instead of starting from scratch. New candidates added since
     // last vote land in the arena; candidates removed since last vote are
