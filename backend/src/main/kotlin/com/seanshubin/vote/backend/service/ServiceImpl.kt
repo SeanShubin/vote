@@ -17,6 +17,7 @@ class ServiceImpl(
     private val tokenEncoder: TokenEncoder,
     private val discordConfigProvider: DiscordConfigProvider = DiscordConfigProvider { null },
     private val discordOAuthClient: DiscordOAuthClient = DiscordOAuthClient(),
+    private val devLoginEnabled: Boolean = false,
 ) : Service {
     private val secureRandom = SecureRandom()
     private val clock = integrations.clock
@@ -740,6 +741,60 @@ class ServiceImpl(
         val accessToken = AccessToken(resolvedUser.name, resolvedUser.role)
         val refreshToken = RefreshToken(resolvedUser.name)
         return Tokens(accessToken, refreshToken)
+    }
+
+    override fun loginConfig(): LoginConfig = LoginConfig(devLoginEnabled = devLoginEnabled)
+
+    override fun devListUserNames(): List<String> {
+        requireDevLoginEnabled()
+        return queryModel.listUserNames()
+    }
+
+    override fun devLoginAsExisting(userName: String): Tokens {
+        requireDevLoginEnabled()
+        // Find-only: the login page's picker only offers names that exist, so
+        // an unknown name here is a typo or a stale list — reject rather than
+        // create, so "log in as existing" can never silently make a new user.
+        val user = queryModel.searchUserByName(userName)
+            ?: throw ServiceException(
+                ServiceException.Category.NOT_FOUND,
+                "No user named '$userName'",
+            )
+        return Tokens(AccessToken(user.name, user.role), RefreshToken(user.name))
+    }
+
+    override fun devCreateAndLogin(userName: String): Tokens {
+        requireDevLoginEnabled()
+        val cleaned = Validation.validateUserName(userName)
+        // Create-only: reject an existing name so a mistyped "new" name that
+        // happens to collide doesn't log the operator in as someone else.
+        if (queryModel.searchUserByName(cleaned) != null) {
+            throw ServiceException(
+                ServiceException.Category.CONFLICT,
+                "User name '$cleaned' is already taken — pick it from the existing-user list instead",
+            )
+        }
+        // First user to ever register claims ownership — same rule as Discord
+        // registration, so a dev login against a fresh local DB bootstraps an
+        // admin instead of stranding everyone with no permissions.
+        val role = if (queryModel.userCount() == 0) Role.PRIMARY_ROLE else Role.DEFAULT_ROLE
+        eventLog.appendEvent(
+            "system",
+            clock.now(),
+            DomainEvent.UserRegistered(name = cleaned, role = role),
+        )
+        synchronize()
+        val user = queryModel.findUserByName(cleaned)
+        return Tokens(AccessToken(user.name, user.role), RefreshToken(user.name))
+    }
+
+    private fun requireDevLoginEnabled() {
+        if (!devLoginEnabled) {
+            throw ServiceException(
+                ServiceException.Category.UNSUPPORTED,
+                "Dev login is not enabled in this environment",
+            )
+        }
     }
 
     /**

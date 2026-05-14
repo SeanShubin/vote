@@ -10,6 +10,7 @@ import com.seanshubin.vote.contract.AddElectionRequest
 import com.seanshubin.vote.contract.AuthResponse
 import com.seanshubin.vote.contract.CastBallotRequest
 import com.seanshubin.vote.contract.ClientErrorRequest
+import com.seanshubin.vote.contract.DevLoginRequest
 import com.seanshubin.vote.contract.ErrorResponse
 import com.seanshubin.vote.contract.RenameCandidateRequest
 import com.seanshubin.vote.contract.RenameTierRequest
@@ -146,6 +147,10 @@ class RequestRouter(
         Route("GET", "/election/[^/]+/tally", ::handleTally),
         Route("POST", "/auth/discord/start", { _ -> handleDiscordLoginStart() }),
         Route("GET", "/auth/discord/callback", ::handleDiscordCallback),
+        Route("GET", "/auth/config", { _ -> handleLoginConfig() }),
+        Route("GET", "/auth/dev/users", { _ -> handleDevListUsers() }),
+        Route("POST", "/auth/dev/login", ::handleDevLogin),
+        Route("POST", "/auth/dev/create", ::handleDevCreate),
     )
 
     private fun dispatch(req: HttpRequest): HttpResponse {
@@ -604,6 +609,34 @@ class RequestRouter(
             setCookies = listOf(discordStateCookie.makeClearCookie()),
             headers = mapOf("Location" to "$frontendBaseUrl/login?error=$code"),
         )
+
+    /**
+     * Which login methods this environment offers. Unauthenticated — the
+     * login page reads it before any session exists. In production this
+     * always reports devLoginEnabled=false, so the dev-login UI never renders.
+     */
+    private fun handleLoginConfig(): HttpResponse =
+        HttpResponse(200, json.encodeToString(service.loginConfig()))
+
+    /**
+     * User-name list for the dev-login picker. The service rejects this with
+     * UNSUPPORTED (→ 501) unless dev login is enabled, so the endpoint is
+     * inert in production even though it's always registered.
+     */
+    private fun handleDevListUsers(): HttpResponse =
+        HttpResponse(200, json.encodeToString(service.devListUserNames()))
+
+    /** Dev-only: start a session as an existing user. Sets the refresh cookie. */
+    private fun handleDevLogin(req: HttpRequest): HttpResponse {
+        val request = json.decodeFromString<DevLoginRequest>(req.body)
+        return authSuccess(service.devLoginAsExisting(request.userName))
+    }
+
+    /** Dev-only: create a new user and start a session as them. Sets the refresh cookie. */
+    private fun handleDevCreate(req: HttpRequest): HttpResponse {
+        val request = json.decodeFromString<DevLoginRequest>(req.body)
+        return authSuccess(service.devCreateAndLogin(request.userName))
+    }
 
     private fun parseQuery(queryString: String): Map<String, String> {
         if (queryString.isEmpty()) return emptyMap()

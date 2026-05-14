@@ -2,6 +2,7 @@ package com.seanshubin.vote.frontend
 
 import com.seanshubin.vote.contract.ApiClient
 import com.seanshubin.vote.contract.AuthResponse
+import com.seanshubin.vote.contract.LoginConfig
 import kotlinx.coroutines.CancellationException
 import com.seanshubin.vote.domain.ElectionDetail
 import com.seanshubin.vote.domain.ElectionSummary
@@ -80,6 +81,15 @@ class FakeApiClient : ApiClient {
 
     var discordLoginStartUrlResult: Result<String> = Result.success("https://discord.com/oauth2/authorize?fake=1")
     val discordLoginStartUrlCalls = mutableListOf<Unit>()
+
+    var loginConfigResult: Result<LoginConfig> = Result.success(LoginConfig(devLoginEnabled = false))
+    val loginConfigCalls = mutableListOf<Unit>()
+    var devListUserNamesResult: Result<List<String>> = Result.success(emptyList())
+    val devListUserNamesCalls = mutableListOf<Unit>()
+    var devLoginAsExistingResult: Result<Unit> = Result.success(Unit)
+    val devLoginAsExistingCalls = mutableListOf<String>()
+    var devCreateAndLoginResult: Result<Unit> = Result.success(Unit)
+    val devCreateAndLoginCalls = mutableListOf<String>()
 
     override suspend fun refresh(): AuthResponse? {
         refreshCalls.add(Unit)
@@ -240,6 +250,26 @@ class FakeApiClient : ApiClient {
     override suspend fun discordLoginStartUrl(): String {
         discordLoginStartUrlCalls.add(Unit)
         return discordLoginStartUrlResult.getOrThrow()
+    }
+
+    override suspend fun loginConfig(): LoginConfig {
+        loginConfigCalls.add(Unit)
+        return loginConfigResult.getOrThrow()
+    }
+
+    override suspend fun devListUserNames(): List<String> {
+        devListUserNamesCalls.add(Unit)
+        return devListUserNamesResult.getOrThrow()
+    }
+
+    override suspend fun devLoginAsExisting(userName: String) {
+        devLoginAsExistingCalls.add(userName)
+        devLoginAsExistingResult.getOrThrow()
+    }
+
+    override suspend fun devCreateAndLogin(userName: String) {
+        devCreateAndLoginCalls.add(userName)
+        devCreateAndLoginResult.getOrThrow()
     }
 
     override fun logErrorToServer(error: Throwable) {

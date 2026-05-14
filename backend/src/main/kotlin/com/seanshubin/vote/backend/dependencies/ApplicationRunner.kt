@@ -83,6 +83,7 @@ class ApplicationRunner(
             tokenEncoder = tokenEncoder,
             discordConfigProvider = discordConfigProvider,
             discordOAuthClient = DiscordOAuthClient(),
+            devLoginEnabled = configuration.devLoginEnabled,
         )
         this.service = service
 

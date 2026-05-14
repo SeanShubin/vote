@@ -65,6 +65,21 @@ sealed interface DomainEvent {
     ) : DomainEvent
 
     /**
+     * A user brought into existence without a Discord credential — the
+     * dev-only login bypass (see Service.devCreateAndLogin). Never emitted
+     * in production, where Discord OAuth is the only registration path.
+     * The user simply has no Discord identity ([User.discordId] stays blank);
+     * the first user to ever register still lands as OWNER, like Discord
+     * registration.
+     */
+    @Serializable
+    @SerialName("UserRegistered")
+    data class UserRegistered(
+        val name: String,
+        val role: Role,
+    ) : DomainEvent
+
+    /**
      * Attaches a Discord credential to an existing user. Emitted when a
      * Discord-authenticated user opts to add Discord to an already-
      * authenticated session (not exposed today, but the event shape

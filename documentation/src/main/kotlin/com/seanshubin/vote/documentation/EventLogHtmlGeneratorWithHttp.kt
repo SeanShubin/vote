@@ -158,6 +158,8 @@ class EventLogHtmlGeneratorWithHttp(private val recorder: DocumentationRecorder)
             "<strong>${event.voterName}</strong> deleted ballot in <strong>${event.electionName}</strong>"
         is DomainEvent.UserRegisteredViaDiscord ->
             "<strong>${event.name}</strong> registered via Discord (${event.discordDisplayName}) with role <strong>${event.role}</strong>"
+        is DomainEvent.UserRegistered ->
+            "<strong>${event.name}</strong> registered with role <strong>${event.role}</strong>"
         is DomainEvent.DiscordCredentialLinked ->
             "Discord credential linked to <strong>${event.userName}</strong> (${event.discordDisplayName})"
         is DomainEvent.DiscordDisplayNameChanged ->
@@ -239,6 +241,10 @@ class EventLogHtmlGeneratorWithHttp(private val recorder: DocumentationRecorder)
         is DomainEvent.UserRegisteredViaDiscord -> """
             <div class="detail-row"><span class="label">Name:</span> ${event.name}</div>
             <div class="detail-row"><span class="label">Discord:</span> ${event.discordDisplayName} (${event.discordId})</div>
+            <div class="detail-row"><span class="label">Role:</span> ${event.role}</div>
+        """.trimIndent()
+        is DomainEvent.UserRegistered -> """
+            <div class="detail-row"><span class="label">Name:</span> ${event.name}</div>
             <div class="detail-row"><span class="label">Role:</span> ${event.role}</div>
         """.trimIndent()
         is DomainEvent.DiscordCredentialLinked -> """

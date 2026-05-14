@@ -39,6 +39,10 @@ class Bootstrap(
                 path = "/",
             ),
             discordParameterNames = parseDiscordParameterNames(env),
+            // Local dev only. The Discord-bypass login is for running a
+            // prod snapshot locally (scripts/dev.ps1 launch-from-snapshot);
+            // every local entry point reaches the server through here.
+            devLoginEnabled = true,
         )
     }
 
@@ -58,6 +62,10 @@ class Bootstrap(
                 path = "/api",
             ),
             discordParameterNames = parseDiscordParameterNames(env),
+            // Never in production. The Discord-bypass login mints a session
+            // for any user name — keeping this false here is the structural
+            // guarantee that it cannot exist in the deployed environment.
+            devLoginEnabled = false,
         )
     }
 

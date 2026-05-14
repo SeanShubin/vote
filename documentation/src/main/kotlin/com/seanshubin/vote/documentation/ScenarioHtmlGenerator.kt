@@ -129,6 +129,9 @@ class ScenarioHtmlGenerator(private val eventLog: EventLog) {
         is DomainEvent.UserRegisteredViaDiscord ->
             "<strong>${event.name}</strong> registered via Discord (${event.discordDisplayName}) with role <strong>${event.role}</strong>"
 
+        is DomainEvent.UserRegistered ->
+            "<strong>${event.name}</strong> registered with role <strong>${event.role}</strong>"
+
         is DomainEvent.DiscordCredentialLinked ->
             "Discord credential linked to <strong>${event.userName}</strong>"
 

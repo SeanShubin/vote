@@ -197,6 +197,58 @@ button:disabled {
     margin-bottom: 1rem;
 }
 
+/*
+ * Local-dev login panel — only rendered when the backend reports
+ * devLoginEnabled (never in production). Separated from the Discord button
+ * above it by a rule + spacing so it reads as a distinct, dev-only affordance.
+ */
+.dev-login-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin-top: 2rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid #d0dced;
+}
+
+.dev-login-panel h2 {
+    margin: 0;
+    font-size: 1.1rem;
+    color: #2c5282;
+}
+
+.dev-login-panel p {
+    margin: 0;
+    font-size: 0.85rem;
+    color: #5a6b82;
+}
+
+.dev-login-row {
+    display: flex;
+    gap: 0.5rem;
+    align-items: stretch;
+}
+
+.dev-login-row select,
+.dev-login-row input[type="text"] {
+    flex: 1;
+    min-width: 0;
+}
+
+.dev-login-row select {
+    padding: 0.75rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background-color: white;
+    font-size: 1rem;
+    cursor: pointer;
+}
+
+.dev-login-row button {
+    margin-top: 0;
+    flex-shrink: 0;
+}
+
 .ballot-public-notice-lead {
     font-weight: bold;
 }

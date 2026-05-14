@@ -244,6 +244,49 @@ class HttpApiClient(
         return start.authorizeUrl
     }
 
+    override suspend fun loginConfig(): LoginConfig {
+        // Unauthenticated GET, like version() — read before any session exists.
+        val response = fetch("$baseUrl/auth/config", RequestInit(
+            method = "GET",
+            headers = json("Content-Type" to "application/json"),
+        )).await()
+        return handleResponse(response)
+    }
+
+    override suspend fun devListUserNames(): List<String> {
+        val response = fetch("$baseUrl/auth/dev/users", RequestInit(
+            method = "GET",
+            headers = json("Content-Type" to "application/json"),
+        )).await()
+        return handleResponse(response)
+    }
+
+    override suspend fun devLoginAsExisting(userName: String) {
+        devLogin("/auth/dev/login", userName)
+    }
+
+    override suspend fun devCreateAndLogin(userName: String) {
+        devLogin("/auth/dev/create", userName)
+    }
+
+    /**
+     * Shared body for the two dev-login endpoints. Unauthenticated POST; the
+     * server replies with an AuthResponse and sets the refresh cookie, exactly
+     * like the Discord callback. We update the local session so the client is
+     * immediately usable, though the login page reloads after this returns so
+     * the normal cookie-based bootstrap runs.
+     */
+    private suspend fun devLogin(path: String, userName: String) {
+        val response = fetch("$baseUrl$path", RequestInit(
+            method = "POST",
+            headers = json("Content-Type" to "application/json"),
+            credentials = credentialsInclude,
+            body = json.encodeToString(DevLoginRequest(userName)),
+        )).await()
+        val auth = handleResponse<AuthResponse>(response)
+        session = Session(auth.accessToken, auth.userName, auth.role)
+    }
+
     override fun logErrorToServer(error: Throwable) {
         // CancellationException isn't a real error — it's how Compose tells an
         // in-flight coroutine that the user navigated away or the composable

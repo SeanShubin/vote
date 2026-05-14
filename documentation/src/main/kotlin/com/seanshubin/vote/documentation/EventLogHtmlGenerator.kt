@@ -139,6 +139,10 @@ class EventLogHtmlGenerator(private val eventLog: EventLog) {
             <div class="detail-row"><span class="label">Discord:</span> ${event.discordDisplayName} (${event.discordId})</div>
             <div class="detail-row"><span class="label">Role:</span> ${event.role}</div>
         """.trimIndent()
+        is DomainEvent.UserRegistered -> """
+            <div class="detail-row"><span class="label">User:</span> ${event.name}</div>
+            <div class="detail-row"><span class="label">Role:</span> ${event.role}</div>
+        """.trimIndent()
         is DomainEvent.DiscordCredentialLinked -> """
             <div class="detail-row"><span class="label">User:</span> ${event.userName}</div>
             <div class="detail-row"><span class="label">Discord:</span> ${event.discordDisplayName} (${event.discordId})</div>

@@ -209,4 +209,31 @@ interface ApiClient {
      * Discord button when this fails.
      */
     suspend fun discordLoginStartUrl(): String
+
+    /**
+     * Which login methods this environment offers. Unauthenticated; the login
+     * page calls it on load to decide whether to render the dev-login UI.
+     */
+    suspend fun loginConfig(): LoginConfig
+
+    /**
+     * Every registered user's name, for the dev-login picker. Only meaningful
+     * when [loginConfig] reports dev login enabled — otherwise the backend
+     * rejects the call.
+     */
+    suspend fun devListUserNames(): List<String>
+
+    /**
+     * Dev-only: start a session as an existing user, bypassing Discord. On
+     * success the refresh cookie is set, exactly as after a Discord login —
+     * the caller reloads so the normal bootstrap picks the session up.
+     */
+    suspend fun devLoginAsExisting(userName: String)
+
+    /**
+     * Dev-only: create a brand-new user and start a session as them,
+     * bypassing Discord. Rejects a name that already exists. On success the
+     * refresh cookie is set; the caller reloads to pick the session up.
+     */
+    suspend fun devCreateAndLogin(userName: String)
 }

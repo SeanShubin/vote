@@ -116,6 +116,9 @@ class LambdaHandler : RequestHandler<APIGatewayV2HTTPEvent, APIGatewayV2HTTPResp
                 tokenEncoder = tokenEncoder,
                 discordConfigProvider = discordConfigProvider,
                 discordOAuthClient = DiscordOAuthClient(),
+                // parseLambdaConfiguration hard-codes this false — the
+                // dev-login bypass cannot exist in production.
+                devLoginEnabled = configuration.devLoginEnabled,
             )
 
             return RequestRouter(

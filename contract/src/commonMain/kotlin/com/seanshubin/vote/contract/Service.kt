@@ -87,4 +87,39 @@ interface Service {
      * otherwise fails.
      */
     fun discordLoginComplete(code: String): Tokens
+
+    /**
+     * Which login methods this environment offers. Unauthenticated — the
+     * login page calls it before any session exists to decide whether to
+     * render the dev-login UI.
+     */
+    fun loginConfig(): LoginConfig
+
+    /**
+     * Every registered user's name, for the dev-login picker. Unauthenticated
+     * but gated: throws ServiceException(UNSUPPORTED) unless dev login is
+     * enabled for this environment (see [loginConfig]).
+     */
+    fun devListUserNames(): List<String>
+
+    /**
+     * Dev-only: mint Tokens for an existing user, bypassing Discord. The
+     * picker on the login page only offers names that exist, so this is the
+     * "find" path — it rejects an unknown name rather than creating one.
+     *
+     * Throws ServiceException(UNSUPPORTED) unless dev login is enabled, and
+     * ServiceException(NOT_FOUND) when [userName] doesn't exist.
+     */
+    fun devLoginAsExisting(userName: String): Tokens
+
+    /**
+     * Dev-only: create a brand-new user with [userName] and mint Tokens for
+     * them, bypassing Discord. The "create" path — it rejects a name that
+     * already exists so a typo can't silently log the operator in as someone
+     * else; use [devLoginAsExisting] for existing users.
+     *
+     * Throws ServiceException(UNSUPPORTED) unless dev login is enabled, and
+     * ServiceException(CONFLICT) when [userName] is already taken.
+     */
+    fun devCreateAndLogin(userName: String): Tokens
 }

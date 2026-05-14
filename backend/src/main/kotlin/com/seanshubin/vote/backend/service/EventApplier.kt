@@ -46,6 +46,19 @@ class EventApplier(
                     role = event.role,
                 )
             }
+            is DomainEvent.UserRegistered -> {
+                // No Discord credential — the dev-login bypass. Reuses the
+                // user-creation projection write with the discord fields
+                // left blank, which is exactly the user's state: registered,
+                // no linked Discord identity.
+                commandModel.createUserViaDiscord(
+                    authority = authority,
+                    userName = event.name,
+                    discordId = "",
+                    discordDisplayName = "",
+                    role = event.role,
+                )
+            }
             is DomainEvent.DiscordCredentialLinked -> {
                 commandModel.linkDiscordCredential(
                     authority = authority,

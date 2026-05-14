@@ -16,6 +16,15 @@ data class Configuration(
     val frontendBaseUrl: String,
     val cookieConfig: CookieConfig,
     val discordParameterNames: DiscordParameterNames? = null,
+    /**
+     * Enables the Discord-bypass dev login (user picker + create-user). True
+     * only on local dev runs ([Bootstrap.parseDevConfiguration]); production
+     * boots through [Bootstrap.parseLambdaConfiguration], which hard-codes it
+     * false. Defaults false so tests and direct construction never enable it
+     * by accident — it is a complete auth bypass and must stay structurally
+     * impossible to turn on in production.
+     */
+    val devLoginEnabled: Boolean = false,
 ) {
     /**
      * SSM parameter names for the four Discord OAuth values. All four must be
