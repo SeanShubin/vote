@@ -98,11 +98,11 @@ from prod or be generated synthetically.
 scripts/dev launch-from-snapshot --prod
 
 # Or replay an existing snapshot file (no download).
-scripts/dev launch-from-snapshot --snapshot .local/prod-snapshots/prod-snapshot-20260502-153012.jsonl
+scripts/dev launch-from-snapshot --snapshot .local/prod-snapshots/prod-snapshot.jsonl
 ```
 
 Snapshots land in `.local/` (gitignored, so prod data never gets committed):
-- `--prod` → `.local/prod-snapshots/prod-snapshot-<timestamp>.jsonl`
+- `--prod` → `.local/prod-snapshots/prod-snapshot.jsonl` (single rolling file, overwritten each run — no cleanup needed)
 - generated → `.local/scenario-snapshots/scenarios.jsonl` (see below)
 
 Under the hood this is the same flow as `launch-fresh-dynamodb` with a restore

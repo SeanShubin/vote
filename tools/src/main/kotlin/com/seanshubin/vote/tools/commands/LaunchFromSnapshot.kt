@@ -9,8 +9,6 @@ import com.seanshubin.vote.tools.lib.ProjectPaths
 import kotlinx.coroutines.runBlocking
 import java.nio.file.Files
 import java.nio.file.Path
-import java.time.LocalDateTime
-import java.time.format.DateTimeFormatter
 import kotlin.io.path.exists
 
 class LaunchFromSnapshot : CliktCommand(name = "launch-from-snapshot") {
@@ -20,7 +18,7 @@ class LaunchFromSnapshot : CliktCommand(name = "launch-from-snapshot") {
     )
     private val prod by option(
         "--prod",
-        help = "Download a fresh snapshot from AWS DynamoDB before launching. Saved under .local/prod-snapshots/."
+        help = "Download a fresh snapshot from AWS DynamoDB before launching. Overwrites .local/prod-snapshots/prod-snapshot.jsonl each run."
     ).flag()
 
     override fun help(context: Context) =
@@ -63,10 +61,11 @@ class LaunchFromSnapshot : CliktCommand(name = "launch-from-snapshot") {
             return file
         }
 
-        // --prod: download fresh from AWS into a timestamped file under .local/prod-snapshots/
+        // --prod: download fresh from AWS into a single rolling file. Each
+        // re-clone overwrites it (backupEventLog opens with TRUNCATE_EXISTING),
+        // so the working tree never accumulates stale prod copies.
         Files.createDirectories(ProjectPaths.prodSnapshotDir)
-        val timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"))
-        val target = ProjectPaths.prodSnapshotDir.resolve("prod-snapshot-$timestamp.jsonl")
+        val target = ProjectPaths.prodSnapshotFile
 
         runBlocking {
             BackupDynamodb.backupEventLog(prod = true, file = target)

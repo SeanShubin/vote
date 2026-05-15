@@ -12,6 +12,7 @@ object ProjectPaths {
     val logsArchiveDir: Path get() = logsDir.resolve("archive")
     val scenarioDataDir: Path get() = projectRoot.resolve("scenario-data")
     val prodSnapshotDir: Path get() = projectRoot.resolve(".local/prod-snapshots")
+    val prodSnapshotFile: Path get() = prodSnapshotDir.resolve("prod-snapshot.jsonl")
     val scenarioSnapshotDir: Path get() = projectRoot.resolve(".local/scenario-snapshots")
     val frontendDistDir: Path get() = projectRoot.resolve("frontend/build/dist/js/productionExecutable")
     val backendSchemaSql: Path get() = projectRoot.resolve("backend/src/main/resources/database/schema.sql")
