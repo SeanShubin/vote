@@ -54,6 +54,14 @@ class DirectServiceBackend(
         service.transferElectionOwnership(token, electionName, newOwnerName)
     }
 
+    override fun addElectionManager(token: AccessToken, electionName: String, userName: String) {
+        service.addElectionManager(token, electionName, userName)
+    }
+
+    override fun removeElectionManager(token: AccessToken, electionName: String, userName: String) {
+        service.removeElectionManager(token, electionName, userName)
+    }
+
     override fun castBallot(token: AccessToken, voterName: String, electionName: String, rankings: List<Ranking>): String {
         return service.castBallot(token, voterName, electionName, rankings)
     }

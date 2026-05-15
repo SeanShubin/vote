@@ -6,6 +6,7 @@ import com.seanshubin.vote.backend.http.HttpRequest
 import com.seanshubin.vote.backend.http.HttpResponse
 import com.seanshubin.vote.backend.service.ServiceException
 import com.seanshubin.vote.contract.AccessToken
+import com.seanshubin.vote.contract.AddElectionManagerRequest
 import com.seanshubin.vote.contract.AddElectionRequest
 import com.seanshubin.vote.contract.AuthResponse
 import com.seanshubin.vote.contract.CastBallotRequest
@@ -131,6 +132,8 @@ class RequestRouter(
         Route("GET", "/election/[^/]+", ::handleGetElection),
         Route("DELETE", "/election/[^/]+", ::handleDeleteElection),
         Route("PUT", "/election/[^/]+/owner", ::handleTransferElectionOwnership),
+        Route("POST", "/election/[^/]+/manager-add", ::handleAddElectionManager),
+        Route("DELETE", "/election/[^/]+/manager/[^/]+", ::handleRemoveElectionManager),
         Route("PUT", "/election/[^/]+/description", ::handleSetDescription),
         Route("POST", "/election/[^/]+/candidate-add", ::handleAddCandidates),
         Route("DELETE", "/election/[^/]+/candidate/[^/]+", ::handleRemoveCandidate),
@@ -435,6 +438,25 @@ class RequestRouter(
         val transferRequest = json.decodeFromString<TransferElectionOwnershipRequest>(req.body)
         service.transferElectionOwnership(accessToken, electionName, transferRequest.newOwnerName)
         return HttpResponse(200, json.encodeToString(mapOf("status" to "ownership transferred")))
+    }
+
+    private fun handleAddElectionManager(req: HttpRequest): HttpResponse {
+        val accessToken = extractAccessToken(req)
+        val electionName = extractElectionName(req.target)
+        val request = json.decodeFromString<AddElectionManagerRequest>(req.body)
+        service.addElectionManager(accessToken, electionName, request.userName)
+        return HttpResponse(200, json.encodeToString(mapOf("status" to "manager added")))
+    }
+
+    private fun handleRemoveElectionManager(req: HttpRequest): HttpResponse {
+        val accessToken = extractAccessToken(req)
+        // URL shape: /election/{electionName}/manager/{userName} — same layout
+        // as the remove-candidate route, so the name slots line up at parts[2]
+        // and parts[4].
+        val electionName = extractElectionName(req.target)
+        val userName = extractVoterOrUserName(req.target)
+        service.removeElectionManager(accessToken, electionName, userName)
+        return HttpResponse(200, json.encodeToString(mapOf("status" to "manager removed")))
     }
 
     private fun handleAddCandidates(req: HttpRequest): HttpResponse {

@@ -29,6 +29,20 @@ CREATE TABLE IF NOT EXISTS elections (
     FOREIGN KEY (owner_name) REFERENCES users(name) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Command Model Projection: Election Managers
+-- Co-managers an owner has granted content-editing authority on an election
+-- (candidates, tiers, description) without granting delete/transfer/manager-
+-- list control. election_name FK cascades on election delete, matching
+-- candidates/tiers/ballots. user_name is a plain string column with NO FK --
+-- the same pattern as rankings.candidate_name -- so user rename and removal
+-- cascades are applied explicitly by the command model, not the database.
+CREATE TABLE IF NOT EXISTS election_managers (
+    election_name VARCHAR(255) NOT NULL,
+    user_name VARCHAR(255) NOT NULL,
+    PRIMARY KEY (election_name, user_name),
+    FOREIGN KEY (election_name) REFERENCES elections(election_name) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- Command Model Projection: Candidates
 CREATE TABLE IF NOT EXISTS candidates (
     election_name VARCHAR(255) NOT NULL,

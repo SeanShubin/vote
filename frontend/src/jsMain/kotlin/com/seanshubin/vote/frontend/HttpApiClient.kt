@@ -201,6 +201,20 @@ class HttpApiClient(
         )
     }
 
+    override suspend fun addElectionManager(electionName: String, userName: String) {
+        val request = AddElectionManagerRequest(userName)
+        postWithAuth<AddElectionManagerRequest, Unit>(
+            "/election/${encodeURIComponent(electionName)}/manager-add",
+            request,
+        )
+    }
+
+    override suspend fun removeElectionManager(electionName: String, userName: String) {
+        deleteWithAuth(
+            "/election/${encodeURIComponent(electionName)}/manager/${encodeURIComponent(userName)}"
+        )
+    }
+
     override suspend fun removeUser(userName: String) {
         deleteWithAuth("/user/${encodeURIComponent(userName)}")
     }

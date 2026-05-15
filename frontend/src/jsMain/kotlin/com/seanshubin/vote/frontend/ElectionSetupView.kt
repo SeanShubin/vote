@@ -13,14 +13,21 @@ fun ElectionSetupView(
     existingDescription: String,
     existingCandidates: List<String>,
     existingTiers: List<String>,
+    existingManagers: List<String>,
     ballotsExist: Boolean,
     currentOwnerName: String,
+    // True when the viewer is the election owner or an ADMIN+. Managers (who
+    // can edit content) do NOT get this — the Managers and Transfer Ownership
+    // sections are owner/admin-only, so they're hidden when this is false.
+    canManageManagers: Boolean,
     onDescriptionSaved: (String) -> Unit,
     onCandidatesAdded: (added: List<String>) -> Unit,
     onCandidateRemoved: (removed: String) -> Unit,
     onCandidateRenamed: (oldName: String, newName: String) -> Unit,
     onTiersSaved: (List<String>) -> Unit,
     onTierRenamed: (oldName: String, newName: String) -> Unit,
+    onManagerAdded: (String) -> Unit,
+    onManagerRemoved: (String) -> Unit,
     onOwnerTransferred: (String) -> Unit,
     onError: (String) -> Unit,
 ) {
@@ -37,6 +44,14 @@ fun ElectionSetupView(
     var renameTierText by remember(existingTiers) { mutableStateOf("") }
     var transferFilter by remember(currentOwnerName) { mutableStateOf("") }
     var transferTarget by remember(currentOwnerName) { mutableStateOf<String?>(null) }
+
+    // Manager add-picker filter + the user currently being added (so the right
+    // row shows an "Adding…" label). Keyed off the manager list so navigating
+    // away discards any pending pick.
+    var managerFilter by remember(existingManagers) { mutableStateOf("") }
+    var addingManagerTarget by remember(existingManagers) { mutableStateOf<String?>(null) }
+    // Which manager is being removed right now, for a per-row "Removing…" label.
+    var removingManager by remember(existingManagers) { mutableStateOf<String?>(null) }
 
     val userNamesFetch = rememberFetchState(
         apiClient = apiClient,
@@ -192,6 +207,31 @@ fun ElectionSetupView(
             onOwnerTransferred(target)
             transferTarget = null
             transferFilter = ""
+        },
+    )
+
+    val addManagerAction = rememberAsyncAction(
+        apiClient = apiClient,
+        fallbackErrorMessage = "Failed to add manager",
+        onError = onError,
+        action = {
+            val target = addingManagerTarget ?: return@rememberAsyncAction
+            apiClient.addElectionManager(electionName, target)
+            onManagerAdded(target)
+            addingManagerTarget = null
+            managerFilter = ""
+        },
+    )
+
+    val removeManagerAction = rememberAsyncAction(
+        apiClient = apiClient,
+        fallbackErrorMessage = "Failed to remove manager",
+        onError = onError,
+        action = {
+            val name = removingManager ?: return@rememberAsyncAction
+            apiClient.removeElectionManager(electionName, name)
+            removingManager = null
+            onManagerRemoved(name)
         },
     )
 
@@ -414,6 +454,99 @@ fun ElectionSetupView(
         }
     }
 
+    // Managers — co-managers the owner has granted content-editing authority.
+    // Owner/ADMIN-only section (gated by [canManageManagers]); a manager who
+    // can see the Setup tab still can't recruit more managers. The add-picker
+    // reuses the same filter-then-click pattern as Transfer Ownership.
+    if (canManageManagers) {
+        Div({ classes("section") }) {
+            H2 { Text("Managers") }
+
+            P {
+                Text(
+                    "Managers can edit the description, candidates, and tiers — " +
+                        "but cannot delete or transfer the election, or change this list."
+                )
+            }
+
+            if (existingManagers.isNotEmpty()) {
+                Div({ classes("candidate-list") }) {
+                    existingManagers.forEach { managerName ->
+                        Div({ classes("candidate-row") }) {
+                            Span({ classes("candidate-name") }) { Text(managerName) }
+                            Button({
+                                val busy = addManagerAction.isLoading || removeManagerAction.isLoading
+                                if (busy) attr("disabled", "")
+                                onClick {
+                                    val confirmed = window.confirm(
+                                        "Remove \"$managerName\" as a manager of \"$electionName\"?"
+                                    )
+                                    if (confirmed) {
+                                        removingManager = managerName
+                                        removeManagerAction.invoke()
+                                    }
+                                }
+                            }) {
+                                val isThisRowRemoving = removeManagerAction.isLoading &&
+                                    removingManager == managerName
+                                Text(if (isThisRowRemoving) "Removing…" else "Remove")
+                            }
+                        }
+                    }
+                }
+            } else {
+                P { Text("No managers yet.") }
+            }
+
+            H3 { Text("Add a manager") }
+            P { Text("Type to filter, then click a user to grant them management.") }
+
+            Input(InputType.Text) {
+                classes("input")
+                value(managerFilter)
+                placeholder("filter users")
+                onInput {
+                    managerFilter = it.value
+                    addingManagerTarget = null
+                }
+            }
+
+            when (val namesState = userNamesFetch.state) {
+                FetchState.Loading -> P { Text("Loading users…") }
+                is FetchState.Error -> Div({ classes("error") }) { Text(namesState.message) }
+                is FetchState.Success -> {
+                    // Exclude the owner (already has full authority) and anyone
+                    // already managing — backend re-checks both, this just keeps
+                    // the picker from offering pointless choices.
+                    val matches = namesState.value
+                        .filter { !it.equals(currentOwnerName, ignoreCase = true) }
+                        .filter { name -> existingManagers.none { it.equals(name, ignoreCase = true) } }
+                        .filter { matchesSubsequence(it, managerFilter) }
+                    if (matches.isEmpty()) {
+                        P { Text("No matching users.") }
+                    } else {
+                        Div({ classes("transfer-owner-list") }) {
+                            matches.forEach { candidate ->
+                                val isPending = addManagerAction.isLoading &&
+                                    addingManagerTarget == candidate
+                                Button({
+                                    classes("transfer-owner-item")
+                                    if (addManagerAction.isLoading) attr("disabled", "")
+                                    onClick {
+                                        addingManagerTarget = candidate
+                                        addManagerAction.invoke()
+                                    }
+                                }) {
+                                    Text(if (isPending) "Adding $candidate…" else candidate)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     // Hand the election off to another user. After a successful transfer the
     // current viewer loses owner-only authority on this election, so the
     // backend's owner-or-ADMIN gate will start rejecting further edits unless
@@ -426,8 +559,12 @@ fun ElectionSetupView(
     // existence, but the UI rules out typos before submission. Matching is by
     // subsequence (each filter character must appear in order somewhere in
     // the candidate's name), case-insensitive, so "abi" matches "Sean Shubin".
-    Div({ classes("section") }) {
-        H2 { Text("Transfer Ownership") }
+    //
+    // Owner/ADMIN-only, same gate as the Managers section — a plain manager
+    // who can see the Setup tab can't transfer the election away.
+    if (canManageManagers) {
+        Div({ classes("section") }) {
+            H2 { Text("Transfer Ownership") }
 
         P {
             Text(
@@ -481,6 +618,7 @@ fun ElectionSetupView(
                     }
                 }
             }
+        }
         }
     }
 }

@@ -40,6 +40,16 @@ class MySqlCommandModel(
     }
 
     override fun removeUser(authority: String, userName: String) {
+        // Cascade election-manager rows first: election_managers.user_name has
+        // no FK (it's a plain string column, like rankings.candidate_name), so
+        // the database won't clean these up on its own — without this, removing
+        // a user would leave dangling manager rows on other people's elections.
+        val managerDeleteSql = queryLoader.load("election-manager-delete-by-user")
+        connection.prepareStatement(managerDeleteSql).use { stmt ->
+            stmt.setString(1, userName)
+            stmt.executeUpdate()
+        }
+
         val sql = queryLoader.load("user-delete")
         connection.prepareStatement(sql).use { stmt ->
             stmt.setString(1, userName)
@@ -71,6 +81,24 @@ class MySqlCommandModel(
         connection.prepareStatement(sql).use { stmt ->
             stmt.setString(1, newOwnerName)
             stmt.setString(2, electionName)
+            stmt.executeUpdate()
+        }
+    }
+
+    override fun addElectionManager(authority: String, electionName: String, userName: String) {
+        val sql = queryLoader.load("election-manager-insert")
+        connection.prepareStatement(sql).use { stmt ->
+            stmt.setString(1, electionName)
+            stmt.setString(2, userName)
+            stmt.executeUpdate()
+        }
+    }
+
+    override fun removeElectionManager(authority: String, electionName: String, userName: String) {
+        val sql = queryLoader.load("election-manager-delete")
+        connection.prepareStatement(sql).use { stmt ->
+            stmt.setString(1, electionName)
+            stmt.setString(2, userName)
             stmt.executeUpdate()
         }
     }
@@ -348,6 +376,15 @@ class MySqlCommandModel(
 
         val updateElections = queryLoader.load("election-update-owner-name")
         connection.prepareStatement(updateElections).use { stmt ->
+            stmt.setString(1, newUserName)
+            stmt.setString(2, oldUserName)
+            stmt.executeUpdate()
+        }
+
+        // election_managers.user_name has no FK, so the rename has to be
+        // propagated explicitly here — mirrors the election-owner update above.
+        val updateManagers = queryLoader.load("election-manager-update-user-name")
+        connection.prepareStatement(updateManagers).use { stmt ->
             stmt.setString(1, newUserName)
             stmt.setString(2, oldUserName)
             stmt.executeUpdate()

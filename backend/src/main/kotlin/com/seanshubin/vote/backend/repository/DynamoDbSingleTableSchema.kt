@@ -11,6 +11,7 @@ object DynamoDbSingleTableSchema {
     const val USER_PREFIX = "USER#"
     const val ELECTION_PREFIX = "ELECTION#"
     const val CANDIDATE_PREFIX = "CANDIDATE#"
+    const val MANAGER_PREFIX = "MANAGER#"
     const val BALLOT_PREFIX = "BALLOT#"
     const val METADATA_SK = "METADATA"
     const val SYNC_SK = "SYNC"
@@ -77,5 +78,9 @@ object DynamoDbSingleTableSchema {
     fun userPK(userName: String) = "$USER_PREFIX${userName.lowercase()}"
     fun electionPK(electionName: String) = "$ELECTION_PREFIX$electionName"
     fun candidateSK(candidateName: String) = "$CANDIDATE_PREFIX$candidateName"
+    // Manager keys lowercase the username segment for the same reason ballot
+    // keys do — username uniqueness is case-insensitive; the display case
+    // lives in the item's "user_name" attribute.
+    fun managerSK(userName: String) = "$MANAGER_PREFIX${userName.lowercase()}"
     fun ballotSK(voterName: String) = "$BALLOT_PREFIX${voterName.lowercase()}"
 }

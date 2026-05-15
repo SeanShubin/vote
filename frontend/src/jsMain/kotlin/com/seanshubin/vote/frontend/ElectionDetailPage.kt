@@ -132,11 +132,22 @@ fun ElectionDetailPage(
             Div({ classes("success") }) { Text(successMessage!!) }
         }
 
-        // Setup is restricted to the election owner or any user with role >=
-        // ADMIN. Same gate as the Delete button. Backend re-checks; this just
+        // Setup is visible to the election owner, any co-manager the owner has
+        // added, or any user with role >= ADMIN. Backend re-checks; this just
         // hides the UI surface so non-privileged voters don't see edit fields
         // they couldn't successfully save anyway.
         val canSetup = loadedElection?.let { e ->
+            e.ownerName == currentUserName ||
+                e.managers.contains(currentUserName) ||
+                (currentRole != null && currentRole >= Role.ADMIN)
+        } ?: false
+
+        // Owner/ADMIN-only authority: editing the manager list, transferring
+        // ownership, deleting the election. A co-manager gets the Setup tab
+        // (content editing) but not these — so the Managers and Transfer
+        // sections inside ElectionSetupView, and the Delete button below, are
+        // gated on this rather than on canSetup.
+        val canManageManagers = loadedElection?.let { e ->
             e.ownerName == currentUserName ||
                 (currentRole != null && currentRole >= Role.ADMIN)
         } ?: false
@@ -188,8 +199,10 @@ fun ElectionDetailPage(
                         existingDescription = loadedElection?.description ?: "",
                         existingCandidates = candidates,
                         existingTiers = loadedElection?.tiers ?: emptyList(),
+                        existingManagers = loadedElection?.managers ?: emptyList(),
                         ballotsExist = (loadedElection?.ballotCount ?: 0) > 0,
                         currentOwnerName = loadedElection?.ownerName ?: "",
+                        canManageManagers = canManageManagers,
                         onDescriptionSaved = { newDescription ->
                             successMessage = "Description saved"
                             errorMessage = null
@@ -262,6 +275,22 @@ fun ElectionDetailPage(
                                 e.copy(tiers = e.tiers.map { if (it == oldName) newName else it }) to c
                             }
                             tallyFetch.reload()
+                        },
+                        onManagerAdded = { added ->
+                            successMessage = "Added manager \"$added\""
+                            errorMessage = null
+                            // Patch the manager list in place — independent of
+                            // candidates and tally, so no refetch is needed.
+                            lastLoadedShell = lastLoadedShell?.let { (e, c) ->
+                                e.copy(managers = (e.managers + added).distinct()) to c
+                            }
+                        },
+                        onManagerRemoved = { removed ->
+                            successMessage = "Removed manager \"$removed\""
+                            errorMessage = null
+                            lastLoadedShell = lastLoadedShell?.let { (e, c) ->
+                                e.copy(managers = e.managers.filter { it != removed }) to c
+                            }
                         },
                         onOwnerTransferred = { newOwnerName ->
                             successMessage = "Ownership transferred to $newOwnerName"

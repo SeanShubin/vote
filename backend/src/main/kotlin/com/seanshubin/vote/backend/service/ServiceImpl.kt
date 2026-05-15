@@ -191,8 +191,8 @@ class ServiceImpl(
 
     override fun setElectionDescription(accessToken: AccessToken, electionName: String, description: String) {
         // VALIDATION SECTION
-        requirePermission(accessToken, Permission.USE_APPLICATION)
-        requireIsElectionOwner(accessToken, electionName)
+        requirePermission(accessToken, Permission.VIEW_APPLICATION)
+        requireCanManageElection(accessToken, electionName)
 
         val validElectionName = Validation.validateElectionName(electionName)
         val validDescription = Validation.validateElectionDescription(description)
@@ -257,7 +257,8 @@ class ServiceImpl(
         val candidateCount = queryModel.candidateCount(electionName)
         val ballotCount = queryModel.ballotCount(electionName)
         val tiers = queryModel.listTiers(electionName)
-        return election.toElectionDetail(candidateCount, ballotCount, tiers)
+        val managers = queryModel.listElectionManagers(electionName)
+        return election.toElectionDetail(candidateCount, ballotCount, tiers, managers)
     }
 
     override fun deleteElection(accessToken: AccessToken, electionName: String) {
@@ -329,6 +330,67 @@ class ServiceImpl(
         synchronize()
     }
 
+    override fun addElectionManager(accessToken: AccessToken, electionName: String, userName: String) {
+        // VALIDATION SECTION
+        requirePermission(accessToken, Permission.VIEW_APPLICATION)
+        // Only the owner or an ADMIN can change who manages an election — a
+        // co-manager can edit content but can't recruit more managers.
+        val election = requireElectionOwnerOrAdmin(accessToken, electionName)
+
+        val validUserName = Validation.validateUserName(userName)
+        // Resolve to the canonical stored case so the projection records the
+        // manager exactly as the user is registered, mirroring addElection.
+        val targetUser = queryModel.searchUserByName(validUserName)
+            ?: throw ServiceException(
+                ServiceException.Category.NOT_FOUND,
+                "User not found: $validUserName"
+            )
+
+        // The owner already has full authority — listing them as a manager
+        // would be a confusing no-op, so reject it loudly instead.
+        if (election.ownerName.equals(targetUser.name, ignoreCase = true)) {
+            throw ServiceException(
+                ServiceException.Category.CONFLICT,
+                "${targetUser.name} already owns '${election.electionName}'"
+            )
+        }
+
+        // Idempotent: already a manager → no event. Keeps the audit log honest.
+        val existing = queryModel.listElectionManagers(election.electionName)
+        if (existing.any { it.equals(targetUser.name, ignoreCase = true) }) return
+
+        // EXECUTION SECTION
+        eventLog.appendEvent(
+            accessToken.userName,
+            clock.now(),
+            DomainEvent.ElectionManagerAdded(election.electionName, targetUser.name),
+        )
+        synchronize()
+    }
+
+    override fun removeElectionManager(accessToken: AccessToken, electionName: String, userName: String) {
+        // VALIDATION SECTION
+        requirePermission(accessToken, Permission.VIEW_APPLICATION)
+        val election = requireElectionOwnerOrAdmin(accessToken, electionName)
+
+        val validUserName = Validation.validateUserName(userName)
+
+        // Idempotent: if they aren't a manager, the post-condition already
+        // holds — emit nothing rather than minting a no-op event. Match the
+        // stored canonical case so the event records the real name.
+        val match = queryModel.listElectionManagers(election.electionName)
+            .firstOrNull { it.equals(validUserName, ignoreCase = true) }
+            ?: return
+
+        // EXECUTION SECTION
+        eventLog.appendEvent(
+            accessToken.userName,
+            clock.now(),
+            DomainEvent.ElectionManagerRemoved(election.electionName, match),
+        )
+        synchronize()
+    }
+
     override fun listElections(accessToken: AccessToken): List<ElectionSummary> {
         requirePermission(accessToken, Permission.VIEW_APPLICATION)
         return queryModel.listElections()
@@ -381,8 +443,8 @@ class ServiceImpl(
 
     override fun addCandidates(accessToken: AccessToken, electionName: String, candidateNames: List<String>) {
         // VALIDATION SECTION
-        requirePermission(accessToken, Permission.USE_APPLICATION)
-        requireIsElectionOwner(accessToken, electionName)
+        requirePermission(accessToken, Permission.VIEW_APPLICATION)
+        requireCanManageElection(accessToken, electionName)
 
         val validElectionName = Validation.validateElectionName(electionName)
         val validCandidateNames = Validation.validateCandidateNames(candidateNames)
@@ -410,8 +472,8 @@ class ServiceImpl(
 
     override fun removeCandidate(accessToken: AccessToken, electionName: String, candidateName: String) {
         // VALIDATION SECTION
-        requirePermission(accessToken, Permission.USE_APPLICATION)
-        requireIsElectionOwner(accessToken, electionName)
+        requirePermission(accessToken, Permission.VIEW_APPLICATION)
+        requireCanManageElection(accessToken, electionName)
 
         val validElectionName = Validation.validateElectionName(electionName)
         val validCandidateName = Validation.validateCandidateName(candidateName)
@@ -445,8 +507,8 @@ class ServiceImpl(
         newName: String,
     ) {
         // VALIDATION SECTION
-        requirePermission(accessToken, Permission.USE_APPLICATION)
-        requireIsElectionOwner(accessToken, electionName)
+        requirePermission(accessToken, Permission.VIEW_APPLICATION)
+        requireCanManageElection(accessToken, electionName)
 
         val validElectionName = Validation.validateElectionName(electionName)
         val validOldName = Validation.validateCandidateName(oldName)
@@ -490,8 +552,8 @@ class ServiceImpl(
 
     override fun setTiers(accessToken: AccessToken, electionName: String, tierNames: List<String>) {
         // VALIDATION SECTION
-        requirePermission(accessToken, Permission.USE_APPLICATION)
-        requireIsElectionOwner(accessToken, electionName)
+        requirePermission(accessToken, Permission.VIEW_APPLICATION)
+        requireCanManageElection(accessToken, electionName)
 
         val validElectionName = Validation.validateElectionName(electionName)
         val validTierNames = Validation.validateTierNames(tierNames)
@@ -527,8 +589,8 @@ class ServiceImpl(
         newName: String,
     ) {
         // VALIDATION SECTION
-        requirePermission(accessToken, Permission.USE_APPLICATION)
-        requireIsElectionOwner(accessToken, electionName)
+        requirePermission(accessToken, Permission.VIEW_APPLICATION)
+        requireCanManageElection(accessToken, electionName)
 
         val validElectionName = Validation.validateElectionName(electionName)
         val validOldName = Validation.validateTierName(oldName)
@@ -912,18 +974,56 @@ class ServiceImpl(
         }
     }
 
-    private fun requireIsElectionOwner(accessToken: AccessToken, electionName: String) {
+    /**
+     * Gate for content editing — candidates, tiers, description. Passes for the
+     * election owner, any co-manager the owner has added, or an ADMIN+ moderator
+     * ([Permission.MANAGE_USERS]). Throws NOT_FOUND if the election is missing,
+     * UNAUTHORIZED otherwise. The owner-vs-manager split is intentional: managers
+     * edit content but cannot delete/transfer the election or change the manager
+     * list — those stay with the owner (or ADMIN+); see [requireElectionOwnerOrAdmin].
+     */
+    private fun requireCanManageElection(accessToken: AccessToken, electionName: String) {
         val election = queryModel.searchElectionByName(electionName)
             ?: throw ServiceException(
                 ServiceException.Category.NOT_FOUND,
                 "Election '$electionName' not found"
             )
-        if (!election.ownerName.equals(accessToken.userName, ignoreCase = true)) {
+        val isOwner = election.ownerName.equals(accessToken.userName, ignoreCase = true)
+        val isManager = queryModel.listElectionManagers(election.electionName)
+            .any { it.equals(accessToken.userName, ignoreCase = true) }
+        val canModerate = hasPermission(accessToken, Permission.MANAGE_USERS)
+        if (!isOwner && !isManager && !canModerate) {
             throw ServiceException(
                 ServiceException.Category.UNAUTHORIZED,
-                "User ${accessToken.userName} is not the owner of election '$electionName'"
+                "User ${accessToken.userName} cannot manage election '$electionName'"
             )
         }
+    }
+
+    /**
+     * Gate for owner-only election administration — delete, transfer ownership,
+     * and adding/removing managers. Passes only for the election owner or an
+     * ADMIN+ moderator; a co-manager does not qualify. Returns the resolved
+     * [ElectionSummary] so callers get the canonical election name and owner.
+     */
+    private fun requireElectionOwnerOrAdmin(
+        accessToken: AccessToken,
+        electionName: String,
+    ): ElectionSummary {
+        val election = queryModel.searchElectionByName(electionName)
+            ?: throw ServiceException(
+                ServiceException.Category.NOT_FOUND,
+                "Election '$electionName' not found"
+            )
+        val isOwner = election.ownerName.equals(accessToken.userName, ignoreCase = true)
+        val canModerate = hasPermission(accessToken, Permission.MANAGE_USERS)
+        if (!isOwner && !canModerate) {
+            throw ServiceException(
+                ServiceException.Category.UNAUTHORIZED,
+                "Only the owner or an ADMIN can administer election '$electionName'"
+            )
+        }
+        return election
     }
 
 }

@@ -32,6 +32,8 @@ class FakeApiClient : ApiClient {
     val getTallyCalls = mutableListOf<String>()
     val deleteElectionCalls = mutableListOf<String>()
     val transferElectionOwnershipCalls = mutableListOf<TransferElectionOwnershipCall>()
+    val addElectionManagerCalls = mutableListOf<ElectionManagerCall>()
+    val removeElectionManagerCalls = mutableListOf<ElectionManagerCall>()
     val removeUserCalls = mutableListOf<String>()
     val loggedErrors = mutableListOf<Throwable>()
 
@@ -61,6 +63,8 @@ class FakeApiClient : ApiClient {
     var getTallyResult: Result<ElectionTally> = Result.failure(Exception("Get tally not configured"))
     var deleteElectionResult: Result<Unit> = Result.success(Unit)
     var transferElectionOwnershipResult: Result<Unit> = Result.success(Unit)
+    var addElectionManagerResult: Result<Unit> = Result.success(Unit)
+    var removeElectionManagerResult: Result<Unit> = Result.success(Unit)
     var removeUserResult: Result<Unit> = Result.success(Unit)
     var listTablesResult: Result<List<String>> = Result.success(emptyList())
     var tableDataResult: Result<TableData> = Result.success(TableData("", emptyList(), emptyList()))
@@ -202,6 +206,16 @@ class FakeApiClient : ApiClient {
         transferElectionOwnershipResult.getOrThrow()
     }
 
+    override suspend fun addElectionManager(electionName: String, userName: String) {
+        addElectionManagerCalls.add(ElectionManagerCall(electionName, userName))
+        addElectionManagerResult.getOrThrow()
+    }
+
+    override suspend fun removeElectionManager(electionName: String, userName: String) {
+        removeElectionManagerCalls.add(ElectionManagerCall(electionName, userName))
+        removeElectionManagerResult.getOrThrow()
+    }
+
     override suspend fun removeUser(userName: String) {
         removeUserCalls.add(userName)
         removeUserResult.getOrThrow()
@@ -289,4 +303,5 @@ class FakeApiClient : ApiClient {
     data class CastBallotCall(val electionName: String, val rankings: List<Ranking>)
     data class SetRoleCall(val userName: String, val role: Role)
     data class TransferElectionOwnershipCall(val electionName: String, val newOwnerName: String)
+    data class ElectionManagerCall(val electionName: String, val userName: String)
 }

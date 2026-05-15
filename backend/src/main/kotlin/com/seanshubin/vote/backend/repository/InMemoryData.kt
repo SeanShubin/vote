@@ -7,6 +7,9 @@ class InMemoryData {
     val users = mutableMapOf<String, UserData>()
     val elections = mutableMapOf<String, ElectionData>()
     val candidates = mutableMapOf<String, MutableSet<String>>()
+    // Per-election co-managers, keyed by election name. The set holds the
+    // canonical display-case user names; lookups compare case-insensitively.
+    val electionManagers = mutableMapOf<String, MutableSet<String>>()
     // Per-election ordered tier names. The list is the source of truth for
     // tier ordering; the InMemory store mirrors what MySQL stores in a
     // separate table and what DynamoDB stores as an attribute on the

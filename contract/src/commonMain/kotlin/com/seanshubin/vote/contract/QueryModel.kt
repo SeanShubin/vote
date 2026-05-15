@@ -26,6 +26,13 @@ interface QueryModel {
     fun listCandidates(electionName: String): List<String>
 
     /**
+     * Co-managers of the election — users granted content-editing authority
+     * by the owner. Does not include the owner. Empty when none have been
+     * added or the election doesn't exist.
+     */
+    fun listElectionManagers(electionName: String): List<String>
+
+    /**
      * For each candidate in the election, how many ballots mention that
      * candidate (with any rank, including null). Used by the candidate
      * editor to warn the owner about the blast radius of a rename — a

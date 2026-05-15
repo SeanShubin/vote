@@ -55,6 +55,16 @@ class ElectionContext(
         testContext.backend.synchronize()
     }
 
+    fun addManager(userName: String) {
+        testContext.backend.addElectionManager(owner.accessToken, name, userName)
+        testContext.backend.synchronize()
+    }
+
+    fun removeManager(userName: String) {
+        testContext.backend.removeElectionManager(owner.accessToken, name, userName)
+        testContext.backend.synchronize()
+    }
+
     val candidates: List<String>
         get() = testContext.database.listCandidates(name)
 

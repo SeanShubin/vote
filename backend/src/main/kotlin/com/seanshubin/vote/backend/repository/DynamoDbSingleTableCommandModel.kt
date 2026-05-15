@@ -90,6 +90,28 @@ class DynamoDbSingleTableCommandModel(
                     )
                 })
             }
+            // Cascade: drop this user from every election's manager list. The
+            // InMemory and MySQL stores do the same — managers aren't tied to
+            // the user item by a key relationship, so they need explicit cleanup.
+            val managerItems = dynamoDb.scan(ScanRequest {
+                tableName = DynamoDbSingleTableSchema.MAIN_TABLE
+                filterExpression = "begins_with(SK, :prefix) AND user_name = :user"
+                expressionAttributeValues = mapOf(
+                    ":prefix" to AttributeValue.S(DynamoDbSingleTableSchema.MANAGER_PREFIX),
+                    ":user" to AttributeValue.S(userName),
+                )
+            }).items
+            managerItems?.forEach { item ->
+                val pk = item["PK"]?.asS() ?: return@forEach
+                val sk = item["SK"]?.asS() ?: return@forEach
+                dynamoDb.deleteItem(DeleteItemRequest {
+                    tableName = DynamoDbSingleTableSchema.MAIN_TABLE
+                    key = mapOf(
+                        "PK" to AttributeValue.S(pk),
+                        "SK" to AttributeValue.S(sk),
+                    )
+                })
+            }
         }
     }
 
@@ -175,6 +197,39 @@ class DynamoDbSingleTableCommandModel(
                     item = ballotItem.toMutableMap().apply {
                         this["SK"] = AttributeValue.S(DynamoDbSingleTableSchema.ballotSK(newUserName))
                         this["voter_name"] = AttributeValue.S(newUserName)
+                    }
+                })
+            }
+
+            // Update election-manager entries. The manager SK embeds the
+            // lowercased username, so a rename is delete-old + put-new just
+            // like ballots — an in-place attribute update wouldn't move the key.
+            val managerItems = dynamoDb.scan(ScanRequest {
+                tableName = DynamoDbSingleTableSchema.MAIN_TABLE
+                filterExpression = "begins_with(SK, :prefix) AND user_name = :user"
+                expressionAttributeValues = mapOf(
+                    ":prefix" to AttributeValue.S(DynamoDbSingleTableSchema.MANAGER_PREFIX),
+                    ":user" to AttributeValue.S(oldUserName)
+                )
+            }).items
+
+            managerItems?.forEach { managerItem ->
+                val pk = managerItem["PK"]?.asS() ?: return@forEach
+                val oldSk = managerItem["SK"]?.asS() ?: return@forEach
+
+                dynamoDb.deleteItem(DeleteItemRequest {
+                    tableName = DynamoDbSingleTableSchema.MAIN_TABLE
+                    key = mapOf(
+                        "PK" to AttributeValue.S(pk),
+                        "SK" to AttributeValue.S(oldSk)
+                    )
+                })
+
+                dynamoDb.putItem(PutItemRequest {
+                    tableName = DynamoDbSingleTableSchema.MAIN_TABLE
+                    item = managerItem.toMutableMap().apply {
+                        this["SK"] = AttributeValue.S(DynamoDbSingleTableSchema.managerSK(newUserName))
+                        this["user_name"] = AttributeValue.S(newUserName)
                     }
                 })
             }
@@ -290,6 +345,33 @@ class DynamoDbSingleTableCommandModel(
                 updateExpression = "SET owner_name = :owner"
                 expressionAttributeValues = mapOf(
                     ":owner" to AttributeValue.S(newOwnerName),
+                )
+            })
+        }
+    }
+
+    override fun addElectionManager(authority: String, electionName: String, userName: String) {
+        runBlocking {
+            dynamoDb.putItem(PutItemRequest {
+                tableName = DynamoDbSingleTableSchema.MAIN_TABLE
+                item = mapOf(
+                    "PK" to AttributeValue.S(DynamoDbSingleTableSchema.electionPK(electionName)),
+                    "SK" to AttributeValue.S(DynamoDbSingleTableSchema.managerSK(userName)),
+                    "entity_type" to AttributeValue.S("MANAGER"),
+                    "election_name" to AttributeValue.S(electionName),
+                    "user_name" to AttributeValue.S(userName),
+                )
+            })
+        }
+    }
+
+    override fun removeElectionManager(authority: String, electionName: String, userName: String) {
+        runBlocking {
+            dynamoDb.deleteItem(DeleteItemRequest {
+                tableName = DynamoDbSingleTableSchema.MAIN_TABLE
+                key = mapOf(
+                    "PK" to AttributeValue.S(DynamoDbSingleTableSchema.electionPK(electionName)),
+                    "SK" to AttributeValue.S(DynamoDbSingleTableSchema.managerSK(userName)),
                 )
             })
         }

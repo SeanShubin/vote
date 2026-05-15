@@ -24,4 +24,12 @@ data class ElectionDetail(
      * silently invalidate their meaning.
      */
     val tiers: List<String> = emptyList(),
+    /**
+     * Co-managers: users the owner has granted content-editing authority
+     * (candidates, tiers, description). Does not include the owner. Empty
+     * when the owner hasn't shared management. The Setup tab is visible to
+     * the owner, anyone in this list, and ADMIN+; the manager list itself
+     * is editable only by the owner or ADMIN+.
+     */
+    val managers: List<String> = emptyList(),
 )

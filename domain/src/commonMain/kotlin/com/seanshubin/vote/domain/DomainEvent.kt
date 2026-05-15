@@ -152,6 +152,31 @@ sealed interface DomainEvent {
     ) : DomainEvent
 
     /**
+     * Grant [userName] co-manager authority on [electionName]. A manager can do
+     * the same content editing the owner can — candidates, tiers, description —
+     * but not delete the election, transfer ownership, or change the manager
+     * list itself; those stay with the owner (or an ADMIN). Distinct from
+     * [ElectionOwnerChanged]: the owner is unchanged and keeps full authority.
+     */
+    @Serializable
+    @SerialName("ElectionManagerAdded")
+    data class ElectionManagerAdded(
+        val electionName: String,
+        val userName: String,
+    ) : DomainEvent
+
+    /**
+     * Revoke [userName]'s co-manager authority on [electionName]. No-op intent
+     * if they weren't a manager — the service filters those out before emitting.
+     */
+    @Serializable
+    @SerialName("ElectionManagerRemoved")
+    data class ElectionManagerRemoved(
+        val electionName: String,
+        val userName: String,
+    ) : DomainEvent
+
+    /**
      * Candidate Management Events
      */
     @Serializable

@@ -65,6 +65,12 @@ class InMemoryQueryModel(private val data: InMemoryData) : QueryModel {
         return data.candidates[electionName]?.toList() ?: emptyList()
     }
 
+    override fun listElectionManagers(electionName: String): List<String> {
+        return data.electionManagers[electionName]
+            ?.sortedWith(String.CASE_INSENSITIVE_ORDER)
+            ?: emptyList()
+    }
+
     override fun candidateBallotCounts(electionName: String): Map<String, Int> {
         val candidateSet = data.candidates[electionName] ?: return emptyMap()
         // Start every candidate at zero so the map's key set always matches

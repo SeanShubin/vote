@@ -27,6 +27,21 @@ interface Service {
     fun getElection(accessToken: AccessToken, electionName: String): ElectionDetail
     fun deleteElection(accessToken: AccessToken, electionName: String)
     fun transferElectionOwnership(accessToken: AccessToken, electionName: String, newOwnerName: String)
+
+    /**
+     * Grant [userName] co-manager authority on [electionName]: the same
+     * content editing the owner has (candidates, tiers, description), but not
+     * delete/transfer/manager-list changes. Allowed for the election owner or
+     * ADMIN+. No-op if [userName] is already a manager; rejected if [userName]
+     * is the owner or doesn't exist.
+     */
+    fun addElectionManager(accessToken: AccessToken, electionName: String, userName: String)
+
+    /**
+     * Revoke [userName]'s co-manager authority. Allowed for the election owner
+     * or ADMIN+. No-op if [userName] wasn't a manager.
+     */
+    fun removeElectionManager(accessToken: AccessToken, electionName: String, userName: String)
     fun listElections(accessToken: AccessToken): List<ElectionSummary>
     fun listTables(accessToken: AccessToken): List<String>
     fun listDebugTables(accessToken: AccessToken): List<String>

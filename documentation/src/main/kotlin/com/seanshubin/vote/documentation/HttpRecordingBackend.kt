@@ -79,6 +79,19 @@ class HttpRecordingBackend(
         recorder.put("/election/$encodedName/owner", body, token)
     }
 
+    override fun addElectionManager(token: AccessToken, electionName: String, userName: String) {
+        val request = AddElectionManagerRequest(userName)
+        val body = json.encodeToString(request)
+        val encodedName = URLEncoder.encode(electionName, StandardCharsets.UTF_8)
+        recorder.post("/election/$encodedName/manager-add", body, token)
+    }
+
+    override fun removeElectionManager(token: AccessToken, electionName: String, userName: String) {
+        val encodedElection = URLEncoder.encode(electionName, StandardCharsets.UTF_8)
+        val encodedUser = URLEncoder.encode(userName, StandardCharsets.UTF_8)
+        recorder.delete("/election/$encodedElection/manager/$encodedUser", token)
+    }
+
     override fun castBallot(token: AccessToken, voterName: String, electionName: String, rankings: List<Ranking>): String {
         val request = CastBallotRequest(voterName, rankings)
         val body = json.encodeToString(request)

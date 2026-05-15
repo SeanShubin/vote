@@ -143,6 +143,20 @@ interface ApiClient {
     suspend fun transferElectionOwnership(electionName: String, newOwnerName: String)
 
     /**
+     * Grant a user co-manager authority on the election — they can edit
+     * candidates, tiers, and description, but cannot delete/transfer the
+     * election or change the manager list. Allowed for the election owner or
+     * ADMIN+. No-op if the user is already a manager.
+     */
+    suspend fun addElectionManager(electionName: String, userName: String)
+
+    /**
+     * Revoke a user's co-manager authority on the election. Allowed for the
+     * election owner or ADMIN+. No-op if the user wasn't a manager.
+     */
+    suspend fun removeElectionManager(electionName: String, userName: String)
+
+    /**
      * Admin: list all users with each one's current role and the roles the
      * caller is allowed to assign. The backend computes [UserNameRole.allowedRoles]
      * from the caller's authority — the UI can bind dropdowns directly to it.

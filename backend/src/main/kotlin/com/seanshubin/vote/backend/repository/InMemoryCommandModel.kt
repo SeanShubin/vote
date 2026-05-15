@@ -31,6 +31,12 @@ class InMemoryCommandModel(private val data: InMemoryData) : CommandModel {
             .filter { (_, ballot) -> ballot.voterName.equals(userName, ignoreCase = true) }
             .map { it.key }
             .forEach { data.ballots.remove(it) }
+        // Cascade: drop this user from every election's manager list. The
+        // election_managers.user_name column has no FK, so MySQL handles this
+        // via an explicit delete-by-user too.
+        data.electionManagers.values.forEach { managers ->
+            managers.removeAll { it.equals(userName, ignoreCase = true) }
+        }
     }
 
     override fun addElection(authority: String, owner: String, electionName: String, description: String) {
@@ -40,6 +46,7 @@ class InMemoryCommandModel(private val data: InMemoryData) : CommandModel {
             description = description,
         )
         data.candidates[electionName] = mutableSetOf()
+        data.electionManagers[electionName] = mutableSetOf()
     }
 
     override fun setElectionDescription(authority: String, electionName: String, description: String) {
@@ -52,10 +59,23 @@ class InMemoryCommandModel(private val data: InMemoryData) : CommandModel {
         data.elections[electionName] = election.copy(ownerName = newOwnerName)
     }
 
+    override fun addElectionManager(authority: String, electionName: String, userName: String) {
+        val managers = data.electionManagers.getOrPut(electionName) { mutableSetOf() }
+        // Drop any case-variant of this name first so the set never carries
+        // two rows for the same user; the resolved canonical name wins.
+        managers.removeAll { it.equals(userName, ignoreCase = true) }
+        managers.add(userName)
+    }
+
+    override fun removeElectionManager(authority: String, electionName: String, userName: String) {
+        data.electionManagers[electionName]?.removeAll { it.equals(userName, ignoreCase = true) }
+    }
+
     override fun deleteElection(authority: String, electionName: String) {
         data.elections.remove(electionName)
         data.candidates.remove(electionName)
         data.tiers.remove(electionName)
+        data.electionManagers.remove(electionName)
         data.ballots.keys.removeIf { (election, _) -> election == electionName }
     }
 
@@ -209,6 +229,14 @@ class InMemoryCommandModel(private val data: InMemoryData) : CommandModel {
             .forEach { election ->
                 data.elections[election.electionName] = election.copy(ownerName = newUserName)
             }
+
+        // Update election-manager entries — same case-insensitive match, since
+        // the user could be a co-manager on elections they don't own.
+        data.electionManagers.values.forEach { managers ->
+            if (managers.removeAll { it.equals(oldUserName, ignoreCase = true) }) {
+                managers.add(newUserName)
+            }
+        }
 
         // Update ballots
         val ballotsToUpdate = data.ballots.entries

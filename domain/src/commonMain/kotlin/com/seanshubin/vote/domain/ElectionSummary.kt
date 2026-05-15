@@ -12,6 +12,7 @@ data class ElectionSummary(
         candidateCount: Int,
         ballotCount: Int,
         tiers: List<String> = emptyList(),
+        managers: List<String> = emptyList(),
     ): ElectionDetail =
         ElectionDetail(
             ownerName = ownerName,
@@ -20,5 +21,6 @@ data class ElectionSummary(
             candidateCount = candidateCount,
             ballotCount = ballotCount,
             tiers = tiers,
+            managers = managers,
         )
 }

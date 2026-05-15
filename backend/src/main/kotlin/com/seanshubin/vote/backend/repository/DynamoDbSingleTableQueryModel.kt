@@ -178,6 +178,23 @@ class DynamoDbSingleTableQueryModel(
         }
     }
 
+    override fun listElectionManagers(electionName: String): List<String> {
+        return runBlocking {
+            val response = dynamoDb.query(QueryRequest {
+                tableName = DynamoDbSingleTableSchema.MAIN_TABLE
+                keyConditionExpression = "PK = :pk AND begins_with(SK, :sk_prefix)"
+                expressionAttributeValues = mapOf(
+                    ":pk" to AttributeValue.S(DynamoDbSingleTableSchema.electionPK(electionName)),
+                    ":sk_prefix" to AttributeValue.S(DynamoDbSingleTableSchema.MANAGER_PREFIX)
+                )
+            })
+
+            response.items?.mapNotNull { it["user_name"]?.asS() }
+                ?.sortedWith(String.CASE_INSENSITIVE_ORDER)
+                ?: emptyList()
+        }
+    }
+
     override fun candidateBallotCounts(electionName: String): Map<String, Int> {
         // Two queries — candidate list (for the zero-count entries) and the
         // ballot list (rankings JSON contains the candidate names). The
