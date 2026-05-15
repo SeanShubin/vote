@@ -1,0 +1,171 @@
+#!/usr/bin/env bash
+# Convert docs/spoiler-free-voting.md into the static HTML page served
+# alongside the SPA at /methodology.html.
+#
+# Single source of truth: the markdown lives under docs/ (where repo
+# readers find it). The generated HTML is committed so the frontend
+# build (and CDN deploy) doesn't need Node.js — but when the markdown
+# changes, this script regenerates the HTML and both files get
+# committed together. The source lives outside frontend/.../resources/
+# on purpose: anything under resources/ is bundled into the production
+# webpack output, and we don't want to ship the markdown to the CDN.
+#
+# Conversion is done with marked-cli (https://www.npmjs.com/package/marked)
+# via npx — the only external dependency is Node.js. The wrapper template
+# below provides a standalone reading layout: the page deliberately does
+# not pull in the SPA's styles.css, which is tuned for narrow card-shell
+# layouts rather than long-form prose.
+#
+# Usage: scripts/convert-docs
+# Output: frontend/src/jsMain/resources/methodology.html
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+SOURCE_FILE="$PROJECT_DIR/docs/spoiler-free-voting.md"
+OUTPUT_FILE="$PROJECT_DIR/frontend/src/jsMain/resources/methodology.html"
+
+if [ ! -f "$SOURCE_FILE" ]; then
+    echo "Error: source file not found: $SOURCE_FILE" >&2
+    exit 1
+fi
+
+if ! command -v npx >/dev/null 2>&1; then
+    echo "Error: npx not found. Install Node.js (mise install node@lts) and re-run." >&2
+    exit 1
+fi
+
+echo "Converting $SOURCE_FILE -> $OUTPUT_FILE"
+
+# Heredoc: HTML head + sticky nav header. Single-quoted EOF so $ and
+# backticks are literal. Closing EOF must be at column 0.
+cat > "$OUTPUT_FILE" <<'EOF'
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spoiler-Free Voting Method</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <style>
+        /*
+          Self-contained styles. This page is a static HTML file served
+          alongside the SPA's frontend.js — it intentionally doesn't
+          pull in the SPA's styles.css because the layout it needs
+          (long-form reading column, generous line height, large
+          headings) doesn't match the SPA's app-shell containers.
+        */
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
+                Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            line-height: 1.6;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 0 1rem 3rem 1rem;
+            color: #333;
+            background: #f5f5f5;
+        }
+        .nav-header {
+            position: sticky;
+            top: 0;
+            background: #f5f5f5;
+            padding: 0.75rem 0;
+            border-bottom: 2px solid #2c7be5;
+            margin-bottom: 1.5rem;
+            z-index: 100;
+        }
+        .back-link {
+            display: inline-block;
+            padding: 0.4rem 0.9rem;
+            background: #2c7be5;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+            font-weight: 500;
+            font-size: 0.9rem;
+        }
+        .back-link:hover {
+            background: #1c5fb8;
+        }
+        h1, h2, h3 {
+            color: #1f3956;
+            margin-top: 2rem;
+        }
+        h1 {
+            border-bottom: 2px solid #2c7be5;
+            padding-bottom: 0.3em;
+            margin-top: 0;
+        }
+        h2 {
+            border-bottom: 1px solid #aab8ca;
+            padding-bottom: 0.2em;
+        }
+        h3 {
+            color: #34495e;
+        }
+        p, ul, ol {
+            margin: 0.75rem 0;
+        }
+        ul, ol {
+            padding-left: 1.8rem;
+        }
+        li {
+            margin: 0.25rem 0;
+        }
+        code {
+            background: #ecf2fb;
+            padding: 0.1rem 0.35rem;
+            border-radius: 3px;
+            font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+            font-size: 0.9em;
+        }
+        pre {
+            background: white;
+            border: 1px solid #aab8ca;
+            padding: 0.9rem 1rem;
+            border-radius: 5px;
+            overflow-x: auto;
+            font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+            font-size: 0.88rem;
+            line-height: 1.5;
+        }
+        pre code {
+            background: transparent;
+            padding: 0;
+        }
+        blockquote {
+            border-left: 4px solid #2c7be5;
+            padding: 0.4rem 0 0.4rem 1rem;
+            margin: 1rem 0;
+            color: #555;
+            background: #ecf2fb;
+            border-radius: 0 4px 4px 0;
+        }
+        strong {
+            color: #1f3956;
+        }
+    </style>
+</head>
+<body>
+
+<div class="nav-header">
+    <a href="/" class="back-link">← Back to Vote</a>
+</div>
+
+EOF
+
+# Convert the markdown and append. Use explicit -i instead of stdin
+# redirection — under Git Bash on Windows the stdin pipe doesn't always
+# survive the npx → node shim chain, so marked ends up converting its
+# own binary source instead of our input. -i is robust across shells.
+npx --quiet marked -i "$SOURCE_FILE" >> "$OUTPUT_FILE"
+
+# Close the wrapper.
+cat >> "$OUTPUT_FILE" <<'EOF'
+
+</body>
+</html>
+EOF
+
+echo "✓ Wrote $OUTPUT_FILE"

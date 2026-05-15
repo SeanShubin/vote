@@ -60,11 +60,23 @@ scripts/dev worktree-sync             Reset clean auxiliary worktrees to master;
 
 Run `scripts/dev --help` for the authoritative subcommand list.
 
+### Standalone scripts
+
+A few operations don't need the full Kotlin CLI — they're plain shell
+scripts:
+
+| Script                                              | Purpose                                                                                                                                                                                                                                                                                                      |
+| --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `scripts/convert-docs` / `scripts\convert-docs.ps1` | Regenerate `frontend/src/jsMain/resources/methodology.html` from the markdown source `docs/spoiler-free-voting.md`. Uses `npx marked` — needs Node.js on PATH (the Gradle Kotlin/JS plugin's bundled Node at `~/.gradle/nodejs/<version>/` works too). Run whenever the markdown changes; commit both files. |
+
 ## Requirements
 
 - **JDK 21** — the Gradle build requires it. Kotlin 2.0.21 rejects JDK 22+ as the
   daemon runtime.
 - **Docker** — required for `db-setup-*` and the launch scripts.
+- **Node.js** — only needed by `scripts/convert-docs`. The Gradle Kotlin/JS
+  plugin already downloads one to `~/.gradle/nodejs/`; that's the path of
+  least resistance if you don't have a system Node installed.
 
 ### Version management
 

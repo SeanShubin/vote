@@ -120,6 +120,17 @@ fun HomePage(
                 Text("My Account")
             }
 
+            // Static educational page about Ranked Pairs voting, served as
+            // a plain HTML resource (methodology.html). Full-page navigation
+            // rather than a Compose route — the page is read-only prose and
+            // doesn't need the SPA shell. The back link inside the page
+            // points to "/" which lands the reader back here.
+            Button({
+                onClick { window.location.href = "/methodology.html" }
+            }) {
+                Text("About This Voting Method")
+            }
+
             Button({
                 onClick { onLogout() }
             }) {

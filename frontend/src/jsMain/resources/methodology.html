@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spoiler-Free Voting Method</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <style>
+        /*
+          Self-contained styles. This page is a static HTML file served
+          alongside the SPA's frontend.js — it intentionally doesn't
+          pull in the SPA's styles.css because the layout it needs
+          (long-form reading column, generous line height, large
+          headings) doesn't match the SPA's app-shell containers.
+        */
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
+                Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            line-height: 1.6;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 0 1rem 3rem 1rem;
+            color: #333;
+            background: #f5f5f5;
+        }
+        .nav-header {
+            position: sticky;
+            top: 0;
+            background: #f5f5f5;
+            padding: 0.75rem 0;
+            border-bottom: 2px solid #2c7be5;
+            margin-bottom: 1.5rem;
+            z-index: 100;
+        }
+        .back-link {
+            display: inline-block;
+            padding: 0.4rem 0.9rem;
+            background: #2c7be5;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+            font-weight: 500;
+            font-size: 0.9rem;
+        }
+        .back-link:hover {
+            background: #1c5fb8;
+        }
+        h1, h2, h3 {
+            color: #1f3956;
+            margin-top: 2rem;
+        }
+        h1 {
+            border-bottom: 2px solid #2c7be5;
+            padding-bottom: 0.3em;
+            margin-top: 0;
+        }
+        h2 {
+            border-bottom: 1px solid #aab8ca;
+            padding-bottom: 0.2em;
+        }
+        h3 {
+            color: #34495e;
+        }
+        p, ul, ol {
+            margin: 0.75rem 0;
+        }
+        ul, ol {
+            padding-left: 1.8rem;
+        }
+        li {
+            margin: 0.25rem 0;
+        }
+        code {
+            background: #ecf2fb;
+            padding: 0.1rem 0.35rem;
+            border-radius: 3px;
+            font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+            font-size: 0.9em;
+        }
+        pre {
+            background: white;
+            border: 1px solid #aab8ca;
+            padding: 0.9rem 1rem;
+            border-radius: 5px;
+            overflow-x: auto;
+            font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+            font-size: 0.88rem;
+            line-height: 1.5;
+        }
+        pre code {
+            background: transparent;
+            padding: 0;
+        }
+        blockquote {
+            border-left: 4px solid #2c7be5;
+            padding: 0.4rem 0 0.4rem 1rem;
+            margin: 1rem 0;
+            color: #555;
+            background: #ecf2fb;
+            border-radius: 0 4px 4px 0;
+        }
+        strong {
+            color: #1f3956;
+        }
+    </style>
+</head>
+<body>
+
+<div class="nav-header">
+    <a href="/" class="back-link">← Back to Vote</a>
+</div>
+
+<h1>Spoiler-Free Voting Method</h1>
+<h2>Goal</h2>
+<ul>
+<li>Given many individuals with preferences between candidates, each
+expressed as an ordered ranking,</li>
+<li>return a single ordered ranking of candidates that reflects the
+combined preferences of the voters.</li>
+<li>A voter expressing their true preference should not have to worry
+about their vote working against them.</li>
+<li>Many voting systems — first-past-the-post and instant-runoff voting
+among them — incentivize voting tactically for the lesser of two
+evils rather than expressing true preference. The system used here
+is designed to remove that pressure.</li>
+</ul>
+<h2>Mechanics</h2>
+<ul>
+<li>Instead of checking which candidate got the most first-place votes,
+as in first-past-the-post,</li>
+<li>and instead of eliminating the candidate with the fewest first-place
+votes round by round, as in instant-runoff voting,</li>
+<li>every candidate is compared individually to every other candidate.</li>
+<li>If one candidate wins every head-to-head matchup, that candidate
+wins (this is known as the <strong>Condorcet Criterion</strong>).</li>
+</ul>
+<h2>Cycles</h2>
+<ul>
+<li>Sometimes there&#39;s no candidate who beats everyone else
+head-to-head — instead you get a cycle, like rock-paper-scissors:
+rock beats scissors, scissors beats paper, paper beats rock.</li>
+<li>To resolve cycles we use a method called <strong>Ranked Pairs</strong> (Nicolaus
+Tideman, 1987). The idea is to lock matchups into the final ranking
+one at a time, strongest first. If a matchup would contradict
+matchups already locked in — by closing a cycle — it&#39;s skipped.</li>
+<li>&quot;Strongest first&quot; means the matchup with the most votes for the
+winning candidate, with less opposition breaking ties between
+matchups that have the same winning-vote count.</li>
+<li>When every matchup in a cycle has the same strength as every
+other matchup in the same cycle, the algorithm refuses to pick
+arbitrarily and treats those candidates as tied.</li>
+</ul>
+<h2>Examples</h2>
+<h3>Why pairwise methods are superior to first-past-the-post</h3>
+<p>Let&#39;s say you have 3 candidates: &quot;minor-improvements&quot;, &quot;status-quo&quot;,
+and &quot;radical-changes&quot;.</p>
+<pre><code>30% of the population prefers minor-improvements, then status-quo, then radical-changes
+30% of the population prefers status-quo, then minor-improvements, then radical-changes
+40% of the population prefers radical-changes, then minor-improvements, then status-quo
+</code></pre>
+<p>If you only count first-place votes, radical-changes wins, even
+though this does not accurately reflect voter preference. To see why,
+consider:</p>
+<pre><code>70% of voters would rather have minor-improvements than status-quo
+60% of voters would rather have minor-improvements than radical-changes
+60% of voters would rather have status-quo than radical-changes
+</code></pre>
+<p>When the candidates are compared pairwise, the accurate preference is
+minor-improvements, then status-quo, then radical-changes. But when
+only the voter&#39;s top candidate is considered, so much information is
+thrown away that the least-preferred candidate wins.</p>
+<p>A pairwise method ranks them minor-improvements &gt; status-quo &gt;
+radical-changes — consistent with the actual voter preference.</p>
+<h3>How pairwise methods reduce tactical voting</h3>
+<p>Consider this dilemma:</p>
+<pre><code>3 voters prefer minor-improvements, then status-quo, then radical-changes
+4 voters prefer status-quo, then minor-improvements, then radical-changes
+2 voters prefer radical-changes, then minor-improvements, then status-quo
+</code></pre>
+<p>If we&#39;re counting first-place votes (or running instant-runoff),
+although the 2 voters prefer radical-changes, they don&#39;t dare vote
+that way because doing so would throw the election to status-quo
+rather than minor-improvements. It is in the best interest of those
+2 voters to <strong>not</strong> express their preference accurately.</p>
+<p>This misrepresents the number of voters who actually preferred
+radical-changes — that information is lost.</p>
+<p>A pairwise method compares the candidates like so:</p>
+<pre><code>minor-improvements defeats status-quo 5 to 4
+minor-improvements defeats radical-changes 7 to 2
+status-quo defeats radical-changes 7 to 2
+</code></pre>
+<p>So the ranking becomes minor-improvements &gt; status-quo &gt;
+radical-changes. The 2 voters could accurately express their
+preference without sabotaging their own interests.</p>
+<h3>Why pairwise methods are superior to instant-runoff voting</h3>
+<p>Instant-runoff voting works like this:</p>
+<blockquote>
+<p>Ballots are initially counted for each elector&#39;s top choice, losing
+candidates are eliminated, and ballots for losing candidates are
+redistributed until one candidate is the top remaining choice of a
+majority of the voters.</p>
+</blockquote>
+<p>The problem is that since only the top choices are counted each
+round, candidates closer to the consensus preference can be the first
+ones eliminated. To illustrate, consider 4 candidates where every
+voter has a different top choice but agrees on a strong second:</p>
+<pre><code>4 voters prefer niche, then satisfactory, then bought, then cult
+3 voters prefer bought, then satisfactory, then niche, then cult
+3 voters prefer cult, then satisfactory, then niche, then bought
+</code></pre>
+<p>In both instant-runoff and first-past-the-post, &quot;niche&quot; wins — even
+though 60% of voters preferred &quot;satisfactory&quot; to &quot;niche&quot;.
+&quot;Satisfactory&quot; — the one every single voter preferred over someone
+else&#39;s top candidate — was the first to be eliminated.</p>
+<h3>How circular ambiguities are resolved using Ranked Pairs</h3>
+<p>Let&#39;s say you have 3 candidates: &quot;rock&quot;, &quot;paper&quot;, and &quot;scissors&quot;.
+Initially there are 9 votes:</p>
+<pre><code>3 voters rank candidates: rock, scissors, paper
+3 voters rank candidates: paper, rock, scissors
+3 voters rank candidates: scissors, paper, rock
+</code></pre>
+<p>This is a 3-way tie. Now what should happen when a 10th voter casts:</p>
+<pre><code>1 voter ranks candidates: rock, scissors, paper
+</code></pre>
+<p>The intuition is that there&#39;s now enough information to break the
+tie, with the outcome aligned with the last ballot cast. Computing
+this result is less obvious. The pairwise matchups are:</p>
+<pre><code>rock defeats scissors 7 to 3
+paper defeats rock 6 to 4
+scissors defeats paper 7 to 3
+</code></pre>
+<p>This looks circular: each candidate loses to one and beats another.
+<strong>Ranked Pairs</strong> resolves it by walking the matchups strongest first
+and locking each one into the ranking unless doing so would create a
+cycle with matchups already locked in.</p>
+<p>Sorted strongest first (more winning votes first, less opposition
+breaking ties):</p>
+<pre><code>Step 1: rock defeats scissors 7 to 3   ← strongest
+Step 2: scissors defeats paper 7 to 3
+Step 3: paper defeats rock     6 to 4   ← weakest
+</code></pre>
+<p>Walking through:</p>
+<ul>
+<li><strong>Step 1</strong> locks <code>rock → scissors</code>. No conflict — nothing else is
+locked yet.</li>
+<li><strong>Step 2</strong> locks <code>scissors → paper</code>. Together with step 1, the
+ranking so far is <code>rock &gt; scissors &gt; paper</code>. No cycle.</li>
+<li><strong>Step 3</strong> would add <code>paper → rock</code>, but the locked-in path is
+already <code>rock → scissors → paper</code>. Adding <code>paper → rock</code> on top
+would close that path into a cycle (<code>rock → scissors → paper → rock</code>), so it&#39;s <strong>skipped</strong>.</li>
+</ul>
+<p>Final ranking:</p>
+<pre><code>1st rock
+2nd scissors
+3rd paper
+</code></pre>
+<p>This matches the intuition from the 10th ballot.</p>
+<p>The strongest matchups are honored as long as they don&#39;t contradict
+each other. When they do, the weakest one is the one that gets
+dropped — and the report on each pairwise contest shows exactly which
+stronger matchups forced the drop.</p>
+<h3>When the cycle members are perfectly tied in strength</h3>
+<p>Sometimes the matchups inside a cycle all have <em>identical</em> numbers.
+For example, three candidates A, B, C where:</p>
+<pre><code>A defeats B 4 to 2
+B defeats C 4 to 2
+C defeats A 4 to 2
+</code></pre>
+<p>All three matchups have the same winning votes and the same losing
+votes. Picking which two to lock and which one to drop would require
+an arbitrary tiebreaker — like alphabetical order — that doesn&#39;t
+reflect anything voters actually expressed.</p>
+<p>In this case the system refuses to pick. None of the three matchups
+lock, and A, B, and C tie at the same place in the final ranking.
+The honest answer to &quot;which of these is ahead?&quot; is &quot;the votes don&#39;t
+say.&quot;</p>
+<h2>Voting Criteria</h2>
+<blockquote>
+<p>But what about <em>some-criterion-here</em>? Doesn&#39;t that make this voting
+system invalid?</p>
+</blockquote>
+<p>This is a practical solution to a real problem: people feeling they
+can&#39;t express their true preference because the mechanics of the
+voting system will work against them if they do. There are infinitely
+many criteria one could imagine such that it&#39;s logically impossible
+for any voting method to satisfy all of them — see Arrow&#39;s impossibility
+theorem and friends.</p>
+<p>A more useful question is: can you think of a specific case where
+expressing your preferences honestly causes the outcome to be further
+from what you want? If not, then the system is doing its job.</p>
+
+
+</body>
+</html>
