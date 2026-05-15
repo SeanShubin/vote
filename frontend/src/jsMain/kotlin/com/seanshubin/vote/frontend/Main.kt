@@ -2,10 +2,13 @@ package com.seanshubin.vote.frontend
 
 import androidx.compose.runtime.*
 import com.seanshubin.vote.contract.ApiClient
+import com.seanshubin.vote.domain.RankingSide
 import com.seanshubin.vote.domain.Role
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.web.dom.*
 import org.jetbrains.compose.web.renderComposable
+
+private const val SIDE_STORAGE_KEY = "voteApp.currentSide"
 
 fun main() {
     if (BuildConfig.GIT_HASH == "dev") {
@@ -47,6 +50,29 @@ fun VoteApp(apiClient: ApiClient) {
     var userName by remember { mutableStateOf<String?>(null) }
     var role by remember { mutableStateOf<Role?>(null) }
     val scope = rememberCoroutineScope()
+
+    // Active ballot side, sticky across navigation and reload. Persisted to
+    // localStorage so a voter who flipped to the secret side stays on it the
+    // next time they open the app. Stored at this level (rather than inside
+    // VotingView/TallyView) so every page that renders side-scoped data sees
+    // the same value and a single body.secret-mode effect drives the
+    // dramatic dark-theme swap everywhere — not just on the voting page.
+    var currentSide by remember {
+        val stored = kotlinx.browser.window.localStorage.getItem(SIDE_STORAGE_KEY)
+        val initial = runCatching { stored?.let { RankingSide.valueOf(it) } }.getOrNull()
+            ?: RankingSide.PUBLIC
+        mutableStateOf(initial)
+    }
+    LaunchedEffect(currentSide) {
+        kotlinx.browser.window.localStorage.setItem(SIDE_STORAGE_KEY, currentSide.name)
+    }
+    DisposableEffect(currentSide) {
+        val cls = "secret-mode"
+        val body = kotlinx.browser.document.body
+        if (currentSide == RankingSide.SECRET) body?.classList?.add(cls)
+        else body?.classList?.remove(cls)
+        onDispose { body?.classList?.remove(cls) }
+    }
 
     // Bootstrap session from the refresh cookie. On success the user stays on
     // whatever URL they landed on (so deep links like /elections/Foo work
@@ -180,6 +206,8 @@ fun VoteApp(apiClient: ApiClient) {
             electionName = page.electionName,
             currentUserName = userName,
             currentRole = role,
+            currentSide = currentSide,
+            onSetSide = { currentSide = it },
             onBack = { router.navigate(Page.Elections) },
             onElectionDeleted = { router.replace(Page.Elections) },
             onNavigateToPreferences = {
@@ -195,6 +223,8 @@ fun VoteApp(apiClient: ApiClient) {
         is Page.ElectionPreferences -> ElectionPreferencesPage(
             apiClient = apiClient,
             electionName = page.electionName,
+            currentSide = currentSide,
+            onSetSide = { currentSide = it },
             // Land on the Results tab — that's where the buttons that open
             // this page live, so it's almost certainly where the user came
             // from. The hash is read by rememberHashTab on the destination.
@@ -203,11 +233,15 @@ fun VoteApp(apiClient: ApiClient) {
         is Page.ElectionDecision -> ElectionDecisionPage(
             apiClient = apiClient,
             electionName = page.electionName,
+            currentSide = currentSide,
+            onSetSide = { currentSide = it },
             onBack = { router.navigate(Page.ElectionDetail(page.electionName), hash = "tally") },
         )
         is Page.ElectionProcess -> ElectionProcessPage(
             apiClient = apiClient,
             electionName = page.electionName,
+            currentSide = currentSide,
+            onSetSide = { currentSide = it },
             onBack = { router.navigate(Page.ElectionDetail(page.electionName), hash = "tally") },
         )
         is Page.RawTables -> TablesPage(

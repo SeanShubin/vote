@@ -3,6 +3,7 @@ package com.seanshubin.vote.frontend
 import androidx.compose.runtime.*
 import com.seanshubin.vote.contract.ApiClient
 import com.seanshubin.vote.domain.ElectionDetail
+import com.seanshubin.vote.domain.RankingSide
 import com.seanshubin.vote.domain.Role
 import kotlinx.browser.window
 import kotlinx.coroutines.async
@@ -28,6 +29,8 @@ fun ElectionDetailPage(
     // election owner, or to any user with role >= ADMIN. Backend re-checks.
     currentUserName: String?,
     currentRole: Role?,
+    currentSide: RankingSide,
+    onSetSide: (RankingSide) -> Unit,
     onBack: () -> Unit,
     onElectionDeleted: () -> Unit,
     onNavigateToPreferences: () -> Unit = {},
@@ -61,13 +64,16 @@ fun ElectionDetailPage(
             election.await() to candidates.await()
         }
     }
+    // Tally is side-scoped: PUBLIC and SECRET produce separate results that
+    // never influence each other. Caching keyed on side too so the prior
+    // side's tally doesn't briefly paint before the new fetch resolves.
     val tallyFetch = rememberCachedFetchState(
         apiClient = apiClient,
-        cacheKey = "tally:$electionName",
-        key = electionName,
+        cacheKey = "tally:$electionName:$currentSide",
+        key = "$electionName:$currentSide",
         fallbackErrorMessage = "Failed to load tally",
     ) {
-        apiClient.getTally(electionName)
+        apiClient.getTally(electionName, currentSide)
     }
 
     val deleteAction = rememberAsyncAction(
@@ -318,6 +324,8 @@ fun ElectionDetailPage(
                         candidates = candidates,
                         tiers = loadedElection?.tiers ?: emptyList(),
                         currentUserName = currentUserName,
+                        currentSide = currentSide,
+                        onSetSide = onSetSide,
                         // Patch the header count locally and refresh the
                         // tally — the cached helper avoids the Loading
                         // flash on the Results tab.
@@ -335,6 +343,8 @@ fun ElectionDetailPage(
                     )
                     "tally" -> TallyView(
                         state = tallyFetch.state,
+                        currentSide = currentSide,
+                        onSetSide = onSetSide,
                         onNavigateToPreferences = onNavigateToPreferences,
                         onNavigateToDecision = onNavigateToDecision,
                         onNavigateToProcess = onNavigateToProcess,

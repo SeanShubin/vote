@@ -4,6 +4,7 @@ import androidx.compose.runtime.*
 import com.seanshubin.vote.domain.Ballot
 import com.seanshubin.vote.domain.ElectionTally
 import com.seanshubin.vote.domain.Place
+import com.seanshubin.vote.domain.RankingSide
 import com.seanshubin.vote.domain.Tally
 import com.seanshubin.vote.domain.TallySection
 import org.jetbrains.compose.web.attributes.*
@@ -13,12 +14,15 @@ import org.jetbrains.compose.web.dom.*
 @Composable
 fun TallyView(
     state: FetchState<ElectionTally>,
+    currentSide: RankingSide,
+    onSetSide: (RankingSide) -> Unit,
     onNavigateToPreferences: () -> Unit,
     onNavigateToDecision: () -> Unit,
     onNavigateToProcess: () -> Unit,
 ) {
     Div({ classes("section") }) {
         H2 { Text("Results") }
+        SideToggle(currentSide, onSetSide)
 
         when (state) {
             FetchState.Loading -> P { Text("Loading results…") }

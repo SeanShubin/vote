@@ -26,18 +26,21 @@ import org.jetbrains.compose.web.dom.*
 fun ElectionPreferencesPage(
     apiClient: ApiClient,
     electionName: String,
+    currentSide: RankingSide,
+    onSetSide: (RankingSide) -> Unit,
     onBack: () -> Unit,
 ) {
     val tallyFetch = rememberFetchState(
         apiClient = apiClient,
-        key = electionName,
+        key = "$electionName:$currentSide",
         fallbackErrorMessage = "Failed to load tally",
     ) {
-        apiClient.getTally(electionName)
+        apiClient.getTally(electionName, currentSide)
     }
 
     Div({ classes("admin-container") }) {
         H1 { Text("Preferences: $electionName") }
+        SideToggle(currentSide, onSetSide)
         P({ classes("pair-page-explainer") }) {
             Text(
                 "Direct head-to-head between two candidates. Each total is the count of " +
@@ -82,18 +85,21 @@ fun ElectionPreferencesPage(
 fun ElectionDecisionPage(
     apiClient: ApiClient,
     electionName: String,
+    currentSide: RankingSide,
+    onSetSide: (RankingSide) -> Unit,
     onBack: () -> Unit,
 ) {
     val tallyFetch = rememberFetchState(
         apiClient = apiClient,
-        key = electionName,
+        key = "$electionName:$currentSide",
         fallbackErrorMessage = "Failed to load tally",
     ) {
-        apiClient.getTally(electionName)
+        apiClient.getTally(electionName, currentSide)
     }
 
     Div({ classes("admin-container") }) {
         H1 { Text("Decision: $electionName") }
+        SideToggle(currentSide, onSetSide)
         P({ classes("pair-page-explainer") }) {
             Text(
                 "What the Ranked Pairs tally did with the direct contest between these " +
@@ -137,18 +143,21 @@ fun ElectionDecisionPage(
 fun ElectionProcessPage(
     apiClient: ApiClient,
     electionName: String,
+    currentSide: RankingSide,
+    onSetSide: (RankingSide) -> Unit,
     onBack: () -> Unit,
 ) {
     val tallyFetch = rememberFetchState(
         apiClient = apiClient,
-        key = electionName,
+        key = "$electionName:$currentSide",
         fallbackErrorMessage = "Failed to load tally",
     ) {
-        apiClient.getTally(electionName)
+        apiClient.getTally(electionName, currentSide)
     }
 
     Div({ classes("admin-container") }) {
         H1 { Text("Ranked Pairs Process: $electionName") }
+        SideToggle(currentSide, onSetSide)
         P({ classes("pair-page-explainer") }) {
             Text(
                 "Every contest, grouped by strength bucket (winning votes first, " +

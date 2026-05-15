@@ -40,6 +40,11 @@ fun VotingView(
     // as plain text. Null falls back to "Your Rankings" so the feature still
     // works in any context where the username isn't threaded through.
     currentUserName: String?,
+    // Active ballot side. Owned by VoteApp so navigating away (e.g. to the
+    // tally tab) and back keeps the same side; the body.secret-mode theme
+    // swap also lives at app level so it stays applied across pages.
+    currentSide: RankingSide,
+    onSetSide: (RankingSide) -> Unit,
     // Fired only on the transitions that actually change the server-side
     // ballot count: +1 on first cast, -1 on full-clear / explicit removal.
     // In-place rank reorderings (which auto-save but don't change the count)
@@ -47,7 +52,6 @@ fun VotingView(
     onBallotCountChanged: (Int) -> Unit,
     onError: (String) -> Unit,
 ) {
-    var currentSide by remember(electionName) { mutableStateOf(RankingSide.PUBLIC) }
     var publicState by remember(electionName, candidates, tiers) {
         mutableStateOf(SideState.initial(tiers))
     }
@@ -67,25 +71,6 @@ fun VotingView(
     }
 
     DragAutoScroll(active = dragSource != null)
-
-    // Dramatic theme swap when the secret side is active. Toggles a
-    // `secret-mode` class on document.body so the dark-theme stylesheet
-    // takes over the entire page (background, cards, chips, toggles) —
-    // the side-switch isn't a subtle indicator, it's a mode shift the
-    // voter can't miss. Cleaned up on unmount so leaving the voting
-    // page doesn't strand the body in dark mode.
-    DisposableEffect(currentSide) {
-        val cls = "secret-mode"
-        val body = kotlinx.browser.document.body
-        if (currentSide == RankingSide.SECRET) {
-            body?.classList?.add(cls)
-        } else {
-            body?.classList?.remove(cls)
-        }
-        onDispose {
-            body?.classList?.remove(cls)
-        }
-    }
 
     val activeState = if (currentSide == RankingSide.PUBLIC) publicState else secretState
     val otherState = if (currentSide == RankingSide.PUBLIC) secretState else publicState
@@ -349,23 +334,7 @@ fun VotingView(
     Div({ classes("section") }) {
         H2 { Text("Vote") }
 
-        // Side toggle. Public is default and stays default across navigations
-        // (the toggle resets per-election so a SECRET-side stash from one
-        // election can't bleed into another). Inactive-side state persists
-        // in memory while this composition lives, so toggling away and back
-        // doesn't lose work the voter has staged.
-        Div({ classes("ballot-side-toggle") }) {
-            Button({
-                classes("ballot-side-button")
-                if (currentSide == RankingSide.PUBLIC) classes("ballot-side-button-active")
-                onClick { currentSide = RankingSide.PUBLIC }
-            }) { Text("Public side") }
-            Button({
-                classes("ballot-side-button")
-                if (currentSide == RankingSide.SECRET) classes("ballot-side-button-active")
-                onClick { currentSide = RankingSide.SECRET }
-            }) { Text("Secret side") }
-        }
+        SideToggle(currentSide, onSetSide)
 
         Div({ classes("ballot-public-notice") }) {
             if (currentSide == RankingSide.PUBLIC) {
