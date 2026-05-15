@@ -147,7 +147,7 @@ class BallotProjectionTest {
             ),
             electionTiers = listOf("S", "A"),
         )
-        // Same virtual order, same pairwise contests the Schulze pass will see.
+        // Same virtual order, same pairwise contests the tally pass will see.
         assertEquals(
             listOf(
                 pc("Alice", 1, "S"),

@@ -13,7 +13,7 @@ import kotlin.math.min
  * The voter never explicitly ranks tier markers — they pick a tier per
  * candidate and the projection step materializes the markers.
  *
- * **Projected form** (what the Schulze pipeline consumes): the same
+ * **Projected form** (what the pairwise tally pipeline consumes): the same
  * candidate rankings plus synthetic [kind] = [RankingKind.TIER] entries
  * inserted at the right cut points by [projectBallot]. The tier annotation
  * on candidate rankings is what tells the projection where each marker goes.

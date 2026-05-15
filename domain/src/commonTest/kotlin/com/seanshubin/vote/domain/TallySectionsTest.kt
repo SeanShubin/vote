@@ -30,7 +30,7 @@ class TallySectionsTest {
 
     @Test
     fun `tier markers are stripped and the survivors are renumbered`() {
-        // Schulze ranks (markers + candidates):
+        // tally ranks (markers + candidates):
         //   1 Alice    (cleared Tier1)
         //   2 Tier1
         //   3 Bob      (cleared Tier2, not Tier1)
@@ -56,8 +56,8 @@ class TallySectionsTest {
     }
 
     @Test
-    fun `candidates with the same Schulze rank tie in the display`() {
-        // Schulze: Alice and Bob tied at 1, Charlie at 3.
+    fun `candidates with the same tally rank tie in the display`() {
+        // Tally: Alice and Bob tied at 1, Charlie at 3.
         // Display: Alice 1st, Bob 1st, Charlie 3rd (standard tied-rank skip).
         val places = listOf(
             Place(1, "Alice"),
@@ -83,11 +83,11 @@ class TallySectionsTest {
     @Test
     fun `tying with a tier marker renders between that tier and the next`() {
         // Strict-precedence rule: a candidate clears tier T iff their
-        // Schulze rank is *strictly less than* T's marker rank. Alice
+        // tally rank is *strictly less than* T's marker rank. Alice
         // tied with Tier1 here, so she does not clear it — but she also
         // didn't fall below it. She renders in a naked row list directly
         // after Tier1's (empty) card, visibly between Tier1 and Tier2.
-        // Schulze ranks:
+        // tally ranks:
         //   1 Alice
         //   1 Tier1   (tied with Alice)
         //   3 Bob
@@ -119,7 +119,7 @@ class TallySectionsTest {
     @Test
     fun `two candidates symmetrically tied with the top tier render between cards`() {
         // The motivating example: V1 ranks Alice > Excellent > Bob > Good,
-        // V2 ranks Bob > Excellent > Alice > Good. Schulze pairwise:
+        // V2 ranks Bob > Excellent > Alice > Good. Pairwise:
         //   Alice ~ Bob, Alice ~ Excellent, Bob ~ Excellent
         //   Alice > Good, Bob > Good, Excellent > Good
         // After adjustForTies, Alice/Bob/Excellent share rank 1, Good is rank 4.
@@ -200,7 +200,7 @@ class TallySectionsTest {
 
     @Test
     fun `candidates tied below a tier all share the next display rank`() {
-        // Bob and Charlie tied at Schulze rank 4, both below Tier1.
+        // Bob and Charlie tied at tally rank 4, both below Tier1.
         // Display: Alice 1st (Tier1), Bob and Charlie tied 2nd (no tier).
         val places = listOf(
             Place(1, "Alice"),

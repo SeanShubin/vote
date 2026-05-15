@@ -16,24 +16,24 @@ import kotlinx.serialization.Serializable
 data class TallySection(val tierName: String?, val places: List<Place>) {
     companion object {
         /**
-         * Splits a Schulze-ranked place list into tier sections for display.
+         * Splits a tally's place list into tier sections for display.
          * Two responsibilities are bundled here because they consume the same
          * input and have to agree on which entries are tier markers:
          *
          * 1. **Renumber for display.** Tier markers participate in the
-         *    Schulze tally as virtual candidates, so [places] contains both
-         *    real candidates and tier markers and a marker's position would
+         *    tally as virtual candidates, so [places] contains both real
+         *    candidates and tier markers and a marker's position would
          *    otherwise eat a rank number ("Alice 1st, Bob 3rd" with a marker
          *    sitting between them). Markers are stripped and the survivors
-         *    are renumbered 1..N while preserving Schulze-induced ties — two
-         *    candidates the tally placed at the same Schulze rank still tie
-         *    in the display.
+         *    are renumbered 1..N while preserving tally-induced ties — two
+         *    candidates the tally placed at the same rank still tie in the
+         *    display.
          *
          * 2. **Assign tier sections.** A candidate **clears** tier T iff
-         *    their Schulze rank is *strictly less than* T's marker rank,
+         *    their tally rank is *strictly less than* T's marker rank,
          *    mirroring the ballot-side rule (a voter ranks a candidate
          *    *ahead of* a marker to clear it). A candidate **ties** with T
-         *    iff their Schulze rank *equals* T's — the pairwise tally
+         *    iff their tally rank *equals* T's — the pairwise process
          *    couldn't establish strict precedence either way. Cleared
          *    candidates render inside that tier's card; tied candidates
          *    render in a naked row list immediately after the card,
@@ -51,7 +51,7 @@ data class TallySection(val tierName: String?, val places: List<Place>) {
             val tierMarkerRank: Map<String, Int> = places
                 .filter { it.candidateName in tierSet }
                 .associate { it.candidateName to it.rank }
-            val schulzeRankByName: Map<String, Int> = candidatesOnly
+            val tallyRankByName: Map<String, Int> = candidatesOnly
                 .associate { it.candidateName to it.rank }
 
             val displayPlaces: List<Place> = run {
@@ -71,14 +71,14 @@ data class TallySection(val tierName: String?, val places: List<Place>) {
                     val tierRank = tierMarkerRank[tierName] ?: return@forEach
                     val cleared = displayPlaces.filter {
                         it.candidateName !in claimed &&
-                            schulzeRankByName.getValue(it.candidateName) < tierRank
+                            tallyRankByName.getValue(it.candidateName) < tierRank
                     }
                     add(TallySection(tierName, cleared))
                     claimed.addAll(cleared.map { it.candidateName })
 
                     val tiedAtBoundary = displayPlaces.filter {
                         it.candidateName !in claimed &&
-                            schulzeRankByName.getValue(it.candidateName) == tierRank
+                            tallyRankByName.getValue(it.candidateName) == tierRank
                     }
                     if (tiedAtBoundary.isNotEmpty()) {
                         add(TallySection(null, tiedAtBoundary))

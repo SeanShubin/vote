@@ -4,7 +4,7 @@ import androidx.compose.runtime.*
 import com.seanshubin.vote.contract.ApiClient
 import com.seanshubin.vote.domain.Ballot
 import com.seanshubin.vote.domain.ElectionTally
-import com.seanshubin.vote.domain.Preference
+import com.seanshubin.vote.domain.RankedPairs
 import com.seanshubin.vote.domain.Ranking.Companion.prefers
 import org.jetbrains.compose.web.dom.*
 
@@ -37,6 +37,13 @@ fun ElectionPreferencesPage(
 
     Div({ classes("admin-container") }) {
         H1 { Text("Preferences: $electionName") }
+        P({ classes("pair-page-explainer") }) {
+            Text(
+                "Direct head-to-head between two candidates. Each total is the count of " +
+                    "voters who ranked both candidates and put one above the other. " +
+                    "Voters who omit either candidate abstain from this contest."
+            )
+        }
 
         Div({ classes("admin-table-scroll") }) {
             when (val state = tallyFetch.state) {
@@ -55,22 +62,23 @@ fun ElectionPreferencesPage(
 }
 
 /**
- * Strongest-paths page. Same chip-pair selector as the Preferences page,
- * but the detail panel shows each direction's multi-hop Schulze path with
- * a per-hop voter list under it: for a path A→C→B, the A→C card lists the
- * voters who ranked A above C, the C→B card lists the voters who ranked
- * C above B. Each hop's voter count IS the hop's strength, so the binding
- * hop can be read directly off the size of its voter list.
+ * Per-pair Tideman decision page. For the selected pair the page shows:
+ *   - the direct head-to-head, with the same voter-list grounding as the
+ *     Preferences page (because every Tideman decision starts there).
+ *   - what Tideman did with the resulting contest: locked it in, skipped
+ *     it because of a cycle (with the locked-edge path that closed the
+ *     cycle), or treated the pair as a tied non-contest. A skipped
+ *     contest is the visual answer to "Goodyng beat Cursed 2-0, so why
+ *     does Cursed end up ranked higher?" — the lock-in order put
+ *     stronger contests in first and the direct verdict got squeezed
+ *     out by a cycle.
  *
- * Tier markers can show up as intermediate nodes inside a path even though
- * they aren't selectable in the chip arena: a path A → T → B is voters'
- * collective judgment that A cleared tier T and B didn't, and that's how a
- * direct head-to-head tie between A and B can still be broken on the
- * strongest path. Tier-styled chips inside paths flag those nodes so a
- * reader doesn't mistake them for candidates.
+ * Tier markers are excluded from the chip arena (the page is for
+ * candidate comparisons), but they can show up inside a cycle path the
+ * algorithm reports, styled distinctly so a reader can tell.
  */
 @Composable
-fun ElectionStrongestPathsPage(
+fun ElectionDecisionPage(
     apiClient: ApiClient,
     electionName: String,
     onBack: () -> Unit,
@@ -84,11 +92,13 @@ fun ElectionStrongestPathsPage(
     }
 
     Div({ classes("admin-container") }) {
-        H1 { Text("Strongest Paths: $electionName") }
+        H1 { Text("Decision: $electionName") }
         P({ classes("pair-page-explainer") }) {
             Text(
-                "A path between two candidates may pass through a tier marker — that's " +
-                    "voters' collective judgment that one side cleared it and the other didn't."
+                "What Tideman's Ranked Pairs did with the direct contest between these " +
+                    "two candidates. A contest is locked into the final ranking unless " +
+                    "doing so would create a cycle with already-locked stronger contests, " +
+                    "in which case it's skipped."
             )
         }
 
@@ -98,7 +108,7 @@ fun ElectionStrongestPathsPage(
                 is FetchState.Error -> Div({ classes("error") }) { Text(state.message) }
                 is FetchState.Success -> {
                     renderPairView(state.value) { a, b ->
-                        renderStrongestPathsDetail(state.value, a, b)
+                        renderDecisionDetail(state.value, a, b)
                     }
                 }
             }
@@ -109,16 +119,65 @@ fun ElectionStrongestPathsPage(
 }
 
 /**
+ * Full Tideman process page. Walks every directed contest in lock-in
+ * order — strongest first — and shows for each contest whether it was
+ * locked into the final DAG or skipped because of a cycle with earlier
+ * locks. Acts as a global "what the algorithm did, step by step" view
+ * that complements the per-pair Decision page.
+ *
+ * For a reader who wants to understand why one candidate beat another,
+ * the typical flow is: read the per-pair Decision for the specific pair
+ * in question, then come here to see where in the global order that
+ * contest sat and which stronger contests forced its hand.
+ */
+@Composable
+fun ElectionProcessPage(
+    apiClient: ApiClient,
+    electionName: String,
+    onBack: () -> Unit,
+) {
+    val tallyFetch = rememberFetchState(
+        apiClient = apiClient,
+        key = electionName,
+        fallbackErrorMessage = "Failed to load tally",
+    ) {
+        apiClient.getTally(electionName)
+    }
+
+    Div({ classes("admin-container") }) {
+        H1 { Text("Ranked Pairs Process: $electionName") }
+        P({ classes("pair-page-explainer") }) {
+            Text(
+                "Every contest in the order Tideman's Ranked Pairs processed it: " +
+                    "strongest first by winning votes, with less opposition breaking ties. " +
+                    "Each contest is locked into the final ranking unless doing so would " +
+                    "close a cycle with already-locked contests."
+            )
+        }
+
+        Div({ classes("admin-table-scroll") }) {
+            when (val state = tallyFetch.state) {
+                FetchState.Loading -> P { Text("Loading…") }
+                is FetchState.Error -> Div({ classes("error") }) { Text(state.message) }
+                is FetchState.Success -> renderProcessDetail(state.value)
+            }
+        }
+
+        Button({ onClick { onBack() } }) { Text("Back to Election") }
+    }
+}
+
+/**
  * Chip arena + detail-panel scaffold shared by the Preferences and
- * Strongest Paths pages. Owns the sticky-plus-changing selection state:
- * the first pick is sticky, the second slot rotates as the user explores
+ * Decision pages. Owns the sticky-plus-changing selection state: the
+ * first pick is sticky, the second slot rotates as the user explores
  * other candidates against it. Delegates to [detailPanel] when (and only
  * when) two candidates are selected. Resetting [selected] when the
  * election changes prevents stale names from carrying across navigation.
  *
  * Tier markers are intentionally excluded from the selection chips — the
  * page is for comparing candidates. Tiers can still appear inside the
- * detail panel (notably as intermediate nodes in strongest-path renderings),
+ * detail panel (e.g. as nodes in a cycle path the algorithm reports),
  * styled distinctly so a reader can tell they're tier markers and not
  * candidates the comparison was about.
  */
@@ -245,96 +304,174 @@ private fun renderPairSide(
 }
 
 @Composable
-private fun renderStrongestPathsDetail(electionTally: ElectionTally, a: String, b: String) {
+private fun renderDecisionDetail(electionTally: ElectionTally, a: String, b: String) {
     val tally = electionTally.tally
     val names = tally.candidateNames
     val ai = names.indexOf(a)
     val bi = names.indexOf(b)
-    val forward = tally.strongestPathMatrix[ai][bi]
-    val reverse = tally.strongestPathMatrix[bi][ai]
-    val forwardWins = forward.strength > reverse.strength
-    val reverseWins = reverse.strength > forward.strength
-    val verdict = when {
-        forwardWins -> "$a beats $b on strongest path: ${forward.strength} vs ${reverse.strength}"
-        reverseWins -> "$b beats $a on strongest path: ${reverse.strength} vs ${forward.strength}"
-        else -> "$a and $b tied on strongest path at ${forward.strength}"
-    }
+    val aOverB = tally.preferences[ai][bi].strength
+    val bOverA = tally.preferences[bi][ai].strength
     val revealed = tally.ballots.filterIsInstance<Ballot.Revealed>()
-    // Winning direction first so the claim sits above its evidence.
-    val (first, firstWins, second, secondWins) =
-        if (reverseWins) PathOrder(reverse, true, forward, false)
-        else PathOrder(forward, forwardWins, reverse, reverseWins)
+
+    // Find the directed contest between a and b in the Tideman lock-in
+    // record, if one exists. A tied pair (aOverB == bOverA) won't appear
+    // in `contests` at all because Tideman emits no contest for ties.
+    val contestIndex = tally.contests.indexOfFirst { contest ->
+        (contest.winner == a && contest.loser == b) ||
+            (contest.winner == b && contest.loser == a)
+    }
+    val contest = contestIndex.takeIf { it >= 0 }?.let { tally.contests[it] }
 
     Div({ classes("pair-detail") }) {
-        Div({ classes("pair-detail-header") }) { Text(verdict) }
-        renderPathBreakdown(first, isWinner = firstWins, ballots = revealed, isSecret = tally.secretBallot, isTier = electionTally::isTier)
-        renderPathBreakdown(second, isWinner = secondWins, ballots = revealed, isSecret = tally.secretBallot, isTier = electionTally::isTier)
+        renderDecisionHeader(a, b, contest, contestIndex, tally.contests.size)
+        renderDecisionDirect(a, b, aOverB, bOverA, revealed, tally.secretBallot)
+        if (contest?.outcome is RankedPairs.Outcome.SkippedByCycle) {
+            renderCycleSection(contest, electionTally::isTier)
+        }
     }
 }
 
-private data class PathOrder(
-    val first: Preference,
-    val firstWins: Boolean,
-    val second: Preference,
-    val secondWins: Boolean,
-)
+@Composable
+private fun renderDecisionHeader(
+    a: String,
+    b: String,
+    contest: RankedPairs.Contest?,
+    contestIndex: Int,
+    contestTotal: Int,
+) {
+    val verdict = when {
+        contest == null ->
+            "$a and $b tied in the direct contest — no edge locked, no edge skipped."
+        contest.outcome is RankedPairs.Outcome.Locked ->
+            "${contest.winner} beats ${contest.loser} — contest locked into the final ranking " +
+                "(step ${contestIndex + 1} of $contestTotal)."
+        contest.outcome is RankedPairs.Outcome.SkippedByCycle ->
+            "${contest.winner} beat ${contest.loser} directly, but the contest was skipped " +
+                "(step ${contestIndex + 1} of $contestTotal) — locking it in would have " +
+                "closed a cycle with earlier, stronger contests."
+        else -> ""
+    }
+    Div({ classes("pair-detail-header") }) { Text(verdict) }
+}
 
 @Composable
-private fun renderPathBreakdown(
-    pref: Preference,
-    isWinner: Boolean,
-    ballots: List<Ballot.Revealed>,
+private fun renderDecisionDirect(
+    a: String,
+    b: String,
+    aOverB: Int,
+    bOverA: Int,
+    revealed: List<Ballot.Revealed>,
     isSecret: Boolean,
+) {
+    val aVoters = votersWhoPrefer(revealed, a, b)
+    val bVoters = votersWhoPrefer(revealed, b, a)
+    val abstainVoters = votersWhoAbstainOnPair(revealed, a, b)
+    val aWins = aOverB > bOverA
+    val bWins = bOverA > aOverB
+
+    Div({ classes("pair-side-row") }) {
+        if (bWins) {
+            renderPairSide(name = b, voters = bVoters, count = bOverA, isWinner = true, isSecret = isSecret)
+            renderPairSide(name = a, voters = aVoters, count = aOverB, isWinner = false, isSecret = isSecret)
+        } else {
+            renderPairSide(name = a, voters = aVoters, count = aOverB, isWinner = aWins, isSecret = isSecret)
+            renderPairSide(name = b, voters = bVoters, count = bOverA, isWinner = false, isSecret = isSecret)
+        }
+    }
+
+    if (isSecret || abstainVoters.isNotEmpty()) {
+        Div({ classes("pair-abstain") }) {
+            H3 { Text("No expressed preference (${abstainVoters.size})") }
+            if (isSecret) {
+                P({ classes("pair-secret-note") }) { Text("(ballots are secret)") }
+            } else {
+                renderVoterList(abstainVoters)
+            }
+        }
+    }
+}
+
+@Composable
+private fun renderCycleSection(
+    contest: RankedPairs.Contest,
     isTier: (String) -> Boolean,
 ) {
-    val highlightBinding = pref.strengths.size > 1
-    val weakest = pref.strength
-    Div({
-        classes("pair-path")
-        if (isWinner) classes("pair-path-winner")
-    }) {
-        Div({ classes("pair-path-summary") }) {
-            renderPathName(pref.path[0], isTier(pref.path[0]))
-            pref.strengths.forEachIndexed { idx, s ->
-                Span({ classes("pair-path-arrow") }) { Text("→") }
-                val isBinding = highlightBinding && s == weakest
-                Span({
-                    classes("pair-path-strength")
-                    if (isBinding) classes("pair-path-strength-binding")
-                }) {
-                    Text(s.toString())
+    val skipped = contest.outcome as RankedPairs.Outcome.SkippedByCycle
+    Div({ classes("rp-cycle-section") }) {
+        H3 { Text("Why it was skipped") }
+        P {
+            Text(
+                "Locking in ${contest.winner} → ${contest.loser} would have created " +
+                    "a cycle: the path below is already in the locked ranking, " +
+                    "so adding this contest would close ${contest.loser} → … → " +
+                    "${contest.winner} → ${contest.loser} back on itself."
+            )
+        }
+        Div({ classes("rp-cycle-path") }) {
+            skipped.cyclePath.forEachIndexed { idx, name ->
+                if (idx > 0) {
+                    Span({ classes("rp-cycle-arrow") }) { Text("→") }
                 }
-                Span({ classes("pair-path-arrow") }) { Text("→") }
-                renderPathName(pref.path[idx + 1], isTier(pref.path[idx + 1]))
-            }
-            Span({ classes("pair-path-overall") }) {
-                Text("(overall strength ${pref.strength})")
+                renderNameChip(name, isTier(name))
             }
         }
+    }
+}
 
-        Div({ classes("pair-path-hops") }) {
-            pref.strengths.forEachIndexed { idx, s ->
-                val from = pref.path[idx]
-                val to = pref.path[idx + 1]
-                val isBinding = highlightBinding && s == weakest
-                Div({
-                    classes("pair-path-hop")
-                    if (isBinding) classes("pair-path-hop-binding")
-                }) {
-                    Div({ classes("pair-path-hop-header") }) {
-                        renderPathName(from, isTier(from))
-                        Text(" → ")
-                        renderPathName(to, isTier(to))
-                        Text(" ")
-                        Span({ classes("pair-path-hop-strength") }) {
-                            Text("$s ${if (s == 1) "voter" else "voters"}")
-                        }
-                    }
-                    if (isSecret) {
-                        P({ classes("pair-secret-note") }) { Text("(ballots are secret)") }
-                    } else {
-                        renderVoterList(votersWhoPrefer(ballots, from, to))
-                    }
+@Composable
+private fun renderProcessDetail(electionTally: ElectionTally) {
+    val contests = electionTally.tally.contests
+    if (contests.isEmpty()) {
+        P { Text("No contests — every candidate pair is tied or there are not enough candidates.") }
+        return
+    }
+    val locked = contests.count { it.outcome is RankedPairs.Outcome.Locked }
+    val skipped = contests.size - locked
+    Div({ classes("rp-process-summary") }) {
+        Text("$locked locked · $skipped skipped · ${contests.size} total contests")
+    }
+    Ol({ classes("rp-process-list") }) {
+        contests.forEachIndexed { idx, contest ->
+            renderProcessRow(idx + 1, contest, electionTally::isTier)
+        }
+    }
+}
+
+@Composable
+private fun renderProcessRow(
+    step: Int,
+    contest: RankedPairs.Contest,
+    isTier: (String) -> Boolean,
+) {
+    val locked = contest.outcome is RankedPairs.Outcome.Locked
+    Li({
+        classes("rp-process-row")
+        if (locked) classes("rp-process-row-locked") else classes("rp-process-row-skipped")
+    }) {
+        Div({ classes("rp-process-row-header") }) {
+            Span({ classes("rp-process-step") }) { Text("Step $step") }
+            Span({
+                classes("rp-process-status")
+                if (locked) classes("rp-process-status-locked") else classes("rp-process-status-skipped")
+            }) {
+                Text(if (locked) "Locked" else "Skipped")
+            }
+        }
+        Div({ classes("rp-process-contest") }) {
+            renderNameChip(contest.winner, isTier(contest.winner))
+            Span({ classes("rp-process-arrow") }) { Text("→") }
+            renderNameChip(contest.loser, isTier(contest.loser))
+            Span({ classes("rp-process-margin") }) {
+                Text("${contest.winningVotes} to ${contest.losingVotes}")
+            }
+        }
+        val outcome = contest.outcome
+        if (outcome is RankedPairs.Outcome.SkippedByCycle) {
+            Div({ classes("rp-process-reason") }) {
+                Span({ classes("rp-process-reason-label") }) { Text("Cycle: ") }
+                outcome.cyclePath.forEachIndexed { i, name ->
+                    if (i > 0) Span({ classes("rp-cycle-arrow") }) { Text("→") }
+                    renderNameChip(name, isTier(name))
                 }
             }
         }
@@ -342,10 +479,10 @@ private fun renderPathBreakdown(
 }
 
 @Composable
-private fun renderPathName(name: String, isTier: Boolean) {
+private fun renderNameChip(name: String, isTier: Boolean) {
     Span({
-        classes("pair-path-name")
-        if (isTier) classes("pair-path-name-tier")
+        classes("rp-name-chip")
+        if (isTier) classes("rp-name-chip-tier")
     }) { Text(name) }
 }
 

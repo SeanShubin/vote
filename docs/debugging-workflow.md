@@ -146,7 +146,7 @@ password `password`.
   never run against real prod).
 - `launch-from-snapshot --snapshot .local/scenario-snapshots/scenarios.jsonl`
   — when you want repeatable, synthetic data covering every voting algorithm
-  edge case (Schulze cycle, tactical voting, result ties, etc.) without
+  edge case (Condorcet cycle, tactical voting, result ties, etc.) without
   touching prod or AWS.
 
 ## Debugging Workflow

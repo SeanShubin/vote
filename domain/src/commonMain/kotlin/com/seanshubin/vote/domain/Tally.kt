@@ -1,7 +1,5 @@
 package com.seanshubin.vote.domain
 
-import com.seanshubin.vote.domain.Preference.Companion.places
-import com.seanshubin.vote.domain.Preference.Companion.strongestPaths
 import com.seanshubin.vote.domain.Ranking.Companion.prefers
 import kotlinx.serialization.Serializable
 
@@ -12,9 +10,9 @@ data class Tally(
     val secretBallot: Boolean,
     val ballots: List<Ballot>,
     val preferences: List<List<Preference>>,
-    val strongestPathMatrix: List<List<Preference>>,
+    val contests: List<RankedPairs.Contest>,
     val places: List<Place>,
-    val whoVoted: List<String>
+    val whoVoted: List<String>,
 ) {
     companion object {
         fun countBallots(
@@ -33,9 +31,9 @@ data class Tally(
             val projectedBallots = ballots.map { ballot ->
                 ballot.copy(rankings = projectBallot(ballot.rankings, tiers))
             }
-            // Tier markers join real candidates as nodes in the Schulze
-            // pairwise matrix — they're "virtual candidates" the algorithm
-            // uses to place real candidates relative to each tier line.
+            // Tier markers join real candidates as nodes in the pairwise
+            // matrix — they're "virtual candidates" the algorithm uses to
+            // place real candidates relative to each tier line.
             val allNodes = candidates + tiers
             // Drop nodes nobody ever ranked (real or virtual) — they'd just
             // contribute a noise row/column and a bottom-of-the-list place
@@ -78,8 +76,7 @@ data class Tally(
                 // ballots field below still gets rawBallots — display sees
                 // what voters cast, not the synthesized expansion.
                 val preferences = projectedBallots.map { it.rankings }.fold(emptyPreferences, ::accumulateRankings)
-                val strongestPaths = preferences.strongestPaths()
-                val places = strongestPaths.places(candidates)
+                val rankedPairs = RankedPairs.run(candidates, preferences)
                 val whoVoted = rawBallots.map { it.voterName }.sorted()
                 // Ballots flow through unchanged — display sees the same data the
                 // algorithm sees. No synthesis of "last place" entries for omitted
@@ -96,9 +93,9 @@ data class Tally(
                     secretBallot,
                     ballots,
                     preferences,
-                    strongestPaths,
-                    places,
-                    whoVoted
+                    rankedPairs.contests,
+                    rankedPairs.places,
+                    whoVoted,
                 )
             }
 

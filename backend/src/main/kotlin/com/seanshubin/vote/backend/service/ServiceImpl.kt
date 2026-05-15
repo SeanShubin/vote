@@ -722,11 +722,12 @@ class ServiceImpl(
         val tiers = queryModel.listTiers(electionName)
         val ballots = queryModel.listBallots(electionName)
         // Tally projects each ballot into its virtual form (candidates +
-        // materialized tier markers) before running Schulze. Storage only
-        // carries candidate rankings with a tier annotation; the markers
-        // are produced at compute time so a tier rename never invalidates
-        // a recorded ballot. When tiers is empty the projection is a no-op.
-        // Secret-ballot toggle dropped — tally always shows ranked ballots.
+        // materialized tier markers) before running the pairwise +
+        // Ranked Pairs pipeline. Storage only carries candidate rankings
+        // with a tier annotation; the markers are produced at compute time
+        // so a tier rename never invalidates a recorded ballot. When tiers
+        // is empty the projection is a no-op. Secret-ballot toggle dropped
+        // — tally always shows ranked ballots.
         val tally = Tally.countBallots(
             electionName = electionName,
             secretBallot = false,

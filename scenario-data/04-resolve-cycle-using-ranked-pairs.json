@@ -1,8 +1,8 @@
 {
     "scenarioNumber": "04",
-    "scenarioName": "04-resolve-cycle-using-schulze-method",
-    "displayName": "Resolve Cycle Using Schulze Method",
-    "electionName": "Resolve Cycle Using Schulze Method Election",
+    "scenarioName": "04-resolve-cycle-using-ranked-pairs",
+    "displayName": "Resolve Cycle Using Ranked Pairs",
+    "electionName": "Resolve Cycle Using Ranked Pairs Election",
     "ownerName": "owner",
     "candidates": [
         {

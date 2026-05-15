@@ -2,8 +2,8 @@ package com.seanshubin.vote.domain
 
 /**
  * Expand a voter's ballot (candidate rankings + per-candidate tier
- * annotations) into the virtual ballot the Schulze pipeline consumes
- * (candidates and tier markers interleaved in one strict order).
+ * annotations) into the virtual ballot the pairwise tally pipeline
+ * consumes (candidates and tier markers interleaved in one strict order).
  *
  * **Input contract:** every [Ranking] in [rankings] must be
  * [RankingKind.CANDIDATE]. The voter expresses tier-clearing implicitly

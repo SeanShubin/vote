@@ -1,8 +1,8 @@
 {
     "scenarioNumber": "05",
-    "scenarioName": "05-schulze-example-from-wikipedia",
-    "displayName": "Schulze Example From Wikipedia",
-    "electionName": "Schulze Example From Wikipedia Election",
+    "scenarioName": "05-pairwise-example-from-wikipedia",
+    "displayName": "Pairwise Example From Wikipedia",
+    "electionName": "Pairwise Example From Wikipedia Election",
     "ownerName": "owner",
     "candidates": [
         {

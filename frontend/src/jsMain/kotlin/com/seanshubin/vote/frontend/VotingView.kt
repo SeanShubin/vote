@@ -173,7 +173,7 @@ fun VotingView(
             // Project the stored annotations back into the in-memory list
             // shape (candidates interleaved with tier markers) — same
             // function the tally pipeline uses, so what the voter sees
-            // mirrors what Schulze will compute on.
+            // mirrors what the pairwise tally will compute on.
             rankingsToRankedItems(knownExisting, tiers)
         }
         ranked = newRanked
@@ -755,7 +755,7 @@ internal fun List<RankedItem>.toRankings(): List<Ranking> {
  * and reconstruct the in-memory list with [RankedItem.TierMarker] entries
  * in the right positions. Reuses [projectBallot] — the same function the
  * tally pipeline runs on cast ballots — so the UI's reconstruction can't
- * drift from the Schulze pipeline's interpretation.
+ * drift from the tally pipeline's interpretation.
  */
 internal fun rankingsToRankedItems(
     rankings: List<Ranking>,

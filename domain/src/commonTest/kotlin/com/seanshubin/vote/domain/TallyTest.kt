@@ -80,8 +80,9 @@ class TallyTest {
             ballot("bob", "A" to 1),
             ballot("carol", "B" to 1, "A" to 2),
         )
-        // Both candidates rank=1 (a tie at the top under Schulze with equal
-        // pairwise wins).
+        // Both candidates rank=1 (a tie at the top: the direct contest is
+        // tied 1-1, so Tideman locks no edge and the DAG leaves them
+        // unconstrained — they share place 1).
         assertEquals(setOf(1), tally.places.map { it.rank }.toSet())
         assertEquals(setOf("A", "B"), tally.places.map { it.candidateName }.toSet())
     }

@@ -179,8 +179,11 @@ fun VoteApp(apiClient: ApiClient) {
             onNavigateToPreferences = {
                 router.navigate(Page.ElectionPreferences(page.electionName))
             },
-            onNavigateToStrongestPaths = {
-                router.navigate(Page.ElectionStrongestPaths(page.electionName))
+            onNavigateToDecision = {
+                router.navigate(Page.ElectionDecision(page.electionName))
+            },
+            onNavigateToProcess = {
+                router.navigate(Page.ElectionProcess(page.electionName))
             },
         )
         is Page.ElectionPreferences -> ElectionPreferencesPage(
@@ -191,7 +194,12 @@ fun VoteApp(apiClient: ApiClient) {
             // from. The hash is read by rememberHashTab on the destination.
             onBack = { router.navigate(Page.ElectionDetail(page.electionName), hash = "tally") },
         )
-        is Page.ElectionStrongestPaths -> ElectionStrongestPathsPage(
+        is Page.ElectionDecision -> ElectionDecisionPage(
+            apiClient = apiClient,
+            electionName = page.electionName,
+            onBack = { router.navigate(Page.ElectionDetail(page.electionName), hash = "tally") },
+        )
+        is Page.ElectionProcess -> ElectionProcessPage(
             apiClient = apiClient,
             electionName = page.electionName,
             onBack = { router.navigate(Page.ElectionDetail(page.electionName), hash = "tally") },

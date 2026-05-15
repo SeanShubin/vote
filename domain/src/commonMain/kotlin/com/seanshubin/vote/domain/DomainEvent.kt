@@ -232,7 +232,8 @@ sealed interface DomainEvent {
      * annotation on every cast ballot for this election. Since the
      * voter's intent is encoded as "this candidate cleared the
      * second-prestige tier" via the label, swapping the label preserves
-     * the intent — Schulze sees the same virtual ballot before and after.
+     * the intent — the pairwise tally sees the same virtual ballot before
+     * and after.
      */
     @Serializable
     @SerialName("TierRenamed")

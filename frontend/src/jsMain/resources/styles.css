@@ -21,9 +21,9 @@ body {
 }
 
 /*
- * Admin pages (Raw Tables, Debug Tables, Preferences, Strongest Paths) reclaim
- * browser width for the data tables. Unlike .container, no max-width — small
- * viewport margin only.
+ * Admin pages (Raw Tables, Debug Tables, Preferences, Decision, Process)
+ * reclaim browser width for the data tables. Unlike .container, no
+ * max-width — small viewport margin only.
  *
  * Layout: a flex column sized to the dynamic viewport so children can be split
  * into "fixed" (page header, action buttons) and "fills the rest" (the
@@ -1068,22 +1068,6 @@ tr:nth-child(even) {
     color: white;
 }
 
-/*
- * Tier markers can appear inside strongest-path renderings as intermediate
- * nodes (a path A → T → B uses T to show that voters placed A above the
- * tier and B below it). Light-blue background + bold mirror the tier-card
- * styling on the vote and results pages so the reader recognizes "this is
- * a tier marker, not a candidate the comparison was about." Tiers are not
- * selectable in the chip arena, so this style is only ever applied inside
- * path-node rendering.
- */
-.pair-path-name-tier {
-    background: #e8eef5;
-    font-weight: 700;
-    padding: 0.05rem 0.4rem;
-    border-radius: 4px;
-}
-
 .pair-page-explainer {
     color: #555;
     font-size: 0.9rem;
@@ -1196,91 +1180,167 @@ tr:nth-child(even) {
     color: #6b7d8d;
 }
 
-.pair-path {
+/*
+ * Tideman reports (rp-*). Two pages share this vocabulary:
+ *   - Decision: per-pair Tideman verdict (Locked / Skipped / no contest).
+ *   - Process: full lock-in narrative, one row per contest in order.
+ * Both pages use the same chip + arrow primitives so a reader who learns
+ * the chip style on one page recognises it on the other.
+ */
+
+/*
+ * Tier markers can appear as nodes inside a reported cycle path (one of
+ * the locked contests that closes the cycle may have a tier marker as
+ * winner or loser, since tier markers are virtual candidates in the
+ * pairwise matrix). The light-blue + bold styling mirrors the tier-card
+ * look elsewhere so a reader recognises "this is a tier marker, not a
+ * candidate the comparison is between." Tiers aren't selectable in the
+ * chip arena, so this style only applies inside reported paths.
+ */
+.rp-name-chip {
+    padding: 0.05rem 0.4rem;
+    border-radius: 4px;
+    color: #1f3956;
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+
+.rp-name-chip-tier {
+    background: #e8eef5;
+    font-weight: 700;
+}
+
+.rp-cycle-arrow {
+    color: #aab8ca;
+    margin: 0 0.2rem;
+}
+
+/* Decision page: the "why this was skipped" callout sits below the
+ * direct head-to-head and lays out the locked-edge path that closes
+ * the cycle. */
+.rp-cycle-section {
     background: white;
     border: 1px solid #aab8ca;
     border-radius: 6px;
     padding: 0.75rem;
-    display: flex;
-    flex-direction: column;
-    gap: 0.6rem;
 }
 
-.pair-path-winner {
-    border: 2px solid #2c7be5;
-    padding: calc(0.75rem - 1px);
-    background: #ecf2fb;
+.rp-cycle-section h3 {
+    margin: 0 0 0.5rem 0;
+    font-size: 0.95rem;
+    color: #6b7d8d;
 }
 
-.pair-path-summary {
+.rp-cycle-path {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 0.3rem;
-    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-    color: #1f3956;
-    font-weight: 500;
-}
-
-.pair-path-name {
-    color: #1f3956;
-}
-
-.pair-path-arrow {
-    color: #aab8ca;
-}
-
-.pair-path-strength {
-    color: #2c7be5;
-}
-
-/* Binding hop: the minimum-strength link along a multi-hop path — the one
- * that fixes the path's overall strength. Boxed + bolded so it stands out. */
-.pair-path-strength-binding {
-    font-weight: 700;
+    gap: 0.15rem;
+    margin-top: 0.5rem;
+    padding: 0.5rem 0.75rem;
     background: #f0f6ff;
-    padding: 0 0.3rem;
-    border-radius: 3px;
-    color: #1c5fb8;
+    border-radius: 4px;
 }
 
-.pair-path-overall {
-    margin-left: 0.4rem;
+/* Process page: header summary + ordered list of contest rows. */
+.rp-process-summary {
     color: #6b7d8d;
-    font-family: inherit;
-    font-weight: 400;
-    font-size: 0.85rem;
+    font-size: 0.9rem;
+    margin: 0 0 1rem;
+    font-variant-numeric: tabular-nums;
 }
 
-.pair-path-hops {
+.rp-process-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
 }
 
-.pair-path-hop {
-    border: 1px solid #ddd;
+.rp-process-row {
+    border-radius: 6px;
+    padding: 0.6rem 0.9rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.rp-process-row-locked {
+    background: #ecf2fb;
+    border: 1px solid #aab8ca;
+}
+
+.rp-process-row-skipped {
+    background: #f7f7f7;
+    border: 1px dashed #aab8ca;
+}
+
+.rp-process-row-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-size: 0.85rem;
+}
+
+.rp-process-step {
+    color: #6b7d8d;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.04em;
+}
+
+.rp-process-status {
+    padding: 0.05rem 0.5rem;
     border-radius: 4px;
-    background: #f9f9f9;
-    padding: 0.5rem 0.75rem;
-}
-
-.pair-path-hop-binding {
-    border-color: #2c7be5;
-    background: #f0f6ff;
-}
-
-.pair-path-hop-header {
-    font-weight: 500;
-    color: #34495e;
-    margin-bottom: 0.3rem;
-}
-
-.pair-path-hop-strength {
-    color: #2c7be5;
     font-weight: 600;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.rp-process-status-locked {
+    background: #2c7be5;
+    color: white;
+}
+
+.rp-process-status-skipped {
+    background: #d8e0ea;
+    color: #34495e;
+}
+
+.rp-process-contest {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.3rem;
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-weight: 500;
+}
+
+.rp-process-arrow {
+    color: #aab8ca;
+}
+
+.rp-process-margin {
+    color: #6b7d8d;
+    font-weight: 400;
     margin-left: 0.4rem;
     font-variant-numeric: tabular-nums;
+}
+
+.rp-process-reason {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.15rem;
+    color: #6b7d8d;
+    font-size: 0.85rem;
+}
+
+.rp-process-reason-label {
+    color: #34495e;
+    font-weight: 600;
+    margin-right: 0.3rem;
 }
 
 .build-stamp {

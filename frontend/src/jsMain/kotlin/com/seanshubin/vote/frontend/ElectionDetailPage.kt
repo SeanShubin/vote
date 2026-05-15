@@ -31,7 +31,8 @@ fun ElectionDetailPage(
     onBack: () -> Unit,
     onElectionDeleted: () -> Unit,
     onNavigateToPreferences: () -> Unit = {},
-    onNavigateToStrongestPaths: () -> Unit = {},
+    onNavigateToDecision: () -> Unit = {},
+    onNavigateToProcess: () -> Unit = {},
 ) {
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var successMessage by remember { mutableStateOf<String?>(null) }
@@ -39,8 +40,9 @@ fun ElectionDetailPage(
 
     // Two independent fetches:
     //   shellFetch — election + candidates, in parallel; gates the page UI.
-    //   tallyFetch — the heavier endpoint (server runs Schulze + serializes
-    //                ballots/preferences/strongest-paths), kept off the
+    //   tallyFetch — the heavier endpoint (server runs the pairwise +
+    //                Ranked Pairs pipeline and serializes ballots,
+    //                preferences, and the contest lock-in record), kept off the
     //                page's critical path so the shell renders the moment
     //                the two light fetches return. The tally streams in on
     //                its own track and the Results tab consumes it as a
@@ -334,7 +336,8 @@ fun ElectionDetailPage(
                     "tally" -> TallyView(
                         state = tallyFetch.state,
                         onNavigateToPreferences = onNavigateToPreferences,
-                        onNavigateToStrongestPaths = onNavigateToStrongestPaths,
+                        onNavigateToDecision = onNavigateToDecision,
+                        onNavigateToProcess = onNavigateToProcess,
                     )
                 }
             }

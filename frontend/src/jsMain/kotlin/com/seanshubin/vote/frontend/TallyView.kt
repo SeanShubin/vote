@@ -14,7 +14,8 @@ import org.jetbrains.compose.web.dom.*
 fun TallyView(
     state: FetchState<ElectionTally>,
     onNavigateToPreferences: () -> Unit,
-    onNavigateToStrongestPaths: () -> Unit,
+    onNavigateToDecision: () -> Unit,
+    onNavigateToProcess: () -> Unit,
 ) {
     Div({ classes("section") }) {
         H2 { Text("Results") }
@@ -25,7 +26,8 @@ fun TallyView(
             is FetchState.Success -> renderTally(
                 state.value,
                 onNavigateToPreferences = onNavigateToPreferences,
-                onNavigateToStrongestPaths = onNavigateToStrongestPaths,
+                onNavigateToDecision = onNavigateToDecision,
+                onNavigateToProcess = onNavigateToProcess,
             )
         }
     }
@@ -35,21 +37,23 @@ fun TallyView(
  * Lets the viewer toggle individual ballots on/off and watch the Winners
  * list recompute against the active subset. Local-only: no persisted state,
  * no effect on other viewers — leaving the page resets to "all on". The full
- * Tally.countBallots pipeline (Schulze strongest paths + place grouping)
- * lives in the shared `domain` module so the frontend can rerun it directly.
+ * Tally.countBallots pipeline (pairwise matrix + Tideman ranked pairs + place
+ * grouping) lives in the shared `domain` module so the frontend can rerun it
+ * directly.
  *
  * Only `Ballot.Revealed` ballots are toggleable: secret ballots strip the
  * voter identity and Tally.countBallots only accepts revealed input. With the
  * current `secretBallot = false` setting, every ballot is revealed.
  *
- * The toggle does not flow into the Preferences / Strongest Paths detail
+ * The toggle does not flow into the Preferences / Decision / Process detail
  * pages — those are separate routes that fetch their own (unfiltered) tally.
  */
 @Composable
 private fun renderTally(
     serverTally: ElectionTally,
     onNavigateToPreferences: () -> Unit,
-    onNavigateToStrongestPaths: () -> Unit,
+    onNavigateToDecision: () -> Unit,
+    onNavigateToProcess: () -> Unit,
 ) {
     val revealed = serverTally.tally.ballots.filterIsInstance<Ballot.Revealed>()
     val totalToggleable = revealed.size
@@ -85,13 +89,13 @@ private fun renderTally(
             .groupingBy { it }
             .eachCount()
     }
-    // Memoize the Schulze recomputation against (serverTally, active). The
-    // strongest-paths pass inside Tally.countBallots is O(n³) on the candidate
-    // count, so without the remember Compose would re-run it on every
-    // recomposition (parent reposes, hover, etc.) — not just when the active
-    // set actually changes. Equality on Set<String> is structural, so toggling
-    // a ballot invalidates the cache by design and triggers exactly one
-    // recompute.
+    // Memoize the tally recomputation against (serverTally, active). The
+    // Tideman lock-in pass inside Tally.countBallots is at worst O(n³) on
+    // the candidate count (BFS per skipped contest), so without the
+    // remember Compose would re-run it on every recomposition (parent
+    // reposes, hover, etc.) — not just when the active set actually
+    // changes. Equality on Set<String> is structural, so toggling a ballot
+    // invalidates the cache by design and triggers exactly one recompute.
     val displaySections = if (allOn) {
         serverTally.sections
     } else {
@@ -191,12 +195,14 @@ private fun renderTally(
         )
     }
 
-    // Detail tables (preferences, strongest paths) live on their own
-    // admin-style pages — they get wide quickly and don't belong inside the
-    // aesthetic election shell. See docs/style-guide.md.
+    // Detail tables (preferences, decision, process) live on their own
+    // admin-style pages — they get wide quickly and don't belong inside
+    // the aesthetic election shell. See docs/style-guide.md and
+    // docs/tideman-ranked-pairs.md for what each report shows.
     Div({ classes("button-row") }) {
         Button({ onClick { onNavigateToPreferences() } }) { Text("View Preferences") }
-        Button({ onClick { onNavigateToStrongestPaths() } }) { Text("View Strongest Paths") }
+        Button({ onClick { onNavigateToDecision() } }) { Text("View Decision") }
+        Button({ onClick { onNavigateToProcess() } }) { Text("View Process") }
     }
 }
 
