@@ -97,6 +97,30 @@ candidate directly, all their outgoing contests lock in (they never
 have an incoming edge to close a cycle into), and topology puts them
 alone at place 1.
 
+### The alphabetical tiebreak can affect the ranking
+
+When two contests have the same winning votes *and* the same losing
+votes, step 3 falls through to a sort by winner name then loser name.
+That tiebreaker is normally invisible (it just decides display order
+within a "bucket" of equally-strong contests), but in one case it can
+change the outcome: when several equally-strong contests form a cycle.
+
+Pathological example: three candidates A, B, C with A→B, B→C, and C→A
+all at strength 3-3 (a clean rock-paper-scissors at equal votes).
+Whichever two of those three lock first determine the ranking — the
+third creates a cycle and gets skipped. Under our alphabetical
+tiebreak: A→B locks (winner A), then B→C locks (winner B), then C→A
+is skipped because A→B→C already exists. Final: A > B > C.
+
+Tideman's original 1987 paper resolves this with a random ballot.
+That removes the alphabetical bias at the cost of determinism — the
+result of an election with a perfect numeric tie among cycle edges
+could come out differently on different runs. We chose determinism;
+alphabetically-earlier candidates win perfect ties as a side effect.
+In practice, the perfect-numeric-tie case is rare enough that this
+trade-off is mostly theoretical, but it's not nothing — it's worth
+being explicit about.
+
 ## A worked example
 
 Three candidates — Apple, Banana, Cherry — and five voters. Two voters

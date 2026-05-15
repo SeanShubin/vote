@@ -1230,23 +1230,113 @@ tr:nth-child(even) {
     color: #6b7d8d;
 }
 
-.rp-cycle-path {
+/*
+ * The cycle comparison on the Decision page: one row per locked contest
+ * in the cycle path, then one final row for the skipped contest. The
+ * step number + status pill + (winner → loser) + strength columns line
+ * up across rows so a reader can scan down and see the priority order
+ * the lock-in process used.
+ */
+.rp-cycle-comparison {
     display: flex;
-    flex-wrap: wrap;
+    flex-direction: column;
+    gap: 0.35rem;
+    margin-top: 0.75rem;
+}
+
+.rp-cycle-row {
+    display: grid;
+    grid-template-columns: auto auto 1fr auto;
     align-items: center;
-    gap: 0.15rem;
-    margin-top: 0.5rem;
-    padding: 0.5rem 0.75rem;
-    background: #f0f6ff;
+    gap: 0.75rem;
+    padding: 0.45rem 0.75rem;
     border-radius: 4px;
 }
 
-/* Process page: header summary + ordered list of contest rows. */
+.rp-cycle-row-locked {
+    background: #ecf2fb;
+    border: 1px solid #aab8ca;
+}
+
+.rp-cycle-row-skipped {
+    background: #f7f7f7;
+    border: 1px dashed #aab8ca;
+}
+
+.rp-cycle-row-step {
+    color: #6b7d8d;
+    font-variant-numeric: tabular-nums;
+    font-size: 0.85rem;
+    letter-spacing: 0.04em;
+}
+
+.rp-cycle-row-status {
+    padding: 0.05rem 0.5rem;
+    border-radius: 4px;
+    font-weight: 600;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.rp-cycle-row-edge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-weight: 500;
+}
+
+.rp-cycle-row-strength {
+    color: #6b7d8d;
+    font-size: 0.85rem;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+/* Process page: header summary + explainer + bucket-grouped contest rows. */
 .rp-process-summary {
     color: #6b7d8d;
     font-size: 0.9rem;
-    margin: 0 0 1rem;
+    margin: 0 0 0.5rem;
     font-variant-numeric: tabular-nums;
+}
+
+.rp-process-explainer {
+    color: #555;
+    font-size: 0.9rem;
+    margin: 0 0 1rem;
+}
+
+/*
+ * Bucket header inserted between groups of contests that share
+ * (winning votes, losing votes). Visually breaks up the flat list so a
+ * reader sees "this run of rows was locked first because the bucket is
+ * stronger."
+ */
+.rp-process-bucket-header {
+    display: flex;
+    align-items: baseline;
+    gap: 0.75rem;
+    margin: 1rem 0 0.5rem 0;
+    padding-bottom: 0.3rem;
+    border-bottom: 1px solid #aab8ca;
+}
+
+.rp-process-bucket-header:first-child {
+    margin-top: 0;
+}
+
+.rp-process-bucket-label {
+    font-weight: 700;
+    color: #1f3956;
+    font-variant-numeric: tabular-nums;
+    font-size: 0.95rem;
+}
+
+.rp-process-bucket-count {
+    color: #6b7d8d;
+    font-size: 0.85rem;
 }
 
 .rp-process-list {
