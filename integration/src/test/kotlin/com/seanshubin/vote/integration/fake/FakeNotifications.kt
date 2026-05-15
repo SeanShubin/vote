@@ -38,4 +38,18 @@ class FakeNotifications : Notifications {
         events.add("mail: to=$to, subject=$subject")
         sentMails.add(to to subject)
     }
+
+    override fun unhandledHttpException(method: String, path: String, message: String, stackTrace: String) {
+        events.add("unhandled-http-exception: $method $path - $message")
+    }
+
+    override fun clientErrorReported(
+        message: String,
+        url: String,
+        userAgent: String,
+        stackTrace: String?,
+        timestamp: String,
+    ) {
+        events.add("client-error: $message @ $url")
+    }
 }

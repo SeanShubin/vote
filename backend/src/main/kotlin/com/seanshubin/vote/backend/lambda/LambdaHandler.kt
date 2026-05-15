@@ -18,8 +18,11 @@ import com.seanshubin.vote.backend.http.HttpRequest
 import com.seanshubin.vote.backend.http.SetCookie
 import com.seanshubin.vote.backend.integration.ProductionIntegrations
 import com.seanshubin.vote.backend.router.RequestRouter
+import com.seanshubin.vote.backend.service.DynamoToRelational
+import com.seanshubin.vote.backend.service.EventApplier
 import com.seanshubin.vote.backend.service.ServiceImpl
 import kotlinx.serialization.json.Json
+import java.net.http.HttpClient
 
 /**
  * Lambda entry point — translates between API Gateway HTTPv2 events and
@@ -74,6 +77,11 @@ class LambdaHandler : RequestHandler<APIGatewayV2HTTPEvent, APIGatewayV2HTTPResp
     }
 
     companion object {
+        // Single HttpClient shared across all warm Lambda invocations. SnapStart
+        // captures it in the checkpoint, so cold-restored invocations reuse the
+        // same connection-pooled instance rather than building a fresh client
+        // per invocation.
+        private val sharedHttpClient: HttpClient = HttpClient.newHttpClient()
         private val router: RequestRouter = buildRouter()
 
         private fun buildRouter(): RequestRouter {
@@ -115,7 +123,9 @@ class LambdaHandler : RequestHandler<APIGatewayV2HTTPEvent, APIGatewayV2HTTPResp
                 rawTableScanner = repositories.rawTableScanner,
                 tokenEncoder = tokenEncoder,
                 discordConfigProvider = discordConfigProvider,
-                discordOAuthClient = DiscordOAuthClient(),
+                discordOAuthClient = DiscordOAuthClient(httpClient = sharedHttpClient),
+                relationalProjection = DynamoToRelational(repositories.queryModel, repositories.eventLog),
+                eventApplier = EventApplier(repositories.eventLog, repositories.commandModel, repositories.queryModel),
                 // parseLambdaConfiguration hard-codes this false — the
                 // dev-login bypass cannot exist in production.
                 devLoginEnabled = configuration.devLoginEnabled,
@@ -127,6 +137,7 @@ class LambdaHandler : RequestHandler<APIGatewayV2HTTPEvent, APIGatewayV2HTTPResp
                 tokenEncoder = tokenEncoder,
                 refreshCookie = configuration.cookieConfig,
                 frontendBaseUrl = configuration.frontendBaseUrl,
+                notifications = integrations.notifications,
             )
         }
     }

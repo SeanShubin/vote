@@ -1,5 +1,7 @@
 package com.seanshubin.vote.tools.lib
 
+import com.seanshubin.vote.backend.auth.DiscordConfigProvider
+import com.seanshubin.vote.backend.auth.DiscordOAuthClient
 import com.seanshubin.vote.backend.auth.JwtCipher
 import com.seanshubin.vote.backend.auth.TokenEncoder
 import com.seanshubin.vote.backend.repository.InMemoryCommandModel
@@ -7,6 +9,8 @@ import com.seanshubin.vote.backend.repository.InMemoryData
 import com.seanshubin.vote.backend.repository.InMemoryEventLog
 import com.seanshubin.vote.backend.repository.InMemoryQueryModel
 import com.seanshubin.vote.backend.repository.InMemoryRawTableScanner
+import com.seanshubin.vote.backend.service.DynamoToRelational
+import com.seanshubin.vote.backend.service.EventApplier
 import com.seanshubin.vote.backend.service.ServiceImpl
 import com.seanshubin.vote.contract.Clock
 import com.seanshubin.vote.contract.Integrations
@@ -14,6 +18,7 @@ import com.seanshubin.vote.contract.Notifications
 import com.seanshubin.vote.contract.Service
 import com.seanshubin.vote.contract.UniqueIdGenerator
 import kotlinx.datetime.Instant
+import java.net.http.HttpClient
 import java.util.UUID
 
 /**
@@ -43,6 +48,11 @@ class InProcessService {
         queryModel = queryModel,
         rawTableScanner = rawTableScanner,
         tokenEncoder = tokenEncoder,
+        discordConfigProvider = DiscordConfigProvider { null },
+        discordOAuthClient = DiscordOAuthClient(httpClient = HttpClient.newHttpClient()),
+        relationalProjection = DynamoToRelational(queryModel, eventLog),
+        eventApplier = EventApplier(eventLog, commandModel, queryModel),
+        devLoginEnabled = false,
     )
 }
 
@@ -72,4 +82,12 @@ private object NoopNotifications : Notifications {
     override fun topLevelException(message: String, stackTrace: String) = Unit
     override fun sqlException(name: String, sqlCode: String, message: String) = Unit
     override fun sendMailEvent(to: String, subject: String) = Unit
+    override fun unhandledHttpException(method: String, path: String, message: String, stackTrace: String) = Unit
+    override fun clientErrorReported(
+        message: String,
+        url: String,
+        userAgent: String,
+        stackTrace: String?,
+        timestamp: String,
+    ) = Unit
 }

@@ -326,6 +326,10 @@ class HttpApiClient(
                 body = json.encodeToString(errorRequest)
             ))
         } catch (loggingError: Throwable) {
+            // Terminal sink: the server-logging path itself failed (network,
+            // CORS, etc.). There's no further injectable channel — the
+            // browser console is the last resort. This is the Humble I/O
+            // Adapter pattern; everything testable has been extracted above.
             console.error("Failed to log error to server:", loggingError)
             console.error("Original error:", error)
         }

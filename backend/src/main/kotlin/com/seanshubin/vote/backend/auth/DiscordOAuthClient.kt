@@ -22,7 +22,7 @@ import java.nio.charset.StandardCharsets
  * layer), not here.
  */
 class DiscordOAuthClient(
-    private val httpClient: HttpClient = HttpClient.newHttpClient(),
+    private val httpClient: HttpClient,
     private val authorizeBase: String = DEFAULT_AUTHORIZE,
     private val tokenEndpoint: String = DEFAULT_TOKEN,
     private val apiBase: String = DEFAULT_API,

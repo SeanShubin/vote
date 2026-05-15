@@ -38,4 +38,25 @@ object ConsoleNotifications : Notifications {
     override fun sendMailEvent(to: String, subject: String) {
         println("Sending email to $to: $subject")
     }
+
+    override fun unhandledHttpException(method: String, path: String, message: String, stackTrace: String) {
+        System.err.println("Unhandled exception: $method $path - $message")
+        System.err.println(stackTrace)
+    }
+
+    override fun clientErrorReported(
+        message: String,
+        url: String,
+        userAgent: String,
+        stackTrace: String?,
+        timestamp: String,
+    ) {
+        System.err.println(
+            "CLIENT ERROR: $message\n" +
+                "  URL: $url\n" +
+                "  User-Agent: $userAgent\n" +
+                "  Timestamp: $timestamp\n" +
+                "  Stack trace: ${stackTrace ?: "none"}"
+        )
+    }
 }

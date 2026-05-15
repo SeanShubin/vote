@@ -9,4 +9,16 @@ interface Notifications {
     fun topLevelException(message: String, stackTrace: String)
     fun sqlException(name: String, sqlCode: String, message: String)
     fun sendMailEvent(to: String, subject: String)
+
+    /** Unrecoverable exception while routing an HTTP request — returns a 500. */
+    fun unhandledHttpException(method: String, path: String, message: String, stackTrace: String)
+
+    /** A frontend client reported an uncaught runtime error to /log-client-error. */
+    fun clientErrorReported(
+        message: String,
+        url: String,
+        userAgent: String,
+        stackTrace: String?,
+        timestamp: String,
+    )
 }

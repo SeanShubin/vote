@@ -8,11 +8,14 @@ import com.seanshubin.vote.backend.auth.SsmDiscordConfigProvider
 import com.seanshubin.vote.backend.auth.TokenEncoder
 import com.seanshubin.vote.backend.router.RequestRouter
 import com.seanshubin.vote.backend.router.SimpleHttpHandler
+import com.seanshubin.vote.backend.service.DynamoToRelational
+import com.seanshubin.vote.backend.service.EventApplier
 import com.seanshubin.vote.backend.service.ServiceImpl
 import com.seanshubin.vote.contract.Integrations
 import com.seanshubin.vote.contract.Service
 import kotlinx.serialization.json.Json
 import org.eclipse.jetty.server.Server
+import java.net.http.HttpClient
 import java.sql.Connection
 
 class ApplicationRunner(
@@ -23,6 +26,7 @@ class ApplicationRunner(
     private val dynamoDbStartup: DynamoDbStartup,
     private val json: Json,
 ) {
+    private val sharedHttpClient: HttpClient = HttpClient.newHttpClient()
     private var sqlConnection: Connection? = null
     private var dynamoDbClient: DynamoDbClient? = null
     private var server: Server? = null
@@ -82,7 +86,9 @@ class ApplicationRunner(
             rawTableScanner = repositories.rawTableScanner,
             tokenEncoder = tokenEncoder,
             discordConfigProvider = discordConfigProvider,
-            discordOAuthClient = DiscordOAuthClient(),
+            discordOAuthClient = DiscordOAuthClient(httpClient = sharedHttpClient),
+            relationalProjection = DynamoToRelational(repositories.queryModel, repositories.eventLog),
+            eventApplier = EventApplier(repositories.eventLog, repositories.commandModel, repositories.queryModel),
             devLoginEnabled = configuration.devLoginEnabled,
         )
         this.service = service
@@ -100,6 +106,7 @@ class ApplicationRunner(
             tokenEncoder = tokenEncoder,
             refreshCookie = configuration.cookieConfig,
             frontendBaseUrl = configuration.frontendBaseUrl,
+            notifications = integrations.notifications,
         )
         val httpHandler = SimpleHttpHandler(router)
         server = Server(configuration.port)
