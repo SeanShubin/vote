@@ -4,6 +4,7 @@ import androidx.compose.runtime.*
 import com.seanshubin.vote.contract.ApiClient
 import com.seanshubin.vote.domain.Ranking
 import com.seanshubin.vote.domain.RankingKind
+import com.seanshubin.vote.domain.RankingSide
 import com.seanshubin.vote.domain.buildBallotText
 import com.seanshubin.vote.domain.projectBallot
 import kotlinx.browser.window
@@ -11,37 +12,23 @@ import org.jetbrains.compose.web.attributes.*
 import org.jetbrains.compose.web.dom.*
 
 /**
- * Ranked-ballot voting UI. Candidates start in the "arena" pool (3-column
- * grid). Click a chip to rank it, or drag it directly into the list / a tier.
- * Drag a row to reorder live. ↑/↓ keys nudge the focused row. × returns a row
- * to the arena.
+ * Ranked-ballot voting UI with dual-sided support.
  *
- * There is no submit step: every change to the ranked list is persisted
- * immediately via castBallot, so the on-screen ordering is always the
- * voter's current ballot. The wire format sends `List<Ranking>` where each
- * ranked entry gets `rank = position + 1` and a `kind` tag (CANDIDATE or
- * TIER). Unranked candidates are simply omitted; the tally only counts
- * pairwise preferences between candidates the voter actually ranked, so
- * leaving a candidate off a ballot means "I express no opinion about
- * this candidate" rather than "I rank this candidate last."
+ * Each ballot has two independent sides — PUBLIC and SECRET — that share a
+ * single ballot id (confirmation) on the server. Voters can fill in either
+ * or both. The two sides never influence each other's tally.
  *
- * Tier mode — the threshold metaphor. Tier markers are virtual candidates
- * the voter ranks alongside the real ones; ranking a candidate ahead of a
- * tier marker means "this candidate clears that tier." A candidate's tier
- * is the highest tier they cleared. The ballot is pre-populated with the
- * tier markers in declared order. Clicking a tier card selects it as the
- * default target for click-to-rank. The selection highlight only shows
- * while the arena still has unranked chips, since once everything is ranked
- * the selection has nowhere to be applied. When the arena empties to non-
- * empty via a candidate removal, the selection snaps to the tier that
- * candidate had cleared, so putting them back in the same tier is one
- * click. Tier markers are not draggable and have no remove/move buttons —
- * their relative order is invariant. Clearing every candidate row (only
- * tier markers remain) is treated as "no ballot" and deletes the ballot
- * server-side.
+ * On screen, only the currently selected side is editable; the other
+ * side's state is kept in memory so toggling back doesn't lose work. The
+ * top-of-view side toggle picks which side is active (PUBLIC by default).
+ * The "copy other side" button stamps the other side's rankings onto the
+ * current side as a starting point.
  *
- * The on-screen rank number ignores tier markers — voters see 01, 02, 03
- * over their candidates regardless of how the tier markers are interleaved.
+ * Persistence: a single castBallot call carries both sides' rankings
+ * (each [Ranking] tagged with its [RankingSide]). The save logic fires
+ * when either side changes from its last-saved snapshot. If neither side
+ * has any candidate ranked, the ballot is deleted entirely so the voter
+ * doesn't leave a phantom row behind.
  */
 @Composable
 fun VotingView(
@@ -60,23 +47,16 @@ fun VotingView(
     onBallotCountChanged: (Int) -> Unit,
     onError: (String) -> Unit,
 ) {
-    var arena by remember(electionName, candidates, tiers) { mutableStateOf<List<String>>(emptyList()) }
-    var ranked by remember(electionName, candidates, tiers) { mutableStateOf<List<RankedItem>>(emptyList()) }
-    // savedRanked mirrors the server: empty list = no ballot, non-empty =
-    // exactly what we last sent via castBallot. Updated after a successful
-    // save (or delete). Kept separate from `ranked` so the auto-save effect
-    // can tell user-initiated changes apart from the initial load.
-    var savedRanked by remember(electionName, candidates, tiers) { mutableStateOf<List<RankedItem>?>(null) }
-    // Selected tier — the tier a click on a candidate chip will drop into.
-    // Stored as the tier name (not index) so insertions/deletions in `ranked`
-    // don't invalidate it. Null when tiers are not configured.
-    var selectedTierName by remember(electionName, tiers) { mutableStateOf<String?>(null) }
+    var currentSide by remember(electionName) { mutableStateOf(RankingSide.PUBLIC) }
+    var publicState by remember(electionName, candidates, tiers) {
+        mutableStateOf(SideState.initial(tiers))
+    }
+    var secretState by remember(electionName, candidates, tiers) {
+        mutableStateOf(SideState.initial(tiers))
+    }
     var dragSource by remember { mutableStateOf<DragSource?>(null) }
     var isInitialized by remember(electionName, candidates, tiers) { mutableStateOf(false) }
-    // Transient "Copied!" toast next to the copy button. Cleared after a
-    // short delay; copyFeedbackToken bumps each click so a second click
-    // while the first toast is still up restarts the timer rather than
-    // letting the older coroutine clear the message early.
+    // Transient "Copied!" toast next to the copy button.
     var copyFeedback by remember { mutableStateOf<String?>(null) }
     var copyFeedbackToken by remember { mutableStateOf(0) }
     LaunchedEffect(copyFeedbackToken) {
@@ -88,94 +68,112 @@ fun VotingView(
 
     DragAutoScroll(active = dragSource != null)
 
-    // Pre-populate from any existing ballot so a returning voter sees their
-    // prior pick instead of starting from scratch. New candidates added since
-    // last vote land in the arena; candidates removed since last vote are
-    // dropped from the previous ranking. logErrorToServer rethrows
-    // CancellationException, so navigating away mid-fetch cancels cleanly.
+    val activeState = if (currentSide == RankingSide.PUBLIC) publicState else secretState
+    val otherState = if (currentSide == RankingSide.PUBLIC) secretState else publicState
+    // Public→secret mirror: as long as the two sides hold identical
+    // rankings, every public-side edit also lands on the secret side. The
+    // moment they diverge (because the voter edited secret directly, or
+    // because the loaded ballot already differed), mirroring stops; it
+    // resumes if the voter manually brings them back to equal (e.g. via
+    // "Copy from public side"). Mirroring is one-way — secret-side edits
+    // never propagate to public. Implementation is implicit: there's no
+    // stored "mirror is on" flag; the equality check happens at each edit.
+    fun setActive(transform: (SideState) -> SideState) {
+        if (currentSide == RankingSide.PUBLIC) {
+            val wasMirrored = publicState.ranked == secretState.ranked
+            val updated = transform(publicState)
+            publicState = updated
+            if (wasMirrored) {
+                secretState = secretState.copy(
+                    ranked = updated.ranked,
+                    arena = updated.arena,
+                    selectedTierName = updated.selectedTierName,
+                )
+            }
+        } else {
+            secretState = transform(secretState)
+        }
+    }
+
+    // Pre-populate from any existing ballot, splitting by side so PUBLIC and
+    // SECRET each get their own starting state. Candidates removed since the
+    // ballot was cast are dropped; new candidates land in each side's arena.
     LaunchedEffect(electionName, candidates, tiers) {
         if (candidates.isEmpty() && tiers.isEmpty()) {
-            arena = emptyList()
-            ranked = emptyList()
-            savedRanked = emptyList()
-            selectedTierName = null
+            publicState = SideState.initial(tiers)
+            secretState = SideState.initial(tiers)
             isInitialized = true
             return@LaunchedEffect
         }
         val candidateSet = candidates.toSet()
+        val tierSet = tiers.toSet()
         val existing = try {
             apiClient.getMyRankings(electionName)
         } catch (e: Exception) {
             apiClient.logErrorToServer(e)
             emptyList()
         }
-        // Server returns candidate-only rankings (tier markers are
-        // materialized at compute time, never stored). Drop any whose
-        // candidate name is no longer a candidate or whose tier annotation
-        // is no longer a configured tier — the election may have changed
-        // since the ballot was cast, and a stray reference would either
-        // refuse to load or pin a candidate to a tier that no longer exists.
-        val tierSet = tiers.toSet()
-        val knownExisting = existing
-            .filter { it.rank != null && it.candidateName in candidateSet }
-            .map { r -> if (r.tier != null && r.tier !in tierSet) r.copy(tier = null) else r }
-            .sortedBy { it.rank }
+        fun hydrate(side: RankingSide): SideState {
+            // Server returns candidate-only rankings (tier markers are
+            // materialized at compute time, never stored). Drop any whose
+            // candidate name is no longer a candidate or whose tier annotation
+            // is no longer a configured tier.
+            val knownExisting = existing
+                .filter { it.side == side }
+                .filter { it.rank != null && it.candidateName in candidateSet }
+                .map { r -> if (r.tier != null && r.tier !in tierSet) r.copy(tier = null) else r }
+                .sortedBy { it.rank }
 
-        val newRanked: List<RankedItem> = if (tiers.isEmpty()) {
-            knownExisting.map { RankedItem.Candidate(it.candidateName) }
-        } else if (knownExisting.isEmpty()) {
-            // Fresh ballot template: just the tier markers, no candidates.
-            // The voter drags chips into the tiers from the arena.
-            tiers.map { RankedItem.TierMarker(it) }
-        } else {
-            // Project the stored annotations back into the in-memory list
-            // shape (candidates interleaved with tier markers) — same
-            // function the tally pipeline uses, so what the voter sees
-            // mirrors what the pairwise tally will compute on.
-            rankingsToRankedItems(knownExisting, tiers)
+            val newRanked: List<RankedItem> = when {
+                tiers.isEmpty() -> knownExisting.map { RankedItem.Candidate(it.candidateName) }
+                knownExisting.isEmpty() -> tiers.map { RankedItem.TierMarker(it) }
+                else -> rankingsToRankedItems(knownExisting, tiers, side)
+            }
+            val rankedCandidateNames = newRanked.filterIsInstance<RankedItem.Candidate>().map { it.name }.toSet()
+            return SideState(
+                arena = candidates.filter { it !in rankedCandidateNames },
+                ranked = newRanked,
+                savedRanked = if (knownExisting.isEmpty()) emptyList() else newRanked,
+                selectedTierName = tiers.firstOrNull(),
+            )
         }
-        ranked = newRanked
-        // savedRanked reflects the SERVER state. If the server had no ballot
-        // (existing was empty), savedRanked is empty even when ranked has
-        // tier markers — those markers are part of the on-screen draft, not
-        // a ballot the user has cast.
-        savedRanked = if (knownExisting.isEmpty()) emptyList() else newRanked
-        val rankedCandidates = newRanked.filterIsInstance<RankedItem.Candidate>().map { it.name }.toSet()
-        arena = candidates.filter { it !in rankedCandidates }
-        selectedTierName = tiers.firstOrNull()
+        publicState = hydrate(RankingSide.PUBLIC)
+        secretState = hydrate(RankingSide.SECRET)
         isInitialized = true
     }
 
-    // Auto-save on every change to `ranked`. A short debounce coalesces the
-    // burst of intermediate states produced by drag-reorder (onDragOver fires
-    // many times during one drag). When `ranked` changes again before the
-    // debounce expires, LaunchedEffect cancels the in-flight coroutine and
-    // the older save never goes out, so the server only sees the settled state.
-    //
-    // "No candidates ranked" (only tier markers, or completely empty) is
-    // treated as "this voter has no ballot" — we call deleteMyBallot so the
-    // ballot row goes away entirely. The transitions that change the ballot
-    // count (first cast OR full clear) trigger onBallotSaved to refresh the
-    // header.
-    LaunchedEffect(ranked) {
-        val saved = savedRanked ?: return@LaunchedEffect
-        val rankedHasCandidates = ranked.any { it is RankedItem.Candidate }
-        val savedHasBallot = saved.isNotEmpty()
-        if (!rankedHasCandidates && !savedHasBallot) return@LaunchedEffect
-        if (rankedHasCandidates && ranked == saved) return@LaunchedEffect
+    // Auto-save when either side diverges from its last-saved snapshot. We
+    // batch both sides into one castBallot call (rankings list carries side
+    // tags), so the wire view of the ballot is always the union of what the
+    // voter has staged across the two sides.
+    LaunchedEffect(publicState, secretState) {
+        val pub = publicState.savedRanked ?: return@LaunchedEffect
+        val sec = secretState.savedRanked ?: return@LaunchedEffect
+        val pubChanged = publicState.ranked != pub
+        val secChanged = secretState.ranked != sec
+        if (!pubChanged && !secChanged) return@LaunchedEffect
+        val pubHasCandidates = publicState.ranked.any { it is RankedItem.Candidate }
+        val secHasCandidates = secretState.ranked.any { it is RankedItem.Candidate }
+        // No candidates ranked on either side = no ballot at all.
+        val anyCandidates = pubHasCandidates || secHasCandidates
+        val hadSavedBallot = pub.isNotEmpty() || sec.isNotEmpty()
+        if (!anyCandidates && !hadSavedBallot) return@LaunchedEffect
         kotlinx.coroutines.delay(250)
-        val toSave = ranked
+        val toSavePublic = publicState.ranked
+        val toSaveSecret = secretState.ranked
         try {
-            if (!rankedHasCandidates) {
-                // Server should hold no ballot. Idempotent if already gone.
+            if (!anyCandidates) {
                 apiClient.deleteMyBallot(electionName)
-                savedRanked = emptyList()
+                publicState = publicState.copy(savedRanked = emptyList())
+                secretState = secretState.copy(savedRanked = emptyList())
                 onBallotCountChanged(-1)
             } else {
-                val rankings = toSave.toRankings()
+                val rankings = toSavePublic.toRankings(RankingSide.PUBLIC) +
+                    toSaveSecret.toRankings(RankingSide.SECRET)
                 apiClient.castBallot(electionName, rankings)
-                val wasFirstCast = !savedHasBallot
-                savedRanked = toSave
+                val wasFirstCast = !hadSavedBallot
+                publicState = publicState.copy(savedRanked = toSavePublic)
+                secretState = secretState.copy(savedRanked = toSaveSecret)
                 if (wasFirstCast) onBallotCountChanged(+1)
             }
         } catch (e: Exception) {
@@ -190,109 +188,98 @@ fun VotingView(
         onError = onError,
         action = {
             apiClient.deleteMyBallot(electionName)
-            // Reset local state so the UI reflects the now-empty ballot. All
-            // candidates return to the arena; tier markers go back to the
-            // initial pre-populated template. The auto-save guard sees
-            // !rankedHasCandidates && !savedHasBallot, so no follow-up fires.
-            val freshRanked = if (tiers.isEmpty()) emptyList()
-                else tiers.map { RankedItem.TierMarker(it) }
-            ranked = freshRanked
-            savedRanked = emptyList()
-            arena = candidates
-            // Update the ballot-count header above the tabs.
+            publicState = SideState.initial(tiers).copy(
+                arena = candidates,
+                savedRanked = emptyList(),
+            )
+            secretState = SideState.initial(tiers).copy(
+                arena = candidates,
+                savedRanked = emptyList(),
+            )
             onBallotCountChanged(-1)
         },
     )
 
     fun handleClickChip(name: String) {
-        arena = arena.filter { it != name }
-        val tierToInsertAt = selectedTierName
-        if (tierToInsertAt == null) {
-            // Plain mode — append at the end of the ranking.
-            ranked = ranked + RankedItem.Candidate(name)
-        } else {
-            // The candidate clears the selected tier — insert directly
-            // ahead of that tier marker so the marker is the highest tier
-            // they cleared, and any harder tier above stays uncleared.
-            val tierIndex = ranked.indexOfFirst {
-                it is RankedItem.TierMarker && it.name == tierToInsertAt
-            }
-            if (tierIndex < 0) {
-                // Selected tier missing somehow — fall back to append.
-                ranked = ranked + RankedItem.Candidate(name)
+        setActive { s ->
+            val tierToInsertAt = s.selectedTierName
+            val newRanked = if (tierToInsertAt == null) {
+                s.ranked + RankedItem.Candidate(name)
             } else {
-                ranked = ranked.toMutableList().apply {
-                    add(tierIndex, RankedItem.Candidate(name))
+                val tierIndex = s.ranked.indexOfFirst {
+                    it is RankedItem.TierMarker && it.name == tierToInsertAt
                 }
+                if (tierIndex < 0) s.ranked + RankedItem.Candidate(name)
+                else s.ranked.toMutableList().apply { add(tierIndex, RankedItem.Candidate(name)) }
             }
+            s.copy(
+                arena = s.arena.filter { it != name },
+                ranked = newRanked,
+            )
         }
     }
 
     fun handleRemove(index: Int) {
-        if (index !in ranked.indices) return
-        val item = ranked[index]
-        if (item !is RankedItem.Candidate) return
-        // If the arena was empty before this removal, there's no visible
-        // tier selection (the highlight is suppressed when arena is empty).
-        // Snap the selection to the tier the removed candidate had cleared
-        // — i.e. the next tier marker after them in `ranked` — so putting
-        // them back is one click. If they cleared no tier (no marker after
-        // them), leave the prior selection alone.
-        if (arena.isEmpty()) {
-            val clearedTier = ranked.asSequence()
-                .drop(index + 1)
-                .filterIsInstance<RankedItem.TierMarker>()
-                .firstOrNull()
-            if (clearedTier != null) selectedTierName = clearedTier.name
+        setActive { s ->
+            if (index !in s.ranked.indices) return@setActive s
+            val item = s.ranked[index]
+            if (item !is RankedItem.Candidate) return@setActive s
+            // If the arena was empty before this removal, snap selection
+            // to the tier the removed candidate had cleared.
+            val nextSelected = if (s.arena.isEmpty()) {
+                val clearedTier = s.ranked.asSequence()
+                    .drop(index + 1)
+                    .filterIsInstance<RankedItem.TierMarker>()
+                    .firstOrNull()
+                clearedTier?.name ?: s.selectedTierName
+            } else s.selectedTierName
+            s.copy(
+                ranked = s.ranked.toMutableList().apply { removeAt(index) },
+                arena = s.arena + item.name,
+                selectedTierName = nextSelected,
+            )
         }
-        ranked = ranked.toMutableList().apply { removeAt(index) }
-        arena = arena + item.name
     }
 
     fun handleMove(i: Int, dir: Int) {
-        val j = i + dir
-        if (j < 0 || j >= ranked.size) return
-        if (ranked[i] !is RankedItem.Candidate) return
-        // Candidate can swap with an adjacent tier marker — that's just the
-        // candidate moving into a different tier — but only if doing so
-        // preserves the *relative* order of tier markers. (Bumping the
-        // bottom tier past the candidate at position 0 would invert the
-        // tier order, for example.)
-        if (ranked[j] is RankedItem.TierMarker) {
-            val updated = ranked.toMutableList().apply {
-                val tmp = this[i]; this[i] = this[j]; this[j] = tmp
+        setActive { s ->
+            val j = i + dir
+            if (j < 0 || j >= s.ranked.size) return@setActive s
+            if (s.ranked[i] !is RankedItem.Candidate) return@setActive s
+            // Candidate-tier swap is allowed only if it preserves tier order.
+            if (s.ranked[j] is RankedItem.TierMarker) {
+                val updated = s.ranked.toMutableList().apply {
+                    val tmp = this[i]; this[i] = this[j]; this[j] = tmp
+                }
+                val originalTierOrder = s.ranked.filterIsInstance<RankedItem.TierMarker>().map { it.name }
+                val newTierOrder = updated.filterIsInstance<RankedItem.TierMarker>().map { it.name }
+                if (newTierOrder != originalTierOrder) return@setActive s
             }
-            val originalTierOrder = ranked.filterIsInstance<RankedItem.TierMarker>().map { it.name }
-            val newTierOrder = updated.filterIsInstance<RankedItem.TierMarker>().map { it.name }
-            if (newTierOrder != originalTierOrder) return
-        }
-        ranked = ranked.toMutableList().apply {
-            val tmp = this[i]; this[i] = this[j]; this[j] = tmp
+            s.copy(
+                ranked = s.ranked.toMutableList().apply {
+                    val tmp = this[i]; this[i] = this[j]; this[j] = tmp
+                },
+            )
         }
     }
 
-    // Returns the new `ranked` list after dropping `source` so the candidate
-    // clears `tierName` and no harder tier — i.e. positioned immediately
-    // ahead of that tier marker. null means the drop is a no-op or invalid;
-    // caller should bail without touching state. Used by the tier-card-level
-    // drop target.
-    fun rankedAfterDropOnTier(source: DragSource, tierName: String): List<RankedItem>? {
-        val markerIdx = ranked.indexOfFirst {
+    fun rankedAfterDropOnTier(s: SideState, source: DragSource, tierName: String): List<RankedItem>? {
+        val markerIdx = s.ranked.indexOfFirst {
             it is RankedItem.TierMarker && it.name == tierName
         }
         if (markerIdx < 0) return null
         return when (source) {
-            is DragSource.FromArena -> ranked.toMutableList().apply {
+            is DragSource.FromArena -> s.ranked.toMutableList().apply {
                 add(markerIdx, RankedItem.Candidate(source.name))
             }
             is DragSource.FromRanked -> {
                 val srcIdx = source.index
-                if (srcIdx !in ranked.indices) return null
-                val moving = ranked[srcIdx]
+                if (srcIdx !in s.ranked.indices) return null
+                val moving = s.ranked[srcIdx]
                 if (moving !is RankedItem.Candidate) return null
                 if (srcIdx == markerIdx - 1) return null
                 val insertPos = if (srcIdx < markerIdx) markerIdx - 1 else markerIdx
-                ranked.toMutableList().apply {
+                s.ranked.toMutableList().apply {
                     removeAt(srcIdx)
                     add(insertPos, moving)
                 }
@@ -302,50 +289,77 @@ fun VotingView(
 
     fun handleDropOnTier(tierName: String) {
         val src = dragSource ?: return
-        val newRanked = rankedAfterDropOnTier(src, tierName) ?: return
-        if (src is DragSource.FromArena) {
-            arena = arena.filter { it != src.name }
+        setActive { s ->
+            val newRanked = rankedAfterDropOnTier(s, src, tierName) ?: return@setActive s
+            val newArena = if (src is DragSource.FromArena) s.arena.filter { it != src.name } else s.arena
+            s.copy(ranked = newRanked, arena = newArena)
         }
-        ranked = newRanked
     }
 
-    // While dragging an arena chip over a row, the chip is inserted in front
-    // of that row and the source becomes a FromRanked drag — subsequent
-    // dragOver ticks reorder rather than re-insert. While dragging a ranked
-    // row over another, swap candidate-only (rejecting moves that would
-    // permute tier markers' relative order).
     fun handleDragOverRow(idx: Int) {
-        when (val s = dragSource) {
-            is DragSource.FromArena -> {
-                arena = arena.filter { it != s.name }
-                ranked = ranked.toMutableList().apply {
-                    add(idx, RankedItem.Candidate(s.name))
+        setActive { s ->
+            when (val src = dragSource) {
+                is DragSource.FromArena -> {
+                    val newRanked = s.ranked.toMutableList().apply {
+                        add(idx, RankedItem.Candidate(src.name))
+                    }
+                    dragSource = DragSource.FromRanked(idx)
+                    s.copy(
+                        arena = s.arena.filter { it != src.name },
+                        ranked = newRanked,
+                    )
                 }
-                dragSource = DragSource.FromRanked(idx)
-            }
-            is DragSource.FromRanked -> {
-                if (s.index == idx) return
-                if (ranked[s.index] !is RankedItem.Candidate) return
-                val moved = ranked.toMutableList().apply {
-                    val it = removeAt(s.index)
-                    add(idx, it)
+                is DragSource.FromRanked -> {
+                    if (src.index == idx) return@setActive s
+                    if (s.ranked[src.index] !is RankedItem.Candidate) return@setActive s
+                    val moved = s.ranked.toMutableList().apply {
+                        val it = removeAt(src.index)
+                        add(idx, it)
+                    }
+                    val originalTierOrder = s.ranked.filterIsInstance<RankedItem.TierMarker>().map { it.name }
+                    val newTierOrder = moved.filterIsInstance<RankedItem.TierMarker>().map { it.name }
+                    if (newTierOrder != originalTierOrder) return@setActive s
+                    dragSource = DragSource.FromRanked(idx)
+                    s.copy(ranked = moved)
                 }
-                val originalTierOrder = ranked.filterIsInstance<RankedItem.TierMarker>().map { it.name }
-                val newTierOrder = moved.filterIsInstance<RankedItem.TierMarker>().map { it.name }
-                if (newTierOrder != originalTierOrder) return
-                ranked = moved
-                dragSource = DragSource.FromRanked(idx)
+                null -> s
             }
-            null -> Unit
         }
     }
 
     Div({ classes("section") }) {
         H2 { Text("Vote") }
 
+        // Side toggle. Public is default and stays default across navigations
+        // (the toggle resets per-election so a SECRET-side stash from one
+        // election can't bleed into another). Inactive-side state persists
+        // in memory while this composition lives, so toggling away and back
+        // doesn't lose work the voter has staged.
+        Div({ classes("ballot-side-toggle") }) {
+            Button({
+                classes("ballot-side-button")
+                if (currentSide == RankingSide.PUBLIC) classes("ballot-side-button-active")
+                onClick { currentSide = RankingSide.PUBLIC }
+            }) { Text("Public side") }
+            Button({
+                classes("ballot-side-button")
+                if (currentSide == RankingSide.SECRET) classes("ballot-side-button-active")
+                onClick { currentSide = RankingSide.SECRET }
+            }) { Text("Secret side") }
+        }
+
         Div({ classes("ballot-public-notice") }) {
-            Span({ classes("ballot-public-notice-lead") }) { Text("This is a public ballot. ") }
-            Text("Everyone will be able to see how you voted.")
+            if (currentSide == RankingSide.PUBLIC) {
+                Span({ classes("ballot-public-notice-lead") }) { Text("This is the public side. ") }
+                Text("Your rankings on this side appear with your name in the public tally.")
+            } else {
+                Span({ classes("ballot-public-notice-lead") }) { Text("This is the secret side. ") }
+                Text(
+                    "Your rankings on this side appear in the secret tally, " +
+                        "but the explanatory pages do not show your name — only auditors " +
+                        "can resolve which ballot is yours."
+                )
+            }
         }
 
         if (candidates.isEmpty()) {
@@ -357,10 +371,11 @@ fun VotingView(
             return@Div
         }
 
-        // Candidate-only display rank for each row in `ranked`. Tier markers
-        // hold ranked positions but the voter shouldn't see "01, ▸ Tier1, 03,
-        // 04" — they should see "01, ▸ Tier1, 02, 03". Computed once per
-        // recomposition, keyed off the row index.
+        val ranked = activeState.ranked
+        val arena = activeState.arena
+        val selectedTierName = activeState.selectedTierName
+
+        // Candidate-only display rank for each row in `ranked`.
         val candidateRankByIndex = IntArray(ranked.size).also { arr ->
             var n = 0
             ranked.forEachIndexed { i, item ->
@@ -408,19 +423,20 @@ fun VotingView(
                 }
 
                 if (tiers.isEmpty()) {
-                    // Plain mode: flat ordered list of candidate rows. The
-                    // Ol itself is a drop target so dropping below all rows
-                    // (or onto an empty list) appends to the ranking.
                     Ol({
                         classes("ranked-ballot-list")
                         onDragOver { event ->
                             event.preventDefault()
                             val s = dragSource
                             if (s !is DragSource.FromArena) return@onDragOver
-                            arena = arena.filter { it != s.name }
-                            val newIdx = ranked.size
-                            ranked = ranked + RankedItem.Candidate(s.name)
-                            dragSource = DragSource.FromRanked(newIdx)
+                            setActive { state ->
+                                val newIdx = state.ranked.size
+                                dragSource = DragSource.FromRanked(newIdx)
+                                state.copy(
+                                    arena = state.arena.filter { it != s.name },
+                                    ranked = state.ranked + RankedItem.Candidate(s.name),
+                                )
+                            }
                         }
                         onDrop { event ->
                             event.preventDefault()
@@ -445,14 +461,6 @@ fun VotingView(
                         }
                     }
                 } else {
-                    // Tier mode: each tier is its own card showing the
-                    // candidates that cleared it (the run between the
-                    // previous tier marker and this one). The whole card is
-                    // the click target to select it, AND a drop target —
-                    // dropping anywhere inside (other than on a candidate
-                    // row, which has its own row-position drop logic) lands
-                    // the dragged item just ahead of this tier's marker so
-                    // it clears this tier.
                     val chunks = buildList {
                         var bufferStart = 0
                         ranked.forEachIndexed { idx, item ->
@@ -463,9 +471,6 @@ fun VotingView(
                             }
                         }
                     }
-                    // Selection only matters while there are still chips in
-                    // the arena; once everything is ranked, every tier card
-                    // looks the same.
                     val showSelection = arena.isNotEmpty()
                     chunks.forEach { chunk ->
                         Div({
@@ -473,7 +478,9 @@ fun VotingView(
                             if (showSelection && chunk.tierName == selectedTierName) {
                                 classes("ranked-ballot-tier-selected")
                             }
-                            onClick { selectedTierName = chunk.tierName }
+                            onClick {
+                                setActive { it.copy(selectedTierName = chunk.tierName) }
+                            }
                             onDragOver { event -> event.preventDefault() }
                             onDrop { event ->
                                 event.preventDefault()
@@ -514,27 +521,33 @@ fun VotingView(
                 if (ranked.none { it is RankedItem.Candidate }) {
                     P({ classes("ranked-ballot-empty-hint") }) {
                         Text(
-                            if (tiers.isNotEmpty())
-                                "Click a tier to select it then click a candidate, or drag a candidate into any tier"
-                            else
-                                "Click a candidate above to begin, or drag one into the list"
+                            if (currentSide == RankingSide.SECRET) {
+                                if (tiers.isNotEmpty())
+                                    "You haven't cast a secret ballot yet. Click a tier and a candidate, " +
+                                        "or use \"Copy from public side\" to start from your public ballot."
+                                else
+                                    "You haven't cast a secret ballot yet. Click a candidate above to begin, " +
+                                        "or use \"Copy from public side\" to start from your public ballot."
+                            } else {
+                                if (tiers.isNotEmpty())
+                                    "Click a tier to select it then click a candidate, or drag a candidate into any tier"
+                                else
+                                    "Click a candidate above to begin, or drag one into the list"
+                            }
                         )
                     }
                 }
 
                 Div({ classes("ranked-ballot-toolbar") }) {
-                    // "Remove my ballot" is only meaningful when the server
-                    // actually holds a ballot. With tiers, ranked always has
-                    // tier markers, so we test savedRanked (server state)
-                    // rather than ranked.
-                    val hasSavedBallot = savedRanked?.isNotEmpty() == true
+                    val hasSavedBallot = activeState.savedRanked?.isNotEmpty() == true ||
+                        otherState.savedRanked?.isNotEmpty() == true
                     if (hasSavedBallot) {
                         Button({
                             classes("ranked-ballot-remove-button")
                             if (deleteBallotAction.isLoading) attr("disabled", "")
                             onClick {
                                 val confirmed = window.confirm(
-                                    "Remove your ballot from \"$electionName\"? Your rankings will be cleared."
+                                    "Remove your ballot from \"$electionName\"? Both sides' rankings will be cleared."
                                 )
                                 if (confirmed) deleteBallotAction.invoke()
                             }
@@ -543,17 +556,54 @@ fun VotingView(
                         }
                     }
 
-                    // Copy-as-text uses the on-screen `ranked` (not the saved
-                    // server state) so the user can copy whatever they're
-                    // currently looking at, even mid-edit before the debounce
-                    // settles. Disabled when no candidates are ranked since
-                    // there's nothing meaningful to copy in that case.
+                    // Copy from the other side onto the current side. When
+                    // the two sides already hold identical rankings (the
+                    // mirror state) the button is disabled and labeled as an
+                    // indicator so the voter can see they're in sync. Hidden
+                    // entirely when both sides are empty — there's nothing
+                    // to copy and nothing to be "in sync" with yet.
+                    val otherHasCandidates = otherState.ranked.any { it is RankedItem.Candidate }
+                    val activeHasCandidates = activeState.ranked.any { it is RankedItem.Candidate }
+                    val sidesEqual = activeState.ranked == otherState.ranked
+                    if (otherHasCandidates || activeHasCandidates) {
+                        val otherLabel = if (currentSide == RankingSide.PUBLIC) "secret" else "public"
+                        if (sidesEqual) {
+                            Button({
+                                classes("ranked-ballot-copy-button")
+                                classes("ranked-ballot-copy-button-synced")
+                                attr("disabled", "")
+                                title("This side mirrors the $otherLabel side")
+                            }) {
+                                Text("✓ In sync with $otherLabel side")
+                            }
+                        } else if (otherHasCandidates) {
+                            Button({
+                                classes("ranked-ballot-copy-button")
+                                onClick {
+                                    val source = otherState.ranked
+                                    val sourceCandidateNames = source
+                                        .filterIsInstance<RankedItem.Candidate>()
+                                        .map { it.name }
+                                        .toSet()
+                                    setActive { s ->
+                                        s.copy(
+                                            ranked = source,
+                                            arena = candidates.filter { it !in sourceCandidateNames },
+                                        )
+                                    }
+                                }
+                            }) {
+                                Text("Copy from $otherLabel side")
+                            }
+                        }
+                    }
+
                     val canCopy = ranked.any { it is RankedItem.Candidate }
                     if (canCopy) {
                         Button({
                             classes("ranked-ballot-copy-button")
                             onClick {
-                                val rankings = ranked.toRankings()
+                                val rankings = ranked.toRankings(currentSide)
                                 val text = buildBallotText(electionName, currentUserName, rankings)
                                 copyTextToClipboard(text, apiClient)
                                 copyFeedback = "Copied!"
@@ -580,11 +630,32 @@ fun VotingView(
 }
 
 /**
- * One row of the ranked-ballot list. Pulled out so [VotingView]'s body
- * doesn't carry the ~100-line drag/key/button machinery inline. Callbacks
- * receive the row's index back so the caller can mutate ranked-list state
- * without this composable needing to know about it.
+ * Per-side ballot editing state. Two of these (one PUBLIC, one SECRET) live
+ * in the composition and the side toggle picks which one is rendered. Both
+ * are loaded once on mount from a single getMyRankings call (split by side)
+ * and saved together via a single castBallot call carrying both sides.
  */
+private data class SideState(
+    val arena: List<String>,
+    val ranked: List<RankedItem>,
+    // null = not yet loaded; emptyList() = server holds no ballot on this side;
+    // non-empty = exact list last saved. Kept separate from `ranked` so the
+    // auto-save effect can tell intermediate user edits from the initial load.
+    val savedRanked: List<RankedItem>?,
+    val selectedTierName: String?,
+) {
+    companion object {
+        // Fresh template: tier markers laid out so the voter can drop
+        // candidates into them. With no tiers configured, just an empty list.
+        fun initial(tiers: List<String>): SideState = SideState(
+            arena = emptyList(),
+            ranked = if (tiers.isEmpty()) emptyList() else tiers.map { RankedItem.TierMarker(it) },
+            savedRanked = null,
+            selectedTierName = tiers.firstOrNull(),
+        )
+    }
+}
+
 @Composable
 private fun RankedRow(
     idx: Int,
@@ -664,13 +735,6 @@ private fun RankedRow(
     }
 }
 
-/**
- * One entry in the on-screen ranked list. Tier markers and candidates coexist
- * as siblings in `ranked`; making this a sealed hierarchy (rather than a flat
- * record + `kind` field) forces every consumer through an exhaustive `when`,
- * which is the language feature we lean on instead of remembering to test
- * `kind == TIER` in every place that treats them differently.
- */
 internal sealed interface RankedItem {
     val name: String
 
@@ -679,20 +743,12 @@ internal sealed interface RankedItem {
 }
 
 /**
- * Serialize the in-memory ranked list (which still carries [RankedItem.TierMarker]
- * entries for the UI to render) into the storage form (candidate-only
- * rankings with a per-candidate tier annotation). For each candidate we
- * look forward in the list to the next tier marker — that marker's name is
- * the highest tier this candidate cleared, and is what gets stored as
- * [Ranking.tier]. Candidates with no marker after them cleared no tier
- * (tier = null). The output's ranks are dense 1..N over the candidates
- * only — marker positions don't consume rank values because markers aren't
- * stored.
- *
- * Storage rule: [Ranking.kind] is always [RankingKind.CANDIDATE]; tier
- * markers are materialized at tally time by [projectBallot].
+ * Serialize the in-memory ranked list (with [RankedItem.TierMarker] entries
+ * for the UI) into the storage form (candidate-only rankings tagged with
+ * [side]). For each candidate we look forward in the list to the next tier
+ * marker — that marker's name is the highest tier this candidate cleared.
  */
-internal fun List<RankedItem>.toRankings(): List<Ranking> {
+internal fun List<RankedItem>.toRankings(side: RankingSide): List<Ranking> {
     val result = mutableListOf<Ranking>()
     var rank = 0
     forEachIndexed { i, item ->
@@ -701,25 +757,24 @@ internal fun List<RankedItem>.toRankings(): List<Ranking> {
             val tier = subList(i + 1, size)
                 .firstOrNull { it is RankedItem.TierMarker }
                 ?.name
-            result += Ranking(item.name, rank, RankingKind.CANDIDATE, tier)
+            result += Ranking(item.name, rank, RankingKind.CANDIDATE, tier, side)
         }
     }
     return result
 }
 
 /**
- * Inverse of [toRankings] for the load path: take the candidate-only
- * rankings the server returns (each one optionally annotated with a tier)
- * and reconstruct the in-memory list with [RankedItem.TierMarker] entries
- * in the right positions. Reuses [projectBallot] — the same function the
- * tally pipeline runs on cast ballots — so the UI's reconstruction can't
- * drift from the tally pipeline's interpretation.
+ * Inverse of [toRankings] for the load path. Takes candidate-only rankings
+ * (each tagged with its [side]) and reconstructs the in-memory list with
+ * tier markers in the right positions. Tags the synthetic markers with
+ * [side] so [projectBallot]'s same-side invariant holds.
  */
 internal fun rankingsToRankedItems(
     rankings: List<Ranking>,
     electionTiers: List<String>,
+    side: RankingSide,
 ): List<RankedItem> {
-    val projected = projectBallot(rankings, electionTiers)
+    val projected = projectBallot(rankings, electionTiers, side)
     return projected.map { r ->
         when (r.kind) {
             RankingKind.CANDIDATE -> RankedItem.Candidate(r.candidateName)
@@ -728,43 +783,25 @@ internal fun rankingsToRankedItems(
     }
 }
 
-/**
- * Source of an in-progress drag. Drop targets dispatch on this so a chip
- * still in the arena and a row already in the list do the right thing
- * without the drop handler having to reach into either collection itself.
- */
 internal sealed interface DragSource {
     data class FromArena(val name: String) : DragSource
     data class FromRanked(val index: Int) : DragSource
 }
 
-/**
- * One tier's slice of the ranked list: the tier's name, the index of the
- * tier marker in `ranked` (used as the drop position for empty tiers), and
- * the indices of the candidates that cleared this tier — the rows between
- * the previous tier marker (or the start of the list) and this one. A
- * candidate clears tier T iff they sit ahead of T's marker on the ballot.
- */
 private data class TierChunk(
     val tierName: String,
     val tierIndex: Int,
     val candidateIndices: List<Int>,
 )
 
-/**
- * While [active], scrolls the document when an HTML5 drag is near the top or
- * bottom of the viewport. Native drag-and-drop never auto-scrolls, so a drop
- * target below the fold would otherwise be unreachable mid-drag. The listener
- * and rAF loop are torn down the moment the drag ends.
- */
 @Composable
 private fun DragAutoScroll(active: Boolean) {
     DisposableEffect(active) {
         if (!active) {
             onDispose { }
         } else {
-            val edgeZone = 60.0   // px from an edge that triggers scrolling
-            val maxSpeed = 20.0   // px per frame at the very edge
+            val edgeZone = 60.0
+            val maxSpeed = 20.0
             var pointerY = -1.0
             var rafId = 0
 
@@ -796,12 +833,6 @@ private fun DragAutoScroll(active: Boolean) {
     }
 }
 
-/**
- * Best-effort write to the system clipboard via the async Clipboard API.
- * Failures (permission denied, unavailable in insecure contexts) are
- * reported via [apiClient] rather than thrown — the caller has already
- * shown a "Copied!" toast and there's no graceful in-UI recovery here.
- */
 internal fun copyTextToClipboard(text: String, apiClient: ApiClient) {
     try {
         val clipboard = window.navigator.asDynamic().clipboard

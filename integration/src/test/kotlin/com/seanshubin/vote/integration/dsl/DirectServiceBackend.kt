@@ -70,8 +70,8 @@ class DirectServiceBackend(
         return service.getBallot(token, voterName, electionName)
     }
 
-    override fun tally(token: AccessToken, electionName: String): ElectionTally {
-        return service.tally(token, electionName)
+    override fun tally(token: AccessToken, electionName: String, side: RankingSide): ElectionTally {
+        return service.tally(token, electionName, side)
     }
 
     override fun listUsers(token: AccessToken): List<UserNameRole> {

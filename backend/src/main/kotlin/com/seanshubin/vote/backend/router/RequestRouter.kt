@@ -678,7 +678,18 @@ class RequestRouter(
     private fun handleTally(req: HttpRequest): HttpResponse {
         val accessToken = extractAccessToken(req)
         val electionName = extractElectionName(req.target)
-        val tally = service.tally(accessToken, electionName)
+        val side = parseQuery(req.queryString)["side"]
+            ?.let { value ->
+                runCatching { com.seanshubin.vote.domain.RankingSide.valueOf(value) }
+                    .getOrElse {
+                        throw ServiceException(
+                            ServiceException.Category.MALFORMED_JSON,
+                            "Invalid side: $value (expected PUBLIC or SECRET)",
+                        )
+                    }
+            }
+            ?: com.seanshubin.vote.domain.RankingSide.PUBLIC
+        val tally = service.tally(accessToken, electionName, side)
         return HttpResponse(200, json.encodeToString(tally))
     }
 }

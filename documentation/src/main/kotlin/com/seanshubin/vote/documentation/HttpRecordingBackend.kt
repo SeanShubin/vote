@@ -111,9 +111,9 @@ class HttpRecordingBackend(
         }
     }
 
-    override fun tally(token: AccessToken, electionName: String): ElectionTally {
+    override fun tally(token: AccessToken, electionName: String, side: RankingSide): ElectionTally {
         val encodedName = URLEncoder.encode(electionName, StandardCharsets.UTF_8)
-        val response = recorder.get("/election/$encodedName/tally", token)
+        val response = recorder.get("/election/$encodedName/tally?side=$side", token)
         return json.decodeFromString<ElectionTally>(response.body())
     }
 

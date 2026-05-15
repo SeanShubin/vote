@@ -38,7 +38,7 @@ interface ScenarioBackend {
     fun castBallot(token: AccessToken, voterName: String, electionName: String, rankings: List<Ranking>): String
     fun getBallot(token: AccessToken, voterName: String, electionName: String): BallotSummary?
 
-    fun tally(token: AccessToken, electionName: String): ElectionTally
+    fun tally(token: AccessToken, electionName: String, side: RankingSide = RankingSide.PUBLIC): ElectionTally
 
     fun listUsers(token: AccessToken): List<UserNameRole>
     fun getUser(token: AccessToken, userName: String): UserNameEmail

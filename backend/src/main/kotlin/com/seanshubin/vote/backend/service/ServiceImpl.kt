@@ -714,7 +714,7 @@ class ServiceImpl(
         return queryModel.listRankings(voterName, electionName)
     }
 
-    override fun tally(accessToken: AccessToken, electionName: String): ElectionTally {
+    override fun tally(accessToken: AccessToken, electionName: String, side: RankingSide): ElectionTally {
         requirePermission(accessToken, Permission.VIEW_APPLICATION)
         queryModel.searchElectionByName(electionName)
             ?: throw ServiceException(ServiceException.Category.NOT_FOUND, "Election not found: $electionName")
@@ -727,16 +727,36 @@ class ServiceImpl(
         // with a tier annotation; the markers are produced at compute time
         // so a tier rename never invalidates a recorded ballot. When tiers
         // is empty the projection is a no-op.
-        //
-        // TODO: take side as a query parameter and gate SECRET-side ballot
-        // identification on Permission.VIEW_SECRETS.
-        val tally = Tally.countBallots(
+        val rawTally = Tally.countBallots(
             electionName = electionName,
-            side = RankingSide.PUBLIC,
+            side = side,
             candidates = candidates,
             tiers = tiers,
             ballots = ballots,
         )
+        // SECRET-side redaction: callers without VIEW_SECRETS see
+        // anonymous ballots — confirmation, whenCast, and rankings stay,
+        // but voterName is stripped so they can't map a ballot back to
+        // who cast it. Auditors get the full identified view.
+        //
+        // whoVoted (the list of voter names who participated in this
+        // side) stays populated regardless — knowing someone voted on
+        // the secret side is not the secret; only which ballot is theirs
+        // is. The same comment applies to the per-side "did this user
+        // cast a ballot on this side" query model methods.
+        val canSeeSecrets = queryModel.roleHasPermission(accessToken.role, Permission.VIEW_SECRETS)
+        val tally = if (side == RankingSide.SECRET && !canSeeSecrets) {
+            rawTally.copy(
+                ballots = rawTally.ballots.map { ballot ->
+                    when (ballot) {
+                        is Ballot.Identified -> ballot.makeAnonymous()
+                        is Ballot.Anonymous -> ballot
+                    }
+                },
+            )
+        } else {
+            rawTally
+        }
         val sections = TallySection.compute(tally.places, tiers)
         return ElectionTally(tally, tiers, sections)
     }

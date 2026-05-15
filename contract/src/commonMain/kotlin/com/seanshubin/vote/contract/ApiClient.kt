@@ -4,6 +4,7 @@ import com.seanshubin.vote.domain.ElectionDetail
 import com.seanshubin.vote.domain.ElectionSummary
 import com.seanshubin.vote.domain.ElectionTally
 import com.seanshubin.vote.domain.Ranking
+import com.seanshubin.vote.domain.RankingSide
 import com.seanshubin.vote.domain.Role
 import com.seanshubin.vote.domain.TableData
 import com.seanshubin.vote.domain.UserActivity
@@ -129,7 +130,13 @@ interface ApiClient {
      */
     suspend fun getMyRankings(electionName: String): List<Ranking>
 
-    suspend fun getTally(electionName: String): ElectionTally
+    /**
+     * Tally for one side of the election. PUBLIC and SECRET produce
+     * independent results; defaults to PUBLIC. On the SECRET side, voter
+     * names are only present for callers with VIEW_SECRETS authority —
+     * other callers see anonymous ballots (rankings without voterName).
+     */
+    suspend fun getTally(electionName: String, side: RankingSide = RankingSide.PUBLIC): ElectionTally
 
     /** Delete an election. Allowed for the election owner or ADMIN+; rejected otherwise. */
     suspend fun deleteElection(electionName: String)

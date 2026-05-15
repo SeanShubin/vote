@@ -78,7 +78,15 @@ interface Service {
     fun castBallot(accessToken: AccessToken, voterName: String, electionName: String, rankings: List<Ranking>): String
     fun deleteBallot(accessToken: AccessToken, voterName: String, electionName: String)
     fun listRankings(accessToken: AccessToken, voterName: String, electionName: String): List<Ranking>
-    fun tally(accessToken: AccessToken, electionName: String): ElectionTally
+    /**
+     * Tally for one side of the election. PUBLIC and SECRET are tallied
+     * independently; rankings on one side never influence the other's
+     * results. SECRET-side ballots have `voterName` redacted to "" for
+     * callers who lack [Permission.VIEW_SECRETS] — the rankings stay
+     * visible so anyone can browse the secret tally, but only auditors
+     * see which voter cast which ballot.
+     */
+    fun tally(accessToken: AccessToken, electionName: String, side: RankingSide = RankingSide.PUBLIC): ElectionTally
     fun getBallot(accessToken: AccessToken, voterName: String, electionName: String): BallotSummary?
     fun getUserActivity(accessToken: AccessToken): UserActivity
 

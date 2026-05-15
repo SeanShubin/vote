@@ -7,6 +7,7 @@ import kotlinx.coroutines.CancellationException
 import com.seanshubin.vote.domain.ElectionDetail
 import com.seanshubin.vote.domain.ElectionSummary
 import com.seanshubin.vote.domain.Ranking
+import com.seanshubin.vote.domain.RankingSide
 import com.seanshubin.vote.domain.Role
 import com.seanshubin.vote.domain.TableData
 import com.seanshubin.vote.domain.ElectionTally
@@ -29,7 +30,7 @@ class FakeApiClient : ApiClient {
     val listTiersCalls = mutableListOf<String>()
     val castBallotCalls = mutableListOf<CastBallotCall>()
     val deleteMyBallotCalls = mutableListOf<String>()
-    val getTallyCalls = mutableListOf<String>()
+    val getTallyCalls = mutableListOf<Pair<String, RankingSide>>()
     val deleteElectionCalls = mutableListOf<String>()
     val transferElectionOwnershipCalls = mutableListOf<TransferElectionOwnershipCall>()
     val addElectionManagerCalls = mutableListOf<ElectionManagerCall>()
@@ -191,8 +192,8 @@ class FakeApiClient : ApiClient {
         return myRankingsResult.getOrThrow()
     }
 
-    override suspend fun getTally(electionName: String): ElectionTally {
-        getTallyCalls.add(electionName)
+    override suspend fun getTally(electionName: String, side: RankingSide): ElectionTally {
+        getTallyCalls.add(electionName to side)
         return getTallyResult.getOrThrow()
     }
 

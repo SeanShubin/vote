@@ -71,14 +71,21 @@ private fun renderTally(
     val active = currentConfirmations - excluded
 
     val allOn = revealed.isEmpty() || active.size == totalToggleable
-    val activeBallots = revealed.filter { it.confirmation in active }
-    val totalActiveBallots = activeBallots.size
+    // Coverage runs over every ballot — Identified or Anonymous — because
+    // both carry rankings. On the SECRET side for callers without
+    // VIEW_SECRETS, ballots come through as Anonymous and the toggle UI is
+    // hidden, so allOn is always true and we use the full ballot list here.
+    // When toggling is in play (only when ballots are Identified), narrow
+    // to the active subset.
+    val coverageBallots: List<Ballot> = if (allOn) serverTally.tally.ballots
+        else revealed.filter { it.confirmation in active }
+    val totalActiveBallots = coverageBallots.size
     // Each ballot contributes at most once per candidate. A candidate "shows
     // up on" a ballot when that ballot has a Ranking for it with a non-null
     // rank — same predicate Tally.countBallots uses to decide a ballot
     // expresses a preference involving the candidate.
     val ballotsPerCandidate: Map<String, Int> = remember(serverTally, active) {
-        revealed.filter { it.confirmation in active }
+        coverageBallots
             .flatMap { ballot ->
                 ballot.rankings
                     .filter { it.rank != null }
