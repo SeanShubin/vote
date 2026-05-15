@@ -68,6 +68,25 @@ fun VotingView(
 
     DragAutoScroll(active = dragSource != null)
 
+    // Dramatic theme swap when the secret side is active. Toggles a
+    // `secret-mode` class on document.body so the dark-theme stylesheet
+    // takes over the entire page (background, cards, chips, toggles) —
+    // the side-switch isn't a subtle indicator, it's a mode shift the
+    // voter can't miss. Cleaned up on unmount so leaving the voting
+    // page doesn't strand the body in dark mode.
+    DisposableEffect(currentSide) {
+        val cls = "secret-mode"
+        val body = kotlinx.browser.document.body
+        if (currentSide == RankingSide.SECRET) {
+            body?.classList?.add(cls)
+        } else {
+            body?.classList?.remove(cls)
+        }
+        onDispose {
+            body?.classList?.remove(cls)
+        }
+    }
+
     val activeState = if (currentSide == RankingSide.PUBLIC) publicState else secretState
     val otherState = if (currentSide == RankingSide.PUBLIC) secretState else publicState
     // Public→secret mirror: as long as the two sides hold identical

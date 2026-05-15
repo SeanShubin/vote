@@ -9,6 +9,189 @@ body {
     background-color: #f5f5f5;
     color: #333;
     line-height: 1.6;
+    /*
+     * Animate the light↔dark swap whenever .secret-mode is added/removed
+     * from <body>. Most card-level rules below also animate so individual
+     * surfaces (rows, chips, tiers) fade together with the page bg.
+     */
+    transition: background-color 0.45s ease, color 0.45s ease;
+}
+
+/*
+ * Surfaces that the dark theme below recolors. Declaring the transition
+ * here (instead of inside `body.secret-mode .container { ... }` etc.)
+ * lets the same animation play when switching back to light mode — the
+ * removed class triggers a transition from dark values back to the
+ * original light values, since the property is animated on the base
+ * rule rather than the override.
+ */
+.container,
+.admin-container,
+.ballot-public-notice,
+.ballot-side-button,
+.ranked-ballot-arena,
+.ranked-ballot-row,
+.ranked-ballot-tier,
+.ranked-ballot-tier-empty,
+.ranked-ballot-row-button,
+.ranked-ballot-copy-button-synced,
+.ranked-ballot-arena-label,
+.ranked-ballot-list-label,
+.ranked-ballot-tier-title,
+.ranked-ballot-empty-hint,
+.ranked-ballot-toolbar-hint,
+.ranked-ballot-rank-num,
+.ranked-ballot-row-name {
+    transition: background-color 0.45s ease, color 0.45s ease, border-color 0.45s ease;
+}
+
+/*
+ * Dramatic dark theme that takes over the entire page while the voter is
+ * editing the secret side of a ballot. The class is added to <body> by
+ * VotingView's currentSide effect and removed on toggle-back or unmount,
+ * so the page makes the side switch unmissable. Selectors mirror the
+ * light-theme rules above; each override animates via the transitions
+ * declared on its base rule so the swap looks like a coordinated fade
+ * rather than a flash.
+ */
+body.secret-mode {
+    background-color: #0d1224;
+    color: #dde6ff;
+}
+
+body.secret-mode .container,
+body.secret-mode .admin-container {
+    background-color: #161e3a;
+    color: #dde6ff;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+}
+
+body.secret-mode h1,
+body.secret-mode h2,
+body.secret-mode h3 {
+    color: #d6e3ff;
+}
+
+body.secret-mode p {
+    color: #b8c5e6;
+}
+
+body.secret-mode .ballot-public-notice {
+    background-color: #1c2649;
+    border-color: #3b4d8a;
+    color: #c0d0e8;
+}
+
+body.secret-mode .ballot-side-button {
+    background-color: #1c2649;
+    border-color: #3b4d8a;
+    color: #c0d0e8;
+}
+
+body.secret-mode .ballot-side-button-active {
+    background-color: #5b8fff;
+    border-color: #5b8fff;
+    color: #0d1224;
+}
+
+body.secret-mode .ranked-ballot-arena {
+    background-color: #131a33;
+    border-color: #2c3e6c;
+}
+
+body.secret-mode .ranked-ballot-arena-label,
+body.secret-mode .ranked-ballot-list-label,
+body.secret-mode .ranked-ballot-toolbar-hint {
+    color: #7e8db8;
+}
+
+body.secret-mode .ranked-ballot-chip {
+    background-color: #1c2649;
+    border-color: #2c3e6c;
+    color: #dde6ff;
+}
+
+body.secret-mode .ranked-ballot-chip:hover {
+    background-color: #243161;
+    border-color: #5b8fff;
+    color: #ffffff;
+}
+
+body.secret-mode .ranked-ballot-row {
+    background-color: #1c2649;
+    border-color: #2c3e6c;
+    color: #dde6ff;
+}
+
+body.secret-mode .ranked-ballot-row:focus {
+    border-color: #5b8fff;
+    box-shadow: 0 0 0 2px rgba(91, 143, 255, 0.3);
+}
+
+body.secret-mode .ranked-ballot-tier {
+    background-color: #14193c;
+    border-color: #3b4d8a;
+}
+
+body.secret-mode .ranked-ballot-tier-selected {
+    border-color: #5b8fff;
+    background-color: #1a2454;
+}
+
+body.secret-mode .ranked-ballot-tier-title {
+    color: #c0d0e8;
+}
+
+body.secret-mode .ranked-ballot-tier:hover .ranked-ballot-tier-title {
+    color: #5b8fff;
+}
+
+body.secret-mode .ranked-ballot-tier-empty {
+    color: #7e8db8;
+    border-color: #3b4d8a;
+}
+
+body.secret-mode .ranked-ballot-row-name,
+body.secret-mode .ranked-ballot-rank-num {
+    color: #dde6ff;
+}
+
+body.secret-mode .ranked-ballot-empty-hint {
+    color: #b8c5e6;
+}
+
+body.secret-mode button {
+    background-color: #5b8fff;
+    color: #0d1224;
+}
+
+body.secret-mode button:hover {
+    background-color: #7aa3ff;
+}
+
+body.secret-mode button:disabled {
+    background-color: #2c3e6c;
+    color: #7e8db8;
+}
+
+body.secret-mode .ranked-ballot-copy-button-synced {
+    background-color: #1c2649;
+    border-color: #3b4d8a;
+    color: #c0d0e8;
+}
+
+body.secret-mode .ranked-ballot-row-button {
+    background-color: transparent;
+    color: #c0d0e8;
+}
+
+body.secret-mode .ranked-ballot-row-button:hover:not(:disabled) {
+    background-color: rgba(91, 143, 255, 0.15);
+    color: #ffffff;
+}
+
+body.secret-mode .ranked-ballot-copy-feedback {
+    color: #6fe39b;
 }
 
 .container {
