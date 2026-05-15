@@ -52,7 +52,7 @@ class TallyTest {
         // Carol's ballot lists Cherry with rank=null — same as not listing it.
         val tally = countBallots(
             candidates = listOf("Apple", "Cherry"),
-            Ballot.Revealed(
+            Ballot.Identified(
                 voterName = "carol",
                 electionName = "election",
                 confirmation = "c-1",
@@ -98,17 +98,17 @@ class TallyTest {
         assertEquals(emptyList(), tally.places)
     }
 
-    private fun countBallots(candidates: List<String>, vararg ballots: Ballot.Revealed): Tally =
+    private fun countBallots(candidates: List<String>, vararg ballots: Ballot.Identified): Tally =
         Tally.countBallots(
             electionName = "election",
-            secretBallot = false,
+            side = RankingSide.PUBLIC,
             candidates = candidates,
             tiers = emptyList(),
             ballots = ballots.toList(),
         )
 
-    private fun ballot(voter: String, vararg rankings: Pair<String, Int>): Ballot.Revealed =
-        Ballot.Revealed(
+    private fun ballot(voter: String, vararg rankings: Pair<String, Int>): Ballot.Identified =
+        Ballot.Identified(
             voterName = voter,
             electionName = "election",
             confirmation = "c-$voter",

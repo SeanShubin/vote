@@ -6,6 +6,7 @@ import com.seanshubin.vote.domain.Ballot
 import com.seanshubin.vote.domain.ElectionTally
 import com.seanshubin.vote.domain.RankedPairs
 import com.seanshubin.vote.domain.Ranking.Companion.prefers
+import com.seanshubin.vote.domain.RankingSide
 import org.jetbrains.compose.web.dom.*
 
 /**
@@ -254,7 +255,7 @@ private fun renderPreferencesDetail(electionTally: ElectionTally, a: String, b: 
         else -> "$a and $b tied at $aOverB"
     }
 
-    val revealed = tally.ballots.filterIsInstance<Ballot.Revealed>()
+    val revealed = tally.ballots.filterIsInstance<Ballot.Identified>()
     val aVoters = votersWhoPrefer(revealed, a, b)
     val bVoters = votersWhoPrefer(revealed, b, a)
     val abstainVoters = votersWhoAbstainOnPair(revealed, a, b)
@@ -264,18 +265,18 @@ private fun renderPreferencesDetail(electionTally: ElectionTally, a: String, b: 
 
         Div({ classes("pair-side-row") }) {
             if (bWins) {
-                renderPairSide(name = b, voters = bVoters, count = bOverA, isWinner = true, isSecret = tally.secretBallot)
-                renderPairSide(name = a, voters = aVoters, count = aOverB, isWinner = false, isSecret = tally.secretBallot)
+                renderPairSide(name = b, voters = bVoters, count = bOverA, isWinner = true, isSecret = (tally.side == RankingSide.SECRET))
+                renderPairSide(name = a, voters = aVoters, count = aOverB, isWinner = false, isSecret = (tally.side == RankingSide.SECRET))
             } else {
-                renderPairSide(name = a, voters = aVoters, count = aOverB, isWinner = aWins, isSecret = tally.secretBallot)
-                renderPairSide(name = b, voters = bVoters, count = bOverA, isWinner = false, isSecret = tally.secretBallot)
+                renderPairSide(name = a, voters = aVoters, count = aOverB, isWinner = aWins, isSecret = (tally.side == RankingSide.SECRET))
+                renderPairSide(name = b, voters = bVoters, count = bOverA, isWinner = false, isSecret = (tally.side == RankingSide.SECRET))
             }
         }
 
-        if (tally.secretBallot || abstainVoters.isNotEmpty()) {
+        if ((tally.side == RankingSide.SECRET) || abstainVoters.isNotEmpty()) {
             Div({ classes("pair-abstain") }) {
                 H3 { Text("No expressed preference (${abstainVoters.size})") }
-                if (tally.secretBallot) {
+                if ((tally.side == RankingSide.SECRET)) {
                     P({ classes("pair-secret-note") }) { Text("(ballots are secret)") }
                 } else {
                     renderVoterList(abstainVoters)
@@ -318,7 +319,7 @@ private fun renderDecisionDetail(electionTally: ElectionTally, a: String, b: Str
     val bi = names.indexOf(b)
     val aOverB = tally.preferences[ai][bi].strength
     val bOverA = tally.preferences[bi][ai].strength
-    val revealed = tally.ballots.filterIsInstance<Ballot.Revealed>()
+    val revealed = tally.ballots.filterIsInstance<Ballot.Identified>()
 
     // Find the directed contest between a and b in the Ranked Pairs
     // lock-in record, if one exists. A tied pair (aOverB == bOverA)
@@ -333,7 +334,7 @@ private fun renderDecisionDetail(electionTally: ElectionTally, a: String, b: Str
 
     Div({ classes("pair-detail") }) {
         renderDecisionHeader(a, b, contest, contestIndex, tally.contests.size, cycleAnalysis)
-        renderDecisionDirect(a, b, aOverB, bOverA, revealed, tally.secretBallot)
+        renderDecisionDirect(a, b, aOverB, bOverA, revealed, (tally.side == RankingSide.SECRET))
         if (cycleAnalysis != null) {
             renderCycleSection(contest, cycleAnalysis, electionTally::isTier)
         }
@@ -460,7 +461,7 @@ private fun renderDecisionDirect(
     b: String,
     aOverB: Int,
     bOverA: Int,
-    revealed: List<Ballot.Revealed>,
+    revealed: List<Ballot.Identified>,
     isSecret: Boolean,
 ) {
     val aVoters = votersWhoPrefer(revealed, a, b)
@@ -756,7 +757,7 @@ private fun renderVoterList(voters: List<String>) {
 }
 
 private fun votersWhoPrefer(
-    ballots: List<Ballot.Revealed>,
+    ballots: List<Ballot.Identified>,
     a: String,
     b: String,
 ): List<String> = ballots
@@ -765,7 +766,7 @@ private fun votersWhoPrefer(
     .sorted()
 
 private fun votersWhoAbstainOnPair(
-    ballots: List<Ballot.Revealed>,
+    ballots: List<Ballot.Identified>,
     a: String,
     b: String,
 ): List<String> = ballots

@@ -41,9 +41,8 @@ fun TallyView(
  * grouping) lives in the shared `domain` module so the frontend can rerun it
  * directly.
  *
- * Only `Ballot.Revealed` ballots are toggleable: secret ballots strip the
- * voter identity and Tally.countBallots only accepts revealed input. With the
- * current `secretBallot = false` setting, every ballot is revealed.
+ * Only `Ballot.Identified` ballots are toggleable: anonymous ballots strip the
+ * voter identity and Tally.countBallots only accepts identified input.
  *
  * The toggle does not flow into the Preferences / Decision / Process detail
  * pages — those are separate routes that fetch their own (unfiltered) tally.
@@ -55,7 +54,7 @@ private fun renderTally(
     onNavigateToDecision: () -> Unit,
     onNavigateToProcess: () -> Unit,
 ) {
-    val revealed = serverTally.tally.ballots.filterIsInstance<Ballot.Revealed>()
+    val revealed = serverTally.tally.ballots.filterIsInstance<Ballot.Identified>()
     val totalToggleable = revealed.size
     val currentConfirmations = revealed.map { it.confirmation }.toSet()
 
@@ -107,7 +106,7 @@ private fun renderTally(
             val realCandidates = serverTally.tally.candidateNames.filterNot { it in tierSet }
             val recomputed = Tally.countBallots(
                 electionName = serverTally.tally.electionName,
-                secretBallot = serverTally.tally.secretBallot,
+                side = serverTally.tally.side,
                 candidates = realCandidates,
                 tiers = serverTally.tiers,
                 ballots = revealed.filter { it.confirmation in active },
@@ -208,7 +207,7 @@ private fun renderTally(
 
 @Composable
 private fun renderBallotToggles(
-    ballots: List<Ballot.Revealed>,
+    ballots: List<Ballot.Identified>,
     active: Set<String>,
     onToggle: (String) -> Unit,
     onSetAll: (Boolean) -> Unit,

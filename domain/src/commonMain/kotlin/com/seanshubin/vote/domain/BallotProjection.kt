@@ -35,10 +35,15 @@ package com.seanshubin.vote.domain
 fun projectBallot(
     rankings: List<Ranking>,
     electionTiers: List<String>,
+    side: RankingSide = RankingSide.PUBLIC,
 ): List<Ranking> {
     require(rankings.all { it.kind == RankingKind.CANDIDATE }) {
         "projectBallot expects only CANDIDATE-kind rankings as input; " +
             "tier markers are materialized by the projection itself"
+    }
+    require(rankings.all { it.side == side }) {
+        "projectBallot input rankings must all be on the same side ($side); " +
+            "callers are expected to filter before projecting"
     }
 
     val active = rankings.filter { it.rank != null }
@@ -52,6 +57,7 @@ fun projectBallot(
             rank = nextRank++,
             kind = RankingKind.CANDIDATE,
             tier = r.tier,
+            side = side,
         )
     }
     fun emitMarker(tierName: String) {
@@ -60,6 +66,7 @@ fun projectBallot(
             rank = nextRank++,
             kind = RankingKind.TIER,
             tier = null,
+            side = side,
         )
     }
 

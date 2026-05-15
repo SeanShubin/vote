@@ -281,7 +281,7 @@ class DynamoDbSingleTableQueryModel(
         }
     }
 
-    override fun listBallots(electionName: String): List<Ballot.Revealed> {
+    override fun listBallots(electionName: String): List<Ballot.Identified> {
         return runBlocking {
             val response = dynamoDb.query(QueryRequest {
                 tableName = DynamoDbSingleTableSchema.MAIN_TABLE
@@ -293,7 +293,7 @@ class DynamoDbSingleTableQueryModel(
             })
 
             response.items?.mapNotNull { item ->
-                itemToRevealedBallot(item, electionName)
+                itemToIdentifiedBallot(item, electionName)
             } ?: emptyList()
         }
     }
@@ -430,7 +430,7 @@ class DynamoDbSingleTableQueryModel(
         )
     }
 
-    private fun itemToRevealedBallot(item: Map<String, AttributeValue>, electionName: String): Ballot.Revealed? {
+    private fun itemToIdentifiedBallot(item: Map<String, AttributeValue>, electionName: String): Ballot.Identified? {
         val voterName = item["voter_name"]?.asS() ?: return null
         val rankingsJson = item["rankings"]?.asS() ?: return null
         val rankings = json.decodeFromString<List<Ranking>>(rankingsJson)
@@ -438,7 +438,7 @@ class DynamoDbSingleTableQueryModel(
         val whenCast = item["when_cast"]?.asN()?.toLong()?.let { Instant.fromEpochMilliseconds(it) }
             ?: return null
 
-        return Ballot.Revealed(
+        return Ballot.Identified(
             voterName = voterName,
             electionName = electionName,
             rankings = rankings,

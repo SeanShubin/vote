@@ -120,10 +120,10 @@ class InMemoryQueryModel(private val data: InMemoryData) : QueryModel {
         return data.ballots[electionName to voterName.lowercase()]?.toBallotSummary()
     }
 
-    override fun listBallots(electionName: String): List<Ballot.Revealed> {
+    override fun listBallots(electionName: String): List<Ballot.Identified> {
         return data.ballots.values
             .filter { it.electionName == electionName }
-            .map { it.toRevealedBallot() }
+            .map { it.toIdentifiedBallot() }
     }
 
     override fun listUserNames(): List<String> {

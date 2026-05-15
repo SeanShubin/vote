@@ -44,7 +44,7 @@ interface QueryModel {
     fun listRankings(voterName: String, electionName: String): List<Ranking>
     fun listRankings(electionName: String): List<VoterElectionCandidateRank>
     fun searchBallot(voterName: String, electionName: String): BallotSummary?
-    fun listBallots(electionName: String): List<Ballot.Revealed>
+    fun listBallots(electionName: String): List<Ballot.Identified>
     fun listUserNames(): List<String>
     fun listPermissions(role: Role): List<Permission>
     fun electionsOwnedCount(userName: String): Int

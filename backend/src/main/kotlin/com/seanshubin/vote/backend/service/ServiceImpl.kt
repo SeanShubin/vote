@@ -726,11 +726,13 @@ class ServiceImpl(
         // Ranked Pairs pipeline. Storage only carries candidate rankings
         // with a tier annotation; the markers are produced at compute time
         // so a tier rename never invalidates a recorded ballot. When tiers
-        // is empty the projection is a no-op. Secret-ballot toggle dropped
-        // — tally always shows ranked ballots.
+        // is empty the projection is a no-op.
+        //
+        // TODO: take side as a query parameter and gate SECRET-side ballot
+        // identification on Permission.VIEW_SECRETS.
         val tally = Tally.countBallots(
             electionName = electionName,
-            secretBallot = false,
+            side = RankingSide.PUBLIC,
             candidates = candidates,
             tiers = tiers,
             ballots = ballots,

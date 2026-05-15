@@ -89,7 +89,7 @@ class DynamoToRelationalTest {
 
     @Test
     fun `rankings projection explodes each ballot rankings JSON into one row per (election, voter, candidate)`() {
-        val ballot = Ballot.Revealed(
+        val ballot = Ballot.Identified(
             voterName = "bob",
             electionName = "E1",
             confirmation = "conf-1",
@@ -201,7 +201,7 @@ class DynamoToRelationalTest {
         users: List<User> = emptyList(),
         elections: List<ElectionSummary> = emptyList(),
         candidates: Map<String, List<String>> = emptyMap(),
-        ballots: Map<String, List<Ballot.Revealed>> = emptyMap(),
+        ballots: Map<String, List<Ballot.Identified>> = emptyMap(),
         lastSynced: Long? = null,
     ): QueryModel = object : QueryModel {
         override fun listUsers() = users

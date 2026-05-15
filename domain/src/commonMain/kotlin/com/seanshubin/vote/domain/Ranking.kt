@@ -18,8 +18,13 @@ import kotlin.math.min
  * inserted at the right cut points by [projectBallot]. The tier annotation
  * on candidate rankings is what tells the projection where each marker goes.
  *
- * [tier] and [kind] both default to "plain candidate, no tier" so existing
- * serialized events without these fields still deserialize.
+ * [side] partitions a ballot into two independent sub-ballots. Each side
+ * is tallied separately and the two never influence each other. See
+ * [RankingSide] for the secrecy contract.
+ *
+ * [tier], [kind], and [side] all default to "plain candidate, no tier,
+ * public side" so existing serialized events without these fields still
+ * deserialize.
  */
 @Serializable
 data class Ranking(
@@ -27,6 +32,7 @@ data class Ranking(
     val rank: Int?,
     val kind: RankingKind = RankingKind.CANDIDATE,
     val tier: String? = null,
+    val side: RankingSide = RankingSide.PUBLIC,
 ) {
     companion object {
         /**

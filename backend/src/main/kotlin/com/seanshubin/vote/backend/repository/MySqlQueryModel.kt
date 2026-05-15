@@ -280,7 +280,7 @@ class MySqlQueryModel(
         }
     }
 
-    override fun listBallots(electionName: String): List<Ballot.Revealed> {
+    override fun listBallots(electionName: String): List<Ballot.Identified> {
         val sql = queryLoader.load("ballot-select-all-by-election")
         return connection.prepareStatement(sql).use { stmt ->
             stmt.setString(1, electionName)
@@ -302,11 +302,11 @@ class MySqlQueryModel(
                 ballotsByVoter.getOrPut(voterName) { mutableListOf() }.add(ranking to metadata)
             }
 
-            // Convert to Ballot.Revealed list
+            // Convert to Ballot.Identified list
             ballotsByVoter.map { (voterName, rankingsWithMetadata) ->
                 val rankings = rankingsWithMetadata.map { it.first }
                 val metadata = rankingsWithMetadata.first().second // All rows have same metadata
-                Ballot.Revealed(
+                Ballot.Identified(
                     voterName = voterName,
                     electionName = electionName,
                     rankings = rankings,

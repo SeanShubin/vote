@@ -10,6 +10,7 @@ import com.seanshubin.vote.domain.DomainEvent
 import com.seanshubin.vote.domain.Place
 import com.seanshubin.vote.domain.RankedPairs
 import com.seanshubin.vote.domain.Ranking.Companion.prefers
+import com.seanshubin.vote.domain.RankingSide
 import com.seanshubin.vote.domain.Tally
 import com.seanshubin.vote.tools.lib.NarrativeEvent
 import com.seanshubin.vote.tools.lib.Output
@@ -82,7 +83,7 @@ class TallyFromSnapshot : CliktCommand(name = "tally-from-snapshot") {
 
         val tally = Tally.countBallots(
             electionName = name,
-            secretBallot = false,
+            side = RankingSide.PUBLIC,
             candidates = state.candidates.toList(),
             tiers = state.tiers.toList(),
             ballots = state.ballots.values.toList(),
@@ -116,7 +117,7 @@ class TallyFromSnapshot : CliktCommand(name = "tally-from-snapshot") {
         val tiers: MutableList<String> = mutableListOf()
         // Keyed by confirmation. A new BallotCast for the same voter
         // replaces the prior one — confirmations are unique per cast.
-        val ballots: MutableMap<String, Ballot.Revealed> = mutableMapOf()
+        val ballots: MutableMap<String, Ballot.Identified> = mutableMapOf()
     }
 
     private fun projectAllElections(events: List<NarrativeEvent>): Map<String, ElectionState> {
@@ -178,7 +179,7 @@ class TallyFromSnapshot : CliktCommand(name = "tally-from-snapshot") {
                     // A new BallotCast supersedes the voter's prior ballot —
                     // remove any existing entry for this voter first.
                     state.ballots.entries.removeAll { it.value.voterName == e.voterName }
-                    state.ballots[e.confirmation] = Ballot.Revealed(
+                    state.ballots[e.confirmation] = Ballot.Identified(
                         voterName = e.voterName,
                         electionName = e.electionName,
                         confirmation = e.confirmation,
@@ -292,7 +293,7 @@ class TallyFromSnapshot : CliktCommand(name = "tally-from-snapshot") {
             bOverA > aOverB -> println("  $b beats $a, $bOverA to $aOverB.")
             else -> println("  Tied, $aOverB to $bOverA (no contest emitted).")
         }
-        val revealed = tally.ballots.filterIsInstance<Ballot.Revealed>()
+        val revealed = tally.ballots.filterIsInstance<Ballot.Identified>()
         val aVoters = revealed.filter { it.rankings.prefers(a, b) }.map { it.voterName }.sorted()
         val bVoters = revealed.filter { it.rankings.prefers(b, a) }.map { it.voterName }.sorted()
         val abstain = revealed.filterNot { it.rankings.prefers(a, b) || it.rankings.prefers(b, a) }

@@ -9,28 +9,30 @@ import kotlinx.serialization.Serializable
  * sealed-permits cycle (parent ↔ children) folded under one code unit
  * via the analyzer's $-truncation rule.
  *
- * Wire format is preserved by @SerialName — JSON sees "RevealedBallot"
- * and "SecretBallot" regardless of Kotlin nesting.
+ * [Identified] carries the voter name; [Anonymous] is the redacted
+ * projection for callers that lack VIEW_SECRETS authority on a secret-side
+ * tally. Wire format is preserved by @SerialName — JSON sees
+ * "IdentifiedBallot" and "AnonymousBallot" regardless of Kotlin nesting.
  */
 @Serializable
 sealed interface Ballot {
     val rankings: List<Ranking>
 
     @Serializable
-    @SerialName("RevealedBallot")
-    data class Revealed(
+    @SerialName("IdentifiedBallot")
+    data class Identified(
         val voterName: String,
         val electionName: String,
         val confirmation: String,
         val whenCast: Instant,
         override val rankings: List<Ranking>
     ) : Ballot {
-        fun makeSecret(): Secret = Secret(electionName, confirmation, rankings)
+        fun makeAnonymous(): Anonymous = Anonymous(electionName, confirmation, rankings)
     }
 
     @Serializable
-    @SerialName("SecretBallot")
-    data class Secret(
+    @SerialName("AnonymousBallot")
+    data class Anonymous(
         val electionName: String,
         val confirmation: String,
         override val rankings: List<Ranking>
