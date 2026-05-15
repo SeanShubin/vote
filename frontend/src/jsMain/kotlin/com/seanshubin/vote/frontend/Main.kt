@@ -8,6 +8,12 @@ import org.jetbrains.compose.web.dom.*
 import org.jetbrains.compose.web.renderComposable
 
 fun main() {
+    if (BuildConfig.GIT_HASH == "dev") {
+        kotlinx.browser.document
+            .querySelector("link[rel='icon']")
+            ?.setAttribute("href", "/favicon-dev.svg")
+    }
+
     val integrations = ProductionFrontendIntegrations(BuildConfig.API_BASE_URL)
 
     renderComposable(rootElementId = "root") {
