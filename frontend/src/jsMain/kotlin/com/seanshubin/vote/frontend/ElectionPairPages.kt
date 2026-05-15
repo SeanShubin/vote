@@ -95,10 +95,12 @@ fun ElectionDecisionPage(
         H1 { Text("Decision: $electionName") }
         P({ classes("pair-page-explainer") }) {
             Text(
-                "What Tideman's Ranked Pairs did with the direct contest between these " +
-                    "two candidates. A contest is locked into the final ranking unless " +
-                    "doing so would create a cycle with already-locked stronger contests, " +
-                    "in which case it's skipped."
+                "What the Ranked Pairs tally did with the direct contest between these " +
+                    "two candidates. A contest locks into the final ranking unless it " +
+                    "would create a cycle with stronger contests already locked, or with " +
+                    "other contests of identical strength that can't all coexist — in " +
+                    "either case the contest is skipped, and contests skipped because of " +
+                    "an equal-strength conflict leave the candidates tied."
             )
         }
 
@@ -148,10 +150,15 @@ fun ElectionProcessPage(
         H1 { Text("Ranked Pairs Process: $electionName") }
         P({ classes("pair-page-explainer") }) {
             Text(
-                "Every contest in the order Tideman's Ranked Pairs processed it: " +
-                    "strongest first by winning votes, with less opposition breaking ties. " +
-                    "Each contest is locked into the final ranking unless doing so would " +
-                    "close a cycle with already-locked contests."
+                "Every contest, grouped by strength bucket (winning votes first, " +
+                    "less opposition breaking ties). Earlier buckets lock first. " +
+                    "Within a bucket, every contest is evaluated against the same " +
+                    "reference — the already-locked edges plus every other contest in " +
+                    "this bucket — so the outcome doesn't depend on the order rows are " +
+                    "listed in. A contest skips iff a path back from its loser to its " +
+                    "winner exists in that reference. When a cycle is made entirely of " +
+                    "contests of identical strength, every contest in the cycle skips " +
+                    "and the candidates involved tie."
             )
         }
 
@@ -323,7 +330,7 @@ private fun renderDecisionDetail(electionTally: ElectionTally, a: String, b: Str
     val contest = contestIndex.takeIf { it >= 0 }?.let { tally.contests[it] }
 
     Div({ classes("pair-detail") }) {
-        renderDecisionHeader(a, b, contest, contestIndex, tally.contests.size)
+        renderDecisionHeader(a, b, contest, contestIndex, tally.contests.size, tally.contests)
         renderDecisionDirect(a, b, aOverB, bOverA, revealed, tally.secretBallot)
         if (contest?.outcome is RankedPairs.Outcome.SkippedByCycle) {
             renderCycleSection(contest, contestIndex, tally.contests, electionTally::isTier)
@@ -338,6 +345,7 @@ private fun renderDecisionHeader(
     contest: RankedPairs.Contest?,
     contestIndex: Int,
     contestTotal: Int,
+    allContests: List<RankedPairs.Contest>,
 ) {
     val verdict = when {
         contest == null ->
@@ -345,10 +353,26 @@ private fun renderDecisionHeader(
         contest.outcome is RankedPairs.Outcome.Locked ->
             "${contest.winner} beats ${contest.loser} — contest locked into the final ranking " +
                 "(step ${contestIndex + 1} of $contestTotal)."
-        contest.outcome is RankedPairs.Outcome.SkippedByCycle ->
-            "${contest.winner} beat ${contest.loser} directly, but the contest was skipped " +
-                "(step ${contestIndex + 1} of $contestTotal) — locking it in would have " +
-                "closed a cycle with earlier, stronger contests."
+        contest.outcome is RankedPairs.Outcome.SkippedByCycle -> {
+            val skippedOutcome = contest.outcome as RankedPairs.Outcome.SkippedByCycle
+            val sameBucketCycle = skippedOutcome.cyclePath.zipWithNext().any { (from, to) ->
+                val edge = allContests.firstOrNull { it.winner == from && it.loser == to }
+                edge != null &&
+                    edge.outcome is RankedPairs.Outcome.SkippedByCycle &&
+                    edge.winningVotes == contest.winningVotes &&
+                    edge.losingVotes == contest.losingVotes
+            }
+            if (sameBucketCycle) {
+                "${contest.winner} beat ${contest.loser} directly, but the contest was skipped " +
+                    "(step ${contestIndex + 1} of $contestTotal) — it sits in a cycle of " +
+                    "equally-strong contests that can't all coexist. None of the cycle's " +
+                    "contests lock, and the candidates involved tie."
+            } else {
+                "${contest.winner} beat ${contest.loser} directly, but the contest was skipped " +
+                    "(step ${contestIndex + 1} of $contestTotal) — locking it would have closed " +
+                    "a cycle with stronger contests already locked into the ranking."
+            }
+        }
         else -> ""
     }
     Div({ classes("pair-detail-header") }) { Text(verdict) }
@@ -392,19 +416,20 @@ private fun renderDecisionDirect(
 }
 
 /**
- * Why-it-was-skipped explainer for the Decision page. Shows the stronger
- * contests that locked first (each with its step number and strength)
- * next to the skipped contest's own step and strength, so a reader can
- * see *why* those contests had priority: by the lock-in order — winning
- * votes descending, then losing votes ascending — they sit ahead of
- * this one.
+ * Why-it-was-skipped explainer for the Decision page. Lays out each
+ * contest in the cycle path as its own row with the contest's actual
+ * outcome attached: Locked (from an earlier, stronger bucket), or
+ * Skipped (in the same bucket as this contest, dropped together because
+ * none of the tied-strength contests can be privileged over the others
+ * without an arbitrary tiebreak). The skipped contest under inspection
+ * is the final row, so the reader can scan top-to-bottom and see why
+ * the lock-in order — strength buckets first, atomic within a bucket
+ * — couldn't keep this contest.
  *
- * The "stronger" rows are the locked contests that form the cycle's
- * back path: for each adjacent pair (path[i], path[i+1]) in the cycle
- * path, there's a corresponding locked contest with winner=path[i] and
- * loser=path[i+1]. We render them in the order they appear in the
- * cycle path (which is also lock-in step order, because BFS through
- * locked-first edges).
+ * The intro paragraph picks between two explanations depending on
+ * whether the cycle path is all stronger-locked edges or includes
+ * same-bucket-skipped edges, because the underlying "why" is
+ * different in those two cases.
  */
 @Composable
 private fun renderCycleSection(
@@ -421,65 +446,71 @@ private fun renderCycleSection(
             byEdge[from to to]?.let { it.index + 1 to it.value }
         }
 
+    val anyInSameBucket = cycleEdges.any { (_, c) ->
+        c.outcome is RankedPairs.Outcome.SkippedByCycle &&
+            c.winningVotes == contest.winningVotes &&
+            c.losingVotes == contest.losingVotes
+    }
+
     Div({ classes("rp-cycle-section") }) {
         H3 { Text("Why it was skipped") }
         P {
             Text(
-                "By the time Tideman reached this contest, the contests below had " +
-                    "already locked into the ranking. They were processed first because " +
-                    "the lock-in order sorts contests strongest-first — winning votes " +
-                    "descending, then losing votes ascending — and each had higher " +
-                    "priority than this one on that ordering. Together they form a path " +
-                    "from ${contest.loser} back to ${contest.winner}, so locking " +
-                    "${contest.winner} → ${contest.loser} now would close it into a cycle."
+                if (anyInSameBucket) {
+                    "This contest is part of a numeric-tie cycle: every contest in " +
+                        "the path below has the same winning votes and the same losing " +
+                        "votes as this one. None of them lock — picking which to keep " +
+                        "and which to drop would require an arbitrary rule, and the " +
+                        "vote counts give no reason to prefer one over the others. " +
+                        "Because none lock, the candidates in the cycle aren't ordered " +
+                        "relative to each other in the final ranking — they tie."
+                } else {
+                    "Stronger contests had already locked into the ranking by the time " +
+                        "this one was considered. They appear in the path below — each " +
+                        "with its step number and strength — because they together form " +
+                        "a path from ${contest.loser} back to ${contest.winner}. Locking " +
+                        "${contest.winner} → ${contest.loser} now would close that path " +
+                        "into a cycle."
+                }
             )
         }
         Div({ classes("rp-cycle-comparison") }) {
-            cycleEdges.forEach { (step, locked) ->
+            cycleEdges.forEach { (step, edgeContest) ->
                 renderCycleEdgeRow(
                     step = step,
-                    contest = locked,
-                    label = "Locked",
-                    rowKind = CycleRowKind.LOCKED,
+                    contest = edgeContest,
+                    isCurrentContest = false,
                     isTier = isTier,
                 )
             }
             renderCycleEdgeRow(
                 step = skippedStep,
                 contest = contest,
-                label = "Skipped",
-                rowKind = CycleRowKind.SKIPPED,
+                isCurrentContest = true,
                 isTier = isTier,
             )
         }
     }
 }
 
-private enum class CycleRowKind { LOCKED, SKIPPED }
-
 @Composable
 private fun renderCycleEdgeRow(
     step: Int,
     contest: RankedPairs.Contest,
-    label: String,
-    rowKind: CycleRowKind,
+    isCurrentContest: Boolean,
     isTier: (String) -> Boolean,
 ) {
+    val locked = contest.outcome is RankedPairs.Outcome.Locked
     Div({
         classes("rp-cycle-row")
-        when (rowKind) {
-            CycleRowKind.LOCKED -> classes("rp-cycle-row-locked")
-            CycleRowKind.SKIPPED -> classes("rp-cycle-row-skipped")
-        }
+        if (locked) classes("rp-cycle-row-locked") else classes("rp-cycle-row-skipped")
+        if (isCurrentContest) classes("rp-cycle-row-current")
     }) {
         Span({ classes("rp-cycle-row-step") }) { Text("Step $step") }
         Span({
             classes("rp-cycle-row-status")
-            when (rowKind) {
-                CycleRowKind.LOCKED -> classes("rp-process-status-locked")
-                CycleRowKind.SKIPPED -> classes("rp-process-status-skipped")
-            }
-        }) { Text(label) }
+            if (locked) classes("rp-process-status-locked") else classes("rp-process-status-skipped")
+        }) { Text(if (locked) "Locked" else "Skipped") }
         Span({ classes("rp-cycle-row-edge") }) {
             renderNameChip(contest.winner, isTier(contest.winner))
             Span({ classes("rp-cycle-arrow") }) { Text("→") }
@@ -521,9 +552,12 @@ private fun renderProcessDetail(electionTally: ElectionTally) {
     P({ classes("rp-process-explainer") }) {
         Text(
             "Contests are grouped by strength bucket (winning votes, then losing votes). " +
-                "Earlier buckets locked first; within a bucket, contests are processed " +
-                "alphabetically by winner then loser — a deterministic tiebreaker for " +
-                "contests with identical strength."
+                "Earlier buckets lock first. Within a bucket, contests are evaluated " +
+                "atomically — each one against the same reference graph (already-locked " +
+                "edges plus every other contest in this bucket) — so the order rows " +
+                "appear in doesn't change any outcomes; it's display-only. When a cycle " +
+                "is made of contests at the same strength, every contest in the cycle " +
+                "skips together, and the candidates involved tie at the same place."
         )
     }
     Div({ classes("rp-process-list") }) {

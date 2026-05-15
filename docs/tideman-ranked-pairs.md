@@ -81,45 +81,72 @@ specific stronger contests that prevented the lock-in.
    direction with the higher count. Ties produce no contest at all.
 3. Sort the contests strongest first:
    - winning votes descending,
-   - then losing votes ascending (less opposition is more decisive),
-   - then alphabetically by winner and loser, for deterministic
-     tiebreaks across contests that match on the numbers.
-4. Walk the sorted list. For each contest, lock it into the DAG
-   *unless* doing so would close a cycle with already-locked edges.
-   A skipped contest records the locked path that closes the cycle, so
-   the report can quote it.
+   - then losing votes ascending (less opposition is more decisive).
+   The remaining sort key (alphabetical, winner then loser) is for
+   *display order only* — it has no effect on which contests lock or
+   skip, because step 4 processes contests of identical strength
+   atomically as a group.
+4. Walk the sorted contests **one strength bucket at a time**, where
+   a bucket is the maximal run of contests with identical winning votes
+   and identical losing votes. For each bucket, decide every contest
+   against the *same* reference graph: the edges already locked by
+   earlier buckets *plus* every other contest in the current bucket.
+   A contest skips iff a path from its loser back to its winner exists
+   in that reference graph after removing the contest's own edge;
+   otherwise it locks. Contests within a bucket are decided
+   independently — there's no implicit "first this one then that one,"
+   so no arbitrary ordering can influence the outcome.
 5. Place candidates by topological layering of the locked DAG. Each
    layer is the candidates that have no incoming locked edge from any
    still-remaining candidate; everyone in a layer shares a place.
 
 The Condorcet criterion holds. If a candidate beats every other
 candidate directly, all their outgoing contests lock in (they never
-have an incoming edge to close a cycle into), and topology puts them
-alone at place 1.
+have an incoming edge to close a cycle into, regardless of bucket
+processing), and topology puts them alone at place 1.
 
-### The alphabetical tiebreak can affect the ranking
+### Numeric-tie cycles tie at the same place
 
-When two contests have the same winning votes *and* the same losing
-votes, step 3 falls through to a sort by winner name then loser name.
-That tiebreaker is normally invisible (it just decides display order
-within a "bucket" of equally-strong contests), but in one case it can
-change the outcome: when several equally-strong contests form a cycle.
+When several equally-strong contests form a cycle, picking which ones
+to lock and which to drop is something the *numbers* can't decide —
+every contest in the cycle has the same winning and losing votes as
+every other. Atomic-bucket processing handles this by skipping all of
+them: each contest's loser → winner path can be closed through the
+*other* contests in the same bucket, so each one is independently
+marked as a cycle edge, and none lock.
 
-Pathological example: three candidates A, B, C with A→B, B→C, and C→A
-all at strength 3-3 (a clean rock-paper-scissors at equal votes).
-Whichever two of those three lock first determine the ranking — the
-third creates a cycle and gets skipped. Under our alphabetical
-tiebreak: A→B locks (winner A), then B→C locks (winner B), then C→A
-is skipped because A→B→C already exists. Final: A > B > C.
+Concretely, rock-paper-scissors at equal votes (three candidates A,
+B, C with A→B, B→C, and C→A all at 3-3) produces no locked edges
+among the three, and the topological layering puts A, B, and C
+together at place 1. The algorithm refuses to invent an order the
+ballots didn't supply.
 
-Tideman's original 1987 paper resolves this with a random ballot.
-That removes the alphabetical bias at the cost of determinism — the
-result of an election with a perfect numeric tie among cycle edges
-could come out differently on different runs. We chose determinism;
-alphabetically-earlier candidates win perfect ties as a side effect.
-In practice, the perfect-numeric-tie case is rare enough that this
-trade-off is mostly theoretical, but it's not nothing — it's worth
-being explicit about.
+Two things this rule preserves:
+
+- **No name-order bias.** Alphabetical sort by winner / loser is still
+  used to display contests in a stable order within a bucket on the
+  Process page, but it doesn't decide anything. Replacing it with
+  reverse alphabetical, or with a hash of the candidate name, would
+  produce identical final places.
+- **Unrelated contests in a tied bucket still lock.** If a bucket
+  contains a sub-cycle *and* a contest unrelated to that cycle (no
+  path closes through any of the cycle's nodes), the unrelated
+  contest locks. Only the cycle members skip together.
+
+### Is this still Tideman?
+
+Yes, in the sense that matters: the algorithm is still Ranked Pairs
+— sort contests strongest first, lock or skip each based on whether
+it would create a cycle with edges already in the ranking. The
+modification is Tideman's *tiebreaker*. The original 1987 paper
+resolves ties between equal-strength contests by consulting a
+randomly selected ballot, which removes name-order bias at the cost
+of determinism (the same election could come out differently on
+different runs). We replace that with the atomic-bucket rule above,
+which preserves determinism and produces honest ties where the
+numbers can't separate candidates. The Condorcet criterion, the
+independence-of-clones property, and the Condorcet loser criterion
+all still hold; only the tiebreaker is different.
 
 ## A worked example
 

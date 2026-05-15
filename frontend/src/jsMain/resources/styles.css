@@ -1263,6 +1263,12 @@ tr:nth-child(even) {
     border: 1px dashed #aab8ca;
 }
 
+/* The pair whose Decision page the user is viewing — highlighted so the
+ * reader can find their row among the others (locked or also-skipped). */
+.rp-cycle-row-current {
+    box-shadow: 0 0 0 2px #1c5fb8;
+}
+
 .rp-cycle-row-step {
     color: #6b7d8d;
     font-variant-numeric: tabular-nums;

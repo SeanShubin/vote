@@ -153,6 +153,90 @@ class RankedPairsTest {
     }
 
     @Test
+    fun `equal-strength cycle ties at one place — no alphabetical bias`() {
+        // 3-cycle where every contest has identical winning/losing votes.
+        // Construct it with 6 voters, two of each cyclic pattern:
+        //   2× A > B > C   →  A>B, A>C, B>C
+        //   2× B > C > A   →  B>C, B>A, C>A
+        //   2× C > A > B   →  C>A, C>B, A>B
+        // Pairwise:
+        //   A vs B: 4-2 (AB voters + CAB voters prefer A; BCA voters prefer B)
+        //   Wait, recompute: A>B for "A>B>C" (2) and "C>A>B" (2) = 4. B>A for "B>C>A" (2) = 2. So A wins 4-2.
+        //   B vs C: B>C from "A>B>C" (2) and "B>C>A" (2) = 4. C>B from "C>A>B" (2) = 2. B wins 4-2.
+        //   C vs A: C>A from "B>C>A" (2) and "C>A>B" (2) = 4. A>C from "A>B>C" (2) = 2. C wins 4-2.
+        // All three contests at 4-2: A→B, B→C, C→A. Perfect numeric tie
+        // among cycle members.
+        //
+        // Under atomic-bucket: every contest in the 4-2 bucket has the
+        // others as the closing path through the rest of the graph, so
+        // all three skip. A, B, C end up tied at place 1.
+        val tally = countBallots(
+            candidates = listOf("A", "B", "C"),
+            ballot("v1", "A" to 1, "B" to 2, "C" to 3),
+            ballot("v2", "A" to 1, "B" to 2, "C" to 3),
+            ballot("v3", "B" to 1, "C" to 2, "A" to 3),
+            ballot("v4", "B" to 1, "C" to 2, "A" to 3),
+            ballot("v5", "C" to 1, "A" to 2, "B" to 3),
+            ballot("v6", "C" to 1, "A" to 2, "B" to 3),
+        )
+        // All three should tie at place 1 — none of the three contests
+        // locked, because none of them is privileged over the others by
+        // the numbers alone.
+        assertEquals(setOf(1), tally.places.map { it.rank }.toSet())
+        assertEquals(setOf("A", "B", "C"), tally.places.map { it.candidateName }.toSet())
+        // Every contest in the bucket should report Skipped.
+        assertEquals(3, tally.contests.size)
+        assertTrue(
+            tally.contests.all { it.outcome is RankedPairs.Outcome.SkippedByCycle },
+            "All three equal-strength cycle contests should skip; got ${tally.contests}",
+        )
+    }
+
+    @Test
+    fun `unrelated contest in same bucket as a cycle still locks`() {
+        // A bucket can contain both a sub-cycle and an unrelated contest.
+        // Atomic-bucket processing handles each contest independently
+        // against (already-locked + other bucket edges minus self), so an
+        // unrelated edge doesn't get penalized for sharing strength with
+        // conflicting edges.
+        //
+        // Construct: 4-2 cycle among A, B, C; plus a 4-2 win D over E
+        // that has no relationship to A/B/C.
+        //
+        // Six voters who form the cycle among ABC (as in the previous
+        // test, but with D and E added at the end), plus two voters who
+        // rank just D > E.
+        val tally = countBallots(
+            candidates = listOf("A", "B", "C", "D", "E"),
+            ballot("v1", "A" to 1, "B" to 2, "C" to 3, "D" to 4, "E" to 5),
+            ballot("v2", "A" to 1, "B" to 2, "C" to 3, "D" to 4, "E" to 5),
+            ballot("v3", "B" to 1, "C" to 2, "A" to 3, "D" to 4, "E" to 5),
+            ballot("v4", "B" to 1, "C" to 2, "A" to 3, "D" to 4, "E" to 5),
+            ballot("v5", "C" to 1, "A" to 2, "B" to 3, "D" to 4, "E" to 5),
+            ballot("v6", "C" to 1, "A" to 2, "B" to 3, "D" to 4, "E" to 5),
+        )
+        // ABC tie at the top (3-way numeric-tie cycle, all skip), then
+        // D and E come in their unambiguous order at the bottom.
+        val rankByName = tally.places.associate { it.candidateName to it.rank }
+        assertEquals(rankByName["A"], rankByName["B"], "A and B should tie")
+        assertEquals(rankByName["B"], rankByName["C"], "B and C should tie")
+        assertTrue(
+            (rankByName["D"] ?: 0) > (rankByName["A"] ?: 0),
+            "D should rank below the ABC tie; got $rankByName",
+        )
+        assertTrue(
+            (rankByName["E"] ?: 0) > (rankByName["D"] ?: 0),
+            "E should rank below D; got $rankByName",
+        )
+        // The D→E contest locked — it doesn't participate in the cycle.
+        val dOverE = tally.contests.first { it.winner == "D" && it.loser == "E" }
+        assertTrue(
+            dOverE.outcome is RankedPairs.Outcome.Locked,
+            "D→E should lock even though it shares strength with the ABC cycle",
+        )
+    }
+
+    @Test
     fun `contest sort order — winning votes desc then losing votes asc`() {
         // Two contests with equal winning votes but different losing votes.
         // Setup:
