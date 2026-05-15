@@ -84,6 +84,13 @@ fun LoginPage(
             }) {
                 Text(if (discordLoginAction.isLoading) "Redirecting…" else "Sign in with Discord")
             }
+
+            Button({
+                attr("type", "button")
+                onClick { window.location.href = "/methodology.html" }
+            }) {
+                Text("About This Voting Method")
+            }
         }
 
         if (loginConfig?.devLoginEnabled == true) {
