@@ -44,6 +44,7 @@ scripts/dev launch-fresh-dynamodb     Fresh DynamoDB launch (purge + start every
 scripts/dev launch-keep-mysql         Launch MySQL keeping existing data
 scripts/dev launch-keep-dynamodb      Launch DynamoDB keeping existing data
 scripts/dev launch-from-snapshot      Replay a JSONL snapshot into local DynamoDB and launch (--prod to download fresh, --snapshot <file> to reuse)
+scripts/dev tally-from-snapshot       Replay a JSONL snapshot in-process and print the Ranked Pairs tally for one election (--snapshot <file> --election <name>; add --pair A B to drill into one head-to-head). No DynamoDB or UI required.
 scripts/dev run-local                 Convenience: launch-fresh-dynamodb
 scripts/dev launch-scenario-mysql     Launch with scenario data preloaded (MySQL)
 scripts/dev launch-scenario-dynamodb  Launch with scenario data preloaded (DynamoDB)

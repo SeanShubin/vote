@@ -49,6 +49,7 @@ import com.seanshubin.vote.tools.commands.RestoreDynamodb
 import com.seanshubin.vote.tools.commands.RollLogs
 import com.seanshubin.vote.tools.commands.RunLocal
 import com.seanshubin.vote.tools.commands.ServeFrontend
+import com.seanshubin.vote.tools.commands.TallyFromSnapshot
 import com.seanshubin.vote.tools.commands.TerminateAll
 import com.seanshubin.vote.tools.commands.TestLifecycle
 import com.seanshubin.vote.tools.commands.WorktreeSync
@@ -87,6 +88,7 @@ fun main(args: Array<String>) {
             LaunchKeepMysql(),
             LaunchKeepDynamodb(),
             LaunchFromSnapshot(),
+            TallyFromSnapshot(),
             RunLocal(),
             InspectMysqlAll(),
             InspectMysqlRawQuery(),

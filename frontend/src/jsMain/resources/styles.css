@@ -1269,6 +1269,28 @@ tr:nth-child(even) {
     box-shadow: 0 0 0 2px #1c5fb8;
 }
 
+/* Closure indicator placed after the last row of a cycle. Without this
+ * row, a reader scanning the cycle's N edges top-to-bottom can miss that
+ * the last edge's loser is the first edge's winner — i.e. that the
+ * contests form a closed loop rather than a one-way path. Visible at
+ * any N. */
+.rp-cycle-closure {
+    display: flex;
+    align-items: center;
+    gap: 0.2rem;
+    color: #6b7d8d;
+    font-style: italic;
+    font-size: 0.85rem;
+    padding: 0.3rem 0.75rem;
+}
+
+.rp-cycle-closure-arrow {
+    color: #2c7be5;
+    font-style: normal;
+    font-size: 1.1rem;
+    margin-right: 0.1rem;
+}
+
 .rp-cycle-row-step {
     color: #6b7d8d;
     font-variant-numeric: tabular-nums;

@@ -320,22 +320,93 @@ private fun renderDecisionDetail(electionTally: ElectionTally, a: String, b: Str
     val bOverA = tally.preferences[bi][ai].strength
     val revealed = tally.ballots.filterIsInstance<Ballot.Revealed>()
 
-    // Find the directed contest between a and b in the Tideman lock-in
-    // record, if one exists. A tied pair (aOverB == bOverA) won't appear
-    // in `contests` at all because Tideman emits no contest for ties.
+    // Find the directed contest between a and b in the Ranked Pairs
+    // lock-in record, if one exists. A tied pair (aOverB == bOverA)
+    // won't appear in `contests` at all because Tideman emits no contest
+    // for ties.
     val contestIndex = tally.contests.indexOfFirst { contest ->
         (contest.winner == a && contest.loser == b) ||
             (contest.winner == b && contest.loser == a)
     }
     val contest = contestIndex.takeIf { it >= 0 }?.let { tally.contests[it] }
+    val cycleAnalysis = contest?.let { analyzeCycle(it, contestIndex, tally.contests) }
 
     Div({ classes("pair-detail") }) {
-        renderDecisionHeader(a, b, contest, contestIndex, tally.contests.size, tally.contests)
+        renderDecisionHeader(a, b, contest, contestIndex, tally.contests.size, cycleAnalysis)
         renderDecisionDirect(a, b, aOverB, bOverA, revealed, tally.secretBallot)
-        if (contest?.outcome is RankedPairs.Outcome.SkippedByCycle) {
-            renderCycleSection(contest, contestIndex, tally.contests, electionTally::isTier)
+        if (cycleAnalysis != null) {
+            renderCycleSection(contest, cycleAnalysis, electionTally::isTier)
         }
     }
+}
+
+/**
+ * Classification of a skipped contest's cycle, used by both the verdict
+ * header and the long-form "why" section so the two stay in sync.
+ *
+ * Three cases (N = cycle size):
+ *   - **LonelyWeakest**: every other contest in the cycle is locked
+ *     from an earlier (stronger) bucket. This contest is the uniquely
+ *     weakest edge in the cycle and gets dropped to break the loop.
+ *   - **PureTie**: every contest in the cycle is at the same strength
+ *     as this one. None lock — the algorithm can't pick which to drop
+ *     without an arbitrary tiebreak, so all N skip together.
+ *   - **Mixed**: some contests in the cycle are stronger and locked,
+ *     the remaining T (including this one) are tied at this strength
+ *     and skip together for the same reason as PureTie.
+ *
+ * The same edge can never appear as Skipped-from-a-different-bucket:
+ * a skipped contest's cycle path is BFS through
+ * (locked edges) ∪ (own-bucket tentative edges), so any Skipped edge
+ * in the path must be from this contest's own bucket.
+ */
+private enum class CycleKind { LONELY_WEAKEST, PURE_TIE, MIXED }
+
+/** Cycle-path edge: step index (1-based) paired with the contest. */
+private data class CycleEdge(val step: Int, val contest: RankedPairs.Contest)
+
+/**
+ * Analysis of [contest]'s cycle, or null if [contest] is not skipped.
+ * [edges] lists the cycle-path contests in the order they appear in
+ * the path (loser → winner direction), so the current contest
+ * implicitly closes the loop by returning to [edges].first()'s winner.
+ */
+private data class CycleAnalysis(
+    val kind: CycleKind,
+    val edges: List<CycleEdge>,
+    val skippedStep: Int,
+    val totalSize: Int,
+    val lockedCount: Int,
+    val tiedCount: Int,
+)
+
+private fun analyzeCycle(
+    contest: RankedPairs.Contest,
+    contestIndex: Int,
+    allContests: List<RankedPairs.Contest>,
+): CycleAnalysis? {
+    val outcome = contest.outcome as? RankedPairs.Outcome.SkippedByCycle ?: return null
+    val byEdge: Map<Pair<String, String>, IndexedValue<RankedPairs.Contest>> =
+        allContests.withIndex().associateBy { (_, c) -> c.winner to c.loser }
+    val edges: List<CycleEdge> = outcome.cyclePath.zipWithNext().mapNotNull { (from, to) ->
+        byEdge[from to to]?.let { CycleEdge(it.index + 1, it.value) }
+    }
+    val locked = edges.count { it.contest.outcome is RankedPairs.Outcome.Locked }
+    val tied = edges.size - locked + 1  // +1 for the current contest itself
+    val total = edges.size + 1
+    val kind = when {
+        tied == 1 -> CycleKind.LONELY_WEAKEST
+        tied == total -> CycleKind.PURE_TIE
+        else -> CycleKind.MIXED
+    }
+    return CycleAnalysis(
+        kind = kind,
+        edges = edges,
+        skippedStep = contestIndex + 1,
+        totalSize = total,
+        lockedCount = locked,
+        tiedCount = tied,
+    )
 }
 
 @Composable
@@ -345,7 +416,7 @@ private fun renderDecisionHeader(
     contest: RankedPairs.Contest?,
     contestIndex: Int,
     contestTotal: Int,
-    allContests: List<RankedPairs.Contest>,
+    cycleAnalysis: CycleAnalysis?,
 ) {
     val verdict = when {
         contest == null ->
@@ -353,24 +424,29 @@ private fun renderDecisionHeader(
         contest.outcome is RankedPairs.Outcome.Locked ->
             "${contest.winner} beats ${contest.loser} — contest locked into the final ranking " +
                 "(step ${contestIndex + 1} of $contestTotal)."
-        contest.outcome is RankedPairs.Outcome.SkippedByCycle -> {
-            val skippedOutcome = contest.outcome as RankedPairs.Outcome.SkippedByCycle
-            val sameBucketCycle = skippedOutcome.cyclePath.zipWithNext().any { (from, to) ->
-                val edge = allContests.firstOrNull { it.winner == from && it.loser == to }
-                edge != null &&
-                    edge.outcome is RankedPairs.Outcome.SkippedByCycle &&
-                    edge.winningVotes == contest.winningVotes &&
-                    edge.losingVotes == contest.losingVotes
-            }
-            if (sameBucketCycle) {
-                "${contest.winner} beat ${contest.loser} directly, but the contest was skipped " +
-                    "(step ${contestIndex + 1} of $contestTotal) — it sits in a cycle of " +
-                    "equally-strong contests that can't all coexist. None of the cycle's " +
-                    "contests lock, and the candidates involved tie."
-            } else {
-                "${contest.winner} beat ${contest.loser} directly, but the contest was skipped " +
-                    "(step ${contestIndex + 1} of $contestTotal) — locking it would have closed " +
-                    "a cycle with stronger contests already locked into the ranking."
+        cycleAnalysis != null -> {
+            val stepInfo = "step ${contestIndex + 1} of $contestTotal"
+            when (cycleAnalysis.kind) {
+                CycleKind.LONELY_WEAKEST ->
+                    "${contest.winner} beat ${contest.loser} directly, but the contest was " +
+                        "skipped ($stepInfo) — stronger contests in its " +
+                        "${cycleAnalysis.totalSize}-cycle already locked, so dropping this " +
+                        "one is what breaks the cycle."
+                CycleKind.PURE_TIE -> {
+                    val n = cycleAnalysis.totalSize
+                    "${contest.winner} beat ${contest.loser} directly, but the contest was " +
+                        "skipped ($stepInfo) — it sits in a cycle of $n equally-strong " +
+                        "contests; none lock, and the candidates involved tie."
+                }
+                CycleKind.MIXED -> {
+                    val tied = cycleAnalysis.tiedCount
+                    val others = tied - 1
+                    val otherWord = if (others == 1) "other contest" else "other contests"
+                    "${contest.winner} beat ${contest.loser} directly, but the contest was " +
+                        "skipped ($stepInfo) — it's tied in strength with $others $otherWord " +
+                        "in its ${cycleAnalysis.totalSize}-cycle, and the algorithm refuses " +
+                        "to pick which of the tied contests to keep."
+                }
             }
         }
         else -> ""
@@ -417,78 +493,99 @@ private fun renderDecisionDirect(
 
 /**
  * Why-it-was-skipped explainer for the Decision page. Lays out each
- * contest in the cycle path as its own row with the contest's actual
- * outcome attached: Locked (from an earlier, stronger bucket), or
- * Skipped (in the same bucket as this contest, dropped together because
- * none of the tied-strength contests can be privileged over the others
- * without an arbitrary tiebreak). The skipped contest under inspection
- * is the final row, so the reader can scan top-to-bottom and see why
- * the lock-in order — strength buckets first, atomic within a bucket
- * — couldn't keep this contest.
+ * contest in the cycle (including this one) as its own row with the
+ * actual outcome attached — Locked (from an earlier, stronger bucket)
+ * or Skipped (same bucket as this contest, tied and dropped together).
+ * After the last row, a closure indicator shows that the loop closes
+ * back to the cycle's starting node, making the closed-loop structure
+ * explicit even for N-cycles with N > 3.
  *
- * The intro paragraph picks between two explanations depending on
- * whether the cycle path is all stronger-locked edges or includes
- * same-bucket-skipped edges, because the underlying "why" is
- * different in those two cases.
+ * The intro paragraph branches on the cycle's classification:
+ *   - LonelyWeakest: this contest is the uniquely weakest; others locked.
+ *   - PureTie:       all N contests are at the same strength; all skip.
+ *   - Mixed:         L stronger ones locked, T tied (this one included).
+ *
+ * The wording scales to any N because it talks in terms of counts
+ * (L, T, totalSize) rather than enumerating specific positions.
  */
 @Composable
 private fun renderCycleSection(
     contest: RankedPairs.Contest,
-    skippedStep: Int,
-    allContests: List<RankedPairs.Contest>,
+    cycleAnalysis: CycleAnalysis,
     isTier: (String) -> Boolean,
 ) {
-    val skipped = contest.outcome as RankedPairs.Outcome.SkippedByCycle
-    val byEdge = allContests.withIndex()
-        .associateBy { (_, c) -> c.winner to c.loser }
-    val cycleEdges: List<Pair<Int, RankedPairs.Contest>> =
-        skipped.cyclePath.zipWithNext().mapNotNull { (from, to) ->
-            byEdge[from to to]?.let { it.index + 1 to it.value }
-        }
-
-    val anyInSameBucket = cycleEdges.any { (_, c) ->
-        c.outcome is RankedPairs.Outcome.SkippedByCycle &&
-            c.winningVotes == contest.winningVotes &&
-            c.losingVotes == contest.losingVotes
-    }
+    val outcome = contest.outcome as RankedPairs.Outcome.SkippedByCycle
+    val cycleStart = outcome.cyclePath.first()
 
     Div({ classes("rp-cycle-section") }) {
         H3 { Text("Why it was skipped") }
-        P {
-            Text(
-                if (anyInSameBucket) {
-                    "This contest is part of a numeric-tie cycle: every contest in " +
-                        "the path below has the same winning votes and the same losing " +
-                        "votes as this one. None of them lock — picking which to keep " +
-                        "and which to drop would require an arbitrary rule, and the " +
-                        "vote counts give no reason to prefer one over the others. " +
-                        "Because none lock, the candidates in the cycle aren't ordered " +
-                        "relative to each other in the final ranking — they tie."
-                } else {
-                    "Stronger contests had already locked into the ranking by the time " +
-                        "this one was considered. They appear in the path below — each " +
-                        "with its step number and strength — because they together form " +
-                        "a path from ${contest.loser} back to ${contest.winner}. Locking " +
-                        "${contest.winner} → ${contest.loser} now would close that path " +
-                        "into a cycle."
-                }
-            )
-        }
+        P { Text(cycleExplanation(contest, cycleAnalysis)) }
+
         Div({ classes("rp-cycle-comparison") }) {
-            cycleEdges.forEach { (step, edgeContest) ->
+            cycleAnalysis.edges.forEach { edge ->
                 renderCycleEdgeRow(
-                    step = step,
-                    contest = edgeContest,
+                    step = edge.step,
+                    contest = edge.contest,
                     isCurrentContest = false,
                     isTier = isTier,
                 )
             }
             renderCycleEdgeRow(
-                step = skippedStep,
+                step = cycleAnalysis.skippedStep,
                 contest = contest,
                 isCurrentContest = true,
                 isTier = isTier,
             )
+            // Closure indicator: makes the loop's closed-loop structure
+            // explicit for any N. Without this, a reader scanning N rows
+            // top-to-bottom might miss that the last edge's loser is the
+            // first edge's winner.
+            Div({ classes("rp-cycle-closure") }) {
+                Span({ classes("rp-cycle-closure-arrow") }) { Text("↩") }
+                Span { Text(" closes back to ") }
+                renderNameChip(cycleStart, isTier(cycleStart))
+            }
+        }
+    }
+}
+
+private fun cycleExplanation(
+    contest: RankedPairs.Contest,
+    analysis: CycleAnalysis,
+): String {
+    val n = analysis.totalSize
+    val l = analysis.lockedCount
+    val t = analysis.tiedCount
+    val w = contest.winningVotes
+    val ls = contest.losingVotes
+    return when (analysis.kind) {
+        CycleKind.LONELY_WEAKEST ->
+            "These $n contests together form a cycle. Every other contest in the cycle " +
+                "locked into the ranking from a stronger bucket. This contest, at $w " +
+                "winning and $ls losing, is the weakest of the $n — so it's the one " +
+                "that gets dropped to break the loop."
+        CycleKind.PURE_TIE ->
+            "These $n contests together form a cycle, and all $n are tied at the same " +
+                "strength ($w winning · $ls losing). Together they create a cycle, so we " +
+                "can keep at most ${n - 1}. But picking which one to drop would require an " +
+                "arbitrary tiebreaker — the vote counts give no reason to prefer one over " +
+                "the others. So all $n skip together, and the candidates involved end up " +
+                "tied in the final ranking."
+        CycleKind.MIXED -> {
+            val contestWord = if (l == 1) "contest" else "contests"
+            val keepCount = t - 1
+            val tiedWord = if (t == 1) "contest" else "contests"
+            val keepWord = if (keepCount == 1) "one" else "${keepCount} of them"
+            val coherentNote = if (keepCount == 0) {
+                ""
+            } else {
+                "Keeping any $keepWord would be a coherent outcome, but " +
+                    "picking which to keep would be arbitrary. "
+            }
+            "These $n contests together form a cycle. $l stronger $contestWord in the " +
+                "cycle locked into the ranking from earlier buckets. The remaining $t " +
+                "$tiedWord — including this one — are tied at this strength " +
+                "($w winning · $ls losing). ${coherentNote}All $t skip together."
         }
     }
 }
