@@ -1,5 +1,7 @@
 package com.seanshubin.vote.integration.dsl
 
+import com.seanshubin.vote.backend.auth.DiscordConfigProvider
+import com.seanshubin.vote.backend.auth.DiscordOAuthClient
 import com.seanshubin.vote.backend.auth.JwtCipher
 import com.seanshubin.vote.backend.auth.TokenEncoder
 import com.seanshubin.vote.backend.repository.InMemoryCommandModel
@@ -7,12 +9,15 @@ import com.seanshubin.vote.backend.repository.InMemoryData
 import com.seanshubin.vote.backend.repository.InMemoryEventLog
 import com.seanshubin.vote.backend.repository.InMemoryQueryModel
 import com.seanshubin.vote.backend.repository.InMemoryRawTableScanner
+import com.seanshubin.vote.backend.service.DynamoToRelational
+import com.seanshubin.vote.backend.service.EventApplier
 import com.seanshubin.vote.backend.service.ServiceImpl
 import com.seanshubin.vote.contract.AccessToken
 import com.seanshubin.vote.domain.DomainEvent
 import com.seanshubin.vote.domain.Role
 import com.seanshubin.vote.integration.database.DatabaseProvider
 import com.seanshubin.vote.integration.fake.TestIntegrations
+import java.net.http.HttpClient
 
 class TestContext(
     provider: DatabaseProvider? = null,
@@ -37,12 +42,17 @@ class TestContext(
     private val tokenEncoder = TokenEncoder(JwtCipher("dev-jwt-secret-DO-NOT-USE-IN-PROD"))
 
     private val service = ServiceImpl(
-        integrations,
-        eventLog,
-        commandModel,
-        queryModel,
-        InMemoryRawTableScanner(),
-        tokenEncoder,
+        integrations = integrations,
+        eventLog = eventLog,
+        commandModel = commandModel,
+        queryModel = queryModel,
+        rawTableScanner = InMemoryRawTableScanner(),
+        tokenEncoder = tokenEncoder,
+        discordConfigProvider = DiscordConfigProvider { null },
+        discordOAuthClient = DiscordOAuthClient(httpClient = HttpClient.newHttpClient()),
+        relationalProjection = DynamoToRelational(queryModel, eventLog),
+        eventApplier = EventApplier(eventLog, commandModel, queryModel),
+        devLoginEnabled = false,
     )
 
     // Backend abstraction - can be direct service calls or HTTP calls

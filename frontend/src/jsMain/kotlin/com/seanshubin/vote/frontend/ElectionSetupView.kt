@@ -31,35 +31,117 @@ fun ElectionSetupView(
     onOwnerTransferred: (String) -> Unit,
     onError: (String) -> Unit,
 ) {
+    DescriptionSection(
+        apiClient = apiClient,
+        electionName = electionName,
+        existingDescription = existingDescription,
+        onDescriptionSaved = onDescriptionSaved,
+        onError = onError,
+    )
+    CandidatesSection(
+        apiClient = apiClient,
+        electionName = electionName,
+        existingCandidates = existingCandidates,
+        onCandidatesAdded = onCandidatesAdded,
+        onCandidateRemoved = onCandidateRemoved,
+        onCandidateRenamed = onCandidateRenamed,
+        onError = onError,
+    )
+    TiersSection(
+        apiClient = apiClient,
+        electionName = electionName,
+        existingTiers = existingTiers,
+        onTiersSaved = onTiersSaved,
+        onTierRenamed = onTierRenamed,
+        onError = onError,
+    )
+    if (canManageManagers) {
+        // Both manager-related sections need the user list; share one fetch.
+        val userNamesFetch = rememberFetchState(
+            apiClient = apiClient,
+            key = currentOwnerName,
+            fallbackErrorMessage = "Failed to load user list",
+        ) {
+            apiClient.listUserNames()
+        }
+        ManagersSection(
+            apiClient = apiClient,
+            electionName = electionName,
+            existingManagers = existingManagers,
+            currentOwnerName = currentOwnerName,
+            userNamesFetch = userNamesFetch,
+            onManagerAdded = onManagerAdded,
+            onManagerRemoved = onManagerRemoved,
+            onError = onError,
+        )
+        TransferOwnershipSection(
+            apiClient = apiClient,
+            electionName = electionName,
+            currentOwnerName = currentOwnerName,
+            userNamesFetch = userNamesFetch,
+            onOwnerTransferred = onOwnerTransferred,
+            onError = onError,
+        )
+    }
+}
+
+// Description editor — owners can update freely (no ballot lock since the
+// text isn't part of any ballot's meaning). Backend rejects the PUT for
+// non-owners; the field is shown to everyone in the Setup tab for symmetry
+// with the candidates / tiers fields.
+@Composable
+private fun DescriptionSection(
+    apiClient: ApiClient,
+    electionName: String,
+    existingDescription: String,
+    onDescriptionSaved: (String) -> Unit,
+    onError: (String) -> Unit,
+) {
     var descriptionText by remember(existingDescription) {
         mutableStateOf(existingDescription)
     }
-    var addCandidatesText by remember(existingCandidates) { mutableStateOf("") }
-    var tiersText by remember(existingTiers) {
-        mutableStateOf(existingTiers.joinToString("\n"))
-    }
-    // Per-tier inline rename: which tier the user is currently renaming
-    // (null when no row is in edit mode) and the text they're typing.
-    var renamingTier by remember(existingTiers) { mutableStateOf<String?>(null) }
-    var renameTierText by remember(existingTiers) { mutableStateOf("") }
-    var transferFilter by remember(currentOwnerName) { mutableStateOf("") }
-    var transferTarget by remember(currentOwnerName) { mutableStateOf<String?>(null) }
 
-    // Manager add-picker filter + the user currently being added (so the right
-    // row shows an "Adding…" label). Keyed off the manager list so navigating
-    // away discards any pending pick.
-    var managerFilter by remember(existingManagers) { mutableStateOf("") }
-    var addingManagerTarget by remember(existingManagers) { mutableStateOf<String?>(null) }
-    // Which manager is being removed right now, for a per-row "Removing…" label.
-    var removingManager by remember(existingManagers) { mutableStateOf<String?>(null) }
-
-    val userNamesFetch = rememberFetchState(
+    val saveDescriptionAction = rememberAsyncAction(
         apiClient = apiClient,
-        key = currentOwnerName,
-        fallbackErrorMessage = "Failed to load user list",
-    ) {
-        apiClient.listUserNames()
+        fallbackErrorMessage = "Failed to save description",
+        onError = onError,
+        action = {
+            val newDescription = descriptionText
+            apiClient.setElectionDescription(electionName, newDescription)
+            onDescriptionSaved(newDescription)
+        },
+    )
+
+    Div({ classes("section") }) {
+        H2 { Text("Description") }
+
+        P { Text("Shown to voters at the top of the election page. Optional.") }
+        TextArea(descriptionText) {
+            classes("textarea")
+            attr("rows", "3")
+            onInput { descriptionText = it.value }
+        }
+
+        Button({
+            if (saveDescriptionAction.isLoading) attr("disabled", "")
+            onClick { saveDescriptionAction.invoke() }
+        }) {
+            Text(if (saveDescriptionAction.isLoading) "Saving…" else "Save Description")
+        }
     }
+}
+
+@Composable
+private fun CandidatesSection(
+    apiClient: ApiClient,
+    electionName: String,
+    existingCandidates: List<String>,
+    onCandidatesAdded: (added: List<String>) -> Unit,
+    onCandidateRemoved: (removed: String) -> Unit,
+    onCandidateRenamed: (oldName: String, newName: String) -> Unit,
+    onError: (String) -> Unit,
+) {
+    var addCandidatesText by remember(existingCandidates) { mutableStateOf("") }
 
     // Inline rename state: which candidate the user is currently editing
     // (null when no row is in edit mode) and the text they're typing. Keyed
@@ -67,6 +149,11 @@ fun ElectionSetupView(
     // pending edit instead of carrying it across.
     var renamingCandidate by remember(existingCandidates) { mutableStateOf<String?>(null) }
     var renameText by remember(existingCandidates) { mutableStateOf("") }
+
+    // Which candidate is being removed right now (so we can show a
+    // "Removing…" spinner on the right row instead of greying out the
+    // whole list).
+    var removingCandidate by remember(existingCandidates) { mutableStateOf<String?>(null) }
 
     // Ballot counts per candidate — fetched lazily and refreshed after every
     // mutation. Empty map until the first fetch returns; rows render with
@@ -97,20 +184,6 @@ fun ElectionSetupView(
 
     fun parseAddCandidates(): List<String> =
         addCandidatesText.split("\n").map { it.trim() }.filter { it.isNotBlank() }
-
-    fun parseTiers(): List<String> =
-        tiersText.split("\n").map { it.trim() }.filter { it.isNotBlank() }
-
-    val saveDescriptionAction = rememberAsyncAction(
-        apiClient = apiClient,
-        fallbackErrorMessage = "Failed to save description",
-        onError = onError,
-        action = {
-            val newDescription = descriptionText
-            apiClient.setElectionDescription(electionName, newDescription)
-            onDescriptionSaved(newDescription)
-        },
-    )
 
     // Add: send the parsed textarea names directly. Backend filters to
     // "new only" so the caller can submit a superset without de-duping
@@ -149,11 +222,6 @@ fun ElectionSetupView(
         },
     )
 
-    // Which candidate is being removed right now (so we can show a
-    // "Removing…" spinner on the right row instead of greying out the
-    // whole list).
-    var removingCandidate by remember(existingCandidates) { mutableStateOf<String?>(null) }
-
     val removeAction = rememberAsyncAction(
         apiClient = apiClient,
         fallbackErrorMessage = "Failed to remove candidate",
@@ -166,96 +234,6 @@ fun ElectionSetupView(
             ballotCounts = apiClient.candidateBallotCounts(electionName)
         },
     )
-
-    val saveTiersAction = rememberAsyncAction(
-        apiClient = apiClient,
-        fallbackErrorMessage = "Failed to save tiers",
-        onError = onError,
-        action = {
-            val newTiers = parseTiers()
-            apiClient.setTiers(electionName, newTiers)
-            onTiersSaved(newTiers)
-        },
-    )
-
-    val renameTierAction = rememberAsyncAction(
-        apiClient = apiClient,
-        fallbackErrorMessage = "Failed to rename tier",
-        onError = onError,
-        action = {
-            val oldName = renamingTier ?: return@rememberAsyncAction
-            val newName = renameTierText.trim()
-            if (newName.isBlank() || newName == oldName) {
-                renamingTier = null
-                renameTierText = ""
-                return@rememberAsyncAction
-            }
-            apiClient.renameTier(electionName, oldName, newName)
-            renamingTier = null
-            renameTierText = ""
-            onTierRenamed(oldName, newName)
-        },
-    )
-
-    val transferOwnerAction = rememberAsyncAction(
-        apiClient = apiClient,
-        fallbackErrorMessage = "Failed to transfer ownership",
-        onError = onError,
-        action = {
-            val target = transferTarget ?: return@rememberAsyncAction
-            apiClient.transferElectionOwnership(electionName, target)
-            onOwnerTransferred(target)
-            transferTarget = null
-            transferFilter = ""
-        },
-    )
-
-    val addManagerAction = rememberAsyncAction(
-        apiClient = apiClient,
-        fallbackErrorMessage = "Failed to add manager",
-        onError = onError,
-        action = {
-            val target = addingManagerTarget ?: return@rememberAsyncAction
-            apiClient.addElectionManager(electionName, target)
-            onManagerAdded(target)
-            addingManagerTarget = null
-            managerFilter = ""
-        },
-    )
-
-    val removeManagerAction = rememberAsyncAction(
-        apiClient = apiClient,
-        fallbackErrorMessage = "Failed to remove manager",
-        onError = onError,
-        action = {
-            val name = removingManager ?: return@rememberAsyncAction
-            apiClient.removeElectionManager(electionName, name)
-            removingManager = null
-            onManagerRemoved(name)
-        },
-    )
-
-    // Description editor — owners can update freely (no ballot lock since
-    // the text isn't part of any ballot's meaning). Backend rejects the
-    // PUT for non-owners; the field is shown to everyone in the Setup tab
-    // for symmetry with the candidates / tiers fields.
-    Div({ classes("section") }) {
-        H2 { Text("Description") }
-
-        P { Text("Shown to voters at the top of the election page. Optional.") }
-        TextArea(descriptionText) {
-            classes("textarea")
-            attr("rows", "3")
-            onInput { descriptionText = it.value }
-        }
-
-        Button({
-            if (saveDescriptionAction.isLoading) attr("disabled", "")
-            onClick { saveDescriptionAction.invoke() }
-        }) {
-            Text(if (saveDescriptionAction.isLoading) "Saving…" else "Save Description")
-        }
-    }
 
     Div({ classes("section") }) {
         H2 { Text("Candidates") }
@@ -270,77 +248,29 @@ fun ElectionSetupView(
             val sorted = existingCandidates.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it })
             Div({ classes("candidate-list") }) {
                 sorted.forEach { candidateName ->
-                    Div({ classes("candidate-row") }) {
-                        if (renamingCandidate == candidateName) {
-                            Input(InputType.Text) {
-                                classes("candidate-rename-input")
-                                value(renameText)
-                                onInput { renameText = it.value }
-                            }
-                            Button({
-                                if (renameAction.isLoading) attr("disabled", "")
-                                onClick { renameAction.invoke() }
-                            }) {
-                                Text(if (renameAction.isLoading) "Saving…" else "Save")
-                            }
-                            Button({
-                                if (renameAction.isLoading) attr("disabled", "")
-                                onClick {
-                                    renamingCandidate = null
-                                    renameText = ""
-                                }
-                            }) { Text("Cancel") }
-                        } else {
-                            Span({ classes("candidate-name") }) { Text(candidateName) }
-                            // Ballot count: "…" while the first fetch is in
-                            // flight, then the real number. Singular vs plural
-                            // matters here because a "1 ballots" stutters.
-                            val countLabel = ballotCounts?.let { counts ->
-                                val n = counts[candidateName] ?: 0
-                                "$n ballot${if (n == 1) "" else "s"}"
-                            } ?: "…"
-                            Span({ classes("candidate-ballot-count") }) { Text(countLabel) }
-                            // Rename: same per-row inline-edit pattern as before.
-                            Button({
-                                val busy = renameAction.isLoading || removeAction.isLoading
-                                if (busy) attr("disabled", "")
-                                onClick {
-                                    renamingCandidate = candidateName
-                                    renameText = candidateName
-                                }
-                            }) { Text("Rename") }
-                            // Remove: per-row Remove button. Confirms with the
-                            // ballot blast-radius so the owner sees exactly
-                            // how many ballots will be touched. Cascade on
-                            // the backend strips this candidate from every
-                            // ranking — same behavior as the old whole-list
-                            // setCandidates flow's diff-remove path.
-                            Button({
-                                val isThisRowRemoving = removeAction.isLoading && removingCandidate == candidateName
-                                val busy = renameAction.isLoading || removeAction.isLoading
-                                if (busy) attr("disabled", "")
-                                onClick {
-                                    val n = ballotCounts?.get(candidateName) ?: 0
-                                    val cascadeNote = if (n == 0) {
-                                        "No ballots reference this candidate."
-                                    } else {
-                                        "This will strip \"$candidateName\" from $n ballot" +
-                                            (if (n == 1) "" else "s") + "."
-                                    }
-                                    val confirmed = window.confirm(
-                                        "Remove \"$candidateName\" from the election? $cascadeNote"
-                                    )
-                                    if (confirmed) {
-                                        removingCandidate = candidateName
-                                        removeAction.invoke()
-                                    }
-                                }
-                            }) {
-                                val isThisRowRemoving = removeAction.isLoading && removingCandidate == candidateName
-                                Text(if (isThisRowRemoving) "Removing…" else "Remove")
-                            }
-                        }
-                    }
+                    CandidateRow(
+                        candidateName = candidateName,
+                        ballotCounts = ballotCounts,
+                        isRenaming = renamingCandidate == candidateName,
+                        renameText = renameText,
+                        onRenameTextChange = { renameText = it },
+                        onStartRename = {
+                            renamingCandidate = candidateName
+                            renameText = candidateName
+                        },
+                        onCancelRename = {
+                            renamingCandidate = null
+                            renameText = ""
+                        },
+                        onConfirmRename = { renameAction.invoke() },
+                        onRemove = {
+                            removingCandidate = candidateName
+                            removeAction.invoke()
+                        },
+                        renameLoading = renameAction.isLoading,
+                        removeLoading = removeAction.isLoading,
+                        isRowRemoving = removeAction.isLoading && removingCandidate == candidateName,
+                    )
                 }
             }
 
@@ -350,7 +280,7 @@ fun ElectionSetupView(
             Div({ classes("candidate-copy-row") }) {
                 Button({
                     onClick {
-                        copyTextToClipboard(sorted.joinToString("\n"))
+                        copyTextToClipboard(sorted.joinToString("\n"), apiClient)
                         copyFeedback = "Copied ${sorted.size} candidate" +
                             (if (sorted.size == 1) "" else "s") + "!"
                         copyFeedbackToken += 1
@@ -382,19 +312,143 @@ fun ElectionSetupView(
             Text(if (addAction.isLoading) "Adding…" else "Add Candidates")
         }
     }
+}
 
-    // Tiers — separate section per requirements. Under the
-    // tier-as-annotation model a tier name is a label on each candidate's
-    // ranking; renaming is a cascading UPDATE so it's safe whether or not
-    // ballots exist. The textarea below replaces the whole list (adds,
-    // removes, reorders); the per-tier "Rename" button below uses the
-    // dedicated rename endpoint so ballots track the label change.
+@Composable
+private fun CandidateRow(
+    candidateName: String,
+    ballotCounts: Map<String, Int>?,
+    isRenaming: Boolean,
+    renameText: String,
+    onRenameTextChange: (String) -> Unit,
+    onStartRename: () -> Unit,
+    onCancelRename: () -> Unit,
+    onConfirmRename: () -> Unit,
+    onRemove: () -> Unit,
+    renameLoading: Boolean,
+    removeLoading: Boolean,
+    isRowRemoving: Boolean,
+) {
+    Div({ classes("candidate-row") }) {
+        if (isRenaming) {
+            Input(InputType.Text) {
+                classes("candidate-rename-input")
+                value(renameText)
+                onInput { onRenameTextChange(it.value) }
+            }
+            Button({
+                if (renameLoading) attr("disabled", "")
+                onClick { onConfirmRename() }
+            }) {
+                Text(if (renameLoading) "Saving…" else "Save")
+            }
+            Button({
+                if (renameLoading) attr("disabled", "")
+                onClick { onCancelRename() }
+            }) { Text("Cancel") }
+        } else {
+            Span({ classes("candidate-name") }) { Text(candidateName) }
+            // Ballot count: "…" while the first fetch is in flight, then the
+            // real number. Singular vs plural matters here because a
+            // "1 ballots" stutters.
+            val countLabel = ballotCounts?.let { counts ->
+                val n = counts[candidateName] ?: 0
+                "$n ballot${if (n == 1) "" else "s"}"
+            } ?: "…"
+            Span({ classes("candidate-ballot-count") }) { Text(countLabel) }
+            Button({
+                val busy = renameLoading || removeLoading
+                if (busy) attr("disabled", "")
+                onClick { onStartRename() }
+            }) { Text("Rename") }
+            // Remove confirms with the ballot blast-radius so the owner sees
+            // exactly how many ballots will be touched. Cascade on the
+            // backend strips this candidate from every ranking.
+            Button({
+                val busy = renameLoading || removeLoading
+                if (busy) attr("disabled", "")
+                onClick {
+                    val n = ballotCounts?.get(candidateName) ?: 0
+                    val cascadeNote = if (n == 0) {
+                        "No ballots reference this candidate."
+                    } else {
+                        "This will strip \"$candidateName\" from $n ballot" +
+                            (if (n == 1) "" else "s") + "."
+                    }
+                    val confirmed = window.confirm(
+                        "Remove \"$candidateName\" from the election? $cascadeNote"
+                    )
+                    if (confirmed) onRemove()
+                }
+            }) {
+                Text(if (isRowRemoving) "Removing…" else "Remove")
+            }
+        }
+    }
+}
+
+// Tiers — separate section per requirements. Under the tier-as-annotation
+// model a tier name is a label on each candidate's ranking; renaming is a
+// cascading UPDATE so it's safe whether or not ballots exist. The textarea
+// below replaces the whole list (adds, removes, reorders); the per-tier
+// "Rename" button uses the dedicated rename endpoint so ballots track the
+// label change.
+@Composable
+private fun TiersSection(
+    apiClient: ApiClient,
+    electionName: String,
+    existingTiers: List<String>,
+    onTiersSaved: (List<String>) -> Unit,
+    onTierRenamed: (oldName: String, newName: String) -> Unit,
+    onError: (String) -> Unit,
+) {
+    var tiersText by remember(existingTiers) {
+        mutableStateOf(existingTiers.joinToString("\n"))
+    }
+    // Per-tier inline rename: which tier the user is currently renaming
+    // (null when no row is in edit mode) and the text they're typing.
+    var renamingTier by remember(existingTiers) { mutableStateOf<String?>(null) }
+    var renameTierText by remember(existingTiers) { mutableStateOf("") }
+
+    fun parseTiers(): List<String> =
+        tiersText.split("\n").map { it.trim() }.filter { it.isNotBlank() }
+
+    val saveTiersAction = rememberAsyncAction(
+        apiClient = apiClient,
+        fallbackErrorMessage = "Failed to save tiers",
+        onError = onError,
+        action = {
+            val newTiers = parseTiers()
+            apiClient.setTiers(electionName, newTiers)
+            onTiersSaved(newTiers)
+        },
+    )
+
+    val renameTierAction = rememberAsyncAction(
+        apiClient = apiClient,
+        fallbackErrorMessage = "Failed to rename tier",
+        onError = onError,
+        action = {
+            val oldName = renamingTier ?: return@rememberAsyncAction
+            val newName = renameTierText.trim()
+            if (newName.isBlank() || newName == oldName) {
+                renamingTier = null
+                renameTierText = ""
+                return@rememberAsyncAction
+            }
+            apiClient.renameTier(electionName, oldName, newName)
+            renamingTier = null
+            renameTierText = ""
+            onTierRenamed(oldName, newName)
+        },
+    )
+
     Div({ classes("section") }) {
         H2 { Text("Tiers (optional)") }
 
         // Per-tier inline rename — mirrors the candidate-rename pattern
-        // above. Fixed alphabetical-ish order? No — tiers are inherently
-        // ordered (top prestige first), so render them in declared order.
+        // above. Tiers are inherently ordered (top prestige first), so
+        // render them in declared order.
         if (existingTiers.isNotEmpty()) {
             Div({ classes("candidate-list") }) {
                 existingTiers.forEach { tierName ->
@@ -453,92 +507,135 @@ fun ElectionSetupView(
             Text(if (saveTiersAction.isLoading) "Saving…" else "Save Tiers")
         }
     }
+}
 
-    // Managers — co-managers the owner has granted content-editing authority.
-    // Owner/ADMIN-only section (gated by [canManageManagers]); a manager who
-    // can see the Setup tab still can't recruit more managers. The add-picker
-    // reuses the same filter-then-click pattern as Transfer Ownership.
-    if (canManageManagers) {
-        Div({ classes("section") }) {
-            H2 { Text("Managers") }
+// Managers — co-managers the owner has granted content-editing authority.
+// Owner/ADMIN-only section (gated by canManageManagers in the parent); a
+// manager who can see the Setup tab still can't recruit more managers. The
+// add-picker reuses the same filter-then-click pattern as Transfer Ownership.
+@Composable
+private fun ManagersSection(
+    apiClient: ApiClient,
+    electionName: String,
+    existingManagers: List<String>,
+    currentOwnerName: String,
+    userNamesFetch: Fetched<List<String>>,
+    onManagerAdded: (String) -> Unit,
+    onManagerRemoved: (String) -> Unit,
+    onError: (String) -> Unit,
+) {
+    // Manager add-picker filter + the user currently being added (so the right
+    // row shows an "Adding…" label). Keyed off the manager list so navigating
+    // away discards any pending pick.
+    var managerFilter by remember(existingManagers) { mutableStateOf("") }
+    var addingManagerTarget by remember(existingManagers) { mutableStateOf<String?>(null) }
+    // Which manager is being removed right now, for a per-row "Removing…" label.
+    var removingManager by remember(existingManagers) { mutableStateOf<String?>(null) }
 
-            P {
-                Text(
-                    "Managers can edit the description, candidates, and tiers — " +
-                        "but cannot delete or transfer the election, or change this list."
-                )
-            }
+    val addManagerAction = rememberAsyncAction(
+        apiClient = apiClient,
+        fallbackErrorMessage = "Failed to add manager",
+        onError = onError,
+        action = {
+            val target = addingManagerTarget ?: return@rememberAsyncAction
+            apiClient.addElectionManager(electionName, target)
+            onManagerAdded(target)
+            addingManagerTarget = null
+            managerFilter = ""
+        },
+    )
 
-            if (existingManagers.isNotEmpty()) {
-                Div({ classes("candidate-list") }) {
-                    existingManagers.forEach { managerName ->
-                        Div({ classes("candidate-row") }) {
-                            Span({ classes("candidate-name") }) { Text(managerName) }
-                            Button({
-                                val busy = addManagerAction.isLoading || removeManagerAction.isLoading
-                                if (busy) attr("disabled", "")
-                                onClick {
-                                    val confirmed = window.confirm(
-                                        "Remove \"$managerName\" as a manager of \"$electionName\"?"
-                                    )
-                                    if (confirmed) {
-                                        removingManager = managerName
-                                        removeManagerAction.invoke()
-                                    }
+    val removeManagerAction = rememberAsyncAction(
+        apiClient = apiClient,
+        fallbackErrorMessage = "Failed to remove manager",
+        onError = onError,
+        action = {
+            val name = removingManager ?: return@rememberAsyncAction
+            apiClient.removeElectionManager(electionName, name)
+            removingManager = null
+            onManagerRemoved(name)
+        },
+    )
+
+    Div({ classes("section") }) {
+        H2 { Text("Managers") }
+
+        P {
+            Text(
+                "Managers can edit the description, candidates, and tiers — " +
+                    "but cannot delete or transfer the election, or change this list."
+            )
+        }
+
+        if (existingManagers.isNotEmpty()) {
+            Div({ classes("candidate-list") }) {
+                existingManagers.forEach { managerName ->
+                    Div({ classes("candidate-row") }) {
+                        Span({ classes("candidate-name") }) { Text(managerName) }
+                        Button({
+                            val busy = addManagerAction.isLoading || removeManagerAction.isLoading
+                            if (busy) attr("disabled", "")
+                            onClick {
+                                val confirmed = window.confirm(
+                                    "Remove \"$managerName\" as a manager of \"$electionName\"?"
+                                )
+                                if (confirmed) {
+                                    removingManager = managerName
+                                    removeManagerAction.invoke()
                                 }
-                            }) {
-                                val isThisRowRemoving = removeManagerAction.isLoading &&
-                                    removingManager == managerName
-                                Text(if (isThisRowRemoving) "Removing…" else "Remove")
                             }
+                        }) {
+                            val isThisRowRemoving = removeManagerAction.isLoading &&
+                                removingManager == managerName
+                            Text(if (isThisRowRemoving) "Removing…" else "Remove")
                         }
                     }
                 }
-            } else {
-                P { Text("No managers yet.") }
             }
+        } else {
+            P { Text("No managers yet.") }
+        }
 
-            H3 { Text("Add a manager") }
-            P { Text("Type to filter, then click a user to grant them management.") }
+        H3 { Text("Add a manager") }
+        P { Text("Type to filter, then click a user to grant them management.") }
 
-            Input(InputType.Text) {
-                classes("input")
-                value(managerFilter)
-                placeholder("filter users")
-                onInput {
-                    managerFilter = it.value
-                    addingManagerTarget = null
-                }
+        Input(InputType.Text) {
+            classes("input")
+            value(managerFilter)
+            placeholder("filter users")
+            onInput {
+                managerFilter = it.value
+                addingManagerTarget = null
             }
+        }
 
-            when (val namesState = userNamesFetch.state) {
-                FetchState.Loading -> P { Text("Loading users…") }
-                is FetchState.Error -> Div({ classes("error") }) { Text(namesState.message) }
-                is FetchState.Success -> {
-                    // Exclude the owner (already has full authority) and anyone
-                    // already managing — backend re-checks both, this just keeps
-                    // the picker from offering pointless choices.
-                    val matches = namesState.value
-                        .filter { !it.equals(currentOwnerName, ignoreCase = true) }
-                        .filter { name -> existingManagers.none { it.equals(name, ignoreCase = true) } }
-                        .filter { matchesSubsequence(it, managerFilter) }
-                    if (matches.isEmpty()) {
-                        P { Text("No matching users.") }
-                    } else {
-                        Div({ classes("transfer-owner-list") }) {
-                            matches.forEach { candidate ->
-                                val isPending = addManagerAction.isLoading &&
-                                    addingManagerTarget == candidate
-                                Button({
-                                    classes("transfer-owner-item")
-                                    if (addManagerAction.isLoading) attr("disabled", "")
-                                    onClick {
-                                        addingManagerTarget = candidate
-                                        addManagerAction.invoke()
-                                    }
-                                }) {
-                                    Text(if (isPending) "Adding $candidate…" else candidate)
+        when (val namesState = userNamesFetch.state) {
+            FetchState.Loading -> P { Text("Loading users…") }
+            is FetchState.Error -> Div({ classes("error") }) { Text(namesState.message) }
+            is FetchState.Success -> {
+                // Exclude the owner (already has full authority) and anyone
+                // already managing — backend re-checks both, this just keeps
+                // the picker from offering pointless choices.
+                val matches = namesState.value
+                    .filter { !it.equals(currentOwnerName, ignoreCase = true) }
+                    .filter { name -> existingManagers.none { it.equals(name, ignoreCase = true) } }
+                    .filter { matchesSubsequence(it, managerFilter) }
+                if (matches.isEmpty()) {
+                    P { Text("No matching users.") }
+                } else {
+                    Div({ classes("transfer-owner-list") }) {
+                        matches.forEach { candidate ->
+                            val isPending = addManagerAction.isLoading &&
+                                addingManagerTarget == candidate
+                            Button({
+                                classes("transfer-owner-item")
+                                if (addManagerAction.isLoading) attr("disabled", "")
+                                onClick {
+                                    addingManagerTarget = candidate
+                                    addManagerAction.invoke()
                                 }
+                            }) {
+                                Text(if (isPending) "Adding $candidate…" else candidate)
                             }
                         }
                     }
@@ -546,25 +643,47 @@ fun ElectionSetupView(
             }
         }
     }
+}
 
-    // Hand the election off to another user. After a successful transfer the
-    // current viewer loses owner-only authority on this election, so the
-    // backend's owner-or-ADMIN gate will start rejecting further edits unless
-    // the viewer has ADMIN+. The page reloads the shell after the callback
-    // fires, which will hide the Setup tab on the next render for a plain
-    // user who just transferred away their last claim to it.
-    //
-    // The picker (filter input + clickable list) replaces free-text entry so
-    // the user can only pick a real registered user — backend still validates
-    // existence, but the UI rules out typos before submission. Matching is by
-    // subsequence (each filter character must appear in order somewhere in
-    // the candidate's name), case-insensitive, so "abi" matches "Sean Shubin".
-    //
-    // Owner/ADMIN-only, same gate as the Managers section — a plain manager
-    // who can see the Setup tab can't transfer the election away.
-    if (canManageManagers) {
-        Div({ classes("section") }) {
-            H2 { Text("Transfer Ownership") }
+// Hand the election off to another user. After a successful transfer the
+// current viewer loses owner-only authority on this election, so the
+// backend's owner-or-ADMIN gate will start rejecting further edits unless
+// the viewer has ADMIN+.
+//
+// The picker (filter input + clickable list) replaces free-text entry so
+// the user can only pick a real registered user — backend still validates
+// existence, but the UI rules out typos before submission. Matching is by
+// subsequence (each filter character must appear in order somewhere in
+// the candidate's name), case-insensitive, so "abi" matches "Sean Shubin".
+//
+// Owner/ADMIN-only, same gate as the Managers section.
+@Composable
+private fun TransferOwnershipSection(
+    apiClient: ApiClient,
+    electionName: String,
+    currentOwnerName: String,
+    userNamesFetch: Fetched<List<String>>,
+    onOwnerTransferred: (String) -> Unit,
+    onError: (String) -> Unit,
+) {
+    var transferFilter by remember(currentOwnerName) { mutableStateOf("") }
+    var transferTarget by remember(currentOwnerName) { mutableStateOf<String?>(null) }
+
+    val transferOwnerAction = rememberAsyncAction(
+        apiClient = apiClient,
+        fallbackErrorMessage = "Failed to transfer ownership",
+        onError = onError,
+        action = {
+            val target = transferTarget ?: return@rememberAsyncAction
+            apiClient.transferElectionOwnership(electionName, target)
+            onOwnerTransferred(target)
+            transferTarget = null
+            transferFilter = ""
+        },
+    )
+
+    Div({ classes("section") }) {
+        H2 { Text("Transfer Ownership") }
 
         P {
             Text(
@@ -618,7 +737,6 @@ fun ElectionSetupView(
                     }
                 }
             }
-        }
         }
     }
 }

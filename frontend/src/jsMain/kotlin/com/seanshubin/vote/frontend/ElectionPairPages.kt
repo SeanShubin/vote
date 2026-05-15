@@ -246,42 +246,16 @@ private fun renderPreferencesDetail(electionTally: ElectionTally, a: String, b: 
     val bi = names.indexOf(b)
     val aOverB = tally.preferences[ai][bi].strength
     val bOverA = tally.preferences[bi][ai].strength
-    val aWins = aOverB > bOverA
-    val bWins = bOverA > aOverB
     val verdict = when {
-        aWins -> "$a beats $b $aOverB to $bOverA"
-        bWins -> "$b beats $a $bOverA to $aOverB"
+        aOverB > bOverA -> "$a beats $b $aOverB to $bOverA"
+        bOverA > aOverB -> "$b beats $a $bOverA to $aOverB"
         else -> "$a and $b tied at $aOverB"
     }
-
     val revealed = tally.ballots.filterIsInstance<Ballot.Revealed>()
-    val aVoters = votersWhoPrefer(revealed, a, b)
-    val bVoters = votersWhoPrefer(revealed, b, a)
-    val abstainVoters = votersWhoAbstainOnPair(revealed, a, b)
 
     Div({ classes("pair-detail") }) {
         Div({ classes("pair-detail-header") }) { Text(verdict) }
-
-        Div({ classes("pair-side-row") }) {
-            if (bWins) {
-                renderPairSide(name = b, voters = bVoters, count = bOverA, isWinner = true, isSecret = tally.secretBallot)
-                renderPairSide(name = a, voters = aVoters, count = aOverB, isWinner = false, isSecret = tally.secretBallot)
-            } else {
-                renderPairSide(name = a, voters = aVoters, count = aOverB, isWinner = aWins, isSecret = tally.secretBallot)
-                renderPairSide(name = b, voters = bVoters, count = bOverA, isWinner = false, isSecret = tally.secretBallot)
-            }
-        }
-
-        if (tally.secretBallot || abstainVoters.isNotEmpty()) {
-            Div({ classes("pair-abstain") }) {
-                H3 { Text("No expressed preference (${abstainVoters.size})") }
-                if (tally.secretBallot) {
-                    P({ classes("pair-secret-note") }) { Text("(ballots are secret)") }
-                } else {
-                    renderVoterList(abstainVoters)
-                }
-            }
-        }
+        renderDirectHeadToHead(a, b, aOverB, bOverA, revealed, tally.secretBallot)
     }
 }
 
@@ -333,7 +307,7 @@ private fun renderDecisionDetail(electionTally: ElectionTally, a: String, b: Str
 
     Div({ classes("pair-detail") }) {
         renderDecisionHeader(a, b, contest, contestIndex, tally.contests.size, cycleAnalysis)
-        renderDecisionDirect(a, b, aOverB, bOverA, revealed, tally.secretBallot)
+        renderDirectHeadToHead(a, b, aOverB, bOverA, revealed, tally.secretBallot)
         if (cycleAnalysis != null) {
             renderCycleSection(contest, cycleAnalysis, electionTally::isTier)
         }
@@ -454,8 +428,15 @@ private fun renderDecisionHeader(
     Div({ classes("pair-detail-header") }) { Text(verdict) }
 }
 
+/**
+ * Direct head-to-head between [a] and [b]: the two pair-side panels (winner
+ * highlighted, ordered with the winner on the left when one exists) plus
+ * the abstain section. Shared by the Preferences page (which adds a verdict
+ * header above) and the Decision page (which adds the Tideman cycle context
+ * around it).
+ */
 @Composable
-private fun renderDecisionDirect(
+private fun renderDirectHeadToHead(
     a: String,
     b: String,
     aOverB: Int,

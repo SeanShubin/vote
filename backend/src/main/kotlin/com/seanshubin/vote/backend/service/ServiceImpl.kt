@@ -15,15 +15,15 @@ class ServiceImpl(
     private val queryModel: QueryModel,
     private val rawTableScanner: RawTableScanner,
     private val tokenEncoder: TokenEncoder,
-    private val discordConfigProvider: DiscordConfigProvider = DiscordConfigProvider { null },
-    private val discordOAuthClient: DiscordOAuthClient = DiscordOAuthClient(),
-    private val devLoginEnabled: Boolean = false,
+    private val discordConfigProvider: DiscordConfigProvider,
+    private val discordOAuthClient: DiscordOAuthClient,
+    private val relationalProjection: DynamoToRelational,
+    private val eventApplier: EventApplier,
+    private val devLoginEnabled: Boolean,
 ) : Service {
     private val secureRandom = SecureRandom()
     private val clock = integrations.clock
     private val uniqueIdGenerator = integrations.uniqueIdGenerator
-    private val relationalProjection = DynamoToRelational(queryModel, eventLog)
-    private val eventApplier = EventApplier(eventLog, commandModel, queryModel)
 
     override fun synchronize() = eventApplier.synchronize()
 

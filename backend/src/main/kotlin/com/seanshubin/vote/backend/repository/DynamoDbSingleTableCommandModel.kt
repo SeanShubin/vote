@@ -117,122 +117,127 @@ class DynamoDbSingleTableCommandModel(
 
     override fun setUserName(authority: String, oldUserName: String, newUserName: String) {
         runBlocking {
-            // Get old user item
-            val oldUserItem = dynamoDb.getItem(GetItemRequest {
+            rewriteUserItem(oldUserName, newUserName)
+            cascadeUserNameToElections(oldUserName, newUserName)
+            cascadeUserNameToBallots(oldUserName, newUserName)
+            cascadeUserNameToManagers(oldUserName, newUserName)
+        }
+    }
+
+    private suspend fun rewriteUserItem(oldUserName: String, newUserName: String) {
+        val oldUserItem = dynamoDb.getItem(GetItemRequest {
+            tableName = DynamoDbSingleTableSchema.MAIN_TABLE
+            key = mapOf(
+                "PK" to AttributeValue.S(DynamoDbSingleTableSchema.userPK(oldUserName)),
+                "SK" to AttributeValue.S(DynamoDbSingleTableSchema.METADATA_SK)
+            )
+        }).item ?: return
+
+        dynamoDb.deleteItem(DeleteItemRequest {
+            tableName = DynamoDbSingleTableSchema.MAIN_TABLE
+            key = mapOf(
+                "PK" to AttributeValue.S(DynamoDbSingleTableSchema.userPK(oldUserName)),
+                "SK" to AttributeValue.S(DynamoDbSingleTableSchema.METADATA_SK)
+            )
+        })
+
+        dynamoDb.putItem(PutItemRequest {
+            tableName = DynamoDbSingleTableSchema.MAIN_TABLE
+            item = oldUserItem.toMutableMap().apply {
+                this["PK"] = AttributeValue.S(DynamoDbSingleTableSchema.userPK(newUserName))
+                this["name"] = AttributeValue.S(newUserName)
+            }
+        })
+    }
+
+    private suspend fun cascadeUserNameToElections(oldUserName: String, newUserName: String) {
+        val elections = dynamoDb.scan(ScanRequest {
+            tableName = DynamoDbSingleTableSchema.MAIN_TABLE
+            filterExpression = "begins_with(PK, :prefix) AND SK = :sk AND owner_name = :owner"
+            expressionAttributeValues = mapOf(
+                ":prefix" to AttributeValue.S(DynamoDbSingleTableSchema.ELECTION_PREFIX),
+                ":sk" to AttributeValue.S(DynamoDbSingleTableSchema.METADATA_SK),
+                ":owner" to AttributeValue.S(oldUserName)
+            )
+        }).items ?: return
+
+        elections.forEach { election ->
+            val electionName = election["election_name"]?.asS() ?: return@forEach
+            dynamoDb.updateItem(UpdateItemRequest {
                 tableName = DynamoDbSingleTableSchema.MAIN_TABLE
                 key = mapOf(
-                    "PK" to AttributeValue.S(DynamoDbSingleTableSchema.userPK(oldUserName)),
+                    "PK" to AttributeValue.S(DynamoDbSingleTableSchema.electionPK(electionName)),
                     "SK" to AttributeValue.S(DynamoDbSingleTableSchema.METADATA_SK)
                 )
-            }).item
+                updateExpression = "SET owner_name = :owner"
+                expressionAttributeValues = mapOf(":owner" to AttributeValue.S(newUserName))
+            })
+        }
+    }
 
-            oldUserItem?.let { user ->
-                // Delete old item
-                dynamoDb.deleteItem(DeleteItemRequest {
-                    tableName = DynamoDbSingleTableSchema.MAIN_TABLE
-                    key = mapOf(
-                        "PK" to AttributeValue.S(DynamoDbSingleTableSchema.userPK(oldUserName)),
-                        "SK" to AttributeValue.S(DynamoDbSingleTableSchema.METADATA_SK)
-                    )
-                })
+    private suspend fun cascadeUserNameToBallots(oldUserName: String, newUserName: String) {
+        val ballotItems = dynamoDb.scan(ScanRequest {
+            tableName = DynamoDbSingleTableSchema.MAIN_TABLE
+            filterExpression = "begins_with(SK, :prefix) AND voter_name = :voter"
+            expressionAttributeValues = mapOf(
+                ":prefix" to AttributeValue.S(DynamoDbSingleTableSchema.BALLOT_PREFIX),
+                ":voter" to AttributeValue.S(oldUserName)
+            )
+        }).items ?: return
 
-                // Create new item with updated name
-                dynamoDb.putItem(PutItemRequest {
-                    tableName = DynamoDbSingleTableSchema.MAIN_TABLE
-                    item = user.toMutableMap().apply {
-                        this["PK"] = AttributeValue.S(DynamoDbSingleTableSchema.userPK(newUserName))
-                        this["name"] = AttributeValue.S(newUserName)
-                    }
-                })
-            }
+        ballotItems.forEach { ballotItem ->
+            val pk = ballotItem["PK"]?.asS() ?: return@forEach
+            val oldSk = ballotItem["SK"]?.asS() ?: return@forEach
 
-            // Update elections owned by this user
-            val elections = dynamoDb.scan(ScanRequest {
+            dynamoDb.deleteItem(DeleteItemRequest {
                 tableName = DynamoDbSingleTableSchema.MAIN_TABLE
-                filterExpression = "begins_with(PK, :prefix) AND SK = :sk AND owner_name = :owner"
-                expressionAttributeValues = mapOf(
-                    ":prefix" to AttributeValue.S(DynamoDbSingleTableSchema.ELECTION_PREFIX),
-                    ":sk" to AttributeValue.S(DynamoDbSingleTableSchema.METADATA_SK),
-                    ":owner" to AttributeValue.S(oldUserName)
+                key = mapOf(
+                    "PK" to AttributeValue.S(pk),
+                    "SK" to AttributeValue.S(oldSk)
                 )
-            }).items
+            })
 
-            elections?.forEach { election ->
-                val electionName = election["election_name"]?.asS() ?: return@forEach
-                dynamoDb.updateItem(UpdateItemRequest {
-                    tableName = DynamoDbSingleTableSchema.MAIN_TABLE
-                    key = mapOf(
-                        "PK" to AttributeValue.S(DynamoDbSingleTableSchema.electionPK(electionName)),
-                        "SK" to AttributeValue.S(DynamoDbSingleTableSchema.METADATA_SK)
-                    )
-                    updateExpression = "SET owner_name = :owner"
-                    expressionAttributeValues = mapOf(":owner" to AttributeValue.S(newUserName))
-                })
-            }
-
-            // Update ballot entries
-            val ballotItems = dynamoDb.scan(ScanRequest {
+            dynamoDb.putItem(PutItemRequest {
                 tableName = DynamoDbSingleTableSchema.MAIN_TABLE
-                filterExpression = "begins_with(SK, :prefix) AND voter_name = :voter"
-                expressionAttributeValues = mapOf(
-                    ":prefix" to AttributeValue.S(DynamoDbSingleTableSchema.BALLOT_PREFIX),
-                    ":voter" to AttributeValue.S(oldUserName)
-                )
-            }).items
+                item = ballotItem.toMutableMap().apply {
+                    this["SK"] = AttributeValue.S(DynamoDbSingleTableSchema.ballotSK(newUserName))
+                    this["voter_name"] = AttributeValue.S(newUserName)
+                }
+            })
+        }
+    }
 
-            ballotItems?.forEach { ballotItem ->
-                val pk = ballotItem["PK"]?.asS() ?: return@forEach
-                val oldSk = ballotItem["SK"]?.asS() ?: return@forEach
+    // The manager SK embeds the lowercased username, so a rename is
+    // delete-old + put-new — an in-place attribute update wouldn't move the key.
+    private suspend fun cascadeUserNameToManagers(oldUserName: String, newUserName: String) {
+        val managerItems = dynamoDb.scan(ScanRequest {
+            tableName = DynamoDbSingleTableSchema.MAIN_TABLE
+            filterExpression = "begins_with(SK, :prefix) AND user_name = :user"
+            expressionAttributeValues = mapOf(
+                ":prefix" to AttributeValue.S(DynamoDbSingleTableSchema.MANAGER_PREFIX),
+                ":user" to AttributeValue.S(oldUserName)
+            )
+        }).items ?: return
 
-                dynamoDb.deleteItem(DeleteItemRequest {
-                    tableName = DynamoDbSingleTableSchema.MAIN_TABLE
-                    key = mapOf(
-                        "PK" to AttributeValue.S(pk),
-                        "SK" to AttributeValue.S(oldSk)
-                    )
-                })
+        managerItems.forEach { managerItem ->
+            val pk = managerItem["PK"]?.asS() ?: return@forEach
+            val oldSk = managerItem["SK"]?.asS() ?: return@forEach
 
-                dynamoDb.putItem(PutItemRequest {
-                    tableName = DynamoDbSingleTableSchema.MAIN_TABLE
-                    item = ballotItem.toMutableMap().apply {
-                        this["SK"] = AttributeValue.S(DynamoDbSingleTableSchema.ballotSK(newUserName))
-                        this["voter_name"] = AttributeValue.S(newUserName)
-                    }
-                })
-            }
-
-            // Update election-manager entries. The manager SK embeds the
-            // lowercased username, so a rename is delete-old + put-new just
-            // like ballots — an in-place attribute update wouldn't move the key.
-            val managerItems = dynamoDb.scan(ScanRequest {
+            dynamoDb.deleteItem(DeleteItemRequest {
                 tableName = DynamoDbSingleTableSchema.MAIN_TABLE
-                filterExpression = "begins_with(SK, :prefix) AND user_name = :user"
-                expressionAttributeValues = mapOf(
-                    ":prefix" to AttributeValue.S(DynamoDbSingleTableSchema.MANAGER_PREFIX),
-                    ":user" to AttributeValue.S(oldUserName)
+                key = mapOf(
+                    "PK" to AttributeValue.S(pk),
+                    "SK" to AttributeValue.S(oldSk)
                 )
-            }).items
+            })
 
-            managerItems?.forEach { managerItem ->
-                val pk = managerItem["PK"]?.asS() ?: return@forEach
-                val oldSk = managerItem["SK"]?.asS() ?: return@forEach
-
-                dynamoDb.deleteItem(DeleteItemRequest {
-                    tableName = DynamoDbSingleTableSchema.MAIN_TABLE
-                    key = mapOf(
-                        "PK" to AttributeValue.S(pk),
-                        "SK" to AttributeValue.S(oldSk)
-                    )
-                })
-
-                dynamoDb.putItem(PutItemRequest {
-                    tableName = DynamoDbSingleTableSchema.MAIN_TABLE
-                    item = managerItem.toMutableMap().apply {
-                        this["SK"] = AttributeValue.S(DynamoDbSingleTableSchema.managerSK(newUserName))
-                        this["user_name"] = AttributeValue.S(newUserName)
-                    }
-                })
-            }
+            dynamoDb.putItem(PutItemRequest {
+                tableName = DynamoDbSingleTableSchema.MAIN_TABLE
+                item = managerItem.toMutableMap().apply {
+                    this["SK"] = AttributeValue.S(DynamoDbSingleTableSchema.managerSK(newUserName))
+                    this["user_name"] = AttributeValue.S(newUserName)
+                }
+            })
         }
     }
 
@@ -609,54 +614,69 @@ class DynamoDbSingleTableCommandModel(
         // one — a reader that catches a half-applied state will at worst see
         // both names momentarily, never neither.
         runBlocking {
-            val ballotItems = dynamoDb.query(QueryRequest {
-                tableName = DynamoDbSingleTableSchema.MAIN_TABLE
-                keyConditionExpression = "PK = :pk AND begins_with(SK, :prefix)"
-                expressionAttributeValues = mapOf(
-                    ":pk" to AttributeValue.S(DynamoDbSingleTableSchema.electionPK(electionName)),
-                    ":prefix" to AttributeValue.S(DynamoDbSingleTableSchema.BALLOT_PREFIX),
-                )
-            }).items
-            ballotItems?.forEach { item ->
-                val sk = item["SK"]?.asS() ?: return@forEach
-                val rankingsJson = item["rankings"]?.asS() ?: return@forEach
-                val rankings = json.decodeFromString<List<Ranking>>(rankingsJson)
-                val rewritten = rankings.map { ranking ->
-                    if (ranking.candidateName == oldName) ranking.copy(candidateName = newName) else ranking
-                }
-                if (rewritten != rankings) {
-                    dynamoDb.updateItem(UpdateItemRequest {
-                        tableName = DynamoDbSingleTableSchema.MAIN_TABLE
-                        key = mapOf(
-                            "PK" to AttributeValue.S(DynamoDbSingleTableSchema.electionPK(electionName)),
-                            "SK" to AttributeValue.S(sk),
-                        )
-                        updateExpression = "SET rankings = :r"
-                        expressionAttributeValues = mapOf(
-                            ":r" to AttributeValue.S(json.encodeToString(rewritten)),
-                        )
-                    })
-                }
-            }
+            rewriteBallotRankingsForCandidateRename(electionName, oldName, newName)
+            putCandidateRow(electionName, newName)
+            deleteCandidateRow(electionName, oldName)
+        }
+    }
 
-            dynamoDb.putItem(PutItemRequest {
-                tableName = DynamoDbSingleTableSchema.MAIN_TABLE
-                item = mapOf(
-                    "PK" to AttributeValue.S(DynamoDbSingleTableSchema.electionPK(electionName)),
-                    "SK" to AttributeValue.S(DynamoDbSingleTableSchema.candidateSK(newName)),
-                    "entity_type" to AttributeValue.S("CANDIDATE"),
-                    "election_name" to AttributeValue.S(electionName),
-                    "candidate_name" to AttributeValue.S(newName)
-                )
-            })
-            dynamoDb.deleteItem(DeleteItemRequest {
+    private suspend fun rewriteBallotRankingsForCandidateRename(
+        electionName: String,
+        oldName: String,
+        newName: String,
+    ) {
+        val ballotItems = dynamoDb.query(QueryRequest {
+            tableName = DynamoDbSingleTableSchema.MAIN_TABLE
+            keyConditionExpression = "PK = :pk AND begins_with(SK, :prefix)"
+            expressionAttributeValues = mapOf(
+                ":pk" to AttributeValue.S(DynamoDbSingleTableSchema.electionPK(electionName)),
+                ":prefix" to AttributeValue.S(DynamoDbSingleTableSchema.BALLOT_PREFIX),
+            )
+        }).items ?: return
+
+        ballotItems.forEach { item ->
+            val sk = item["SK"]?.asS() ?: return@forEach
+            val rankingsJson = item["rankings"]?.asS() ?: return@forEach
+            val rankings = json.decodeFromString<List<Ranking>>(rankingsJson)
+            val rewritten = rankings.map { ranking ->
+                if (ranking.candidateName == oldName) ranking.copy(candidateName = newName) else ranking
+            }
+            if (rewritten == rankings) return@forEach
+            dynamoDb.updateItem(UpdateItemRequest {
                 tableName = DynamoDbSingleTableSchema.MAIN_TABLE
                 key = mapOf(
                     "PK" to AttributeValue.S(DynamoDbSingleTableSchema.electionPK(electionName)),
-                    "SK" to AttributeValue.S(DynamoDbSingleTableSchema.candidateSK(oldName))
+                    "SK" to AttributeValue.S(sk),
+                )
+                updateExpression = "SET rankings = :r"
+                expressionAttributeValues = mapOf(
+                    ":r" to AttributeValue.S(json.encodeToString(rewritten)),
                 )
             })
         }
+    }
+
+    private suspend fun putCandidateRow(electionName: String, candidateName: String) {
+        dynamoDb.putItem(PutItemRequest {
+            tableName = DynamoDbSingleTableSchema.MAIN_TABLE
+            item = mapOf(
+                "PK" to AttributeValue.S(DynamoDbSingleTableSchema.electionPK(electionName)),
+                "SK" to AttributeValue.S(DynamoDbSingleTableSchema.candidateSK(candidateName)),
+                "entity_type" to AttributeValue.S("CANDIDATE"),
+                "election_name" to AttributeValue.S(electionName),
+                "candidate_name" to AttributeValue.S(candidateName)
+            )
+        })
+    }
+
+    private suspend fun deleteCandidateRow(electionName: String, candidateName: String) {
+        dynamoDb.deleteItem(DeleteItemRequest {
+            tableName = DynamoDbSingleTableSchema.MAIN_TABLE
+            key = mapOf(
+                "PK" to AttributeValue.S(DynamoDbSingleTableSchema.electionPK(electionName)),
+                "SK" to AttributeValue.S(DynamoDbSingleTableSchema.candidateSK(candidateName))
+            )
+        })
     }
 
     // Ballot commands
