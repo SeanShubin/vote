@@ -6,6 +6,13 @@ class ServiceException(val category: Category, message: String) : RuntimeExcepti
         NOT_FOUND,
         CONFLICT,
         UNSUPPORTED,
-        MALFORMED_JSON
+        MALFORMED_JSON,
+
+        /**
+         * The owner has paused the event log for a maintenance window.
+         * Mapped to HTTP 503 — the operation is temporarily unavailable but
+         * expected to succeed on retry once the owner resumes the log.
+         */
+        PAUSED,
     }
 }

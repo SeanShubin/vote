@@ -1461,6 +1461,29 @@ tr:nth-child(even) {
     margin-right: 0.3rem;
 }
 
+/*
+ * Owner-paused-event-log banner. Sticky at the very top of the viewport so it
+ * stays visible while the user scrolls a long page. Blue palette (not amber)
+ * to convey "scheduled, intentional, brief" rather than "warning, error,
+ * urgent" — the goal is for voters to read a calm pause, not a broken site.
+ */
+.maintenance-banner {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    padding: 0.75rem 1rem;
+    background-color: #d9e8f6;
+    border-bottom: 1px solid #9ec3e6;
+    color: #1f4a7c;
+    text-align: center;
+    font-size: 0.95rem;
+}
+
+.maintenance-banner-title {
+    font-weight: 600;
+    margin-right: 0.35rem;
+}
+
 .build-stamp {
     position: fixed;
     bottom: 4px;

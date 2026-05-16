@@ -59,5 +59,9 @@ interface ScenarioBackend {
     fun refresh(refreshToken: com.seanshubin.vote.contract.RefreshToken): com.seanshubin.vote.contract.Tokens
     fun authenticateWithToken(accessToken: AccessToken): com.seanshubin.vote.contract.Tokens
 
+    fun pauseEventLog(token: AccessToken)
+    fun resumeEventLog(token: AccessToken)
+    fun isEventLogPaused(): Boolean
+
     fun synchronize()
 }

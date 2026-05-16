@@ -93,6 +93,44 @@ class HttpApiClient(
         return body["version"] ?: 0
     }
 
+    override suspend fun isEventLogPaused(): Boolean {
+        val response = fetch("$baseUrl/admin/event-log/status", RequestInit(
+            method = "GET",
+            headers = json("Content-Type" to "application/json"),
+        )).await()
+        val body = handleResponse<Map<String, Boolean>>(response)
+        return body["paused"] ?: false
+    }
+
+    override suspend fun pauseEventLog() {
+        postEmptyWithAuth("/admin/event-log/pause")
+    }
+
+    override suspend fun resumeEventLog() {
+        postEmptyWithAuth("/admin/event-log/resume")
+    }
+
+    /**
+     * POST with an empty body — the pause/resume endpoints don't take a
+     * payload; the action is the URL. `postWithAuth` insists on a serializable
+     * TReq, and `Unit` has no JSON serializer in kotlinx.serialization, so this
+     * goes through `fetchWithAutoRefresh` directly.
+     */
+    private suspend fun postEmptyWithAuth(path: String) {
+        val response = fetchWithAutoRefresh(path) { token ->
+            RequestInit(
+                method = "POST",
+                headers = json(
+                    "Content-Type" to "application/json",
+                    "Authorization" to "Bearer $token"
+                ),
+                credentials = credentialsInclude,
+                body = "",
+            )
+        }
+        handleResponse<Unit>(response)
+    }
+
     override suspend fun getMyUser(): UserNameEmail {
         val userName = requireSession().userName
         return getWithAuth("/user/${encodeURIComponent(userName)}")

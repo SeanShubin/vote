@@ -15,6 +15,8 @@ object DynamoDbSingleTableSchema {
     const val BALLOT_PREFIX = "BALLOT#"
     const val METADATA_SK = "METADATA"
     const val SYNC_SK = "SYNC"
+    const val METADATA_PK = "METADATA"
+    const val EVENT_LOG_PAUSED_SK = "EVENT_LOG_PAUSED"
 
     suspend fun createTables(dynamoDb: DynamoDbClient) {
         createMainTable(dynamoDb)

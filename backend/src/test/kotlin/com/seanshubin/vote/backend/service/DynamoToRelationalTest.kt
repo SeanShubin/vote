@@ -243,5 +243,7 @@ class DynamoToRelationalTest {
         override fun eventsToSync(lastEventSynced: Long): List<EventEnvelope> =
             events.filter { it.eventId > lastEventSynced }
         override fun eventCount(): Int = events.size
+        override fun setPaused(paused: Boolean) = error("unused in projection tests")
+        override fun isPaused(): Boolean = false
     }
 }
