@@ -191,6 +191,7 @@ fun VoteApp(apiClient: ApiClient) {
             electionName = page.electionName,
             currentUserName = userName,
             currentRole = role,
+            isEventLogPaused = isPaused,
             onBack = { router.navigate(Page.Elections) },
             onElectionDeleted = { router.replace(Page.Elections) },
             onNavigateToPreferences = {

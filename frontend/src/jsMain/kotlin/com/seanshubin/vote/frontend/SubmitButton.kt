@@ -47,6 +47,12 @@ fun rememberAsyncAction(
                     // Session ended mid-action — ApiClient.onSessionLost has
                     // already routed to /login. Don't log or surface an error
                     // to a page that's about to be unmounted.
+                } catch (e: MaintenancePausedException) {
+                    // Owner has paused the event log for a maintenance window.
+                    // The global banner already tells the user — don't log a
+                    // false-positive frontend error, don't double up with a
+                    // per-page red box. The action simply doesn't happen;
+                    // the voter can retry once the banner clears.
                 } catch (e: Exception) {
                     apiClient.logErrorToServer(e)
                     onError(e.message ?: fallbackErrorMessage)

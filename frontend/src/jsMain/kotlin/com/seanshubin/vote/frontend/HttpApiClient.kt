@@ -479,6 +479,12 @@ class HttpApiClient(
             } catch (e: Exception) {
                 ErrorResponse("HTTP ${response.status}: $text")
             }
+            // 503 is the owner-paused-event-log response (RequestRouter maps
+            // EventLogPausedException → 503). Distinct subtype so callers can
+            // recognize the expected planned-maintenance case and skip the
+            // logErrorToServer + per-page error toast — the global banner
+            // already conveys the state. Any other non-2xx is a real error.
+            if (response.status.toInt() == 503) throw MaintenancePausedException(error.error)
             throw ApiException(error.error)
         }
 
@@ -508,3 +514,12 @@ class SessionLostException : ApiException("Session is no longer valid")
 
 /** Thrown when an authenticated method is called without an active session. */
 class NotAuthenticatedException : RuntimeException("No active session. Sign in with Discord first.")
+
+/**
+ * The server returned HTTP 503 because the owner has paused the event log for
+ * a maintenance window. Distinct from a generic [ApiException] so call sites
+ * (rememberAsyncAction, VotingView's auto-save) can treat it as an expected,
+ * non-error condition: no server-side log, no per-page error message — the
+ * global maintenance banner is the single source of truth for the user.
+ */
+class MaintenancePausedException(message: String) : ApiException(message)

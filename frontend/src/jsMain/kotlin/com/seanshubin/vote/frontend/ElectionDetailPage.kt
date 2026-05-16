@@ -28,6 +28,10 @@ fun ElectionDetailPage(
     // election owner, or to any user with role >= ADMIN. Backend re-checks.
     currentUserName: String?,
     currentRole: Role?,
+    // Owner-set pause flag from the root pause-state poller. Passed into
+    // VotingView so its auto-save can short-circuit instead of firing 503s
+    // every drag during a maintenance window.
+    isEventLogPaused: Boolean,
     onBack: () -> Unit,
     onElectionDeleted: () -> Unit,
     onNavigateToPreferences: () -> Unit = {},
@@ -318,6 +322,7 @@ fun ElectionDetailPage(
                         candidates = candidates,
                         tiers = loadedElection?.tiers ?: emptyList(),
                         currentUserName = currentUserName,
+                        isEventLogPaused = isEventLogPaused,
                         // Patch the header count locally and refresh the
                         // tally — the cached helper avoids the Loading
                         // flash on the Results tab.

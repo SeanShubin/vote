@@ -53,6 +53,11 @@ fun VotingView(
     // as plain text. Null falls back to "Your Rankings" so the feature still
     // works in any context where the username isn't threaded through.
     currentUserName: String?,
+    // Owner-set pause flag from the root pause-state poller. When true the
+    // auto-save loop short-circuits and never even fires the request — every
+    // drag-reorder would otherwise hit a 503, generating noise. The 503 path
+    // still works as a fallback in case the pause flag flips after the check.
+    isEventLogPaused: Boolean,
     // Fired only on the transitions that actually change the server-side
     // ballot count: +1 on first cast, -1 on full-clear / explicit removal.
     // In-place rank reorderings (which auto-save but don't change the count)
@@ -157,12 +162,18 @@ fun VotingView(
     // ballot row goes away entirely. The transitions that change the ballot
     // count (first cast OR full clear) trigger onBallotSaved to refresh the
     // header.
-    LaunchedEffect(ranked) {
+    LaunchedEffect(ranked, isEventLogPaused) {
         val saved = savedRanked ?: return@LaunchedEffect
         val rankedHasCandidates = ranked.any { it is RankedItem.Candidate }
         val savedHasBallot = saved.isNotEmpty()
         if (!rankedHasCandidates && !savedHasBallot) return@LaunchedEffect
         if (rankedHasCandidates && ranked == saved) return@LaunchedEffect
+        // Short-circuit while the owner has paused the event log. Without this
+        // every drag-settle during a maintenance window would fire a 503,
+        // generating noise. The voter's local draft survives in `ranked`; when
+        // the pause lifts this effect re-runs (isEventLogPaused is in the
+        // LaunchedEffect key) and the save fires for free.
+        if (isEventLogPaused) return@LaunchedEffect
         kotlinx.coroutines.delay(250)
         val toSave = ranked
         try {
@@ -178,6 +189,11 @@ fun VotingView(
                 savedRanked = toSave
                 if (wasFirstCast) onBallotCountChanged(+1)
             }
+        } catch (e: MaintenancePausedException) {
+            // Race fallback: pause flipped after the early-return check above
+            // but before the request landed. Banner already conveys the state;
+            // skip log + onError so we don't trip the frontend-errors alarm
+            // or stack a red box on top of the banner.
         } catch (e: Exception) {
             apiClient.logErrorToServer(e)
             onError(e.message ?: "Failed to save ballot")
