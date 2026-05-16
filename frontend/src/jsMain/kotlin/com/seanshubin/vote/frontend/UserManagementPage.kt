@@ -26,7 +26,6 @@ fun UserManagementPage(
     apiClient: ApiClient,
     currentUserName: String,
     currentRole: Role?,
-    onNavigateToMyAccount: () -> Unit,
     onBack: () -> Unit,
 ) {
     var errorMessage by remember { mutableStateOf<String?>(null) }
@@ -88,7 +87,6 @@ fun UserManagementPage(
                             UserRow(
                                 user = user,
                                 isSelf = user.userName == currentUserName,
-                                onNavigateToMyAccount = onNavigateToMyAccount,
                                 onRoleSelected = { newRole ->
                                     if (newRole == user.role) return@UserRow
                                     if (newRole == Role.OWNER) {
@@ -128,7 +126,6 @@ fun UserManagementPage(
 private fun UserRow(
     user: UserNameRole,
     isSelf: Boolean,
-    onNavigateToMyAccount: () -> Unit,
     onRoleSelected: (Role) -> Unit,
 ) {
     Div({ classes("user-row") }) {
@@ -166,16 +163,6 @@ private fun UserRow(
                     }
                 }
             }
-        }
-        if (isSelf) {
-            Button({
-                attr("data-my-account", "")
-                onClick { onNavigateToMyAccount() }
-            }) {
-                Text("My account")
-            }
-        } else {
-            Span({ classes("user-row-spacer") })
         }
     }
 }

@@ -16,7 +16,6 @@ fun HomePage(
     onNavigateToRawTables: () -> Unit,
     onNavigateToDebugTables: () -> Unit,
     onNavigateToUserManagement: () -> Unit,
-    onNavigateToMyAccount: () -> Unit,
     onLogout: () -> Unit,
     onAccountDeleted: () -> Unit,
 ) {
@@ -112,12 +111,6 @@ fun HomePage(
                 }) {
                     Text("Debug Tables")
                 }
-            }
-
-            Button({
-                onClick { onNavigateToMyAccount() }
-            }) {
-                Text("My Account")
             }
 
             // Static educational page about Ranked Pairs voting, served as

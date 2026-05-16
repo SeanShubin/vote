@@ -499,26 +499,6 @@ button:disabled {
     margin-top: 0;
 }
 
-/* Self-service account page: vertical stack of email/password sections, each
- * fenced off so the user sees them as separate concerns. */
-.my-account-sections {
-    display: flex;
-    flex-direction: column;
-    gap: 1.5rem;
-    margin-top: 1rem;
-}
-
-.my-account-section {
-    padding: 1rem;
-    border: 1px solid #d6e4f0;
-    border-radius: 4px;
-    background-color: #f7fbff;
-}
-
-.my-account-section h2 {
-    margin-top: 0;
-}
-
 .tabs {
     display: flex;
     gap: 0.5rem;
@@ -730,7 +710,7 @@ button:disabled {
  */
 .users-list {
     display: grid;
-    grid-template-columns: 1fr auto auto;
+    grid-template-columns: 1fr auto;
     column-gap: 1rem;
     row-gap: 0.5rem;
     align-items: center;
@@ -739,14 +719,6 @@ button:disabled {
 
 .user-row {
     display: contents;
-}
-
-.user-row-spacer {
-    /* Holds column 3 open so the next row starts at column 1. Empty otherwise. */
-}
-
-.admin-set-password-form {
-    grid-column: 1 / -1;
 }
 
 .user-name {

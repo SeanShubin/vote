@@ -166,7 +166,6 @@ fun VoteApp(apiClient: ApiClient) {
             onNavigateToRawTables = { router.navigate(Page.RawTables) },
             onNavigateToDebugTables = { router.navigate(Page.DebugTables) },
             onNavigateToUserManagement = { router.navigate(Page.UserManagement) },
-            onNavigateToMyAccount = { router.navigate(Page.MyAccount) },
             onLogout = {
                 scope.launch {
                     try {
@@ -264,12 +263,7 @@ fun VoteApp(apiClient: ApiClient) {
             apiClient = apiClient,
             currentUserName = userName ?: "",
             currentRole = role,
-            onNavigateToMyAccount = { router.navigate(Page.MyAccount) },
             onBack = { router.navigate(Page.Home) },
-        )
-        is Page.MyAccount -> MyAccountPage(
-            apiClient = apiClient,
-            onCancel = { router.navigate(Page.Home) },
         )
     }
 }
