@@ -655,6 +655,13 @@ class ServiceImpl(
 
         val validVoterName = Validation.validateUserName(voterName)
         val validElectionName = Validation.validateElectionName(electionName)
+        // No flag-based stripping here on purpose: castBallot fully
+        // replaces a voter's ballot, so dropping SECRET-tagged rankings
+        // server-side would silently delete any pre-existing secret data
+        // when the flag is off and the voter re-edits the public side.
+        // The UI gates SECRET-side editing when the flag is off and
+        // continues to round-trip existing SECRET state, so the data
+        // survives toggling the flag off and back on at will.
         val validRankings = Validation.validateRankings(rankings)
 
         // Identity check: the body's voterName ("what") must match the token's userName ("who").

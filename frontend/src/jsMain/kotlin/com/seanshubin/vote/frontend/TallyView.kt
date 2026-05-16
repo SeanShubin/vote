@@ -16,13 +16,14 @@ fun TallyView(
     state: FetchState<ElectionTally>,
     currentSide: RankingSide,
     onSetSide: (RankingSide) -> Unit,
+    secretBallotEnabled: Boolean,
     onNavigateToPreferences: () -> Unit,
     onNavigateToDecision: () -> Unit,
     onNavigateToProcess: () -> Unit,
 ) {
     Div({ classes("section") }) {
         H2 { Text("Results") }
-        SideToggle(currentSide, onSetSide)
+        SideToggle(currentSide, onSetSide, enabled = secretBallotEnabled)
 
         when (state) {
             FetchState.Loading -> P { Text("Loading results…") }

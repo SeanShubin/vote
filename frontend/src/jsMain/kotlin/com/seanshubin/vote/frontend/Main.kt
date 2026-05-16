@@ -63,6 +63,7 @@ fun VoteApp(apiClient: ApiClient) {
     // next poll reconciles within a tick. Defaults fill the initial state.
     val flagsState = rememberFeatureFlags(apiClient)
     val featureFlags = flagsState.value
+    val secretBallotEnabled = featureFlags[FeatureFlag.SECRET_BALLOT] ?: FeatureFlag.SECRET_BALLOT.defaultEnabled
 
     // Active ballot side, sticky across navigation and reload. Persisted to
     // localStorage so a voter who flipped to the secret side stays on it the
@@ -76,13 +77,18 @@ fun VoteApp(apiClient: ApiClient) {
             ?: RankingSide.PUBLIC
         mutableStateOf(initial)
     }
+    // While the secret-ballot flag is off the toggle disappears from
+    // every page; force the active side back to PUBLIC so a flag-off
+    // user with a stale localStorage = "SECRET" doesn't drive empty
+    // tally fetches under the hood.
+    val effectiveSide = if (secretBallotEnabled) currentSide else RankingSide.PUBLIC
     LaunchedEffect(currentSide) {
         kotlinx.browser.window.localStorage.setItem(SIDE_STORAGE_KEY, currentSide.name)
     }
-    DisposableEffect(currentSide) {
+    DisposableEffect(effectiveSide) {
         val cls = "secret-mode"
         val body = kotlinx.browser.document.body
-        if (currentSide == RankingSide.SECRET) body?.classList?.add(cls)
+        if (effectiveSide == RankingSide.SECRET) body?.classList?.add(cls)
         else body?.classList?.remove(cls)
         onDispose { body?.classList?.remove(cls) }
     }
@@ -233,8 +239,9 @@ fun VoteApp(apiClient: ApiClient) {
             electionName = page.electionName,
             currentUserName = userName,
             currentRole = role,
-            currentSide = currentSide,
+            currentSide = effectiveSide,
             onSetSide = { currentSide = it },
+            secretBallotEnabled = secretBallotEnabled,
             isEventLogPaused = isPaused,
             onBack = { router.navigate(Page.Elections) },
             onElectionDeleted = { router.replace(Page.Elections) },
@@ -251,8 +258,9 @@ fun VoteApp(apiClient: ApiClient) {
         is Page.ElectionPreferences -> ElectionPreferencesPage(
             apiClient = apiClient,
             electionName = page.electionName,
-            currentSide = currentSide,
+            currentSide = effectiveSide,
             onSetSide = { currentSide = it },
+            secretBallotEnabled = secretBallotEnabled,
             // Land on the Results tab — that's where the buttons that open
             // this page live, so it's almost certainly where the user came
             // from. The hash is read by rememberHashTab on the destination.
@@ -261,15 +269,17 @@ fun VoteApp(apiClient: ApiClient) {
         is Page.ElectionDecision -> ElectionDecisionPage(
             apiClient = apiClient,
             electionName = page.electionName,
-            currentSide = currentSide,
+            currentSide = effectiveSide,
             onSetSide = { currentSide = it },
+            secretBallotEnabled = secretBallotEnabled,
             onBack = { router.navigate(Page.ElectionDetail(page.electionName), hash = "tally") },
         )
         is Page.ElectionProcess -> ElectionProcessPage(
             apiClient = apiClient,
             electionName = page.electionName,
-            currentSide = currentSide,
+            currentSide = effectiveSide,
             onSetSide = { currentSide = it },
+            secretBallotEnabled = secretBallotEnabled,
             onBack = { router.navigate(Page.ElectionDetail(page.electionName), hash = "tally") },
         )
         is Page.RawTables -> TablesPage(

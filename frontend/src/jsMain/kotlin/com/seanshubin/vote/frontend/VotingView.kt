@@ -45,6 +45,12 @@ fun VotingView(
     // swap also lives at app level so it stays applied across pages.
     currentSide: RankingSide,
     onSetSide: (RankingSide) -> Unit,
+    // SECRET_BALLOT feature flag. When off, the side toggle / mirror /
+    // copy controls are hidden and the voter only edits PUBLIC. Any
+    // existing SECRET rankings are still loaded and round-tripped on
+    // save (server doesn't strip), so toggling the flag back on
+    // resurfaces the data intact.
+    secretBallotEnabled: Boolean,
     // Owner-set pause flag from the root pause-state poller. When true the
     // auto-save loop short-circuits and never even fires the request — every
     // drag-reorder would otherwise hit a 503, generating noise. The 503 path
@@ -360,55 +366,60 @@ fun VotingView(
     Div({ classes("section") }) {
         H2 { Text("Vote") }
 
-        Div({ classes("ballot-side-toggle") }) {
-            Button({
-                classes("ballot-side-button")
-                if (currentSide == RankingSide.PUBLIC) classes("ballot-side-button-active")
-                onClick { onSetSide(RankingSide.PUBLIC) }
-            }) { Text("Public side") }
-            Button({
-                classes("ballot-side-button")
-                if (currentSide == RankingSide.SECRET) classes("ballot-side-button-active")
-                onClick { onSetSide(RankingSide.SECRET) }
-            }) { Text("Secret side") }
-            // Sync / copy. Hidden when both sides are empty (nothing to
-            // compare yet); disabled "in sync" indicator when the two
-            // sides already match; active copy button otherwise.
-            if (otherHasCandidates || activeHasCandidates) {
-                if (sidesEqual) {
-                    Button({
-                        classes("ballot-side-copy-button")
-                        classes("ballot-side-copy-button-synced")
-                        attr("disabled", "")
-                        title("This side mirrors the $otherLabel side")
-                    }) {
-                        Text("✓ In sync with $otherLabel side")
-                    }
-                } else if (otherHasCandidates) {
-                    Button({
-                        classes("ballot-side-copy-button")
-                        onClick {
-                            val source = otherState.ranked
-                            val sourceCandidateNames = source
-                                .filterIsInstance<RankedItem.Candidate>()
-                                .map { it.name }
-                                .toSet()
-                            setActive { s ->
-                                s.copy(
-                                    ranked = source,
-                                    arena = candidates.filter { it !in sourceCandidateNames },
-                                )
-                            }
+        if (secretBallotEnabled) {
+            Div({ classes("ballot-side-toggle") }) {
+                Button({
+                    classes("ballot-side-button")
+                    if (currentSide == RankingSide.PUBLIC) classes("ballot-side-button-active")
+                    onClick { onSetSide(RankingSide.PUBLIC) }
+                }) { Text("Public side") }
+                Button({
+                    classes("ballot-side-button")
+                    if (currentSide == RankingSide.SECRET) classes("ballot-side-button-active")
+                    onClick { onSetSide(RankingSide.SECRET) }
+                }) { Text("Secret side") }
+                // Sync / copy. Hidden when both sides are empty (nothing to
+                // compare yet); disabled "in sync" indicator when the two
+                // sides already match; active copy button otherwise.
+                if (otherHasCandidates || activeHasCandidates) {
+                    if (sidesEqual) {
+                        Button({
+                            classes("ballot-side-copy-button")
+                            classes("ballot-side-copy-button-synced")
+                            attr("disabled", "")
+                            title("This side mirrors the $otherLabel side")
+                        }) {
+                            Text("✓ In sync with $otherLabel side")
                         }
-                    }) {
-                        Text("Copy from $otherLabel side")
+                    } else if (otherHasCandidates) {
+                        Button({
+                            classes("ballot-side-copy-button")
+                            onClick {
+                                val source = otherState.ranked
+                                val sourceCandidateNames = source
+                                    .filterIsInstance<RankedItem.Candidate>()
+                                    .map { it.name }
+                                    .toSet()
+                                setActive { s ->
+                                    s.copy(
+                                        ranked = source,
+                                        arena = candidates.filter { it !in sourceCandidateNames },
+                                    )
+                                }
+                            }
+                        }) {
+                            Text("Copy from $otherLabel side")
+                        }
                     }
                 }
             }
         }
 
         Div({ classes("ballot-public-notice") }) {
-            if (currentSide == RankingSide.PUBLIC) {
+            if (!secretBallotEnabled) {
+                Span({ classes("ballot-public-notice-lead") }) { Text("This is a public ballot. ") }
+                Text("Everyone will be able to see how you voted.")
+            } else if (currentSide == RankingSide.PUBLIC) {
                 Span({ classes("ballot-public-notice-lead") }) { Text("This is the public side. ") }
                 Text("Your rankings on this side appear with your name in the public tally.")
             } else {

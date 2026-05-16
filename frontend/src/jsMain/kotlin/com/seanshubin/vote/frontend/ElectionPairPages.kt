@@ -28,6 +28,7 @@ fun ElectionPreferencesPage(
     electionName: String,
     currentSide: RankingSide,
     onSetSide: (RankingSide) -> Unit,
+    secretBallotEnabled: Boolean,
     onBack: () -> Unit,
 ) {
     val tallyFetch = rememberFetchState(
@@ -40,7 +41,7 @@ fun ElectionPreferencesPage(
 
     Div({ classes("admin-container") }) {
         H1 { Text("Preferences: $electionName") }
-        SideToggle(currentSide, onSetSide)
+        SideToggle(currentSide, onSetSide, enabled = secretBallotEnabled)
         P({ classes("pair-page-explainer") }) {
             Text(
                 "Direct head-to-head between two candidates. Each total is the count of " +
@@ -87,6 +88,7 @@ fun ElectionDecisionPage(
     electionName: String,
     currentSide: RankingSide,
     onSetSide: (RankingSide) -> Unit,
+    secretBallotEnabled: Boolean,
     onBack: () -> Unit,
 ) {
     val tallyFetch = rememberFetchState(
@@ -99,7 +101,7 @@ fun ElectionDecisionPage(
 
     Div({ classes("admin-container") }) {
         H1 { Text("Decision: $electionName") }
-        SideToggle(currentSide, onSetSide)
+        SideToggle(currentSide, onSetSide, enabled = secretBallotEnabled)
         P({ classes("pair-page-explainer") }) {
             Text(
                 "What the Ranked Pairs tally did with the direct contest between these " +
@@ -145,6 +147,7 @@ fun ElectionProcessPage(
     electionName: String,
     currentSide: RankingSide,
     onSetSide: (RankingSide) -> Unit,
+    secretBallotEnabled: Boolean,
     onBack: () -> Unit,
 ) {
     val tallyFetch = rememberFetchState(
@@ -157,7 +160,7 @@ fun ElectionProcessPage(
 
     Div({ classes("admin-container") }) {
         H1 { Text("Ranked Pairs Process: $electionName") }
-        SideToggle(currentSide, onSetSide)
+        SideToggle(currentSide, onSetSide, enabled = secretBallotEnabled)
         P({ classes("pair-page-explainer") }) {
             Text(
                 "Every contest, grouped by strength bucket (winning votes first, " +

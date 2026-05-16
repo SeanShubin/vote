@@ -31,6 +31,9 @@ fun ElectionDetailPage(
     currentRole: Role?,
     currentSide: RankingSide,
     onSetSide: (RankingSide) -> Unit,
+    // SECRET_BALLOT feature flag state. When off, every child hides its
+    // side toggle and behaves as PUBLIC-only.
+    secretBallotEnabled: Boolean,
     // Owner-set pause flag from the root pause-state poller. Passed into
     // VotingView so its auto-save can short-circuit instead of firing 503s
     // every drag during a maintenance window.
@@ -330,6 +333,7 @@ fun ElectionDetailPage(
                         currentUserName = currentUserName,
                         currentSide = currentSide,
                         onSetSide = onSetSide,
+                        secretBallotEnabled = secretBallotEnabled,
                         isEventLogPaused = isEventLogPaused,
                         // Patch the header count locally and refresh the
                         // tally — the cached helper avoids the Loading
@@ -350,6 +354,7 @@ fun ElectionDetailPage(
                         state = tallyFetch.state,
                         currentSide = currentSide,
                         onSetSide = onSetSide,
+                        secretBallotEnabled = secretBallotEnabled,
                         onNavigateToPreferences = onNavigateToPreferences,
                         onNavigateToDecision = onNavigateToDecision,
                         onNavigateToProcess = onNavigateToProcess,
