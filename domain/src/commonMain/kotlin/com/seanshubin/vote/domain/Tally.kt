@@ -38,12 +38,27 @@ data class Tally(
             tiers: List<String>,
             ballots: List<Ballot.Identified>,
         ): Tally {
-            // Restrict every ballot to its rankings on the requested side,
-            // then drop ballots that contributed nothing — a voter who only
-            // cast on the other side is simply absent from this side's
-            // tally, not present with an empty ballot row.
+            // Restrict every ballot to its rankings on the requested side.
+            // Implicit-mirror rule on the SECRET side: a voter who has no
+            // explicit SECRET-tagged rankings is treated as having cast
+            // SECRET = PUBLIC. This makes the data model match the user's
+            // mental model — "secret matches public unless explicitly set"
+            // — and means turning the SECRET_BALLOT flag on doesn't leave
+            // the secret tally empty until voters re-engage. The PUBLIC
+            // side has no such fallback: voters who cast only SECRET are
+            // genuinely absent from the public tally.
             val sideBallots = ballots
-                .map { ballot -> ballot.copy(rankings = ballot.rankings.filter { it.side == side }) }
+                .map { ballot ->
+                    val explicit = ballot.rankings.filter { it.side == side }
+                    val effective = if (explicit.isNotEmpty() || side != RankingSide.SECRET) {
+                        explicit
+                    } else {
+                        ballot.rankings
+                            .filter { it.side == RankingSide.PUBLIC }
+                            .map { it.copy(side = RankingSide.SECRET) }
+                    }
+                    ballot.copy(rankings = effective)
+                }
                 .filter { ballot -> ballot.rankings.any { it.rank != null } }
             // Project each cast ballot into its virtual form (candidates +
             // materialized tier markers in one strict order). Storage carries
