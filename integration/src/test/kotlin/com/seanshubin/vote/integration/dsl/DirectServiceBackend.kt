@@ -134,6 +134,16 @@ class DirectServiceBackend(
         return service.authenticateWithToken(accessToken)
     }
 
+    override fun pauseEventLog(token: AccessToken) {
+        service.pauseEventLog(token)
+    }
+
+    override fun resumeEventLog(token: AccessToken) {
+        service.resumeEventLog(token)
+    }
+
+    override fun isEventLogPaused(): Boolean = service.isEventLogPaused()
+
     override fun synchronize() {
         service.synchronize()
     }

@@ -13,6 +13,7 @@ import com.seanshubin.vote.contract.CastBallotRequest
 import com.seanshubin.vote.contract.ClientErrorRequest
 import com.seanshubin.vote.contract.DevLoginRequest
 import com.seanshubin.vote.contract.ErrorResponse
+import com.seanshubin.vote.contract.EventLogPausedException
 import com.seanshubin.vote.contract.Notifications
 import com.seanshubin.vote.contract.RenameCandidateRequest
 import com.seanshubin.vote.contract.RenameTierRequest
@@ -82,6 +83,20 @@ class RequestRouter(
             dispatch(normalizedReq)
         } catch (e: IllegalArgumentException) {
             errorResponse(400, e.message ?: "Bad request")
+        } catch (e: EventLogPausedException) {
+            // Surfaced from the EventLog itself rather than from a per-call
+            // check in ServiceImpl, so every write path is uniformly mapped
+            // to 503 (Service Unavailable) without each handler having to
+            // remember. Friendly message; the frontend's banner gives full
+            // context. Retry-After: 60 hints clients to back off briefly
+            // rather than hammer in a tight loop.
+            HttpResponse(
+                status = 503,
+                body = json.encodeToString(
+                    ErrorResponse(e.message ?: "Event log paused for maintenance")
+                ),
+                headers = mapOf("Retry-After" to "60"),
+            )
         } catch (e: ServiceException) {
             val status = when (e.category) {
                 ServiceException.Category.UNAUTHORIZED -> 401
@@ -89,6 +104,7 @@ class RequestRouter(
                 ServiceException.Category.CONFLICT -> 409
                 ServiceException.Category.UNSUPPORTED -> 501
                 ServiceException.Category.MALFORMED_JSON -> 400
+                ServiceException.Category.PAUSED -> 503
             }
             errorResponse(status, e.message ?: "Service error")
         } catch (e: Exception) {
@@ -113,6 +129,9 @@ class RequestRouter(
     private val routes: List<Route> = listOf(
         Route("GET", "/health", { _ -> handleHealth() }),
         Route("GET", "/version", { _ -> handleVersion() }),
+        Route("GET", "/admin/event-log/status", { _ -> handleEventLogStatus() }),
+        Route("POST", "/admin/event-log/pause", ::handleEventLogPause),
+        Route("POST", "/admin/event-log/resume", ::handleEventLogResume),
         Route("POST", "/log-client-error", ::handleLogClientError),
         Route("POST", "/refresh", ::handleRefresh),
         Route("POST", "/logout", { _ -> handleLogout() }),
@@ -256,6 +275,27 @@ class RequestRouter(
     private fun handleVersion(): HttpResponse {
         val version = service.version()
         return HttpResponse(200, json.encodeToString(mapOf("version" to version)))
+    }
+
+    /**
+     * Pause flag for the frontend's maintenance banner. Unauthenticated like
+     * [handleVersion] — every browser polls it (logged in or not) and the
+     * value is non-sensitive. Lives under `/admin/` purely as a URL grouping
+     * with the pause/resume endpoints; the read itself is open.
+     */
+    private fun handleEventLogStatus(): HttpResponse =
+        HttpResponse(200, json.encodeToString(mapOf("paused" to service.isEventLogPaused())))
+
+    private fun handleEventLogPause(req: HttpRequest): HttpResponse {
+        val accessToken = extractAccessToken(req)
+        service.pauseEventLog(accessToken)
+        return HttpResponse(200, json.encodeToString(mapOf("paused" to true)))
+    }
+
+    private fun handleEventLogResume(req: HttpRequest): HttpResponse {
+        val accessToken = extractAccessToken(req)
+        service.resumeEventLog(accessToken)
+        return HttpResponse(200, json.encodeToString(mapOf("paused" to false)))
     }
 
     private fun handleLogClientError(req: HttpRequest): HttpResponse {

@@ -43,6 +43,12 @@ class FakeApiClient : ApiClient {
     val logoutCalls = mutableListOf<Unit>()
     var versionResult: Result<Long> = Result.success(0L)
     val versionCalls = mutableListOf<Unit>()
+    var isEventLogPausedResult: Result<Boolean> = Result.success(false)
+    val isEventLogPausedCalls = mutableListOf<Unit>()
+    var pauseEventLogResult: Result<Unit> = Result.success(Unit)
+    val pauseEventLogCalls = mutableListOf<Unit>()
+    var resumeEventLogResult: Result<Unit> = Result.success(Unit)
+    val resumeEventLogCalls = mutableListOf<Unit>()
     var getMyUserResult: Result<UserNameEmail> = Result.success(UserNameEmail("user"))
     val getMyUserCalls = mutableListOf<Unit>()
     var listElectionsResult: Result<List<ElectionSummary>> = Result.success(emptyList())
@@ -108,6 +114,21 @@ class FakeApiClient : ApiClient {
     override suspend fun version(): Long {
         versionCalls.add(Unit)
         return versionResult.getOrThrow()
+    }
+
+    override suspend fun isEventLogPaused(): Boolean {
+        isEventLogPausedCalls.add(Unit)
+        return isEventLogPausedResult.getOrThrow()
+    }
+
+    override suspend fun pauseEventLog() {
+        pauseEventLogCalls.add(Unit)
+        pauseEventLogResult.getOrThrow()
+    }
+
+    override suspend fun resumeEventLog() {
+        resumeEventLogCalls.add(Unit)
+        resumeEventLogResult.getOrThrow()
     }
 
     override var onSessionLost: (() -> Unit)? = null

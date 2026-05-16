@@ -200,6 +200,20 @@ class HttpRecordingBackend(
         throw UnsupportedOperationException("authenticateWithToken not supported in HttpRecordingBackend")
     }
 
+    override fun pauseEventLog(token: AccessToken) {
+        recorder.post("/admin/event-log/pause", "", token)
+    }
+
+    override fun resumeEventLog(token: AccessToken) {
+        recorder.post("/admin/event-log/resume", "", token)
+    }
+
+    override fun isEventLogPaused(): Boolean {
+        val response = recorder.get("/admin/event-log/status")
+        val body = json.decodeFromString<Map<String, Boolean>>(response.body())
+        return body["paused"] ?: false
+    }
+
     override fun synchronize() {
         recorder.post("/sync", "{}")
     }

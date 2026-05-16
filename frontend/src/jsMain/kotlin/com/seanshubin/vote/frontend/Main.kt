@@ -50,6 +50,13 @@ fun VoteApp(apiClient: ApiClient) {
     var userName by remember { mutableStateOf<String?>(null) }
     var role by remember { mutableStateOf<Role?>(null) }
     val scope = rememberCoroutineScope()
+    // Polled here at the app root so the banner shows above every page —
+    // login, locked-out, home, election detail, admin tables — regardless of
+    // which the user is on when the owner pauses or resumes. Held as a
+    // MutableState so the owner-only toggle on HomePage can write through
+    // optimistically and the banner flips instantly (poll reconciles later).
+    val pauseState = rememberPauseState(apiClient)
+    val isPaused = pauseState.value
 
     // Active ballot side, sticky across navigation and reload. Persisted to
     // localStorage so a voter who flipped to the secret side stays on it the
@@ -121,6 +128,8 @@ fun VoteApp(apiClient: ApiClient) {
         return
     }
 
+    if (isPaused) MaintenanceBanner()
+
     // NO_ACCESS is the lock-out role: the user signed in via Discord but an
     // admin has not granted them any permissions. Every authenticated
     // endpoint requires VIEW_APPLICATION (≥ OBSERVER), so navigating into
@@ -161,6 +170,8 @@ fun VoteApp(apiClient: ApiClient) {
             apiClient = apiClient,
             userName = userName ?: "Unknown",
             role = role,
+            isEventLogPaused = isPaused,
+            onEventLogPauseToggled = { pauseState.value = it },
             onNavigateToCreateElection = { router.navigate(Page.CreateElection) },
             onNavigateToElections = { router.navigate(Page.Elections) },
             onNavigateToRawTables = { router.navigate(Page.RawTables) },
@@ -207,6 +218,7 @@ fun VoteApp(apiClient: ApiClient) {
             currentRole = role,
             currentSide = currentSide,
             onSetSide = { currentSide = it },
+            isEventLogPaused = isPaused,
             onBack = { router.navigate(Page.Elections) },
             onElectionDeleted = { router.replace(Page.Elections) },
             onNavigateToPreferences = {

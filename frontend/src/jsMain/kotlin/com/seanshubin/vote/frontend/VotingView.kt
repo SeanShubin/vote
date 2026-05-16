@@ -45,6 +45,11 @@ fun VotingView(
     // swap also lives at app level so it stays applied across pages.
     currentSide: RankingSide,
     onSetSide: (RankingSide) -> Unit,
+    // Owner-set pause flag from the root pause-state poller. When true the
+    // auto-save loop short-circuits and never even fires the request — every
+    // drag-reorder would otherwise hit a 503, generating noise. The 503 path
+    // still works as a fallback in case the pause flag flips after the check.
+    isEventLogPaused: Boolean,
     // Fired only on the transitions that actually change the server-side
     // ballot count: +1 on first cast, -1 on full-clear / explicit removal.
     // In-place rank reorderings (which auto-save but don't change the count)
@@ -149,8 +154,11 @@ fun VotingView(
     // Auto-save when either side diverges from its last-saved snapshot. We
     // batch both sides into one castBallot call (rankings list carries side
     // tags), so the wire view of the ballot is always the union of what the
-    // voter has staged across the two sides.
-    LaunchedEffect(publicState, secretState) {
+    // voter has staged across the two sides. Keyed on isEventLogPaused too
+    // so a pause→unpause flip re-fires this effect and the pending save
+    // goes out automatically — the voter's draft survives the pause window
+    // without them touching anything.
+    LaunchedEffect(publicState, secretState, isEventLogPaused) {
         val pub = publicState.savedRanked ?: return@LaunchedEffect
         val sec = secretState.savedRanked ?: return@LaunchedEffect
         val pubChanged = publicState.ranked != pub
@@ -162,6 +170,11 @@ fun VotingView(
         val anyCandidates = pubHasCandidates || secHasCandidates
         val hadSavedBallot = pub.isNotEmpty() || sec.isNotEmpty()
         if (!anyCandidates && !hadSavedBallot) return@LaunchedEffect
+        // Short-circuit while the owner has paused the event log. Without
+        // this every drag-settle during a maintenance window would fire a
+        // 503, generating noise. The drafts survive in publicState/
+        // secretState; pause-lift re-runs this effect via the key above.
+        if (isEventLogPaused) return@LaunchedEffect
         kotlinx.coroutines.delay(250)
         val toSavePublic = publicState.ranked
         val toSaveSecret = secretState.ranked
@@ -180,6 +193,11 @@ fun VotingView(
                 secretState = secretState.copy(savedRanked = toSaveSecret)
                 if (wasFirstCast) onBallotCountChanged(+1)
             }
+        } catch (e: MaintenancePausedException) {
+            // Race fallback: pause flipped after the early-return check above
+            // but before the request landed. Banner already conveys the state;
+            // skip log + onError so we don't trip the frontend-errors alarm
+            // or stack a red box on top of the banner.
         } catch (e: Exception) {
             apiClient.logErrorToServer(e)
             onError(e.message ?: "Failed to save ballot")

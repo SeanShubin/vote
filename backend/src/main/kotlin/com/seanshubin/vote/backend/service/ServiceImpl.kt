@@ -40,6 +40,18 @@ class ServiceImpl(
         }
     }
 
+    override fun pauseEventLog(accessToken: AccessToken) {
+        requireOwner(accessToken, "pause the event log")
+        eventLog.setPaused(true)
+    }
+
+    override fun resumeEventLog(accessToken: AccessToken) {
+        requireOwner(accessToken, "resume the event log")
+        eventLog.setPaused(false)
+    }
+
+    override fun isEventLogPaused(): Boolean = eventLog.isPaused()
+
     override fun refresh(refreshToken: RefreshToken): Tokens {
         val user = requireSessionUser(refreshToken.userName)
         val accessToken = AccessToken(user.name, user.role)
@@ -1019,6 +1031,21 @@ class ServiceImpl(
             throw ServiceException(
                 ServiceException.Category.UNAUTHORIZED,
                 "User ${accessToken.userName} cannot manage election '$electionName'"
+            )
+        }
+    }
+
+    /**
+     * Gate for system-wide owner-only actions (e.g. pausing the event log
+     * for a maintenance window). The OWNER role is by definition a single
+     * user — see [Role.PRIMARY_ROLE] — so this is the right gate for actions
+     * that should never be delegated to ADMIN or AUDITOR.
+     */
+    private fun requireOwner(accessToken: AccessToken, action: String) {
+        if (accessToken.role != Role.OWNER) {
+            throw ServiceException(
+                ServiceException.Category.UNAUTHORIZED,
+                "Only the OWNER can $action (current role: ${accessToken.role})",
             )
         }
     }

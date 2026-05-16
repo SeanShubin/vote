@@ -7,6 +7,26 @@ interface Service {
     fun health(): String
 
     /**
+     * Pause the event log so no new events can be appended. Owner-only —
+     * used before pushing a deploy that requires a data migration, so the
+     * migration and the new code can land without races against in-flight
+     * writes. While paused, every event-producing service call fails with
+     * [ServiceException.Category.PAUSED] (HTTP 503).
+     */
+    fun pauseEventLog(accessToken: AccessToken)
+
+    /** Resume the event log. Owner-only. Inverse of [pauseEventLog]. */
+    fun resumeEventLog(accessToken: AccessToken)
+
+    /**
+     * Whether the event log is currently paused. Unauthenticated — the
+     * frontend polls this from every browser to render the maintenance
+     * banner, so it must work without a session (and never trip the token
+     * refresh path), just like [version].
+     */
+    fun isEventLogPaused(): Boolean
+
+    /**
      * Monotonic version of the read model — the id of the last event projected
      * into the query tables. Every write advances it; if it hasn't moved, no
      * data anywhere has changed. Clients poll this to decide whether a refetch

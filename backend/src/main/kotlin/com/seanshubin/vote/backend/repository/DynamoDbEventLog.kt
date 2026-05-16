@@ -3,6 +3,7 @@ package com.seanshubin.vote.backend.repository
 import aws.sdk.kotlin.services.dynamodb.DynamoDbClient
 import aws.sdk.kotlin.services.dynamodb.model.*
 import com.seanshubin.vote.contract.EventLog
+import com.seanshubin.vote.contract.EventLogPausedException
 import com.seanshubin.vote.domain.DomainEvent
 import com.seanshubin.vote.domain.EventEnvelope
 import kotlinx.datetime.Instant
@@ -16,6 +17,11 @@ class DynamoDbEventLog(
 ) : EventLog {
 
     override fun appendEvent(authority: String, whenHappened: Instant, event: DomainEvent) {
+        // Read-then-write rather than a conditional PutItem because pause is
+        // an operator-driven flag, not a contended race — and a clear
+        // exception is far more useful than a ConditionalCheckFailed wrapper.
+        if (isPaused()) throw EventLogPausedException()
+
         val eventType = event::class.simpleName ?: "Unknown"
         val eventData = json.encodeToString(event)
 
@@ -79,6 +85,36 @@ class DynamoDbEventLog(
                 select = Select.Count
             })
             response.count ?: 0
+        }
+    }
+
+    override fun setPaused(paused: Boolean) {
+        runBlocking {
+            dynamoDb.putItem(PutItemRequest {
+                tableName = DynamoDbSingleTableSchema.MAIN_TABLE
+                item = mapOf(
+                    "PK" to AttributeValue.S(DynamoDbSingleTableSchema.METADATA_PK),
+                    "SK" to AttributeValue.S(DynamoDbSingleTableSchema.EVENT_LOG_PAUSED_SK),
+                    "paused" to AttributeValue.Bool(paused),
+                )
+            })
+        }
+    }
+
+    override fun isPaused(): Boolean {
+        return runBlocking {
+            val response = dynamoDb.getItem(GetItemRequest {
+                tableName = DynamoDbSingleTableSchema.MAIN_TABLE
+                key = mapOf(
+                    "PK" to AttributeValue.S(DynamoDbSingleTableSchema.METADATA_PK),
+                    "SK" to AttributeValue.S(DynamoDbSingleTableSchema.EVENT_LOG_PAUSED_SK),
+                )
+                // Strongly-consistent so a recent pause from the operator is
+                // visible immediately to every Lambda — the whole point of the
+                // pause is to coordinate across the deploy window.
+                consistentRead = true
+            })
+            response.item?.get("paused")?.asBoolOrNull() ?: false
         }
     }
 

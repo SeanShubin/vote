@@ -98,3 +98,15 @@ CREATE TABLE IF NOT EXISTS sync_state (
 
 -- Initialize sync state
 INSERT IGNORE INTO sync_state (id, last_synced) VALUES (1, 0);
+
+-- Event Log Pause Flag — owner-only operator switch the backend reads on
+-- every appendEvent. Single-row table mirroring sync_state. Persisted so the
+-- pause survives Lambda restarts and is visible to every concurrent instance
+-- (critical: the pause must hold across the migration+deploy window).
+CREATE TABLE IF NOT EXISTS event_log_state (
+    id INT PRIMARY KEY DEFAULT 1,
+    paused BOOLEAN NOT NULL DEFAULT FALSE,
+    CHECK (id = 1)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT IGNORE INTO event_log_state (id, paused) VALUES (1, FALSE);

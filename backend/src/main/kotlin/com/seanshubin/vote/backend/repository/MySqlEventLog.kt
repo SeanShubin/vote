@@ -1,6 +1,7 @@
 package com.seanshubin.vote.backend.repository
 
 import com.seanshubin.vote.contract.EventLog
+import com.seanshubin.vote.contract.EventLogPausedException
 import com.seanshubin.vote.contract.QueryLoader
 import com.seanshubin.vote.domain.DomainEvent
 import com.seanshubin.vote.domain.EventEnvelope
@@ -18,6 +19,8 @@ class MySqlEventLog(
     private val json: Json
 ) : EventLog {
     override fun appendEvent(authority: String, whenHappened: Instant, event: DomainEvent) {
+        if (isPaused()) throw EventLogPausedException()
+
         val eventType = event::class.simpleName ?: "Unknown"
         val eventData = json.encodeToString(event)
         val sql = queryLoader.load("event-log-insert")
@@ -54,6 +57,22 @@ class MySqlEventLog(
             } else {
                 0
             }
+        }
+    }
+
+    override fun setPaused(paused: Boolean) {
+        val sql = queryLoader.load("event-log-state-upsert")
+        connection.prepareStatement(sql).use { stmt ->
+            stmt.setBoolean(1, paused)
+            stmt.executeUpdate()
+        }
+    }
+
+    override fun isPaused(): Boolean {
+        val sql = queryLoader.load("event-log-state-select")
+        return connection.prepareStatement(sql).use { stmt ->
+            val rs = stmt.executeQuery()
+            if (rs.next()) rs.getBoolean("paused") else false
         }
     }
 

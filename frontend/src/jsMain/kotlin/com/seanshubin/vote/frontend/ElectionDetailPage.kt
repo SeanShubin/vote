@@ -31,6 +31,10 @@ fun ElectionDetailPage(
     currentRole: Role?,
     currentSide: RankingSide,
     onSetSide: (RankingSide) -> Unit,
+    // Owner-set pause flag from the root pause-state poller. Passed into
+    // VotingView so its auto-save can short-circuit instead of firing 503s
+    // every drag during a maintenance window.
+    isEventLogPaused: Boolean,
     onBack: () -> Unit,
     onElectionDeleted: () -> Unit,
     onNavigateToPreferences: () -> Unit = {},
@@ -326,6 +330,7 @@ fun ElectionDetailPage(
                         currentUserName = currentUserName,
                         currentSide = currentSide,
                         onSetSide = onSetSide,
+                        isEventLogPaused = isEventLogPaused,
                         // Patch the header count locally and refresh the
                         // tally — the cached helper avoids the Loading
                         // flash on the Results tab.

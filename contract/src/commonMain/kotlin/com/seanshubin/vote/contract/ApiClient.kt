@@ -42,6 +42,24 @@ interface ApiClient {
     suspend fun version(): Long
 
     /**
+     * Whether the owner has paused the event log. Unauthenticated like
+     * [version] — every browser polls it to drive the maintenance banner,
+     * so it must work without a session.
+     */
+    suspend fun isEventLogPaused(): Boolean
+
+    /**
+     * Owner-only: pause the event log so the owner can run a data migration
+     * without new events landing in the deploy window. After this returns,
+     * every event-producing endpoint returns HTTP 503 until [resumeEventLog]
+     * is called.
+     */
+    suspend fun pauseEventLog()
+
+    /** Owner-only: resume the event log. Inverse of [pauseEventLog]. */
+    suspend fun resumeEventLog()
+
+    /**
      * Set by the SPA shell to perform "you are now logged out" UX (clear
      * userName/role, route to /login). Implementations invoke it exactly when
      * an authenticated request can't be recovered via refresh — e.g. the user
