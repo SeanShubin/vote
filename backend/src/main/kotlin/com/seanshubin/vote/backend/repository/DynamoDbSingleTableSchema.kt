@@ -17,6 +17,9 @@ object DynamoDbSingleTableSchema {
     const val SYNC_SK = "SYNC"
     const val METADATA_PK = "METADATA"
     const val EVENT_LOG_PAUSED_SK = "EVENT_LOG_PAUSED"
+    const val FEATURE_FLAG_SK_PREFIX = "FEATURE_FLAG#"
+
+    fun featureFlagSK(flagName: String) = "$FEATURE_FLAG_SK_PREFIX$flagName"
 
     suspend fun createTables(dynamoDb: DynamoDbClient) {
         createMainTable(dynamoDb)

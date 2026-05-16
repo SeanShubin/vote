@@ -110,3 +110,12 @@ CREATE TABLE IF NOT EXISTS event_log_state (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 INSERT IGNORE INTO event_log_state (id, paused) VALUES (1, FALSE);
+
+-- Feature Flags — owner-only runtime switches the service reads to decide
+-- whether a gated feature is active. One row per flag (no row = use the
+-- code-side FeatureFlag.defaultEnabled). No audit trail: these are operator
+-- state, not domain events, so only the current value is kept.
+CREATE TABLE IF NOT EXISTS feature_flags (
+    flag_name VARCHAR(100) PRIMARY KEY,
+    enabled BOOLEAN NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

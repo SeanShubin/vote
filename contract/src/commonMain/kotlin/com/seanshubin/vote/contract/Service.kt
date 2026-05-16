@@ -27,6 +27,20 @@ interface Service {
     fun isEventLogPaused(): Boolean
 
     /**
+     * Current value of every feature flag. Unauthenticated — the frontend
+     * polls this every 10s from every browser so the admin page and any
+     * gated UI surfaces stay current; same rationale as [isEventLogPaused].
+     */
+    fun listFeatureFlags(): Map<FeatureFlag, Boolean>
+
+    /**
+     * Owner-only: flip a single feature flag. The new value is visible to
+     * every Lambda on the next strongly-consistent read; the frontend
+     * picks it up within one [listFeatureFlags] poll tick.
+     */
+    fun setFeatureEnabled(accessToken: AccessToken, flag: FeatureFlag, enabled: Boolean)
+
+    /**
      * Monotonic version of the read model — the id of the last event projected
      * into the query tables. Every write advances it; if it hasn't moved, no
      * data anywhere has changed. Clients poll this to decide whether a refetch

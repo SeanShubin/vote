@@ -9,6 +9,7 @@ import com.seanshubin.vote.backend.repository.InMemoryData
 import com.seanshubin.vote.backend.repository.InMemoryEventLog
 import com.seanshubin.vote.backend.repository.InMemoryQueryModel
 import com.seanshubin.vote.backend.repository.InMemoryRawTableScanner
+import com.seanshubin.vote.backend.repository.InMemorySystemSettings
 import com.seanshubin.vote.backend.service.DynamoToRelational
 import com.seanshubin.vote.backend.service.EventApplier
 import com.seanshubin.vote.backend.service.ServiceImpl
@@ -47,6 +48,7 @@ class InProcessService {
         commandModel = commandModel,
         queryModel = queryModel,
         rawTableScanner = rawTableScanner,
+        systemSettings = InMemorySystemSettings(),
         tokenEncoder = tokenEncoder,
         discordConfigProvider = DiscordConfigProvider { null },
         discordOAuthClient = DiscordOAuthClient(httpClient = HttpClient.newHttpClient()),

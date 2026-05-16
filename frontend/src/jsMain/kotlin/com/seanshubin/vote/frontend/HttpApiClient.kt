@@ -110,6 +110,29 @@ class HttpApiClient(
         postEmptyWithAuth("/admin/event-log/resume")
     }
 
+    override suspend fun listFeatureFlags(): Map<FeatureFlag, Boolean> {
+        // Unauthenticated like /admin/event-log/status — same polling cadence,
+        // same lack of token-refresh risk.
+        val response = fetch("$baseUrl/admin/feature-flags", RequestInit(
+            method = "GET",
+            headers = json("Content-Type" to "application/json"),
+        )).await()
+        val byName = handleResponse<Map<String, Boolean>>(response)
+        // Resolve against the enum so an unknown stored flag (e.g. a
+        // server-side flag this client predates) is skipped and every
+        // current flag has a value — defaults fill any gap.
+        return FeatureFlag.entries.associateWith { flag ->
+            byName[flag.name] ?: flag.defaultEnabled
+        }
+    }
+
+    override suspend fun setFeatureEnabled(flag: FeatureFlag, enabled: Boolean) {
+        putWithAuth<Map<String, Boolean>, Map<String, Boolean>>(
+            "/admin/feature-flags/${encodeURIComponent(flag.name)}",
+            mapOf("enabled" to enabled),
+        )
+    }
+
     /**
      * POST with an empty body — the pause/resume endpoints don't take a
      * payload; the action is the URL. `postWithAuth` insists on a serializable

@@ -132,6 +132,8 @@ class RequestRouter(
         Route("GET", "/admin/event-log/status", { _ -> handleEventLogStatus() }),
         Route("POST", "/admin/event-log/pause", ::handleEventLogPause),
         Route("POST", "/admin/event-log/resume", ::handleEventLogResume),
+        Route("GET", "/admin/feature-flags", { _ -> handleListFeatureFlags() }),
+        Route("PUT", "/admin/feature-flags/[^/]+", ::handleSetFeatureFlag),
         Route("POST", "/log-client-error", ::handleLogClientError),
         Route("POST", "/refresh", ::handleRefresh),
         Route("POST", "/logout", { _ -> handleLogout() }),
@@ -296,6 +298,35 @@ class RequestRouter(
         val accessToken = extractAccessToken(req)
         service.resumeEventLog(accessToken)
         return HttpResponse(200, json.encodeToString(mapOf("paused" to false)))
+    }
+
+    private fun handleListFeatureFlags(): HttpResponse {
+        // Wire shape: { "SECRET_BALLOT": true, ... } — flag name to enabled.
+        // Unauthenticated to match /admin/event-log/status; the values aren't
+        // sensitive (every gated UI surface would reveal them anyway).
+        val flags = service.listFeatureFlags().mapKeys { it.key.name }
+        return HttpResponse(200, json.encodeToString(flags))
+    }
+
+    private fun handleSetFeatureFlag(req: HttpRequest): HttpResponse {
+        val accessToken = extractAccessToken(req)
+        val flagName = req.target.substringAfterLast('/')
+            .let { java.net.URLDecoder.decode(it, "UTF-8") }
+        val flag = runCatching { com.seanshubin.vote.domain.FeatureFlag.valueOf(flagName) }
+            .getOrElse {
+                throw ServiceException(
+                    ServiceException.Category.NOT_FOUND,
+                    "Unknown feature flag: $flagName",
+                )
+            }
+        val body = json.decodeFromString<Map<String, Boolean>>(req.body)
+        val enabled = body["enabled"]
+            ?: throw ServiceException(
+                ServiceException.Category.MALFORMED_JSON,
+                "Missing 'enabled' field in body",
+            )
+        service.setFeatureEnabled(accessToken, flag, enabled)
+        return HttpResponse(200, json.encodeToString(mapOf(flag.name to enabled)))
     }
 
     private fun handleLogClientError(req: HttpRequest): HttpResponse {

@@ -6,6 +6,7 @@ import com.seanshubin.vote.contract.LoginConfig
 import kotlinx.coroutines.CancellationException
 import com.seanshubin.vote.domain.ElectionDetail
 import com.seanshubin.vote.domain.ElectionSummary
+import com.seanshubin.vote.domain.FeatureFlag
 import com.seanshubin.vote.domain.Ranking
 import com.seanshubin.vote.domain.RankingSide
 import com.seanshubin.vote.domain.Role
@@ -49,6 +50,11 @@ class FakeApiClient : ApiClient {
     val pauseEventLogCalls = mutableListOf<Unit>()
     var resumeEventLogResult: Result<Unit> = Result.success(Unit)
     val resumeEventLogCalls = mutableListOf<Unit>()
+    var listFeatureFlagsResult: Result<Map<FeatureFlag, Boolean>> =
+        Result.success(FeatureFlag.entries.associateWith { it.defaultEnabled })
+    val listFeatureFlagsCalls = mutableListOf<Unit>()
+    var setFeatureEnabledResult: Result<Unit> = Result.success(Unit)
+    val setFeatureEnabledCalls = mutableListOf<Pair<FeatureFlag, Boolean>>()
     var getMyUserResult: Result<UserNameEmail> = Result.success(UserNameEmail("user"))
     val getMyUserCalls = mutableListOf<Unit>()
     var listElectionsResult: Result<List<ElectionSummary>> = Result.success(emptyList())
@@ -129,6 +135,16 @@ class FakeApiClient : ApiClient {
     override suspend fun resumeEventLog() {
         resumeEventLogCalls.add(Unit)
         resumeEventLogResult.getOrThrow()
+    }
+
+    override suspend fun listFeatureFlags(): Map<FeatureFlag, Boolean> {
+        listFeatureFlagsCalls.add(Unit)
+        return listFeatureFlagsResult.getOrThrow()
+    }
+
+    override suspend fun setFeatureEnabled(flag: FeatureFlag, enabled: Boolean) {
+        setFeatureEnabledCalls.add(flag to enabled)
+        setFeatureEnabledResult.getOrThrow()
     }
 
     override var onSessionLost: (() -> Unit)? = null

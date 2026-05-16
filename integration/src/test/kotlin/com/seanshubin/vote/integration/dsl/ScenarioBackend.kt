@@ -63,5 +63,8 @@ interface ScenarioBackend {
     fun resumeEventLog(token: AccessToken)
     fun isEventLogPaused(): Boolean
 
+    fun listFeatureFlags(): Map<FeatureFlag, Boolean>
+    fun setFeatureEnabled(token: AccessToken, flag: FeatureFlag, enabled: Boolean)
+
     fun synchronize()
 }

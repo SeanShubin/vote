@@ -144,6 +144,12 @@ class DirectServiceBackend(
 
     override fun isEventLogPaused(): Boolean = service.isEventLogPaused()
 
+    override fun listFeatureFlags(): Map<FeatureFlag, Boolean> = service.listFeatureFlags()
+
+    override fun setFeatureEnabled(token: AccessToken, flag: FeatureFlag, enabled: Boolean) {
+        service.setFeatureEnabled(token, flag, enabled)
+    }
+
     override fun synchronize() {
         service.synchronize()
     }

@@ -14,6 +14,7 @@ class ServiceImpl(
     private val commandModel: CommandModel,
     private val queryModel: QueryModel,
     private val rawTableScanner: RawTableScanner,
+    private val systemSettings: SystemSettings,
     private val tokenEncoder: TokenEncoder,
     private val discordConfigProvider: DiscordConfigProvider,
     private val discordOAuthClient: DiscordOAuthClient,
@@ -51,6 +52,13 @@ class ServiceImpl(
     }
 
     override fun isEventLogPaused(): Boolean = eventLog.isPaused()
+
+    override fun listFeatureFlags(): Map<FeatureFlag, Boolean> = systemSettings.listAll()
+
+    override fun setFeatureEnabled(accessToken: AccessToken, flag: FeatureFlag, enabled: Boolean) {
+        requireOwner(accessToken, "change feature flag ${flag.name}")
+        systemSettings.setEnabled(flag, enabled)
+    }
 
     override fun refresh(refreshToken: RefreshToken): Tokens {
         val user = requireSessionUser(refreshToken.userName)

@@ -3,6 +3,7 @@ package com.seanshubin.vote.contract
 import com.seanshubin.vote.domain.ElectionDetail
 import com.seanshubin.vote.domain.ElectionSummary
 import com.seanshubin.vote.domain.ElectionTally
+import com.seanshubin.vote.domain.FeatureFlag
 import com.seanshubin.vote.domain.Ranking
 import com.seanshubin.vote.domain.RankingSide
 import com.seanshubin.vote.domain.Role
@@ -58,6 +59,18 @@ interface ApiClient {
 
     /** Owner-only: resume the event log. Inverse of [pauseEventLog]. */
     suspend fun resumeEventLog()
+
+    /**
+     * Current value of every feature flag. Unauthenticated — polled by
+     * every browser so gated UI surfaces stay current.
+     */
+    suspend fun listFeatureFlags(): Map<FeatureFlag, Boolean>
+
+    /**
+     * Owner-only: flip one feature flag. The new value propagates to every
+     * Lambda on the next request and to every browser within one poll tick.
+     */
+    suspend fun setFeatureEnabled(flag: FeatureFlag, enabled: Boolean)
 
     /**
      * Set by the SPA shell to perform "you are now logged out" UX (clear

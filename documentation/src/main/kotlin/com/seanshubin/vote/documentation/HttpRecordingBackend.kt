@@ -214,6 +214,19 @@ class HttpRecordingBackend(
         return body["paused"] ?: false
     }
 
+    override fun listFeatureFlags(): Map<FeatureFlag, Boolean> {
+        val response = recorder.get("/admin/feature-flags")
+        val byName = json.decodeFromString<Map<String, Boolean>>(response.body())
+        return FeatureFlag.entries.associateWith { flag ->
+            byName[flag.name] ?: flag.defaultEnabled
+        }
+    }
+
+    override fun setFeatureEnabled(token: AccessToken, flag: FeatureFlag, enabled: Boolean) {
+        val body = json.encodeToString(mapOf("enabled" to enabled))
+        recorder.put("/admin/feature-flags/${URLEncoder.encode(flag.name, StandardCharsets.UTF_8)}", body, token)
+    }
+
     override fun synchronize() {
         recorder.post("/sync", "{}")
     }

@@ -84,6 +84,7 @@ class ApplicationRunner(
             commandModel = repositories.commandModel,
             queryModel = repositories.queryModel,
             rawTableScanner = repositories.rawTableScanner,
+            systemSettings = repositories.systemSettings,
             tokenEncoder = tokenEncoder,
             discordConfigProvider = discordConfigProvider,
             discordOAuthClient = DiscordOAuthClient(httpClient = sharedHttpClient),
