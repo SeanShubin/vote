@@ -331,10 +331,63 @@ fun VotingView(
         }
     }
 
+    // Sync/copy state — surfaced next to the side toggle below so the voter
+    // sees the relationship between the two sides at a glance (and can act
+    // on it) right where they're about to switch.
+    val otherHasCandidates = otherState.ranked.any { it is RankedItem.Candidate }
+    val activeHasCandidates = activeState.ranked.any { it is RankedItem.Candidate }
+    val sidesEqual = activeState.ranked == otherState.ranked
+    val otherLabel = if (currentSide == RankingSide.PUBLIC) "secret" else "public"
+
     Div({ classes("section") }) {
         H2 { Text("Vote") }
 
-        SideToggle(currentSide, onSetSide)
+        Div({ classes("ballot-side-toggle") }) {
+            Button({
+                classes("ballot-side-button")
+                if (currentSide == RankingSide.PUBLIC) classes("ballot-side-button-active")
+                onClick { onSetSide(RankingSide.PUBLIC) }
+            }) { Text("Public side") }
+            Button({
+                classes("ballot-side-button")
+                if (currentSide == RankingSide.SECRET) classes("ballot-side-button-active")
+                onClick { onSetSide(RankingSide.SECRET) }
+            }) { Text("Secret side") }
+            // Sync / copy. Hidden when both sides are empty (nothing to
+            // compare yet); disabled "in sync" indicator when the two
+            // sides already match; active copy button otherwise.
+            if (otherHasCandidates || activeHasCandidates) {
+                if (sidesEqual) {
+                    Button({
+                        classes("ballot-side-copy-button")
+                        classes("ballot-side-copy-button-synced")
+                        attr("disabled", "")
+                        title("This side mirrors the $otherLabel side")
+                    }) {
+                        Text("✓ In sync with $otherLabel side")
+                    }
+                } else if (otherHasCandidates) {
+                    Button({
+                        classes("ballot-side-copy-button")
+                        onClick {
+                            val source = otherState.ranked
+                            val sourceCandidateNames = source
+                                .filterIsInstance<RankedItem.Candidate>()
+                                .map { it.name }
+                                .toSet()
+                            setActive { s ->
+                                s.copy(
+                                    ranked = source,
+                                    arena = candidates.filter { it !in sourceCandidateNames },
+                                )
+                            }
+                        }
+                    }) {
+                        Text("Copy from $otherLabel side")
+                    }
+                }
+            }
+        }
 
         Div({ classes("ballot-public-notice") }) {
             if (currentSide == RankingSide.PUBLIC) {
@@ -541,48 +594,6 @@ fun VotingView(
                             }
                         }) {
                             Text(if (deleteBallotAction.isLoading) "Removing…" else "Remove my ballot")
-                        }
-                    }
-
-                    // Copy from the other side onto the current side. When
-                    // the two sides already hold identical rankings (the
-                    // mirror state) the button is disabled and labeled as an
-                    // indicator so the voter can see they're in sync. Hidden
-                    // entirely when both sides are empty — there's nothing
-                    // to copy and nothing to be "in sync" with yet.
-                    val otherHasCandidates = otherState.ranked.any { it is RankedItem.Candidate }
-                    val activeHasCandidates = activeState.ranked.any { it is RankedItem.Candidate }
-                    val sidesEqual = activeState.ranked == otherState.ranked
-                    if (otherHasCandidates || activeHasCandidates) {
-                        val otherLabel = if (currentSide == RankingSide.PUBLIC) "secret" else "public"
-                        if (sidesEqual) {
-                            Button({
-                                classes("ranked-ballot-copy-button")
-                                classes("ranked-ballot-copy-button-synced")
-                                attr("disabled", "")
-                                title("This side mirrors the $otherLabel side")
-                            }) {
-                                Text("✓ In sync with $otherLabel side")
-                            }
-                        } else if (otherHasCandidates) {
-                            Button({
-                                classes("ranked-ballot-copy-button")
-                                onClick {
-                                    val source = otherState.ranked
-                                    val sourceCandidateNames = source
-                                        .filterIsInstance<RankedItem.Candidate>()
-                                        .map { it.name }
-                                        .toSet()
-                                    setActive { s ->
-                                        s.copy(
-                                            ranked = source,
-                                            arena = candidates.filter { it !in sourceCandidateNames },
-                                        )
-                                    }
-                                }
-                            }) {
-                                Text("Copy from $otherLabel side")
-                            }
                         }
                     }
 

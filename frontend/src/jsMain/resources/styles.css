@@ -35,6 +35,7 @@ body {
 .ranked-ballot-tier-empty,
 .ranked-ballot-row-button,
 .ranked-ballot-copy-button-synced,
+.ballot-side-copy-button-synced,
 .ranked-ballot-arena-label,
 .ranked-ballot-list-label,
 .ranked-ballot-tier-title,
@@ -174,7 +175,8 @@ body.secret-mode button:disabled {
     color: #7e8db8;
 }
 
-body.secret-mode .ranked-ballot-copy-button-synced {
+body.secret-mode .ranked-ballot-copy-button-synced,
+body.secret-mode .ballot-side-copy-button-synced {
     background-color: #1c2649;
     border-color: #3b4d8a;
     color: #c0d0e8;
@@ -382,8 +384,10 @@ button:disabled {
 
 .ballot-side-toggle {
     display: flex;
+    flex-wrap: wrap;
     gap: 0.5rem;
     margin-bottom: 0.75rem;
+    align-items: center;
 }
 
 .ballot-side-button {
@@ -403,14 +407,28 @@ button:disabled {
     color: #ffffff;
 }
 
-.ranked-ballot-copy-button-synced {
+/*
+ * Sync/copy button that sits beside the public/secret toggle. Pushed to
+ * the right via margin-left:auto so the two-side buttons stay grouped on
+ * the left and the sync state lives on the opposite edge — clearly tied
+ * to the toggle, visually separated from it.
+ */
+.ballot-side-copy-button {
+    flex: 0 0 auto;
+    padding: 0.4rem 1rem;
+    margin-top: 0;
+    margin-left: auto;
+    font-size: 0.95rem;
+}
+
+.ballot-side-copy-button-synced {
     background-color: #ecf2fb;
     border: 1px solid #b8d0f0;
     color: #2c5282;
     cursor: default;
 }
 
-.ranked-ballot-copy-button-synced:disabled {
+.ballot-side-copy-button-synced:disabled {
     opacity: 1;
 }
 
