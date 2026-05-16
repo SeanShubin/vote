@@ -87,7 +87,11 @@ object Validation {
                 }
             }
             val validTier = ranking.tier?.let { validateTierName(it) }
-            Ranking(validCandidateName, ranking.rank, ranking.kind, validTier)
+            // Preserve `side` — reconstructing without it would silently
+            // collapse every SECRET-side ranking back to the PUBLIC default,
+            // which is exactly the bug that hid copied secret ballots from
+            // the secret-side tally before this line was fixed.
+            Ranking(validCandidateName, ranking.rank, ranking.kind, validTier, ranking.side)
         }
     }
 
