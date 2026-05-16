@@ -124,6 +124,25 @@ Resources:
                   - ssm:RemoveTagsFromResource
                   - ssm:ListTagsForResource
                 Resource: !Sub "arn:aws:ssm:*:${AWS::AccountId}:parameter/pairwisevote-*"
+        # SES perms so CFN can manage AWS::SES::EmailIdentity (domain
+        # verification + DKIM for alert emails). Scoped to identity ARNs in
+        # this account; SES identity ARNs don't support a name-prefix wildcard
+        # the way SSM/Secrets do, so the resource is account-wide on identities.
+        - PolicyName: SesIdentityProjectScope
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ses:CreateEmailIdentity
+                  - ses:GetEmailIdentity
+                  - ses:DeleteEmailIdentity
+                  - ses:PutEmailIdentityDkimAttributes
+                  - ses:PutEmailIdentityDkimSigningAttributes
+                  - ses:TagResource
+                  - ses:UntagResource
+                  - ses:ListTagsForResource
+                Resource: !Sub "arn:aws:ses:*:${AWS::AccountId}:identity/*"
 
   # S3 bucket where CI uploads packaged Lambda artifacts. CFN's `package`
   # command rewrites local CodeUri references to s3://... pointers in this bucket.
