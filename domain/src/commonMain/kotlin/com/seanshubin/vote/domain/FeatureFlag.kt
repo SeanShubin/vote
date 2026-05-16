@@ -25,7 +25,7 @@ enum class FeatureFlag(val defaultEnabled: Boolean, val description: String) {
      * rankings remain in the event log; flipping back on resurfaces them.
      */
     SECRET_BALLOT(
-        defaultEnabled = true,
+        defaultEnabled = false,
         description = "Dual-sided ballots (public + secret sides). Off = only public-side voting visible.",
     ),
 }
