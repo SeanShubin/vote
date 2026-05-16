@@ -11,13 +11,12 @@ fun HomePage(
     apiClient: ApiClient,
     userName: String,
     role: Role?,
-    isEventLogPaused: Boolean,
-    onEventLogPauseToggled: (Boolean) -> Unit,
     onNavigateToCreateElection: () -> Unit,
     onNavigateToElections: () -> Unit,
     onNavigateToRawTables: () -> Unit,
     onNavigateToDebugTables: () -> Unit,
     onNavigateToUserManagement: () -> Unit,
+    onNavigateToAdmin: () -> Unit,
     onLogout: () -> Unit,
     onAccountDeleted: () -> Unit,
 ) {
@@ -40,25 +39,6 @@ fun HomePage(
         action = {
             apiClient.removeUser(userName)
             onAccountDeleted()
-        },
-    )
-
-    // Owner-only pause/resume action. Owner pauses before pushing a deploy
-    // that needs a data migration, so no new events land between the
-    // migration and the new code starting up. Optimistic local flip via
-    // onEventLogPauseToggled — root's poller reconciles within one tick.
-    val pauseToggleAction = rememberAsyncAction(
-        apiClient = apiClient,
-        fallbackErrorMessage = if (isEventLogPaused) "Failed to resume" else "Failed to pause",
-        onError = { errorMessage = it },
-        action = {
-            if (isEventLogPaused) {
-                apiClient.resumeEventLog()
-                onEventLogPauseToggled(false)
-            } else {
-                apiClient.pauseEventLog()
-                onEventLogPauseToggled(true)
-            }
         },
     )
 
@@ -134,33 +114,14 @@ fun HomePage(
                 }
             }
 
-            // OWNER-only event-log pause toggle. Used to freeze writes for the
-            // duration of a deploy that involves a data migration. The
-            // confirm() prompt names the action explicitly so a misclick
-            // can't pause the system out from under everyone. The backend
-            // re-checks Role.OWNER on every call.
+            // OWNER-only system console: pause/resume the event log and
+            // toggle feature flags. The backend re-checks Role.OWNER on
+            // every mutating call there.
             if (role == Role.OWNER) {
                 Button({
-                    if (pauseToggleAction.isLoading) attr("disabled", "")
-                    onClick {
-                        val message = if (isEventLogPaused) {
-                            "Resume the event log? Voting and editing will start working again."
-                        } else {
-                            "Pause the event log? Voting and editing will be temporarily disabled for everyone."
-                        }
-                        if (kotlinx.browser.window.confirm(message)) {
-                            pauseToggleAction.invoke()
-                        }
-                    }
+                    onClick { onNavigateToAdmin() }
                 }) {
-                    Text(
-                        when {
-                            pauseToggleAction.isLoading && isEventLogPaused -> "Resuming…"
-                            pauseToggleAction.isLoading -> "Pausing…"
-                            isEventLogPaused -> "Resume Event Log"
-                            else -> "Pause Event Log"
-                        }
-                    )
+                    Text("System")
                 }
             }
 

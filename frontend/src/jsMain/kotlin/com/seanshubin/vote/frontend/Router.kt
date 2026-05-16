@@ -20,6 +20,7 @@ sealed class Page {
     object RawTables : Page()
     object DebugTables : Page()
     object UserManagement : Page()
+    object Admin : Page()
     data class ElectionDetail(val electionName: String) : Page()
     data class ElectionPreferences(val electionName: String) : Page()
     data class ElectionDecision(val electionName: String) : Page()
@@ -45,6 +46,7 @@ fun pageToPath(page: Page): String = when (page) {
     is Page.RawTables -> "/admin/raw-tables"
     is Page.DebugTables -> "/admin/debug-tables"
     is Page.UserManagement -> "/admin/users"
+    is Page.Admin -> "/admin"
 }
 
 /**
@@ -87,6 +89,7 @@ fun pathToPage(pathWithQuery: String): Page {
         normalized == "/admin/raw-tables" -> Page.RawTables
         normalized == "/admin/debug-tables" -> Page.DebugTables
         normalized == "/admin/users" -> Page.UserManagement
+        normalized == "/admin" -> Page.Admin
         else -> Page.Home
     }
 }

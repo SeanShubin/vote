@@ -2,6 +2,7 @@ package com.seanshubin.vote.frontend
 
 import androidx.compose.runtime.*
 import com.seanshubin.vote.contract.ApiClient
+import com.seanshubin.vote.domain.FeatureFlag
 import com.seanshubin.vote.domain.RankingSide
 import com.seanshubin.vote.domain.Role
 import kotlinx.coroutines.launch
@@ -57,6 +58,11 @@ fun VoteApp(apiClient: ApiClient) {
     // optimistically and the banner flips instantly (poll reconciles later).
     val pauseState = rememberPauseState(apiClient)
     val isPaused = pauseState.value
+    // Feature flags polled on the same cadence as pause. Same optimistic-
+    // write story: the owner toggles, the flag map updates locally; the
+    // next poll reconciles within a tick. Defaults fill the initial state.
+    val flagsState = rememberFeatureFlags(apiClient)
+    val featureFlags = flagsState.value
 
     // Active ballot side, sticky across navigation and reload. Persisted to
     // localStorage so a voter who flipped to the secret side stays on it the
@@ -182,13 +188,12 @@ fun VoteApp(apiClient: ApiClient) {
             apiClient = apiClient,
             userName = userName ?: "Unknown",
             role = role,
-            isEventLogPaused = isPaused,
-            onEventLogPauseToggled = { pauseState.value = it },
             onNavigateToCreateElection = { router.navigate(Page.CreateElection) },
             onNavigateToElections = { router.navigate(Page.Elections) },
             onNavigateToRawTables = { router.navigate(Page.RawTables) },
             onNavigateToDebugTables = { router.navigate(Page.DebugTables) },
             onNavigateToUserManagement = { router.navigate(Page.UserManagement) },
+            onNavigateToAdmin = { router.navigate(Page.Admin) },
             onLogout = {
                 scope.launch {
                     try {
@@ -287,6 +292,17 @@ fun VoteApp(apiClient: ApiClient) {
             apiClient = apiClient,
             currentUserName = userName ?: "",
             currentRole = role,
+            onBack = { router.navigate(Page.Home) },
+        )
+        is Page.Admin -> AdminPage(
+            apiClient = apiClient,
+            role = role,
+            isEventLogPaused = isPaused,
+            onEventLogPauseToggled = { pauseState.value = it },
+            featureFlags = featureFlags,
+            onFeatureFlagToggled = { flag, enabled ->
+                flagsState.value = flagsState.value + (flag to enabled)
+            },
             onBack = { router.navigate(Page.Home) },
         )
     }
