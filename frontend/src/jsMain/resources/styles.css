@@ -4,205 +4,253 @@
     box-sizing: border-box;
 }
 
+/*
+ * Theme palette. Every color a theme may want to override lives here as a
+ * CSS custom property; layout/spacing/border-radius values stay inline on
+ * their selectors. To add a new theme:
+ *   1. Add a `body.your-theme { ... }` block that re-sets the variables
+ *      below to your palette.
+ *   2. Toggle the class on `<body>` from Compose based on whatever state
+ *      drives the theme.
+ * No selector edits required — every consumer below already reads through
+ * var(--…).
+ *
+ * Two themes ship today:
+ *   - `body.secret-mode` — dark navy/cool-blue, applied to every viewer
+ *     while the voter is editing the secret side of a ballot.
+ *   - `body.paused-owner-mode` — alarm red, applied ONLY to the owner
+ *     while the event log is paused. Voters and observers don't see it;
+ *     the owner sees it as a constant nudge to unpause when done.
+ */
+:root {
+    /* Page + container surfaces */
+    --color-page-bg: #f5f5f5;
+    --color-page-text: #333;
+    --color-card-bg: #ffffff;
+    --color-card-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+
+    /* Typography */
+    --color-heading: #2c3e50;
+    --color-paragraph: #333;
+    --color-label: #888;
+
+    /* Notice / info surfaces */
+    --color-notice-bg: #ecf2fb;
+    --color-notice-border: #b8d0f0;
+    --color-notice-text: #2c3e50;
+
+    /* Ballot — arena, rows, chips */
+    --color-arena-bg: #f9f9f9;
+    --color-arena-border: #ddd;
+    --color-chip-bg: #ffffff;
+    --color-chip-border: #ddd;
+    --color-chip-text: #333;
+    --color-chip-hover-bg: #ecf2fb;
+    --color-chip-hover-border: #3498db;
+    --color-chip-hover-text: #3498db;
+    --color-row-bg: #ffffff;
+    --color-row-border: #ddd;
+    --color-row-text: #333;
+    --color-row-focus-border: #3498db;
+    --color-row-focus-shadow: rgba(52, 152, 219, 0.2);
+    --color-row-button-text: #333;
+    --color-row-button-hover-bg: #f0f0f0;
+
+    /* Ballot — tier cards */
+    --color-tier-bg: #e8eef5;
+    --color-tier-border: #aab8ca;
+    --color-tier-title: #34495e;
+    --color-tier-title-hover: #2c7be5;
+    --color-tier-selected-bg: #f0f6ff;
+    --color-tier-selected-border: #2c7be5;
+    --color-tier-empty-text: #888;
+    --color-tier-empty-border: #ccc;
+
+    /* Buttons */
+    --color-button-bg: #3498db;
+    --color-button-text: white;
+    --color-button-hover-bg: #2980b9;
+    --color-button-disabled-bg: #95a5a6;
+    --color-button-disabled-text: white;
+
+    /* Side toggle + sync indicator */
+    --color-side-button-bg: #f4f7fb;
+    --color-side-button-border: #b8d0f0;
+    --color-side-button-text: #2c3e50;
+    --color-side-button-active-bg: #2c5282;
+    --color-side-button-active-border: #2c5282;
+    --color-side-button-active-text: #ffffff;
+    --color-synced-bg: #ecf2fb;
+    --color-synced-border: #b8d0f0;
+    --color-synced-text: #2c5282;
+
+    /* Misc */
+    --color-feedback-positive: #3c3;
+}
+
 body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-    background-color: #f5f5f5;
-    color: #333;
+    background-color: var(--color-page-bg);
+    color: var(--color-page-text);
     line-height: 1.6;
     /*
-     * Animate the light↔dark swap whenever .secret-mode is added/removed
-     * from <body>. Most card-level rules below also animate so individual
-     * surfaces (rows, chips, tiers) fade together with the page bg.
+     * Animate every var change so toggling themes (secret-mode,
+     * paused-owner-mode) fades the whole page in one coordinated swap.
+     * Most card-level rules also animate via the block below.
      */
     transition: background-color 0.45s ease, color 0.45s ease;
 }
 
 /*
- * Surfaces that the dark theme below recolors. Declaring the transition
- * here (instead of inside `body.secret-mode .container { ... }` etc.)
- * lets the same animation play when switching back to light mode — the
- * removed class triggers a transition from dark values back to the
- * original light values, since the property is animated on the base
- * rule rather than the override.
+ * Surfaces themes recolor. The transition lives on the base rule so the
+ * animation plays in BOTH directions — class added and class removed —
+ * because the property is being animated on the element itself, not on
+ * the override.
  */
 .container,
 .admin-container,
 .ballot-public-notice,
 .ballot-side-button,
+.ballot-side-copy-button-synced,
 .ranked-ballot-arena,
 .ranked-ballot-row,
 .ranked-ballot-tier,
 .ranked-ballot-tier-empty,
 .ranked-ballot-row-button,
-.ranked-ballot-copy-button-synced,
-.ballot-side-copy-button-synced,
 .ranked-ballot-arena-label,
 .ranked-ballot-list-label,
 .ranked-ballot-tier-title,
 .ranked-ballot-empty-hint,
 .ranked-ballot-toolbar-hint,
 .ranked-ballot-rank-num,
-.ranked-ballot-row-name {
+.ranked-ballot-row-name,
+.ranked-ballot-chip,
+button {
     transition: background-color 0.45s ease, color 0.45s ease, border-color 0.45s ease;
 }
 
 /*
- * Dramatic dark theme that takes over the entire page while the voter is
- * editing the secret side of a ballot. The class is added to <body> by
- * VotingView's currentSide effect and removed on toggle-back or unmount,
- * so the page makes the side switch unmissable. Selectors mirror the
- * light-theme rules above; each override animates via the transitions
- * declared on its base rule so the swap looks like a coordinated fade
- * rather than a flash.
+ * Dark theme — voter is editing the secret side. Applied to <body> by
+ * VoteApp's currentSide effect, visible to every viewer regardless of role.
  */
 body.secret-mode {
-    background-color: #0d1224;
-    color: #dde6ff;
+    --color-page-bg: #0d1224;
+    --color-page-text: #dde6ff;
+    --color-card-bg: #161e3a;
+    --color-card-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+    --color-heading: #d6e3ff;
+    --color-paragraph: #b8c5e6;
+    --color-label: #7e8db8;
+    --color-notice-bg: #1c2649;
+    --color-notice-border: #3b4d8a;
+    --color-notice-text: #c0d0e8;
+    --color-arena-bg: #131a33;
+    --color-arena-border: #2c3e6c;
+    --color-chip-bg: #1c2649;
+    --color-chip-border: #2c3e6c;
+    --color-chip-text: #dde6ff;
+    --color-chip-hover-bg: #243161;
+    --color-chip-hover-border: #5b8fff;
+    --color-chip-hover-text: #ffffff;
+    --color-row-bg: #1c2649;
+    --color-row-border: #2c3e6c;
+    --color-row-text: #dde6ff;
+    --color-row-focus-border: #5b8fff;
+    --color-row-focus-shadow: rgba(91, 143, 255, 0.3);
+    --color-row-button-text: #c0d0e8;
+    --color-row-button-hover-bg: rgba(91, 143, 255, 0.15);
+    --color-tier-bg: #14193c;
+    --color-tier-border: #3b4d8a;
+    --color-tier-title: #c0d0e8;
+    --color-tier-title-hover: #5b8fff;
+    --color-tier-selected-bg: #1a2454;
+    --color-tier-selected-border: #5b8fff;
+    --color-tier-empty-text: #7e8db8;
+    --color-tier-empty-border: #3b4d8a;
+    --color-button-bg: #5b8fff;
+    --color-button-text: #0d1224;
+    --color-button-hover-bg: #7aa3ff;
+    --color-button-disabled-bg: #2c3e6c;
+    --color-button-disabled-text: #7e8db8;
+    --color-side-button-bg: #1c2649;
+    --color-side-button-border: #3b4d8a;
+    --color-side-button-text: #c0d0e8;
+    --color-side-button-active-bg: #5b8fff;
+    --color-side-button-active-border: #5b8fff;
+    --color-side-button-active-text: #0d1224;
+    --color-synced-bg: #1c2649;
+    --color-synced-border: #3b4d8a;
+    --color-synced-text: #c0d0e8;
+    --color-feedback-positive: #6fe39b;
 }
 
-body.secret-mode .container,
-body.secret-mode .admin-container {
-    background-color: #161e3a;
-    color: #dde6ff;
-    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
-}
-
-body.secret-mode h1,
-body.secret-mode h2,
-body.secret-mode h3 {
-    color: #d6e3ff;
-}
-
-body.secret-mode p {
-    color: #b8c5e6;
-}
-
-body.secret-mode .ballot-public-notice {
-    background-color: #1c2649;
-    border-color: #3b4d8a;
-    color: #c0d0e8;
-}
-
-body.secret-mode .ballot-side-button {
-    background-color: #1c2649;
-    border-color: #3b4d8a;
-    color: #c0d0e8;
-}
-
-body.secret-mode .ballot-side-button-active {
-    background-color: #5b8fff;
-    border-color: #5b8fff;
-    color: #0d1224;
-}
-
-body.secret-mode .ranked-ballot-arena {
-    background-color: #131a33;
-    border-color: #2c3e6c;
-}
-
-body.secret-mode .ranked-ballot-arena-label,
-body.secret-mode .ranked-ballot-list-label,
-body.secret-mode .ranked-ballot-toolbar-hint {
-    color: #7e8db8;
-}
-
-body.secret-mode .ranked-ballot-chip {
-    background-color: #1c2649;
-    border-color: #2c3e6c;
-    color: #dde6ff;
-}
-
-body.secret-mode .ranked-ballot-chip:hover {
-    background-color: #243161;
-    border-color: #5b8fff;
-    color: #ffffff;
-}
-
-body.secret-mode .ranked-ballot-row {
-    background-color: #1c2649;
-    border-color: #2c3e6c;
-    color: #dde6ff;
-}
-
-body.secret-mode .ranked-ballot-row:focus {
-    border-color: #5b8fff;
-    box-shadow: 0 0 0 2px rgba(91, 143, 255, 0.3);
-}
-
-body.secret-mode .ranked-ballot-tier {
-    background-color: #14193c;
-    border-color: #3b4d8a;
-}
-
-body.secret-mode .ranked-ballot-tier-selected {
-    border-color: #5b8fff;
-    background-color: #1a2454;
-}
-
-body.secret-mode .ranked-ballot-tier-title {
-    color: #c0d0e8;
-}
-
-body.secret-mode .ranked-ballot-tier:hover .ranked-ballot-tier-title {
-    color: #5b8fff;
-}
-
-body.secret-mode .ranked-ballot-tier-empty {
-    color: #7e8db8;
-    border-color: #3b4d8a;
-}
-
-body.secret-mode .ranked-ballot-row-name,
-body.secret-mode .ranked-ballot-rank-num {
-    color: #dde6ff;
-}
-
-body.secret-mode .ranked-ballot-empty-hint {
-    color: #b8c5e6;
-}
-
-body.secret-mode button {
-    background-color: #5b8fff;
-    color: #0d1224;
-}
-
-body.secret-mode button:hover {
-    background-color: #7aa3ff;
-}
-
-body.secret-mode button:disabled {
-    background-color: #2c3e6c;
-    color: #7e8db8;
-}
-
-body.secret-mode .ranked-ballot-copy-button-synced,
-body.secret-mode .ballot-side-copy-button-synced {
-    background-color: #1c2649;
-    border-color: #3b4d8a;
-    color: #c0d0e8;
-}
-
-body.secret-mode .ranked-ballot-row-button {
-    background-color: transparent;
-    color: #c0d0e8;
-}
-
-body.secret-mode .ranked-ballot-row-button:hover:not(:disabled) {
-    background-color: rgba(91, 143, 255, 0.15);
-    color: #ffffff;
-}
-
-body.secret-mode .ranked-ballot-copy-feedback {
-    color: #6fe39b;
+/*
+ * Red theme — owner is viewing the app while the event log is paused.
+ * Applied to <body> ONLY when both conditions hold (see VoteApp). Voters
+ * and observers see the normal maintenance banner; only the owner gets
+ * the full-page alarm color, because only the owner can resolve the pause.
+ * Sequenced after secret-mode so it wins on the rare overlap (owner
+ * looking at the secret side while paused — pause is more actionable).
+ */
+body.paused-owner-mode {
+    --color-page-bg: #1a0808;
+    --color-page-text: #fae0e0;
+    --color-card-bg: #2a0d0d;
+    --color-card-shadow: 0 2px 12px rgba(40, 0, 0, 0.55);
+    --color-heading: #f5d0d0;
+    --color-paragraph: #d4a8a8;
+    --color-label: #a87070;
+    --color-notice-bg: #3a1414;
+    --color-notice-border: #8a3030;
+    --color-notice-text: #e8b8b8;
+    --color-arena-bg: #1f0c0c;
+    --color-arena-border: #6b2020;
+    --color-chip-bg: #3a1414;
+    --color-chip-border: #6b2020;
+    --color-chip-text: #fae0e0;
+    --color-chip-hover-bg: #4a1818;
+    --color-chip-hover-border: #dc2626;
+    --color-chip-hover-text: #ffffff;
+    --color-row-bg: #3a1414;
+    --color-row-border: #6b2020;
+    --color-row-text: #fae0e0;
+    --color-row-focus-border: #dc2626;
+    --color-row-focus-shadow: rgba(220, 38, 38, 0.35);
+    --color-row-button-text: #e8b8b8;
+    --color-row-button-hover-bg: rgba(220, 38, 38, 0.15);
+    --color-tier-bg: #2a0d0d;
+    --color-tier-border: #8a3030;
+    --color-tier-title: #e8b8b8;
+    --color-tier-title-hover: #dc2626;
+    --color-tier-selected-bg: #4a1818;
+    --color-tier-selected-border: #dc2626;
+    --color-tier-empty-text: #a87070;
+    --color-tier-empty-border: #8a3030;
+    --color-button-bg: #dc2626;
+    --color-button-text: #ffffff;
+    --color-button-hover-bg: #ef4444;
+    --color-button-disabled-bg: #6b2020;
+    --color-button-disabled-text: #a87070;
+    --color-side-button-bg: #3a1414;
+    --color-side-button-border: #8a3030;
+    --color-side-button-text: #e8b8b8;
+    --color-side-button-active-bg: #dc2626;
+    --color-side-button-active-border: #dc2626;
+    --color-side-button-active-text: #ffffff;
+    --color-synced-bg: #3a1414;
+    --color-synced-border: #8a3030;
+    --color-synced-text: #e8b8b8;
+    --color-feedback-positive: #6fe39b;
 }
 
 .container {
     max-width: 800px;
     margin: 2rem auto;
     padding: 2rem;
-    background: white;
+    background: var(--color-card-bg);
+    color: var(--color-page-text);
     border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--color-card-shadow);
 }
 
 /*
@@ -224,9 +272,10 @@ body.secret-mode .ranked-ballot-copy-feedback {
 .admin-container {
     margin: 1rem;
     padding: 1rem;
-    background: white;
+    background: var(--color-card-bg);
+    color: var(--color-page-text);
     border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--color-card-shadow);
     height: calc(100dvh - 2rem);
     display: flex;
     flex-direction: column;
@@ -248,26 +297,27 @@ body.secret-mode .ranked-ballot-copy-feedback {
 }
 
 h1 {
-    color: #2c3e50;
+    color: var(--color-heading);
     margin-bottom: 1.5rem;
     font-size: 2rem;
 }
 
 h2 {
-    color: #34495e;
+    color: var(--color-heading);
     margin-top: 1.5rem;
     margin-bottom: 1rem;
     font-size: 1.5rem;
 }
 
 h3 {
-    color: #34495e;
+    color: var(--color-heading);
     margin-top: 1rem;
     margin-bottom: 0.5rem;
     font-size: 1.25rem;
 }
 
 p {
+    color: var(--color-paragraph);
     margin-bottom: 1rem;
 }
 
@@ -320,8 +370,8 @@ input[type="number"]:focus {
 
 button {
     padding: 0.75rem 1.5rem;
-    background-color: #3498db;
-    color: white;
+    background-color: var(--color-button-bg);
+    color: var(--color-button-text);
     border: none;
     border-radius: 4px;
     font-size: 1rem;
@@ -331,11 +381,12 @@ button {
 }
 
 button:hover {
-    background-color: #2980b9;
+    background-color: var(--color-button-hover-bg);
 }
 
 button:disabled {
-    background-color: #95a5a6;
+    background-color: var(--color-button-disabled-bg);
+    color: var(--color-button-disabled-text);
     cursor: not-allowed;
 }
 
@@ -375,10 +426,10 @@ button:disabled {
 
 .ballot-public-notice {
     padding: 0.75rem 1rem;
-    background-color: #ecf2fb;
-    border: 1px solid #b8d0f0;
+    background-color: var(--color-notice-bg);
+    border: 1px solid var(--color-notice-border);
     border-radius: 4px;
-    color: #2c3e50;
+    color: var(--color-notice-text);
     margin-bottom: 1rem;
 }
 
@@ -393,18 +444,18 @@ button:disabled {
 .ballot-side-button {
     flex: 0 0 auto;
     padding: 0.4rem 1rem;
-    background-color: #f4f7fb;
-    border: 1px solid #b8d0f0;
+    background-color: var(--color-side-button-bg);
+    border: 1px solid var(--color-side-button-border);
     border-radius: 4px;
-    color: #2c3e50;
+    color: var(--color-side-button-text);
     cursor: pointer;
     margin-top: 0;
 }
 
 .ballot-side-button-active {
-    background-color: #2c5282;
-    border-color: #2c5282;
-    color: #ffffff;
+    background-color: var(--color-side-button-active-bg);
+    border-color: var(--color-side-button-active-border);
+    color: var(--color-side-button-active-text);
 }
 
 /*
@@ -422,9 +473,9 @@ button:disabled {
 }
 
 .ballot-side-copy-button-synced {
-    background-color: #ecf2fb;
-    border: 1px solid #b8d0f0;
-    color: #2c5282;
+    background-color: var(--color-synced-bg);
+    border: 1px solid var(--color-synced-border);
+    color: var(--color-synced-text);
     cursor: default;
 }
 
@@ -798,8 +849,8 @@ button:disabled {
 }
 
 .ranked-ballot-arena {
-    background: #f9f9f9;
-    border: 1px solid #ddd;
+    background: var(--color-arena-bg);
+    border: 1px solid var(--color-arena-border);
     border-radius: 6px;
     padding: 1rem;
 }
@@ -810,7 +861,7 @@ button:disabled {
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.1em;
-    color: #888;
+    color: var(--color-label);
     display: block;
     margin-bottom: 0.5rem;
 }
@@ -823,10 +874,10 @@ button:disabled {
 
 .ranked-ballot-chip {
     padding: 0.75rem 0.5rem;
-    background: white;
-    border: 1px solid #ddd;
+    background: var(--color-chip-bg);
+    border: 1px solid var(--color-chip-border);
     border-radius: 4px;
-    color: #333;
+    color: var(--color-chip-text);
     font-size: 0.9rem;
     font-weight: 500;
     cursor: pointer;
@@ -837,9 +888,9 @@ button:disabled {
 }
 
 .ranked-ballot-chip:hover {
-    background: #ecf2fb;
-    border-color: #3498db;
-    color: #3498db;
+    background: var(--color-chip-hover-bg);
+    border-color: var(--color-chip-hover-border);
+    color: var(--color-chip-hover-text);
     transform: translateY(-1px);
 }
 
@@ -860,8 +911,9 @@ button:disabled {
     align-items: center;
     height: 56px;
     margin-bottom: 0.4rem;
-    background: white;
-    border: 1px solid #ddd;
+    background: var(--color-row-bg);
+    color: var(--color-row-text);
+    border: 1px solid var(--color-row-border);
     border-radius: 6px;
     user-select: none;
     cursor: grab;
@@ -869,13 +921,13 @@ button:disabled {
 
 .ranked-ballot-row:focus {
     outline: none;
-    border-color: #3498db;
-    box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+    border-color: var(--color-row-focus-border);
+    box-shadow: 0 0 0 2px var(--color-row-focus-shadow);
 }
 
 .ranked-ballot-row.dragging {
     opacity: 0.5;
-    border-color: #3498db;
+    border-color: var(--color-row-focus-border);
     cursor: grabbing;
 }
 
@@ -889,39 +941,39 @@ button:disabled {
  * arena is empty, since selection is meaningless then.
  */
 .ranked-ballot-tier {
-    border: 1px solid #aab8ca;
+    border: 1px solid var(--color-tier-border);
     border-radius: 6px;
     padding: 0.4rem 0.75rem 0.6rem;
     margin: 0.6rem 0;
-    background: #e8eef5;
+    background: var(--color-tier-bg);
     cursor: pointer;
 }
 
 .ranked-ballot-tier-selected {
-    border: 3px solid #2c7be5;
+    border: 3px solid var(--color-tier-selected-border);
     padding: calc(0.4rem - 2px) calc(0.75rem - 2px) calc(0.6rem - 2px);
-    background: #f0f6ff;
+    background: var(--color-tier-selected-bg);
 }
 
 .ranked-ballot-tier-title {
     display: block;
     padding: 0.2rem 0;
     font-weight: 600;
-    color: #34495e;
+    color: var(--color-tier-title);
     user-select: none;
 }
 
 .ranked-ballot-tier:hover .ranked-ballot-tier-title {
-    color: #2c7be5;
+    color: var(--color-tier-title-hover);
 }
 
 .ranked-ballot-tier-empty {
     padding: 0.6rem;
     text-align: center;
-    color: #888;
+    color: var(--color-tier-empty-text);
     font-size: 0.9rem;
     font-style: italic;
-    border: 1px dashed #ccc;
+    border: 1px dashed var(--color-tier-empty-border);
     border-radius: 4px;
 }
 
@@ -936,7 +988,8 @@ button:disabled {
 }
 
 .tally-results .ranked-ballot-tier:hover .ranked-ballot-tier-title {
-    color: #34495e;
+    /* Suppress the voting view's hover-accent on read-only Results rows. */
+    color: var(--color-tier-title);
 }
 
 /*
@@ -981,7 +1034,7 @@ button:disabled {
     width: 3rem;
     text-align: center;
     font-weight: 600;
-    color: #888;
+    color: var(--color-label);
     flex-shrink: 0;
     font-variant-numeric: tabular-nums;
 }
@@ -991,6 +1044,7 @@ button:disabled {
     font-size: 0.95rem;
     font-weight: 500;
     padding: 0 0.5rem;
+    color: var(--color-row-text);
 }
 
 .ranked-ballot-row-buttons {
@@ -1011,16 +1065,16 @@ button:disabled {
     border: 1px solid transparent;
     border-radius: 4px;
     background: transparent;
-    color: #888;
+    color: var(--color-row-button-text);
     font-size: 0.85rem;
     margin-top: 0;
     padding: 0;
 }
 
 .ranked-ballot-row-button:hover:not(:disabled) {
-    background: #f0f0f0;
-    color: #333;
-    border-color: #ddd;
+    background: var(--color-row-button-hover-bg);
+    color: var(--color-row-text);
+    border-color: var(--color-row-border);
 }
 
 .ranked-ballot-row-button:disabled {
@@ -1035,7 +1089,7 @@ button:disabled {
 }
 
 .ranked-ballot-empty-hint {
-    color: #888;
+    color: var(--color-paragraph);
     font-size: 0.9rem;
     padding: 1rem 0;
     margin-bottom: 0;
@@ -1051,13 +1105,13 @@ button:disabled {
 
 .ranked-ballot-toolbar-hint {
     font-size: 0.75rem;
-    color: #888;
+    color: var(--color-label);
     margin-left: auto;
 }
 
 .ranked-ballot-copy-feedback {
     font-size: 0.85rem;
-    color: #2c5282;
+    color: var(--color-feedback-positive);
 }
 
 table {

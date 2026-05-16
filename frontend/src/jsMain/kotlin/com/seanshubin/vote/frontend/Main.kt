@@ -81,6 +81,18 @@ fun VoteApp(apiClient: ApiClient) {
         onDispose { body?.classList?.remove(cls) }
     }
 
+    // Owner-only alarm theme while the event log is paused. Non-owners see
+    // the standard MaintenanceBanner; only the owner gets the full-page red
+    // wash because only the owner can resolve the pause — it doubles as a
+    // visual reminder not to leave it on indefinitely.
+    DisposableEffect(isPaused, role) {
+        val cls = "paused-owner-mode"
+        val body = kotlinx.browser.document.body
+        if (isPaused && role == Role.OWNER) body?.classList?.add(cls)
+        else body?.classList?.remove(cls)
+        onDispose { body?.classList?.remove(cls) }
+    }
+
     // Bootstrap session from the refresh cookie. On success the user stays on
     // whatever URL they landed on (so deep links like /elections/Foo work
     // straight from a bookmark). On failure, protected pages redirect to /login
