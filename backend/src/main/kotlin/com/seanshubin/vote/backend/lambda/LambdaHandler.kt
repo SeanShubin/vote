@@ -40,40 +40,56 @@ import java.net.http.HttpClient
 class LambdaHandler : RequestHandler<APIGatewayV2HTTPEvent, APIGatewayV2HTTPResponse> {
 
     override fun handleRequest(event: APIGatewayV2HTTPEvent, context: Context): APIGatewayV2HTTPResponse {
-        // APIGW HTTP API v2 puts cookies in `event.cookies` rather than
-        // a Cookie header. Reassemble into the standard header so RequestRouter's
-        // cookie reader works the same as in the Jetty path.
-        val headers = (event.headers ?: emptyMap()).toMutableMap()
-        event.cookies?.takeIf { it.isNotEmpty() }?.let { cookies ->
-            headers["Cookie"] = cookies.joinToString("; ")
+        // Outer guard: RequestRouter.route already catches per-request exceptions
+        // and routes them through unhandledHttpException → 500. This try/catch
+        // is the backstop for anything *outside* that — APIGW event parsing,
+        // cookie reassembly, the response builder, OOM, etc. Notify first
+        // (so the email path gets the full context), then re-throw so Lambda's
+        // built-in Errors metric still ticks and the backstop alarm fires.
+        try {
+            // APIGW HTTP API v2 puts cookies in `event.cookies` rather than
+            // a Cookie header. Reassemble into the standard header so RequestRouter's
+            // cookie reader works the same as in the Jetty path.
+            val headers = (event.headers ?: emptyMap()).toMutableMap()
+            event.cookies?.takeIf { it.isNotEmpty() }?.let { cookies ->
+                headers["Cookie"] = cookies.joinToString("; ")
+            }
+
+            // Path arrives as /api/health (CloudFront → APIGW → Lambda) — RequestRouter
+            // strips the /api prefix uniformly for both Lambda and Jetty entry points.
+            // rawPath excludes the query string; APIGW v2 delivers it separately as
+            // rawQueryString — needed for the Discord OAuth callback's code/state.
+            val request = HttpRequest(
+                method = event.requestContext?.http?.method ?: "GET",
+                target = event.rawPath ?: "/",
+                rawHeaders = headers,
+                body = event.body ?: "",
+                queryString = event.rawQueryString ?: "",
+            )
+            val response = router.route(request)
+
+            val builder = APIGatewayV2HTTPResponse.builder()
+                .withStatusCode(response.status)
+                // Merge contentType in with any extra headers set on the response
+                // (e.g., Location for the Discord OAuth callback's 302 redirect).
+                // Extra headers go last so a route that genuinely needs to override
+                // Content-Type can do so by including it in `headers`.
+                .withHeaders(mapOf("Content-Type" to response.contentType) + response.headers)
+                .withBody(response.body)
+
+            if (response.setCookies.isNotEmpty()) {
+                builder.withCookies(response.setCookies.map(SetCookie::render))
+            }
+            return builder.build()
+        } catch (e: Throwable) {
+            safeNotify {
+                notifications.topLevelException(
+                    message = "LambdaHandler.handleRequest: ${e.message ?: e::class.qualifiedName ?: "unknown"}",
+                    stackTrace = e.stackTraceToString(),
+                )
+            }
+            throw e
         }
-
-        // Path arrives as /api/health (CloudFront → APIGW → Lambda) — RequestRouter
-        // strips the /api prefix uniformly for both Lambda and Jetty entry points.
-        // rawPath excludes the query string; APIGW v2 delivers it separately as
-        // rawQueryString — needed for the Discord OAuth callback's code/state.
-        val request = HttpRequest(
-            method = event.requestContext?.http?.method ?: "GET",
-            target = event.rawPath ?: "/",
-            rawHeaders = headers,
-            body = event.body ?: "",
-            queryString = event.rawQueryString ?: "",
-        )
-        val response = router.route(request)
-
-        val builder = APIGatewayV2HTTPResponse.builder()
-            .withStatusCode(response.status)
-            // Merge contentType in with any extra headers set on the response
-            // (e.g., Location for the Discord OAuth callback's 302 redirect).
-            // Extra headers go last so a route that genuinely needs to override
-            // Content-Type can do so by including it in `headers`.
-            .withHeaders(mapOf("Content-Type" to response.contentType) + response.headers)
-            .withBody(response.body)
-
-        if (response.setCookies.isNotEmpty()) {
-            builder.withCookies(response.setCookies.map(SetCookie::render))
-        }
-        return builder.build()
     }
 
     companion object {
@@ -82,10 +98,41 @@ class LambdaHandler : RequestHandler<APIGatewayV2HTTPEvent, APIGatewayV2HTTPResp
         // same connection-pooled instance rather than building a fresh client
         // per invocation.
         private val sharedHttpClient: HttpClient = HttpClient.newHttpClient()
-        private val router: RequestRouter = buildRouter()
 
-        private fun buildRouter(): RequestRouter {
-            val integrations = ProductionIntegrations(emptyArray())
+        // ProductionIntegrations is cheap and side-effect-free, so build it
+        // first and unconditionally. That way notifications is always available
+        // to the buildRouter() catch block below, even if everything downstream
+        // explodes during cold-init — which is the most painful failure mode
+        // (class-init failure → opaque NoClassDefFoundError on every later
+        // invocation, with no breadcrumb of what actually broke).
+        private val integrations = ProductionIntegrations(emptyArray())
+        internal val notifications get() = integrations.notifications
+
+        private val router: RequestRouter = try {
+            buildRouter(integrations)
+        } catch (e: Throwable) {
+            safeNotify {
+                notifications.topLevelException(
+                    message = "LambdaHandler.buildRouter (cold-init): ${e.message ?: e::class.qualifiedName ?: "unknown"}",
+                    stackTrace = e.stackTraceToString(),
+                )
+            }
+            throw e
+        }
+
+        internal inline fun safeNotify(block: () -> Unit) {
+            try {
+                block()
+            } catch (suppressed: Throwable) {
+                // The alert path itself failed (SES down, IAM regression, etc.).
+                // Print so the original failure's stack still reaches CloudWatch
+                // unfiltered — never let a broken alerter shadow the real error.
+                System.err.println("Notification path failed: ${suppressed.message}")
+                suppressed.printStackTrace(System.err)
+            }
+        }
+
+        private fun buildRouter(integrations: ProductionIntegrations): RequestRouter {
             val configuration = Bootstrap(integrations).parseLambdaConfiguration()
             val region = (configuration.databaseConfig as DatabaseConfig.DynamoDB).region
 

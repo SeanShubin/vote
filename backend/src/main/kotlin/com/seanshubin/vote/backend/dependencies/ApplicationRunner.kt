@@ -109,7 +109,7 @@ class ApplicationRunner(
             frontendBaseUrl = configuration.frontendBaseUrl,
             notifications = integrations.notifications,
         )
-        val httpHandler = SimpleHttpHandler(router)
+        val httpHandler = SimpleHttpHandler(router, integrations.notifications)
         server = Server(configuration.port)
         server!!.handler = httpHandler
 

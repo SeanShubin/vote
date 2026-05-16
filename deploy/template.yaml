@@ -12,7 +12,15 @@ Parameters:
   AlertEmail:
     Type: String
     Default: seanshubin@gmail.com
-    Description: Email to receive ops alerts (Lambda errors, CLIENT ERROR log lines).
+    Description: Email to receive ops alerts (Lambda errors, CLIENT ERROR log lines, SES-sent backend alerts).
+  EmailFromAddress:
+    Type: String
+    Default: alerts@pairwisevote.com
+    Description: >-
+      From address used by the backend's SES alert emails. The local-part
+      can be anything; the domain must match DomainName (or another verified
+      SES identity in this region). The EmailIdentity + DKIM CNAMEs below
+      verify the DomainName so any address @${DomainName} works.
 
 Resources:
   FrontendBucket:
@@ -314,6 +322,12 @@ Resources:
           DISCORD_CLIENT_SECRET_PARAMETER_NAME: !Sub "/${AWS::StackName}/discord/client-secret"
           DISCORD_REDIRECT_URI_PARAMETER_NAME: !Sub "/${AWS::StackName}/discord/redirect-uri"
           DISCORD_GUILD_ID_PARAMETER_NAME: !Sub "/${AWS::StackName}/discord/guild-id"
+          # Backend reads these and, if both are non-blank, decorates
+          # ConsoleNotifications with SesNotifications — error events get
+          # emailed with full message + stack trace. Unset on a deploy →
+          # alerts fall back to stderr-only (CloudWatch alarm path still works).
+          EMAIL_FROM_ADDRESS: !Ref EmailFromAddress
+          EMAIL_TO_ADDRESS: !Ref AlertEmail
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref MainTable
@@ -342,6 +356,17 @@ Resources:
               Condition:
                 StringEquals:
                   "kms:ViaService": !Sub "ssm.${AWS::Region}.amazonaws.com"
+            # SES alert emails. ses:SendEmail has no resource-level granularity
+            # for the legacy email-sending API, so the resource is "*"; the
+            # FromAddress condition pins us to identities under our domain,
+            # so a compromised Lambda still can't impersonate arbitrary senders.
+            - Effect: Allow
+              Action:
+                - ses:SendEmail
+              Resource: "*"
+              Condition:
+                StringEquals:
+                  "ses:FromAddress": !Ref EmailFromAddress
       Events:
         Proxy:
           Type: HttpApi
@@ -355,6 +380,55 @@ Resources:
             ApiId: !Ref BackendApi
             Method: ANY
             Path: /
+
+  # ============================================================
+  # SES: domain identity + DKIM CNAMEs so the backend can send alert
+  # emails From: anything@${DomainName}. Pure verification — once these
+  # CNAMEs publish, SES marks the domain "verified" and DKIM-signs
+  # outbound mail automatically. No code in the backend changes when
+  # the From address moves to a different local-part.
+  # ============================================================
+  EmailDomainIdentity:
+    Type: AWS::SES::EmailIdentity
+    Properties:
+      EmailIdentity: !Ref DomainName
+      DkimAttributes:
+        SigningEnabled: true
+
+  # AWS-managed CNAMEs that prove we own the domain *to SES*. The three
+  # token attributes are SES-generated values returned by the identity
+  # resource above; CFN reconciles the records on stack updates if SES
+  # ever rotates them. Without these the EmailIdentity stays unverified
+  # forever and SES rejects send attempts with MessageRejected.
+  EmailDkimRecord1:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      Name: !GetAtt EmailDomainIdentity.DkimDNSTokenName1
+      Type: CNAME
+      TTL: "1800"
+      ResourceRecords:
+        - !GetAtt EmailDomainIdentity.DkimDNSTokenValue1
+
+  EmailDkimRecord2:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      Name: !GetAtt EmailDomainIdentity.DkimDNSTokenName2
+      Type: CNAME
+      TTL: "1800"
+      ResourceRecords:
+        - !GetAtt EmailDomainIdentity.DkimDNSTokenValue2
+
+  EmailDkimRecord3:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      Name: !GetAtt EmailDomainIdentity.DkimDNSTokenName3
+      Type: CNAME
+      TTL: "1800"
+      ResourceRecords:
+        - !GetAtt EmailDomainIdentity.DkimDNSTokenValue3
 
   # ============================================================
   # Alerts: SNS topic, email subscription, two alarms

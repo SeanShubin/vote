@@ -1,6 +1,7 @@
 package com.seanshubin.vote.backend.router
 
 import com.seanshubin.vote.backend.http.HttpRequest
+import com.seanshubin.vote.contract.Notifications
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
 import org.eclipse.jetty.server.Request
@@ -14,6 +15,7 @@ import org.eclipse.jetty.server.handler.AbstractHandler
  */
 class SimpleHttpHandler(
     private val router: RequestRouter,
+    private val notifications: Notifications,
 ) : AbstractHandler() {
 
     override fun handle(
@@ -24,38 +26,61 @@ class SimpleHttpHandler(
     ) {
         baseRequest.isHandled = true
 
-        // CORS for local dev (frontend on :3000 calling backend on :8080).
-        // Production has the SPA + API on the same origin via CloudFront, so
-        // these headers are belt-and-suspenders for dev only.
-        response.setHeader("Access-Control-Allow-Origin", "http://localhost:3000")
-        response.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-        response.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization")
-        response.setHeader("Access-Control-Allow-Credentials", "true")
-        response.setHeader("Access-Control-Max-Age", "3600")
+        // Outer guard: RequestRouter.route handles per-request exceptions, but
+        // header/body extraction and the response-writing block below sit
+        // outside that catch. Notify and return a 500 so the client gets a
+        // clean response rather than Jetty's default error page.
+        try {
+            // CORS for local dev (frontend on :3000 calling backend on :8080).
+            // Production has the SPA + API on the same origin via CloudFront, so
+            // these headers are belt-and-suspenders for dev only.
+            response.setHeader("Access-Control-Allow-Origin", "http://localhost:3000")
+            response.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+            response.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization")
+            response.setHeader("Access-Control-Allow-Credentials", "true")
+            response.setHeader("Access-Control-Max-Age", "3600")
 
-        val headers = request.headerNames.toList().associateWith { request.getHeader(it) }
-        val body = request.reader.use { it.readText() }
+            val headers = request.headerNames.toList().associateWith { request.getHeader(it) }
+            val body = request.reader.use { it.readText() }
 
-        val httpResponse = router.route(
-            HttpRequest(
-                method = request.method,
-                target = target,
-                rawHeaders = headers,
-                body = body,
-                queryString = request.queryString ?: "",
+            val httpResponse = router.route(
+                HttpRequest(
+                    method = request.method,
+                    target = target,
+                    rawHeaders = headers,
+                    body = body,
+                    queryString = request.queryString ?: "",
+                )
             )
-        )
 
-        response.contentType = httpResponse.contentType
-        response.characterEncoding = "UTF-8"
-        response.status = httpResponse.status
-        // Set-Cookie can repeat; addHeader (not setHeader) preserves multiple values.
-        for (cookie in httpResponse.setCookies) {
-            response.addHeader("Set-Cookie", cookie.render())
+            response.contentType = httpResponse.contentType
+            response.characterEncoding = "UTF-8"
+            response.status = httpResponse.status
+            // Set-Cookie can repeat; addHeader (not setHeader) preserves multiple values.
+            for (cookie in httpResponse.setCookies) {
+                response.addHeader("Set-Cookie", cookie.render())
+            }
+            for ((name, value) in httpResponse.headers) {
+                response.setHeader(name, value)
+            }
+            response.writer.write(httpResponse.body)
+        } catch (e: Throwable) {
+            try {
+                notifications.topLevelException(
+                    message = "SimpleHttpHandler ${request.method} $target: ${e.message ?: e::class.qualifiedName ?: "unknown"}",
+                    stackTrace = e.stackTraceToString(),
+                )
+            } catch (suppressed: Throwable) {
+                System.err.println("Notification path failed: ${suppressed.message}")
+                suppressed.printStackTrace(System.err)
+            }
+            try {
+                response.status = 500
+                response.contentType = "text/plain; charset=UTF-8"
+                response.writer.write("Internal server error")
+            } catch (_: Throwable) {
+                // The response may already be committed; nothing else we can do.
+            }
         }
-        for ((name, value) in httpResponse.headers) {
-            response.setHeader(name, value)
-        }
-        response.writer.write(httpResponse.body)
     }
 }

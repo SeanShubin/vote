@@ -90,8 +90,21 @@ fields @timestamp, message, @duration
 
 ### Alerts
 
-Two CloudWatch alarms fire to an SNS topic that emails
-`seanshubin@gmail.com`:
+There are now **two independent alert paths**, by design:
+
+**Path A — direct SES emails from the backend (primary).** The four
+top-level exception handlers (`LambdaHandler.handleRequest`,
+`LambdaHandler.buildRouter` cold-init, `backend/app/Main.kt`,
+`SimpleHttpHandler.handle`) plus the per-request `RequestRouter`
+catch and the frontend `/log-client-error` endpoint all route through
+`Notifications`. `SesNotifications` decorates `ConsoleNotifications`
+in prod (gated on `EMAIL_FROM_ADDRESS` + `EMAIL_TO_ADDRESS` being set —
+both come from CFN) and emails the recipient with the full message +
+stack trace + request context. **This is what makes the email itself
+the artifact** — no Logs Insights round-trip.
+
+**Path B — SNS-via-CloudWatch (backstop).** Two CloudWatch alarms
+fire to an SNS topic that emails `seanshubin@gmail.com`:
 
 - **`pairwisevote-frontend-client-errors`** — any line containing
   `CLIENT ERROR:` in the last 5 minutes.
@@ -99,9 +112,30 @@ Two CloudWatch alarms fire to an SNS topic that emails
   `Errors` metric (uncaught exceptions / non-2xx Lambda invocations)
   in the last 5 minutes.
 
-**First-deploy gotcha**: SNS sends a confirmation email when the
-subscription is first created. Click the link in that email or
-notifications stay in `PendingConfirmation` and never arrive.
+These fire even when SES is broken (which is the whole point — they're
+the "did Path A fail to deliver?" canary). Expect each real incident
+to produce one rich SES email *plus* one terse SNS email; ignore the
+SNS one if you already got the SES one.
+
+**First-deploy gotchas**:
+
+1. **SES domain verification** — the `AWS::SES::EmailIdentity` and
+   three DKIM CNAMEs in `template.yaml` provision automatically, but
+   verification takes minutes to ~hours for DNS to propagate and SES
+   to revalidate. Until then, Path A silently logs `SesNotifications:
+   failed to send alert email (...)` to stderr and Path B carries the
+   only signal. Check status:
+   ```
+   aws ses get-identity-verification-attributes \
+       --identities pairwisevote.com --region us-east-1
+   ```
+2. **SNS subscription confirmation** — SNS sends a confirmation email
+   when the subscription is first created. Click the link in that email
+   or notifications stay in `PendingConfirmation` and never arrive.
+3. **SES sandbox** — if the account is still in the SES sandbox, the
+   To address must also be a verified SES identity. Production
+   account is out of sandbox; new sandboxed accounts need a one-time
+   "production access" request through the SES console.
 
 ### On-demand log purge
 

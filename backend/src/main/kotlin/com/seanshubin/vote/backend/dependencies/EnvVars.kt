@@ -38,4 +38,18 @@ object EnvVars {
 
     /** SSM parameter path for the gated Discord guild id. */
     const val DISCORD_GUILD_ID_PARAMETER_NAME = "DISCORD_GUILD_ID_PARAMETER_NAME"
+
+    /**
+     * From address for ops alert emails sent via SES. Must be on a domain
+     * (or an email) verified as an SES identity in the deploy region. Unset
+     * disables alert emails entirely (the notifications still log to stderr).
+     */
+    const val EMAIL_FROM_ADDRESS = "EMAIL_FROM_ADDRESS"
+
+    /**
+     * Recipient for ops alert emails. Out of the SES sandbox, this can be any
+     * address; in the sandbox it must also be a verified identity. Unset
+     * disables alert emails entirely.
+     */
+    const val EMAIL_TO_ADDRESS = "EMAIL_TO_ADDRESS"
 }
