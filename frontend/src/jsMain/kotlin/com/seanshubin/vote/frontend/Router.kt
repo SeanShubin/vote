@@ -25,6 +25,7 @@ sealed class Page {
     data class ElectionPreferences(val electionName: String) : Page()
     data class ElectionDecision(val electionName: String) : Page()
     data class ElectionProcess(val electionName: String) : Page()
+    object PasteTally : Page()
 }
 
 /**
@@ -47,6 +48,7 @@ fun pageToPath(page: Page): String = when (page) {
     is Page.DebugTables -> "/admin/debug-tables"
     is Page.UserManagement -> "/admin/users"
     is Page.Admin -> "/admin"
+    is Page.PasteTally -> "/paste-tally"
 }
 
 /**
@@ -90,6 +92,7 @@ fun pathToPage(pathWithQuery: String): Page {
         normalized == "/admin/debug-tables" -> Page.DebugTables
         normalized == "/admin/users" -> Page.UserManagement
         normalized == "/admin" -> Page.Admin
+        normalized == "/paste-tally" -> Page.PasteTally
         else -> Page.Home
     }
 }
@@ -164,7 +167,7 @@ fun rememberRouter(): Router {
 }
 
 /** Pages that don't require authentication. Anything else bounces to /login on auth fail. */
-fun isPublicPage(page: Page): Boolean = page is Page.Login
+fun isPublicPage(page: Page): Boolean = page is Page.Login || page is Page.PasteTally
 
 private fun encodeUriComponent(s: String): String =
     js("encodeURIComponent")(s) as String

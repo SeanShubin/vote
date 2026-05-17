@@ -17,6 +17,7 @@ fun HomePage(
     onNavigateToDebugTables: () -> Unit,
     onNavigateToUserManagement: () -> Unit,
     onNavigateToAdmin: () -> Unit,
+    onNavigateToPasteTally: () -> Unit,
     onLogout: () -> Unit,
     onAccountDeleted: () -> Unit,
 ) {
@@ -134,6 +135,12 @@ fun HomePage(
                 onClick { window.location.href = "/methodology.html" }
             }) {
                 Text("About This Voting Method")
+            }
+
+            Button({
+                onClick { onNavigateToPasteTally() }
+            }) {
+                Text("Tally from pasted ballots")
             }
 
             Button({

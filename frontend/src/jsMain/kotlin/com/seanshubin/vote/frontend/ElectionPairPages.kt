@@ -62,7 +62,9 @@ fun ElectionPreferencesPage(
             }
         }
 
-        Button({ onClick { onBack() } }) { Text("Back to Election") }
+        Div({ classes("button-row") }) {
+            Button({ onClick { onBack() } }) { Text("Back to Election") }
+        }
     }
 }
 
@@ -125,7 +127,9 @@ fun ElectionDecisionPage(
             }
         }
 
-        Button({ onClick { onBack() } }) { Text("Back to Election") }
+        Div({ classes("button-row") }) {
+            Button({ onClick { onBack() } }) { Text("Back to Election") }
+        }
     }
 }
 
@@ -183,7 +187,9 @@ fun ElectionProcessPage(
             }
         }
 
-        Button({ onClick { onBack() } }) { Text("Back to Election") }
+        Div({ classes("button-row") }) {
+            Button({ onClick { onBack() } }) { Text("Back to Election") }
+        }
     }
 }
 
@@ -629,7 +635,7 @@ private fun renderCycleEdgeRow(
  * closed a path. The row's status pill makes this visible.
  */
 @Composable
-private fun renderProcessDetail(electionTally: ElectionTally) {
+internal fun renderProcessDetail(electionTally: ElectionTally) {
     val contests = electionTally.tally.contests
     if (contests.isEmpty()) {
         P { Text("No contests — every candidate pair is tied or there are not enough candidates.") }

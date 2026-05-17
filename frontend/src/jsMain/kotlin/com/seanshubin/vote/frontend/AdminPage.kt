@@ -76,25 +76,27 @@ fun AdminPage(
                     else "Active — voting and editing work normally."
                 )
             }
-            Button({
-                if (pauseToggleAction.isLoading) attr("disabled", "")
-                onClick {
-                    val message = if (isEventLogPaused) {
-                        "Resume the event log? Voting and editing will start working again."
-                    } else {
-                        "Pause the event log? Voting and editing will be temporarily disabled for everyone."
+            Div({ classes("button-row") }) {
+                Button({
+                    if (pauseToggleAction.isLoading) attr("disabled", "")
+                    onClick {
+                        val message = if (isEventLogPaused) {
+                            "Resume the event log? Voting and editing will start working again."
+                        } else {
+                            "Pause the event log? Voting and editing will be temporarily disabled for everyone."
+                        }
+                        if (window.confirm(message)) pauseToggleAction.invoke()
                     }
-                    if (window.confirm(message)) pauseToggleAction.invoke()
+                }) {
+                    Text(
+                        when {
+                            pauseToggleAction.isLoading && isEventLogPaused -> "Resuming…"
+                            pauseToggleAction.isLoading -> "Pausing…"
+                            isEventLogPaused -> "Resume Event Log"
+                            else -> "Pause Event Log"
+                        }
+                    )
                 }
-            }) {
-                Text(
-                    when {
-                        pauseToggleAction.isLoading && isEventLogPaused -> "Resuming…"
-                        pauseToggleAction.isLoading -> "Pausing…"
-                        isEventLogPaused -> "Resume Event Log"
-                        else -> "Pause Event Log"
-                    }
-                )
             }
         }
 
@@ -122,7 +124,9 @@ fun AdminPage(
             }
         }
 
-        Button({ onClick { onBack() } }) { Text("Back to Home") }
+        Div({ classes("button-row") }) {
+            Button({ onClick { onBack() } }) { Text("Back to Home") }
+        }
     }
 }
 

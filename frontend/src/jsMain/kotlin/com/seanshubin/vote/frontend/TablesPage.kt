@@ -87,7 +87,9 @@ fun TablesPage(
             }
         }
 
-        Button({ onClick { onBack() } }) { Text("Back to Home") }
+        Div({ classes("button-row") }) {
+            Button({ onClick { onBack() } }) { Text("Back to Home") }
+        }
     }
 }
 

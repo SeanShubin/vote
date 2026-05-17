@@ -189,7 +189,10 @@ fun VoteApp(apiClient: ApiClient) {
     }
 
     when (val page = router.currentPage) {
-        is Page.Login -> LoginPage(apiClient = apiClient)
+        is Page.Login -> LoginPage(
+            apiClient = apiClient,
+            onNavigateToPasteTally = { router.navigate(Page.PasteTally) },
+        )
         is Page.Home -> HomePage(
             apiClient = apiClient,
             userName = userName ?: "Unknown",
@@ -200,6 +203,7 @@ fun VoteApp(apiClient: ApiClient) {
             onNavigateToDebugTables = { router.navigate(Page.DebugTables) },
             onNavigateToUserManagement = { router.navigate(Page.UserManagement) },
             onNavigateToAdmin = { router.navigate(Page.Admin) },
+            onNavigateToPasteTally = { router.navigate(Page.PasteTally) },
             onLogout = {
                 scope.launch {
                     try {
@@ -314,6 +318,12 @@ fun VoteApp(apiClient: ApiClient) {
                 flagsState.value = flagsState.value + (flag to enabled)
             },
             onBack = { router.navigate(Page.Home) },
+        )
+        is Page.PasteTally -> PasteTallyPage(
+            onBack = {
+                val destination = if (userName != null) Page.Home else Page.Login
+                router.navigate(destination)
+            },
         )
     }
 }

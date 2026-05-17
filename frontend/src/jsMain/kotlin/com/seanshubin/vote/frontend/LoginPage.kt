@@ -23,6 +23,7 @@ import org.w3c.dom.HTMLSelectElement
 @Composable
 fun LoginPage(
     apiClient: ApiClient,
+    onNavigateToPasteTally: () -> Unit,
     coroutineScope: CoroutineScope = rememberCoroutineScope(),
 ) {
     // The Discord OAuth callback redirects here with ?error=… on failure
@@ -90,6 +91,13 @@ fun LoginPage(
                 onClick { window.location.href = "/methodology.html" }
             }) {
                 Text("About This Voting Method")
+            }
+
+            Button({
+                attr("type", "button")
+                onClick { onNavigateToPasteTally() }
+            }) {
+                Text("Tally from pasted ballots")
             }
         }
 
