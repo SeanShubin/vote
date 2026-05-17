@@ -91,10 +91,9 @@ class DynamoDbEventLog(
     override fun setPaused(paused: Boolean) {
         runBlocking {
             dynamoDb.putItem(PutItemRequest {
-                tableName = DynamoDbSingleTableSchema.MAIN_TABLE
+                tableName = DynamoDbOperatorStateSchema.TABLE
                 item = mapOf(
-                    "PK" to AttributeValue.S(DynamoDbSingleTableSchema.METADATA_PK),
-                    "SK" to AttributeValue.S(DynamoDbSingleTableSchema.EVENT_LOG_PAUSED_SK),
+                    "PK" to AttributeValue.S(DynamoDbOperatorStateSchema.EVENT_LOG_PAUSED_PK),
                     "paused" to AttributeValue.Bool(paused),
                 )
             })
@@ -104,10 +103,9 @@ class DynamoDbEventLog(
     override fun isPaused(): Boolean {
         return runBlocking {
             val response = dynamoDb.getItem(GetItemRequest {
-                tableName = DynamoDbSingleTableSchema.MAIN_TABLE
+                tableName = DynamoDbOperatorStateSchema.TABLE
                 key = mapOf(
-                    "PK" to AttributeValue.S(DynamoDbSingleTableSchema.METADATA_PK),
-                    "SK" to AttributeValue.S(DynamoDbSingleTableSchema.EVENT_LOG_PAUSED_SK),
+                    "PK" to AttributeValue.S(DynamoDbOperatorStateSchema.EVENT_LOG_PAUSED_PK),
                 )
                 // Strongly-consistent so a recent pause from the operator is
                 // visible immediately to every Lambda — the whole point of the
