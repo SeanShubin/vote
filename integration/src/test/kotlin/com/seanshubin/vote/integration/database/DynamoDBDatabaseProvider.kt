@@ -5,6 +5,7 @@ import aws.sdk.kotlin.services.dynamodb.DynamoDbClient
 import aws.sdk.kotlin.services.dynamodb.model.*
 import aws.smithy.kotlin.runtime.net.url.Url
 import com.seanshubin.vote.backend.repository.DynamoDbEventLog
+import com.seanshubin.vote.backend.repository.DynamoDbOperatorStateSchema
 import com.seanshubin.vote.backend.repository.DynamoDbSingleTableCommandModel
 import com.seanshubin.vote.backend.repository.DynamoDbSingleTableQueryModel
 import com.seanshubin.vote.backend.repository.DynamoDbSingleTableSchema
@@ -44,11 +45,19 @@ class DynamoDBDatabaseProvider : DatabaseProvider {
 
     init {
         runBlocking {
-            // Create tables using the schema utility
+            // Mirror DynamoDbStartup: both the projection table and the
+            // operator-state table need to exist before the backend runs,
+            // or DynamoDbEventLog.isPaused() throws ResourceNotFoundException
+            // on the very first request.
             try {
                 DynamoDbSingleTableSchema.createTables(dynamoDbClient)
             } catch (e: Exception) {
                 // Tables might already exist
+            }
+            try {
+                DynamoDbOperatorStateSchema.createTable(dynamoDbClient)
+            } catch (e: Exception) {
+                // Table might already exist
             }
         }
     }
