@@ -3,6 +3,7 @@ package com.seanshubin.vote.frontend
 import androidx.compose.runtime.*
 import com.seanshubin.vote.contract.ApiClient
 import com.seanshubin.vote.domain.TableData
+import kotlinx.browser.window
 import org.jetbrains.compose.web.dom.*
 
 /**
@@ -31,11 +32,13 @@ fun TablesPage(
         loadNames()
     }
 
-    // Auto-select the first table once names have loaded.
+    // Once names have loaded, honor the URL hash if it matches a table
+    // (so refresh and deep-links stick); otherwise auto-select the first.
     LaunchedEffect(namesFetch.state) {
         val state = namesFetch.state
         if (state is FetchState.Success && selectedTable == null) {
-            selectedTable = state.value.firstOrNull()
+            val fromHash = window.location.hash.removePrefix("#").takeIf { it in state.value }
+            selectedTable = fromHash ?: state.value.firstOrNull()
         }
     }
 
@@ -62,7 +65,10 @@ fun TablesPage(
                         state.value.forEach { name ->
                             Button({
                                 classes(if (name == selectedTable) "tab-active" else "tab")
-                                onClick { selectedTable = name }
+                                onClick {
+                                    selectedTable = name
+                                    window.location.hash = name
+                                }
                             }) {
                                 Text(name)
                             }
