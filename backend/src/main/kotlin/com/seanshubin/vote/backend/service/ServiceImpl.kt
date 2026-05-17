@@ -212,16 +212,17 @@ class ServiceImpl(
     override fun setElectionDescription(accessToken: AccessToken, electionName: String, description: String) {
         // VALIDATION SECTION
         requirePermission(accessToken, Permission.VIEW_APPLICATION)
-        requireCanManageElection(accessToken, electionName)
-
-        val validElectionName = Validation.validateElectionName(electionName)
+        val election = requireCanManageElection(accessToken, electionName)
         val validDescription = Validation.validateElectionDescription(description)
 
         // EXECUTION SECTION
+        // Use the canonical stored election name in the event so the audit
+        // log records the name exactly as registered, even if the caller
+        // referenced it in a different case.
         eventLog.appendEvent(
             accessToken.userName,
             clock.now(),
-            DomainEvent.ElectionDescriptionChanged(validElectionName, validDescription),
+            DomainEvent.ElectionDescriptionChanged(election.electionName, validDescription),
         )
         synchronize()
     }
@@ -464,28 +465,30 @@ class ServiceImpl(
     override fun addCandidates(accessToken: AccessToken, electionName: String, candidateNames: List<String>) {
         // VALIDATION SECTION
         requirePermission(accessToken, Permission.VIEW_APPLICATION)
-        requireCanManageElection(accessToken, electionName)
+        val election = requireCanManageElection(accessToken, electionName)
 
-        val validElectionName = Validation.validateElectionName(electionName)
         val validCandidateNames = Validation.validateCandidateNames(candidateNames)
         // Detail pages classify each name as candidate-or-tier by lookup
         // against the tier list; a name in both lists would render
         // ambiguously, so reject the collision before storing.
-        val existingTiers = queryModel.listTiers(validElectionName)
+        val existingTiers = queryModel.listTiers(election.electionName)
         Validation.validateCandidatesAndTiersDistinct(validCandidateNames, existingTiers)
 
         // Filter to names not already present. Letting the caller pass a
         // superset (e.g. the user pastes a list that overlaps existing
         // candidates) keeps the UI flow simple — no client-side diffing.
-        val existing = queryModel.listCandidates(validElectionName)
-        val newOnly = validCandidateNames.filter { it !in existing }
+        // Comparison is case-insensitive: "alice" submitted when "Alice"
+        // is already present is treated as a duplicate and skipped, not
+        // added as a second variant.
+        val existingKeys = queryModel.listCandidates(election.electionName).mapTo(mutableSetOf()) { it.lowercase() }
+        val newOnly = validCandidateNames.filter { it.lowercase() !in existingKeys }
         if (newOnly.isEmpty()) return
 
         // EXECUTION SECTION
         eventLog.appendEvent(
             accessToken.userName,
             clock.now(),
-            DomainEvent.CandidatesAdded(validElectionName, newOnly)
+            DomainEvent.CandidatesAdded(election.electionName, newOnly)
         )
         synchronize()
     }
@@ -493,16 +496,18 @@ class ServiceImpl(
     override fun removeCandidate(accessToken: AccessToken, electionName: String, candidateName: String) {
         // VALIDATION SECTION
         requirePermission(accessToken, Permission.VIEW_APPLICATION)
-        requireCanManageElection(accessToken, electionName)
-
-        val validElectionName = Validation.validateElectionName(electionName)
+        val election = requireCanManageElection(accessToken, electionName)
         val validCandidateName = Validation.validateCandidateName(candidateName)
 
         // Idempotent: removing a candidate that isn't there is a silent
         // no-op rather than an error. Two clients hitting the button at
         // the same time should both succeed (the second sees an empty diff).
-        val existing = queryModel.listCandidates(validElectionName)
-        if (validCandidateName !in existing) return
+        // Resolve to the canonical stored case so the event records the
+        // candidate exactly as it's stored, even if the caller used a
+        // different case.
+        val canonical = queryModel.listCandidates(election.electionName)
+            .firstOrNull { it.equals(validCandidateName, ignoreCase = true) }
+            ?: return
 
         // EXECUTION SECTION
         // Event stays plural to keep the audit log shape consistent with
@@ -510,7 +515,7 @@ class ServiceImpl(
         eventLog.appendEvent(
             accessToken.userName,
             clock.now(),
-            DomainEvent.CandidatesRemoved(validElectionName, listOf(validCandidateName))
+            DomainEvent.CandidatesRemoved(election.electionName, listOf(canonical))
         )
         synchronize()
     }
@@ -528,39 +533,42 @@ class ServiceImpl(
     ) {
         // VALIDATION SECTION
         requirePermission(accessToken, Permission.VIEW_APPLICATION)
-        requireCanManageElection(accessToken, electionName)
-
-        val validElectionName = Validation.validateElectionName(electionName)
+        val election = requireCanManageElection(accessToken, electionName)
         val validOldName = Validation.validateCandidateName(oldName)
         val validNewName = Validation.validateCandidateName(newName)
 
-        // Idempotent no-op: renaming a candidate to its own name doesn't need
-        // an event in the log. Match comparisons against the *normalized*
-        // names so trailing whitespace / case-only changes don't mint events
-        // either (validateCandidateName preserves case).
+        // Idempotent no-op: renaming a candidate to its own exact name
+        // doesn't need an event in the log. A case-only rename
+        // ("Alice" → "alice") *does* change display and is allowed to
+        // emit — mirroring how username rename treats case-only changes.
         if (validOldName == validNewName) return
 
-        val existing = queryModel.listCandidates(validElectionName)
-        if (validOldName !in existing) {
-            throw ServiceException(
+        val existing = queryModel.listCandidates(election.electionName)
+        val canonicalOld = existing.firstOrNull { it.equals(validOldName, ignoreCase = true) }
+            ?: throw ServiceException(
                 ServiceException.Category.NOT_FOUND,
                 "Candidate not found: $validOldName"
             )
+        // Conflict only if newName collides with a *different* candidate
+        // (case-insensitively). A case-only rename of the candidate itself
+        // is allowed.
+        val collidesWithOther = existing.any {
+            it.equals(validNewName, ignoreCase = true) && !it.equals(canonicalOld, ignoreCase = true)
         }
-        if (validNewName in existing) {
+        if (collidesWithOther) {
             throw ServiceException(
                 ServiceException.Category.CONFLICT,
                 "Candidate already exists: $validNewName"
             )
         }
-        val tiers = queryModel.listTiers(validElectionName)
+        val tiers = queryModel.listTiers(election.electionName)
         Validation.validateCandidatesAndTiersDistinct(listOf(validNewName), tiers)
 
         // EXECUTION SECTION
         eventLog.appendEvent(
             accessToken.userName,
             clock.now(),
-            DomainEvent.CandidateRenamed(validElectionName, validOldName, validNewName)
+            DomainEvent.CandidateRenamed(election.electionName, canonicalOld, validNewName)
         )
         synchronize()
     }
@@ -573,11 +581,9 @@ class ServiceImpl(
     override fun setTiers(accessToken: AccessToken, electionName: String, tierNames: List<String>) {
         // VALIDATION SECTION
         requirePermission(accessToken, Permission.VIEW_APPLICATION)
-        requireCanManageElection(accessToken, electionName)
-
-        val validElectionName = Validation.validateElectionName(electionName)
+        val election = requireCanManageElection(accessToken, electionName)
         val validTierNames = Validation.validateTierNames(tierNames)
-        val existingCandidates = queryModel.listCandidates(validElectionName)
+        val existingCandidates = queryModel.listCandidates(election.electionName)
         Validation.validateCandidatesAndTiersDistinct(existingCandidates, validTierNames)
 
         // No "no ballots" lock anymore. Rename goes through [renameTier]
@@ -592,7 +598,7 @@ class ServiceImpl(
         eventLog.appendEvent(
             accessToken.userName,
             clock.now(),
-            DomainEvent.TiersSet(validElectionName, validTierNames)
+            DomainEvent.TiersSet(election.electionName, validTierNames)
         )
         synchronize()
     }
@@ -610,36 +616,41 @@ class ServiceImpl(
     ) {
         // VALIDATION SECTION
         requirePermission(accessToken, Permission.VIEW_APPLICATION)
-        requireCanManageElection(accessToken, electionName)
-
-        val validElectionName = Validation.validateElectionName(electionName)
+        val election = requireCanManageElection(accessToken, electionName)
         val validOldName = Validation.validateTierName(oldName)
         val validNewName = Validation.validateTierName(newName)
 
-        // Idempotent no-op: renaming to the same name doesn't earn an event.
+        // Idempotent no-op: renaming to the same exact name doesn't earn
+        // an event. A case-only rename ("Gold" → "gold") *does* change
+        // display and is allowed to emit.
         if (validOldName == validNewName) return
 
-        val existing = queryModel.listTiers(validElectionName)
-        if (validOldName !in existing) {
-            throw ServiceException(
+        val existing = queryModel.listTiers(election.electionName)
+        val canonicalOld = existing.firstOrNull { it.equals(validOldName, ignoreCase = true) }
+            ?: throw ServiceException(
                 ServiceException.Category.NOT_FOUND,
                 "Tier not found: $validOldName"
             )
+        // Conflict only if newName collides with a *different* tier
+        // (case-insensitively). A case-only rename of the tier itself
+        // is allowed.
+        val collidesWithOther = existing.any {
+            it.equals(validNewName, ignoreCase = true) && !it.equals(canonicalOld, ignoreCase = true)
         }
-        if (validNewName in existing) {
+        if (collidesWithOther) {
             throw ServiceException(
                 ServiceException.Category.CONFLICT,
                 "Tier already exists: $validNewName"
             )
         }
-        val candidates = queryModel.listCandidates(validElectionName)
+        val candidates = queryModel.listCandidates(election.electionName)
         Validation.validateCandidatesAndTiersDistinct(candidates, listOf(validNewName))
 
         // EXECUTION SECTION
         eventLog.appendEvent(
             accessToken.userName,
             clock.now(),
-            DomainEvent.TierRenamed(validElectionName, validOldName, validNewName)
+            DomainEvent.TierRenamed(election.electionName, canonicalOld, validNewName)
         )
         synchronize()
     }
@@ -675,20 +686,25 @@ class ServiceImpl(
             )
         }
 
-        queryModel.searchElectionByName(validElectionName)
+        val election = queryModel.searchElectionByName(validElectionName)
             ?: throw ServiceException(ServiceException.Category.NOT_FOUND, "Election not found: $validElectionName")
 
         // No is-launched check (elections are live as soon as they exist) and no
         // eligibility list (anyone authenticated can vote on any election).
 
-        val candidates = queryModel.listCandidates(validElectionName)
-        val tiers = queryModel.listTiers(validElectionName)
+        val candidates = queryModel.listCandidates(election.electionName)
+        val tiers = queryModel.listTiers(election.electionName)
         // Rankings are candidate-only in storage; each ranking carries an
         // optional [Ranking.tier] annotation referencing one of the
         // election's tiers. validateRankingsMatchCandidates checks both
         // the candidate names and the tier annotations against the
         // election's current configuration.
         Validation.validateRankingsMatchCandidates(validRankings, candidates, tiers)
+        // Canonicalize each ranking's candidate and tier names to the
+        // election's stored display case so the tally can compare by
+        // exact string and so the audit log never contains case drift
+        // (voter typed "alice" but election says "Alice").
+        val canonicalRankings = canonicalizeRankings(validRankings, candidates, tiers)
 
         // EXECUTION SECTION
         val confirmation = uniqueIdGenerator.generate()
@@ -696,10 +712,25 @@ class ServiceImpl(
         eventLog.appendEvent(
             accessToken.userName,
             whenCast,
-            DomainEvent.BallotCast(accessToken.userName, validElectionName, validRankings, confirmation, whenCast)
+            DomainEvent.BallotCast(accessToken.userName, election.electionName, canonicalRankings, confirmation, whenCast)
         )
         synchronize()
         return confirmation
+    }
+
+    private fun canonicalizeRankings(
+        rankings: List<Ranking>,
+        candidates: List<String>,
+        tiers: List<String>,
+    ): List<Ranking> {
+        val candidateByLower = candidates.associateBy { it.lowercase() }
+        val tierByLower = tiers.associateBy { it.lowercase() }
+        return rankings.map { ranking ->
+            val canonicalCandidate = candidateByLower[ranking.candidateName.lowercase()]
+                ?: ranking.candidateName
+            val canonicalTier = ranking.tier?.let { tierByLower[it.lowercase()] ?: it }
+            ranking.copy(candidateName = canonicalCandidate, tier = canonicalTier)
+        }
     }
 
     override fun deleteBallot(accessToken: AccessToken, voterName: String, electionName: String) {
@@ -719,19 +750,19 @@ class ServiceImpl(
             )
         }
 
-        queryModel.searchElectionByName(validElectionName)
+        val election = queryModel.searchElectionByName(validElectionName)
             ?: throw ServiceException(ServiceException.Category.NOT_FOUND, "Election not found: $validElectionName")
 
         // Idempotent: if no ballot exists, the post-condition (no ballot) already
         // holds, so emit nothing rather than throwing.
-        queryModel.searchBallot(accessToken.userName, validElectionName)
+        queryModel.searchBallot(accessToken.userName, election.electionName)
             ?: return
 
         // EXECUTION SECTION
         eventLog.appendEvent(
             accessToken.userName,
             clock.now(),
-            DomainEvent.BallotDeleted(accessToken.userName, validElectionName)
+            DomainEvent.BallotDeleted(accessToken.userName, election.electionName)
         )
         synchronize()
     }
@@ -1032,7 +1063,7 @@ class ServiceImpl(
      * edit content but cannot delete/transfer the election or change the manager
      * list — those stay with the owner (or ADMIN+); see [requireElectionOwnerOrAdmin].
      */
-    private fun requireCanManageElection(accessToken: AccessToken, electionName: String) {
+    private fun requireCanManageElection(accessToken: AccessToken, electionName: String): ElectionSummary {
         val election = queryModel.searchElectionByName(electionName)
             ?: throw ServiceException(
                 ServiceException.Category.NOT_FOUND,
@@ -1048,6 +1079,7 @@ class ServiceImpl(
                 "User ${accessToken.userName} cannot manage election '$electionName'"
             )
         }
+        return election
     }
 
     /**

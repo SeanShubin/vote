@@ -52,12 +52,7 @@ object Validation {
         // Empty list is allowed — clearing tiers reverts the election to
         // candidate-only voting (the no-tiers code path).
         val validNames = names.map { validateTierName(it) }
-
-        val duplicates = validNames.groupingBy { it }.eachCount().filter { it.value > 1 }.keys
-        require(duplicates.isEmpty()) {
-            "Duplicate tier names found: ${duplicates.joinToString()}"
-        }
-
+        requireNoCaseInsensitiveDuplicates(validNames, "tier")
         return validNames
     }
 
@@ -100,8 +95,13 @@ object Validation {
         candidates: List<String>,
         tiers: List<String>,
     ) {
-        val rankedCandidates = rankings.map { it.candidateName }.toSet()
-        val unknownCandidates = rankedCandidates - candidates.toSet()
+        // Set ops use lowercase keys so a ballot's "Alice" matches the
+        // election's stored "alice" (and vice versa). Names are otherwise
+        // case-insensitive in this app; only passwords are case-sensitive.
+        val candidateKeys = candidates.map { it.lowercase() }.toSet()
+        val unknownCandidates = rankings.map { it.candidateName }
+            .filter { it.lowercase() !in candidateKeys }
+            .distinct()
         require(unknownCandidates.isEmpty()) {
             "Rankings contain unknown candidates: ${unknownCandidates.joinToString()}"
         }
@@ -110,8 +110,10 @@ object Validation {
         // list, so a mismatched annotation here means the ballot was built
         // against a stale view of the election (or hand-crafted) — reject
         // it so a stray label can't sneak into the projected ballot.
-        val annotatedTiers = rankings.mapNotNull { it.tier }.toSet()
-        val unknownTiers = annotatedTiers - tiers.toSet()
+        val tierKeys = tiers.map { it.lowercase() }.toSet()
+        val unknownTiers = rankings.mapNotNull { it.tier }
+            .filter { it.lowercase() !in tierKeys }
+            .distinct()
         require(unknownTiers.isEmpty()) {
             "Rankings reference unknown tiers: ${unknownTiers.joinToString()}"
         }
@@ -145,25 +147,25 @@ object Validation {
         // restarting an election setup). Each individual name still has to pass
         // validateCandidateName below, so empty *strings* in the list still fail.
         val validNames = names.map { validateCandidateName(it) }
-
-        val duplicates = validNames.groupingBy { it }.eachCount().filter { it.value > 1 }.keys
-        require(duplicates.isEmpty()) {
-            "Duplicate candidate names found: ${duplicates.joinToString()}"
-        }
-
+        requireNoCaseInsensitiveDuplicates(validNames, "candidate")
         return validNames
     }
 
     fun validateVoterNames(names: List<String>): List<String> {
         require(names.isNotEmpty()) { "Voter list must not be empty" }
-
         val validNames = names.map { validateUserName(it) }
-
-        val duplicates = validNames.groupingBy { it }.eachCount().filter { it.value > 1 }.keys
-        require(duplicates.isEmpty()) {
-            "Duplicate voter names found: ${duplicates.joinToString()}"
-        }
-
+        requireNoCaseInsensitiveDuplicates(validNames, "voter")
         return validNames
+    }
+
+    // Report the *original-case* names that collide so the operator can see
+    // which inputs are the offending pair (e.g. "Alice" and "alice"), not
+    // the lowercased key.
+    private fun requireNoCaseInsensitiveDuplicates(names: List<String>, kind: String) {
+        val collisions = names.groupBy { it.lowercase() }.values.filter { it.size > 1 }
+        require(collisions.isEmpty()) {
+            val groups = collisions.joinToString("; ") { it.joinToString("/") }
+            "Duplicate $kind names found: $groups"
+        }
     }
 }

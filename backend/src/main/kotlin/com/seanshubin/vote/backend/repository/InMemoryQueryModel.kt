@@ -24,11 +24,12 @@ class InMemoryQueryModel(private val data: InMemoryData) : QueryModel {
     override fun electionCount(): Int = data.elections.size
 
     override fun candidateCount(electionName: String): Int {
-        return data.candidates[electionName]?.size ?: 0
+        return data.candidates[electionName.lowercase()]?.size ?: 0
     }
 
     override fun ballotCount(electionName: String): Int {
-        return data.ballots.values.count { it.electionName == electionName }
+        val key = electionName.lowercase()
+        return data.ballots.keys.count { it.first == key }
     }
 
     override fun tableCount(): Int {
@@ -58,50 +59,59 @@ class InMemoryQueryModel(private val data: InMemoryData) : QueryModel {
     override fun lastSynced(): Long? = data.lastSynced
 
     override fun searchElectionByName(name: String): ElectionSummary? {
-        return data.elections[name]?.toElectionSummary()
+        return data.elections[name.lowercase()]?.toElectionSummary()
     }
 
     override fun listCandidates(electionName: String): List<String> {
-        return data.candidates[electionName]?.toList() ?: emptyList()
+        return data.candidates[electionName.lowercase()]?.toList() ?: emptyList()
     }
 
     override fun listElectionManagers(electionName: String): List<String> {
-        return data.electionManagers[electionName]
+        return data.electionManagers[electionName.lowercase()]
             ?.sortedWith(String.CASE_INSENSITIVE_ORDER)
             ?: emptyList()
     }
 
     override fun candidateBallotCounts(electionName: String): Map<String, Int> {
-        val candidateSet = data.candidates[electionName] ?: return emptyMap()
+        val electionKey = electionName.lowercase()
+        val candidateSet = data.candidates[electionKey] ?: return emptyMap()
         // Start every candidate at zero so the map's key set always matches
         // the candidate list — callers (the editor UI) want a count for each
         // candidate, even ones with no ballots.
         val counts = candidateSet.associateWith { 0 }.toMutableMap()
-        data.ballots.values
-            .filter { it.electionName == electionName }
+        // Candidate names in stored ballots are canonicalized at projection
+        // time, so a direct lookup matches; the case-insensitive fallback
+        // catches any historical drift.
+        val canonicalByLower = candidateSet.associateBy { it.lowercase() }
+        data.ballots
+            .filter { it.key.first == electionKey }
+            .values
             .forEach { ballot ->
                 ballot.rankings
                     .map { it.candidateName }
                     .toSet()
                     .forEach { name ->
-                        if (name in counts) counts[name] = counts.getValue(name) + 1
+                        val canonical = canonicalByLower[name.lowercase()] ?: return@forEach
+                        counts[canonical] = counts.getValue(canonical) + 1
                     }
             }
         return counts
     }
 
     override fun listTiers(electionName: String): List<String> {
-        return data.tiers[electionName] ?: emptyList()
+        return data.tiers[electionName.lowercase()] ?: emptyList()
     }
 
     override fun listRankings(voterName: String, electionName: String): List<Ranking> {
-        val ballot = data.ballots[electionName to voterName.lowercase()]
+        val ballot = data.ballots[electionName.lowercase() to voterName.lowercase()]
         return ballot?.rankings ?: emptyList()
     }
 
     override fun listRankings(electionName: String): List<VoterElectionCandidateRank> {
-        return data.ballots.values
-            .filter { it.electionName == electionName }
+        val key = electionName.lowercase()
+        return data.ballots
+            .filter { it.key.first == key }
+            .values
             .flatMap { ballot ->
                 ballot.rankings.mapNotNull { ranking ->
                     ranking.rank?.let { rank ->
@@ -117,12 +127,14 @@ class InMemoryQueryModel(private val data: InMemoryData) : QueryModel {
     }
 
     override fun searchBallot(voterName: String, electionName: String): BallotSummary? {
-        return data.ballots[electionName to voterName.lowercase()]?.toBallotSummary()
+        return data.ballots[electionName.lowercase() to voterName.lowercase()]?.toBallotSummary()
     }
 
     override fun listBallots(electionName: String): List<Ballot.Identified> {
-        return data.ballots.values
-            .filter { it.electionName == electionName }
+        val key = electionName.lowercase()
+        return data.ballots
+            .filter { it.key.first == key }
+            .values
             .map { it.toIdentifiedBallot() }
     }
 

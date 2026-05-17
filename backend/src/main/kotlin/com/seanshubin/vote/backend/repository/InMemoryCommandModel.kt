@@ -40,27 +40,30 @@ class InMemoryCommandModel(private val data: InMemoryData) : CommandModel {
     }
 
     override fun addElection(authority: String, owner: String, electionName: String, description: String) {
-        data.elections[electionName] = InMemoryData.ElectionData(
+        val key = electionName.lowercase()
+        data.elections[key] = InMemoryData.ElectionData(
             ownerName = owner,
             electionName = electionName,
             description = description,
         )
-        data.candidates[electionName] = mutableSetOf()
-        data.electionManagers[electionName] = mutableSetOf()
+        data.candidates[key] = mutableSetOf()
+        data.electionManagers[key] = mutableSetOf()
     }
 
     override fun setElectionDescription(authority: String, electionName: String, description: String) {
-        val election = data.elections[electionName] ?: error("Election not found: $electionName")
-        data.elections[electionName] = election.copy(description = description)
+        val key = electionName.lowercase()
+        val election = data.elections[key] ?: error("Election not found: $electionName")
+        data.elections[key] = election.copy(description = description)
     }
 
     override fun setElectionOwner(authority: String, electionName: String, newOwnerName: String) {
-        val election = data.elections[electionName] ?: error("Election not found: $electionName")
-        data.elections[electionName] = election.copy(ownerName = newOwnerName)
+        val key = electionName.lowercase()
+        val election = data.elections[key] ?: error("Election not found: $electionName")
+        data.elections[key] = election.copy(ownerName = newOwnerName)
     }
 
     override fun addElectionManager(authority: String, electionName: String, userName: String) {
-        val managers = data.electionManagers.getOrPut(electionName) { mutableSetOf() }
+        val managers = data.electionManagers.getOrPut(electionName.lowercase()) { mutableSetOf() }
         // Drop any case-variant of this name first so the set never carries
         // two rows for the same user; the resolved canonical name wins.
         managers.removeAll { it.equals(userName, ignoreCase = true) }
@@ -68,20 +71,29 @@ class InMemoryCommandModel(private val data: InMemoryData) : CommandModel {
     }
 
     override fun removeElectionManager(authority: String, electionName: String, userName: String) {
-        data.electionManagers[electionName]?.removeAll { it.equals(userName, ignoreCase = true) }
+        data.electionManagers[electionName.lowercase()]?.removeAll { it.equals(userName, ignoreCase = true) }
     }
 
     override fun deleteElection(authority: String, electionName: String) {
-        data.elections.remove(electionName)
-        data.candidates.remove(electionName)
-        data.tiers.remove(electionName)
-        data.electionManagers.remove(electionName)
-        data.ballots.keys.removeIf { (election, _) -> election == electionName }
+        val key = electionName.lowercase()
+        data.elections.remove(key)
+        data.candidates.remove(key)
+        data.tiers.remove(key)
+        data.electionManagers.remove(key)
+        data.ballots.keys.removeIf { (election, _) -> election == key }
     }
 
     override fun addCandidates(authority: String, electionName: String, candidateNames: List<String>) {
-        val candidates = data.candidates.getOrPut(electionName) { mutableSetOf() }
-        candidates.addAll(candidateNames)
+        val candidates = data.candidates.getOrPut(electionName.lowercase()) { mutableSetOf() }
+        // Idempotent on case-insensitive match: if "Alice" already exists,
+        // re-adding "alice" is a no-op (the original display case wins).
+        // Within the input list itself, the first occurrence wins for the
+        // same reason.
+        val existingKeys = candidates.mapTo(mutableSetOf()) { it.lowercase() }
+        candidateNames.forEach { name ->
+            val key = name.lowercase()
+            if (existingKeys.add(key)) candidates.add(name)
+        }
     }
 
     override fun setTiers(authority: String, electionName: String, tierNames: List<String>) {
@@ -93,81 +105,88 @@ class InMemoryCommandModel(private val data: InMemoryData) : CommandModel {
         // The candidate's rank is left alone; only the tier label is
         // cleared. Without this cascade, dropped-then-re-added tiers
         // would resurrect stale rankings.
-        val previous = data.tiers[electionName].orEmpty().toSet()
-        val removed = previous - tierNames.toSet()
+        val key = electionName.lowercase()
+        val previousKeys = data.tiers[key].orEmpty().mapTo(mutableSetOf()) { it.lowercase() }
+        val newKeys = tierNames.mapTo(mutableSetOf()) { it.lowercase() }
+        val removedKeys = previousKeys - newKeys
         if (tierNames.isEmpty()) {
-            data.tiers.remove(electionName)
+            data.tiers.remove(key)
         } else {
-            data.tiers[electionName] = tierNames.toList()
+            data.tiers[key] = tierNames.toList()
         }
-        if (removed.isNotEmpty()) {
-            clearTierAnnotations(electionName, removed)
+        if (removedKeys.isNotEmpty()) {
+            clearTierAnnotations(key, removedKeys)
         }
     }
 
     override fun renameTier(authority: String, electionName: String, oldName: String, newName: String) {
         // Tier list: swap the label in place, preserving its position.
-        val tiers = data.tiers[electionName] ?: return
-        val idx = tiers.indexOf(oldName)
+        val key = electionName.lowercase()
+        val tiers = data.tiers[key] ?: return
+        val oldKey = oldName.lowercase()
+        val idx = tiers.indexOfFirst { it.lowercase() == oldKey }
         if (idx < 0) return
-        data.tiers[electionName] = tiers.toMutableList().also { it[idx] = newName }
+        data.tiers[key] = tiers.toMutableList().also { it[idx] = newName }
         // Rankings: rewrite every Ranking.tier annotation that pointed at
         // the old label so it now points at the new label. Rank values
         // and the rest of the ranking are untouched.
         data.ballots.entries
-            .filter { (_, ballot) -> ballot.electionName == electionName }
-            .forEach { (key, ballot) ->
+            .filter { (k, _) -> k.first == key }
+            .forEach { (k, ballot) ->
                 val rewritten = ballot.rankings.map { ranking ->
-                    if (ranking.tier == oldName) ranking.copy(tier = newName) else ranking
+                    if (ranking.tier?.lowercase() == oldKey) ranking.copy(tier = newName) else ranking
                 }
                 if (rewritten != ballot.rankings) {
-                    data.ballots[key] = ballot.copy(rankings = rewritten)
+                    data.ballots[k] = ballot.copy(rankings = rewritten)
                 }
             }
     }
 
-    private fun clearTierAnnotations(electionName: String, removedTiers: Set<String>) {
+    private fun clearTierAnnotations(electionKey: String, removedTierKeys: Set<String>) {
         data.ballots.entries
-            .filter { (_, ballot) -> ballot.electionName == electionName }
-            .forEach { (key, ballot) ->
+            .filter { (k, _) -> k.first == electionKey }
+            .forEach { (k, ballot) ->
                 val rewritten = ballot.rankings.map { ranking ->
-                    if (ranking.tier in removedTiers) ranking.copy(tier = null) else ranking
+                    if (ranking.tier?.lowercase() in removedTierKeys) ranking.copy(tier = null) else ranking
                 }
                 if (rewritten != ballot.rankings) {
-                    data.ballots[key] = ballot.copy(rankings = rewritten)
+                    data.ballots[k] = ballot.copy(rankings = rewritten)
                 }
             }
     }
 
     override fun removeCandidates(authority: String, electionName: String, candidateNames: List<String>) {
-        val candidates = data.candidates[electionName] ?: return
-        candidates.removeAll(candidateNames.toSet())
+        val key = electionName.lowercase()
+        val candidates = data.candidates[key] ?: return
+        val removedKeys = candidateNames.mapTo(mutableSetOf()) { it.lowercase() }
+        candidates.removeAll { it.lowercase() in removedKeys }
         // Cascade: strip the removed candidate names from any existing ballot's
         // ranking list in this election. Without this, ballots would carry
         // ghost rankings for candidates that no longer exist.
-        val removed = candidateNames.toSet()
         data.ballots.entries
-            .filter { (_, ballot) -> ballot.electionName == electionName }
-            .forEach { (key, ballot) ->
-                val filtered = ballot.rankings.filter { it.candidateName !in removed }
+            .filter { (k, _) -> k.first == key }
+            .forEach { (k, ballot) ->
+                val filtered = ballot.rankings.filter { it.candidateName.lowercase() !in removedKeys }
                 if (filtered.size != ballot.rankings.size) {
-                    data.ballots[key] = ballot.copy(rankings = filtered)
+                    data.ballots[k] = ballot.copy(rankings = filtered)
                 }
             }
     }
 
     override fun renameCandidate(authority: String, electionName: String, oldName: String, newName: String) {
-        val candidates = data.candidates[electionName] ?: return
-        if (!candidates.remove(oldName)) return
+        val key = electionName.lowercase()
+        val candidates = data.candidates[key] ?: return
+        val oldKey = oldName.lowercase()
+        if (!candidates.removeAll { it.lowercase() == oldKey }) return
         candidates.add(newName)
         data.ballots.entries
-            .filter { (_, ballot) -> ballot.electionName == electionName }
-            .forEach { (key, ballot) ->
+            .filter { (k, _) -> k.first == key }
+            .forEach { (k, ballot) ->
                 val rewritten = ballot.rankings.map { ranking ->
-                    if (ranking.candidateName == oldName) ranking.copy(candidateName = newName) else ranking
+                    if (ranking.candidateName.lowercase() == oldKey) ranking.copy(candidateName = newName) else ranking
                 }
                 if (rewritten != ballot.rankings) {
-                    data.ballots[key] = ballot.copy(rankings = rewritten)
+                    data.ballots[k] = ballot.copy(rankings = rewritten)
                 }
             }
     }
@@ -180,7 +199,7 @@ class InMemoryCommandModel(private val data: InMemoryData) : CommandModel {
         confirmation: String,
         now: Instant
     ) {
-        val key = electionName to voterName.lowercase()
+        val key = electionName.lowercase() to voterName.lowercase()
         data.ballots[key] = InMemoryData.BallotData(
             voterName = voterName,
             electionName = electionName,
@@ -210,7 +229,7 @@ class InMemoryCommandModel(private val data: InMemoryData) : CommandModel {
     }
 
     override fun deleteBallot(authority: String, voterName: String, electionName: String) {
-        data.ballots.remove(electionName to voterName.lowercase())
+        data.ballots.remove(electionName.lowercase() to voterName.lowercase())
     }
 
     override fun setUserName(authority: String, oldUserName: String, newUserName: String) {
@@ -224,10 +243,10 @@ class InMemoryCommandModel(private val data: InMemoryData) : CommandModel {
 
         // Update election ownership — match the previous canonical name case-insensitively
         // since stored values may differ in case from what was passed in.
-        data.elections.values
-            .filter { it.ownerName.equals(oldUserName, ignoreCase = true) }
-            .forEach { election ->
-                data.elections[election.electionName] = election.copy(ownerName = newUserName)
+        data.elections.entries
+            .filter { (_, election) -> election.ownerName.equals(oldUserName, ignoreCase = true) }
+            .forEach { (k, election) ->
+                data.elections[k] = election.copy(ownerName = newUserName)
             }
 
         // Update election-manager entries — same case-insensitive match, since

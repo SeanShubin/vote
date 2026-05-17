@@ -42,8 +42,16 @@ class DirectServiceBackend(
         service.removeCandidate(token, electionName, candidateName)
     }
 
+    override fun renameCandidate(token: AccessToken, electionName: String, oldName: String, newName: String) {
+        service.renameCandidate(token, electionName, oldName, newName)
+    }
+
     override fun setTiers(token: AccessToken, electionName: String, tierNames: List<String>) {
         service.setTiers(token, electionName, tierNames)
+    }
+
+    override fun renameTier(token: AccessToken, electionName: String, oldName: String, newName: String) {
+        service.renameTier(token, electionName, oldName, newName)
     }
 
     override fun deleteElection(token: AccessToken, electionName: String) {
