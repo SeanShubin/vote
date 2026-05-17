@@ -29,8 +29,8 @@ private data class Example(val label: String, val description: String, val text:
 
 private val EXAMPLES = listOf(
     Example(
-        label = "Condorcet winner",
-        description = "Three candidates, no cycle — pairwise picks the consensus winner that first-past-the-post would miss.",
+        label = "Pairwise vs first-past-the-post",
+        description = "100 voters split 30/30/40. First-past-the-post crowns radical-changes; pairwise picks minor-improvements, which 70% of voters preferred over the FPTP winner.",
         text = """
             # From the methodology docs: 100 voters split 30/30/40.
             # First-past-the-post would pick radical-changes, but pairwise
@@ -45,8 +45,43 @@ private val EXAMPLES = listOf(
         """.trimIndent() + "\n",
     ),
     Example(
-        label = "Resolved cycle",
-        description = "Rock-paper-scissors with a 10th tiebreaking ballot — Ranked Pairs locks the strongest contests and skips the one that would close a cycle.",
+        label = "Reducing tactical voting",
+        description = "Under first-past-the-post, the 2 radical-changes voters would have to abandon their top choice to avoid throwing the election. Pairwise lets them rank honestly and the consensus winner still emerges.",
+        text = """
+            # How pairwise methods reduce tactical voting.
+            # Under FPTP the 2 radical-changes voters would have to vote
+            # status-quo to avoid throwing the election; under pairwise
+            # they can rank honestly and minor-improvements still wins.
+            M = minor-improvements
+            S = status-quo
+            R = radical-changes
+            ---
+            3: M > S > R
+            4: S > M > R
+            2: R > M > S
+        """.trimIndent() + "\n",
+    ),
+    Example(
+        label = "Pairwise vs instant-runoff",
+        description = "Every voter has a different top choice but agrees on a strong second. Instant-runoff eliminates the consensus candidate first; pairwise picks them.",
+        text = """
+            # Why pairwise methods are superior to instant-runoff voting.
+            # Every voter ranks "satisfactory" second, yet IRV eliminates
+            # it first because nobody picked it as their top choice.
+            # Pairwise ranks: satisfactory > niche > bought > cult.
+            N = niche
+            S = satisfactory
+            B = bought
+            C = cult
+            ---
+            4: N > S > B > C
+            3: B > S > N > C
+            3: C > S > N > B
+        """.trimIndent() + "\n",
+    ),
+    Example(
+        label = "Cycle resolved by Ranked Pairs",
+        description = "Rock-paper-scissors with a 10th tiebreaking ballot. Ranked Pairs locks the strongest contests and skips the one that would close a cycle.",
         text = """
             # 9 voters form a perfect 3-way tie; a 10th ballot breaks it.
             # Pairwise produces a cycle (rock > scissors > paper > rock),
@@ -180,26 +215,18 @@ private fun ResultsSection(
         H2 { Text("Results") }
 
         H3 { Text("Final ranking") }
-        Ol({ classes("paste-tally-places") }) {
+        // <Ul> with list-style:none — the rank label comes from place.rank,
+        // not from browser auto-numbering, so tied candidates correctly
+        // share a rank (e.g. two "1st"s) and the next rank is skipped.
+        Ul({ classes("paste-tally-places") }) {
             electionTally.tally.places.forEach { place ->
                 Li {
+                    Span({ classes("paste-tally-place-rank") }) { Text(ordinal(place.rank)) }
                     val abbrev = candidates.firstOrNull { it.fullName == place.candidateName }?.abbreviation
                     if (abbrev != null) {
                         Span({ classes("paste-tally-abbrev") }) { Text(abbrev) }
-                        Text(" ${place.candidateName}")
-                    } else {
-                        Text(place.candidateName)
                     }
-                }
-            }
-        }
-
-        H3 { Text("Candidate index") }
-        Ul({ classes("paste-tally-legend") }) {
-            candidates.forEach { decl ->
-                Li {
-                    Span({ classes("paste-tally-abbrev") }) { Text(decl.abbreviation) }
-                    Text(" ${decl.fullName}")
+                    Text(place.candidateName)
                 }
             }
         }

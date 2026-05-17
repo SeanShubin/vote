@@ -4,6 +4,7 @@ import androidx.compose.runtime.*
 import com.seanshubin.vote.contract.ApiClient
 import com.seanshubin.vote.domain.Ballot
 import com.seanshubin.vote.domain.ElectionTally
+import com.seanshubin.vote.domain.PasteTallyFormat
 import com.seanshubin.vote.domain.Place
 import com.seanshubin.vote.domain.RankingSide
 import com.seanshubin.vote.domain.Tally
@@ -221,6 +222,24 @@ private fun renderTally(
                     copyFeedbackToken += 1
                 }
             }) { Text("Copy results as text") }
+            Button({
+                attr(
+                    "title",
+                    "Copy this election in the format the paste-tally page accepts, " +
+                        "so it can be re-tallied or shared without an account."
+                )
+                onClick {
+                    val text = PasteTallyFormat.renderAsPasteText(
+                        candidateNames = serverTally.tally.candidateNames,
+                        ballots = serverTally.tally.ballots,
+                        electionName = serverTally.tally.electionName,
+                        tiers = serverTally.tiers,
+                    )
+                    copyTextToClipboard(text, apiClient)
+                    copyFeedback = "Copied as paste-tally format!"
+                    copyFeedbackToken += 1
+                }
+            }) { Text("Copy as paste-tally format") }
             if (copyFeedback != null) {
                 Span({ classes("copy-feedback") }) { Text(copyFeedback!!) }
             }

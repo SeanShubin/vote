@@ -115,6 +115,115 @@ object PasteTallyFormat {
 
     private const val VOTER_PAD_WIDTH = 4
 
+    /**
+     * Deterministic abbreviation generator: initialism of the candidate
+     * name, lowercased, with a leading "The " stripped first. Designed for
+     * media titles where the first letters of each word are the natural
+     * shorthand.
+     *
+     * Examples:
+     *   "The Great War of Separation 2"      -> "gwos2"
+     *   "The Horseman: Welcome To Florespark" -> "hwtf"
+     *   "Alice Johnson"                      -> "aj"
+     *   "Apple"                              -> "a"
+     *
+     * Collisions are resolved by appending a numeric suffix in input
+     * order (`a`, `a2`, `a3`, …). Names whose base abbreviation is empty
+     * (no alphanumerics) fall back to "x", "x2", "x3", … in input order.
+     */
+    fun generateAbbreviations(names: List<String>): Map<String, String> {
+        if (names.isEmpty()) return emptyMap()
+        val bases = names.associateWith { computeBaseAbbreviation(it) }
+        val taken = mutableSetOf<String>()
+        val final = LinkedHashMap<String, String>()
+        for (name in names) {
+            val base = bases.getValue(name).ifEmpty { "x" }
+            var abbrev = base
+            var counter = 2
+            while (abbrev in taken) {
+                abbrev = "$base$counter"
+                counter++
+            }
+            taken.add(abbrev)
+            final[name] = abbrev
+        }
+        return final
+    }
+
+    private fun computeBaseAbbreviation(name: String): String {
+        val lowered = name.lowercase()
+        val stripped = if (lowered.startsWith("the ")) lowered.removePrefix("the ") else lowered
+        return stripped
+            .split(WHITESPACE)
+            .mapNotNull { word -> word.firstOrNull { it.isLetterOrDigit() } }
+            .joinToString("")
+    }
+
+    private val WHITESPACE = Regex("\\s+")
+
+    /**
+     * Render a tally back to the paste-tally text format. The output is
+     * round-trip safe: feeding it through [parse] reconstructs the same
+     * candidates and ballot groups.
+     *
+     * Tier markers are filtered out — the paste format doesn't model them
+     * and the tally page treats every node as a plain candidate.
+     */
+    fun renderAsPasteText(
+        candidateNames: List<String>,
+        ballots: List<Ballot>,
+        electionName: String? = null,
+        tiers: List<String> = emptyList(),
+    ): String {
+        val tierSet = tiers.toSet()
+        val realCandidates = candidateNames.filter { it !in tierSet }
+        val abbrevs = generateAbbreviations(realCandidates)
+        val realCandidateSet = realCandidates.toSet()
+
+        val builder = StringBuilder()
+        if (electionName != null) {
+            builder.append("# Exported from election: ").append(electionName).append('\n')
+        }
+        for (name in realCandidates) {
+            builder.append(abbrevs.getValue(name)).append(" = ").append(name).append('\n')
+        }
+        builder.append("---\n")
+
+        // Group ballots by their canonical ranking text. Empty ballots
+        // (no candidate ranked) are dropped — the format requires at
+        // least one candidate per line and the tally would ignore them
+        // anyway.
+        val grouped = ballots
+            .mapNotNull { ballot -> ballotToRankingLine(ballot, abbrevs, realCandidateSet) }
+            .groupingBy { it }
+            .eachCount()
+            .entries
+            .sortedWith(
+                compareByDescending<Map.Entry<String, Int>> { it.value }
+                    .thenBy { it.key }
+            )
+        for ((line, count) in grouped) {
+            builder.append(count).append(": ").append(line).append('\n')
+        }
+        return builder.toString()
+    }
+
+    private fun ballotToRankingLine(
+        ballot: Ballot,
+        abbrevs: Map<String, String>,
+        realCandidates: Set<String>,
+    ): String? {
+        val byRank = ballot.rankings
+            .filter { it.candidateName in realCandidates && it.rank != null }
+            .groupBy { it.rank!! }
+        if (byRank.isEmpty()) return null
+        return byRank.entries
+            .sortedBy { it.key }
+            .joinToString(" > ") { (_, tied) ->
+                tied.map { abbrevs.getValue(it.candidateName) }.sorted().joinToString(" = ")
+            }
+    }
+
     private fun parseIndex(indexLines: List<Line>, errors: MutableList<ParseMessage>): List<CandidateDeclaration> {
         val declarations = mutableListOf<CandidateDeclaration>()
         val byAbbrev = mutableMapOf<String, CandidateDeclaration>()

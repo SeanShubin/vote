@@ -316,7 +316,44 @@ class PasteTallyFormatTest {
     }
 
     @Test
-    fun `documentation example 2 - cycle resolved by Ranked Pairs`() {
+    fun `documentation example 2 - tactical voting produces the consensus winner`() {
+        val text = """
+            M = minor-improvements
+            S = status-quo
+            R = radical-changes
+            ---
+            3: M > S > R
+            4: S > M > R
+            2: R > M > S
+        """.trimIndent()
+        val tally = runEndToEnd(text)
+        assertEquals(
+            listOf("minor-improvements", "status-quo", "radical-changes"),
+            tally.places.map { it.candidateName },
+        )
+    }
+
+    @Test
+    fun `documentation example 3 - IRV-eliminated candidate is the pairwise winner`() {
+        val text = """
+            N = niche
+            S = satisfactory
+            B = bought
+            C = cult
+            ---
+            4: N > S > B > C
+            3: B > S > N > C
+            3: C > S > N > B
+        """.trimIndent()
+        val tally = runEndToEnd(text)
+        assertEquals(
+            listOf("satisfactory", "niche", "bought", "cult"),
+            tally.places.map { it.candidateName },
+        )
+    }
+
+    @Test
+    fun `documentation example 4 - cycle resolved by Ranked Pairs`() {
         val text = """
             R = rock
             P = paper
@@ -335,7 +372,7 @@ class PasteTallyFormatTest {
     }
 
     @Test
-    fun `documentation example 3 - perfectly-tied cycle ties all candidates`() {
+    fun `documentation example 5 - perfectly-tied cycle ties all candidates`() {
         val text = """
             A = A
             B = B
@@ -379,6 +416,110 @@ class PasteTallyFormatTest {
             ballots = ballots,
         )
         assertEquals(listOf("Apple", "Banana", "Cherry"), tally.places.map { it.candidateName })
+    }
+
+    @Test
+    fun `generateAbbreviations uses initials of each word lowercased`() {
+        val out = PasteTallyFormat.generateAbbreviations(listOf("Alice Johnson", "Bob Smith"))
+        assertEquals(mapOf("Alice Johnson" to "aj", "Bob Smith" to "bs"), out)
+    }
+
+    @Test
+    fun `generateAbbreviations strips leading The before taking initials`() {
+        val out = PasteTallyFormat.generateAbbreviations(
+            listOf(
+                "The Great War of Separation 2",
+                "The Horseman: Welcome To Florespark",
+            )
+        )
+        assertEquals("gwos2", out["The Great War of Separation 2"])
+        assertEquals("hwtf", out["The Horseman: Welcome To Florespark"])
+    }
+
+    @Test
+    fun `generateAbbreviations single-word name gets one letter`() {
+        val out = PasteTallyFormat.generateAbbreviations(listOf("Apple", "Banana"))
+        assertEquals(mapOf("Apple" to "a", "Banana" to "b"), out)
+    }
+
+    @Test
+    fun `generateAbbreviations The prefix strip is case-insensitive`() {
+        val out = PasteTallyFormat.generateAbbreviations(listOf("THE Quick Fox", "the Lazy Dog"))
+        assertEquals(mapOf("THE Quick Fox" to "qf", "the Lazy Dog" to "ld"), out)
+    }
+
+    @Test
+    fun `generateAbbreviations resolves collisions with numeric suffix in input order`() {
+        // Both have base "ab" after stripping non-alnums and taking initials.
+        val out = PasteTallyFormat.generateAbbreviations(listOf("Alpha Bravo", "Apple Box"))
+        assertEquals("ab", out["Alpha Bravo"])
+        assertEquals("ab2", out["Apple Box"])
+    }
+
+    @Test
+    fun `generateAbbreviations skips non-alphanumerics when taking initials`() {
+        // The leading punctuation on "!!Welcome" is skipped; the first alnum (w) is used.
+        val out = PasteTallyFormat.generateAbbreviations(listOf("!!Welcome 99-bottles"))
+        assertEquals("w9", out["!!Welcome 99-bottles"])
+    }
+
+    @Test
+    fun `generateAbbreviations empty name falls back to x`() {
+        val out = PasteTallyFormat.generateAbbreviations(listOf("---", "!!!"))
+        assertEquals(setOf("x", "x2"), out.values.toSet())
+    }
+
+    @Test
+    fun `renderAsPasteText produces text that the parser accepts and round-trips`() {
+        // Build a small tally end-to-end so the render path consumes the
+        // engine's actual ballot shape.
+        val originalText = """
+            A = Alice
+            B = Bob
+            C = Carol
+            ---
+            5: A > B > C
+            3: B = C > A
+            2: C > A
+        """.trimIndent()
+        val tally = runEndToEnd(originalText)
+
+        val exported = PasteTallyFormat.renderAsPasteText(
+            candidateNames = tally.candidateNames,
+            ballots = tally.ballots,
+            electionName = "test",
+        )
+
+        // Re-parse and re-tally; the place order must match.
+        val reTally = runEndToEnd(exported)
+        assertEquals(tally.places.map { it.candidateName }, reTally.places.map { it.candidateName })
+        assertEquals(tally.places.map { it.rank }, reTally.places.map { it.rank })
+    }
+
+    @Test
+    fun `renderAsPasteText omits tier markers from the candidate index`() {
+        // Synthesize an Identified ballot directly so we can include a tier-marker ranking.
+        val ballots = listOf(
+            Ballot.Identified(
+                voterName = "v1",
+                electionName = "e",
+                confirmation = "c1",
+                whenCast = Instant.fromEpochMilliseconds(0),
+                rankings = listOf(
+                    Ranking("Alice", 1),
+                    Ranking("TopTier", 2, kind = RankingKind.TIER),
+                    Ranking("Bob", 3),
+                ),
+            )
+        )
+        val text = PasteTallyFormat.renderAsPasteText(
+            candidateNames = listOf("Alice", "Bob", "TopTier"),
+            ballots = ballots,
+            tiers = listOf("TopTier"),
+        )
+        assertTrue("Alice" in text)
+        assertTrue("Bob" in text)
+        assertTrue("TopTier" !in text, "tier marker should be excluded: $text")
     }
 
     private fun runEndToEnd(text: String): Tally {

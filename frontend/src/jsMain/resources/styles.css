@@ -1895,11 +1895,22 @@ tr:nth-child(even) {
 }
 
 .paste-tally-places {
-    padding-left: 1.5rem;
+    list-style: none;
+    padding: 0;
+    margin: 0;
 }
 
 .paste-tally-places li {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
     padding: 0.25rem 0;
+}
+
+.paste-tally-place-rank {
+    min-width: 3rem;
+    font-variant-numeric: tabular-nums;
+    color: #555;
 }
 
 .paste-tally-abbrev {
@@ -1914,15 +1925,6 @@ tr:nth-child(even) {
     font-weight: 600;
     color: #2a4d7a;
     text-align: center;
-}
-
-.paste-tally-legend {
-    list-style: none;
-    padding-left: 0;
-}
-
-.paste-tally-legend li {
-    padding: 0.2rem 0;
 }
 
 .paste-tally-examples {
