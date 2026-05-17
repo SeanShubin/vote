@@ -408,7 +408,7 @@ class DynamoDbSingleTableQueryModel(
 
     // Metadata queries
     override fun tableCount(): Int {
-        return 2  // vote_data and vote_event_log
+        return 3  // vote_data, vote_event_log, vote_operator_state
     }
 
     // Helper functions to convert DynamoDB items to domain objects
