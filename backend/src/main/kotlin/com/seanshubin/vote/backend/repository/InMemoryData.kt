@@ -3,17 +3,24 @@ package com.seanshubin.vote.backend.repository
 import com.seanshubin.vote.domain.*
 import kotlinx.datetime.Instant
 
+/**
+ * Canonical-key invariant: every user-supplied identifier used as a map key
+ * (user name, election name, voter name) is lowercased. Names in this app
+ * are case-insensitive — only passwords would be case-sensitive, and there
+ * are no user passwords (Discord OAuth only). Display case is preserved in
+ * the value's name/electionName/voterName attribute. Reads and writes go
+ * through .lowercase() at the boundary; callers must not assume the raw key
+ * is a presentable name.
+ *
+ * For [candidates] and [tiers] the *value* collections carry display-case
+ * names directly; equality and dedup against them use case-insensitive
+ * comparison inside the command/query model.
+ */
 class InMemoryData {
     val users = mutableMapOf<String, UserData>()
     val elections = mutableMapOf<String, ElectionData>()
     val candidates = mutableMapOf<String, MutableSet<String>>()
-    // Per-election co-managers, keyed by election name. The set holds the
-    // canonical display-case user names; lookups compare case-insensitively.
     val electionManagers = mutableMapOf<String, MutableSet<String>>()
-    // Per-election ordered tier names. The list is the source of truth for
-    // tier ordering; the InMemory store mirrors what MySQL stores in a
-    // separate table and what DynamoDB stores as an attribute on the
-    // election METADATA item.
     val tiers = mutableMapOf<String, List<String>>()
     val ballots = mutableMapOf<Pair<String, String>, BallotData>()
     var lastSynced: Long? = null

@@ -60,11 +60,25 @@ class HttpRecordingBackend(
         recorder.delete("/election/$encodedElection/candidate/$encodedCandidate", token)
     }
 
+    override fun renameCandidate(token: AccessToken, electionName: String, oldName: String, newName: String) {
+        val request = RenameCandidateRequest(oldName, newName)
+        val body = json.encodeToString(request)
+        val encodedName = URLEncoder.encode(electionName, StandardCharsets.UTF_8)
+        recorder.post("/election/$encodedName/candidate-rename", body, token)
+    }
+
     override fun setTiers(token: AccessToken, electionName: String, tierNames: List<String>) {
         val request = SetTiersRequest(tierNames)
         val body = json.encodeToString(request)
         val encodedName = URLEncoder.encode(electionName, StandardCharsets.UTF_8)
         recorder.put("/election/$encodedName/tiers", body, token)
+    }
+
+    override fun renameTier(token: AccessToken, electionName: String, oldName: String, newName: String) {
+        val request = RenameTierRequest(oldName, newName)
+        val body = json.encodeToString(request)
+        val encodedName = URLEncoder.encode(electionName, StandardCharsets.UTF_8)
+        recorder.post("/election/$encodedName/tier-rename", body, token)
     }
 
     override fun deleteElection(token: AccessToken, electionName: String) {

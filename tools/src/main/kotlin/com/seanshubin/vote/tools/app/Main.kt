@@ -41,11 +41,14 @@ import com.seanshubin.vote.tools.commands.LaunchKeepMysql
 import com.seanshubin.vote.tools.commands.LaunchScenarioDynamodb
 import com.seanshubin.vote.tools.commands.LaunchScenarioMysql
 import com.seanshubin.vote.tools.commands.MigrateTiers
+import com.seanshubin.vote.tools.commands.NormalizeCase
 import com.seanshubin.vote.tools.commands.NukeDynamodb
 import com.seanshubin.vote.tools.commands.PadTables
+import com.seanshubin.vote.tools.commands.PauseEventLog
 import com.seanshubin.vote.tools.commands.PurgeDynamodb
 import com.seanshubin.vote.tools.commands.PurgeMysql
 import com.seanshubin.vote.tools.commands.RestoreDynamodb
+import com.seanshubin.vote.tools.commands.ResumeEventLog
 import com.seanshubin.vote.tools.commands.RollLogs
 import com.seanshubin.vote.tools.commands.RunLocal
 import com.seanshubin.vote.tools.commands.ServeFrontend
@@ -78,8 +81,11 @@ fun main(args: Array<String>) {
             PurgeMysql(),
             PurgeDynamodb(),
             BackupDynamodb(),
+            NormalizeCase(),
             NukeDynamodb(),
             RestoreDynamodb(),
+            PauseEventLog(),
+            ResumeEventLog(),
             TerminateAll(),
             RollLogs(),
             ServeFrontend(),

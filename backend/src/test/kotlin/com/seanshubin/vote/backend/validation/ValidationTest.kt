@@ -174,6 +174,21 @@ class ValidationTest {
     }
 
     @Test
+    fun `validateCandidateNames detects case-only duplicates`() {
+        // Names in this app are case-insensitive (only passwords would be
+        // case-sensitive, and there are no user passwords). "Alice" and
+        // "alice" refer to the same candidate.
+        val exception = assertFailsWith<IllegalArgumentException> {
+            Validation.validateCandidateNames(listOf("Alice", "alice"))
+        }
+        assertTrue(exception.message!!.contains("Duplicate"))
+        // Error message surfaces the offending pair in their original case
+        // so the operator sees which inputs collided.
+        assertTrue(exception.message!!.contains("Alice"))
+        assertTrue(exception.message!!.contains("alice"))
+    }
+
+    @Test
     fun `validateCandidateNames rejects empty name`() {
         val exception = assertFailsWith<IllegalArgumentException> {
             Validation.validateCandidateNames(listOf("Alice", "", "Bob"))
@@ -229,6 +244,44 @@ class ValidationTest {
             Validation.validateVoterNames(listOf("alice", "  alice  "))
         }
         assertTrue(exception.message!!.contains("Duplicate"))
+    }
+
+    @Test
+    fun `validateVoterNames detects case-only duplicates`() {
+        val exception = assertFailsWith<IllegalArgumentException> {
+            Validation.validateVoterNames(listOf("Alice", "alice"))
+        }
+        assertTrue(exception.message!!.contains("Duplicate"))
+    }
+
+    @Test
+    fun `validateTierNames detects case-only duplicates`() {
+        val exception = assertFailsWith<IllegalArgumentException> {
+            Validation.validateTierNames(listOf("Gold", "gold"))
+        }
+        assertTrue(exception.message!!.contains("Duplicate"))
+    }
+
+    @Test
+    fun `validateRankingsMatchCandidates accepts case-only candidate variant`() {
+        // The voter typed "alice" but the election stored "Alice" — same
+        // candidate, just different case. Match passes.
+        val rankings = listOf(Ranking("alice", 1))
+        Validation.validateRankingsMatchCandidates(
+            rankings,
+            candidates = listOf("Alice", "Bob"),
+            tiers = emptyList(),
+        )
+    }
+
+    @Test
+    fun `validateRankingsMatchCandidates accepts case-only tier variant`() {
+        val rankings = listOf(Ranking("Alice", 1, RankingKind.CANDIDATE, tier = "gold"))
+        Validation.validateRankingsMatchCandidates(
+            rankings,
+            candidates = listOf("Alice"),
+            tiers = listOf("Gold", "Silver"),
+        )
     }
 
     @Test
