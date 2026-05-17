@@ -8,7 +8,7 @@ import com.seanshubin.vote.domain.TableData
 import kotlinx.coroutines.runBlocking
 
 /**
- * Admin-only raw scan over the two physical DynamoDB tables.
+ * Admin-only raw scan over the three physical DynamoDB tables.
  *
  * Items in `vote_data` are heterogeneous (single-table design with type-prefixed
  * keys), so we render the union of all attribute names as columns — items that
@@ -20,16 +20,21 @@ class DynamoDbRawTableScanner(
 ) : RawTableScanner {
 
     override fun listRawTableNames(): List<String> =
-        listOf(DynamoDbSingleTableSchema.MAIN_TABLE, DynamoDbSingleTableSchema.EVENT_LOG_TABLE)
+        listOf(
+            DynamoDbSingleTableSchema.MAIN_TABLE,
+            DynamoDbSingleTableSchema.EVENT_LOG_TABLE,
+            DynamoDbOperatorStateSchema.TABLE,
+        )
 
     override fun scanRawTable(tableName: String): TableData {
         require(tableName in listRawTableNames()) { "Unknown raw table: $tableName" }
         val items = scanAll(tableName)
 
-        // Column ordering: PK/SK (or event_id) first, then the rest alphabetically.
+        // Column ordering: key attributes first, then the rest alphabetically.
         val priority = when (tableName) {
             DynamoDbSingleTableSchema.MAIN_TABLE -> listOf("PK", "SK")
             DynamoDbSingleTableSchema.EVENT_LOG_TABLE -> listOf("event_id")
+            DynamoDbOperatorStateSchema.TABLE -> listOf("PK")
             else -> emptyList()
         }
         val allColumns = items.flatMap { it.keys }.toSet()
@@ -40,8 +45,9 @@ class DynamoDbRawTableScanner(
         // (effectively random) which is unhelpful for an admin view. Sort by the
         // priority columns so the order is predictable and matches what someone
         // would expect when paging through.
-        //  - vote_event_log → event_id descending (newest first, like the debug view)
-        //  - vote_data      → PK then SK ascending (groups related entities together)
+        //  - vote_event_log       → event_id descending (newest first)
+        //  - vote_data            → PK then SK ascending (groups related entities)
+        //  - vote_operator_state  → PK ascending
         val sortedItems = when (tableName) {
             DynamoDbSingleTableSchema.EVENT_LOG_TABLE ->
                 items.sortedByDescending { it["event_id"]?.asN()?.toLongOrNull() ?: 0L }
@@ -52,6 +58,8 @@ class DynamoDbRawTableScanner(
                         { it["SK"]?.asS() ?: "" },
                     )
                 )
+            DynamoDbOperatorStateSchema.TABLE ->
+                items.sortedBy { it["PK"]?.asS() ?: "" }
             else -> items
         }
 
