@@ -1,6 +1,7 @@
 package com.seanshubin.vote.frontend
 
 import androidx.compose.runtime.*
+import com.seanshubin.vote.contract.ApiClient
 import com.seanshubin.vote.domain.Ballot
 import com.seanshubin.vote.domain.ElectionTally
 import com.seanshubin.vote.domain.Place
@@ -13,6 +14,7 @@ import org.jetbrains.compose.web.dom.*
 
 @Composable
 fun TallyView(
+    apiClient: ApiClient,
     state: FetchState<ElectionTally>,
     currentSide: RankingSide,
     onSetSide: (RankingSide) -> Unit,
@@ -29,7 +31,8 @@ fun TallyView(
             FetchState.Loading -> P { Text("Loading results…") }
             is FetchState.Error -> Div({ classes("error") }) { Text(state.message) }
             is FetchState.Success -> renderTally(
-                state.value,
+                apiClient = apiClient,
+                serverTally = state.value,
                 onNavigateToPreferences = onNavigateToPreferences,
                 onNavigateToDecision = onNavigateToDecision,
                 onNavigateToProcess = onNavigateToProcess,
@@ -54,6 +57,7 @@ fun TallyView(
  */
 @Composable
 private fun renderTally(
+    apiClient: ApiClient,
     serverTally: ElectionTally,
     onNavigateToPreferences: () -> Unit,
     onNavigateToDecision: () -> Unit,
@@ -191,6 +195,36 @@ private fun renderTally(
                 }
             }
         }
+
+        // Token bumps reset the auto-clear timer so a fresh click restarts
+        // the 2s window instead of an older coroutine clearing it early.
+        var copyFeedback by remember { mutableStateOf<String?>(null) }
+        var copyFeedbackToken by remember { mutableStateOf(0) }
+        LaunchedEffect(copyFeedbackToken) {
+            if (copyFeedback != null) {
+                kotlinx.coroutines.delay(2000)
+                copyFeedback = null
+            }
+        }
+        Div({ classes("button-row") }) {
+            Button({
+                onClick {
+                    val text = buildTallyText(
+                        electionName = serverTally.tally.electionName,
+                        sections = sections,
+                        ballotsPerCandidate = ballotsPerCandidate,
+                        totalBallots = serverTally.tally.ballots.size,
+                        activeBallots = totalActiveBallots,
+                    )
+                    copyTextToClipboard(text, apiClient)
+                    copyFeedback = "Copied!"
+                    copyFeedbackToken += 1
+                }
+            }) { Text("Copy results as text") }
+            if (copyFeedback != null) {
+                Span({ classes("copy-feedback") }) { Text(copyFeedback!!) }
+            }
+        }
     }
 
     if (revealed.isNotEmpty()) {
@@ -250,6 +284,46 @@ private fun renderBallotToggles(
             }
         }
     }
+}
+
+/**
+ * Plain-text rendering of the winners list for paste into chat / email.
+ * Mirrors the on-screen Results: same section split (tier cards + naked
+ * lists for boundary ties / trailing remainder), same display ranks (ties
+ * preserved), same coverage counts (appearances / active ballots).
+ *
+ * When [activeBallots] equals [totalBallots] the header reads as the
+ * full count; when filtered (some ballots toggled off in the viewer) it
+ * shows the active-of-total form so the reader knows the numbers reflect
+ * a subset.
+ */
+internal fun buildTallyText(
+    electionName: String,
+    sections: List<TallySection>,
+    ballotsPerCandidate: Map<String, Int>,
+    totalBallots: Int,
+    activeBallots: Int,
+): String {
+    val lines = mutableListOf<String>()
+    lines += electionName
+    lines += if (activeBallots == totalBallots) {
+        "Total Ballots: $totalBallots"
+    } else {
+        "Active Ballots: $activeBallots of $totalBallots"
+    }
+    lines += "Each row: place, candidate, appears on x of y ballots"
+    sections.forEach { section ->
+        lines += ""
+        val tierName = section.tierName
+        if (tierName != null) {
+            lines += tierName
+        }
+        section.places.forEach { place ->
+            val count = ballotsPerCandidate[place.candidateName] ?: 0
+            lines += "- ${ordinal(place.rank)}: ${place.candidateName} ($count/$activeBallots)"
+        }
+    }
+    return lines.joinToString("\n")
 }
 
 // Teens (11th, 12th, 13th) take "th" even though they end in 1/2/3.

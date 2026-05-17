@@ -351,6 +351,7 @@ fun ElectionDetailPage(
                         onError = { errorMessage = it },
                     )
                     "tally" -> TallyView(
+                        apiClient = apiClient,
                         state = tallyFetch.state,
                         currentSide = currentSide,
                         onSetSide = onSetSide,
