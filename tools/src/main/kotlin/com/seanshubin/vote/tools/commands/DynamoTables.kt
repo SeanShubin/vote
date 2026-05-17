@@ -28,6 +28,7 @@ object DynamoTables {
         DynamoClient.create().use { client ->
             createMainTableIfMissing(client)
             createEventLogTableIfMissing(client)
+            createOperatorStateTableIfMissing(client)
         }
     }
 
@@ -76,6 +77,23 @@ object DynamoTables {
             }
         } catch (_: ResourceInUseException) {
             println("Note: ${DynamoClient.TABLE_EVENT_LOG} table already exists")
+        }
+    }
+
+    private suspend fun createOperatorStateTableIfMissing(client: aws.sdk.kotlin.services.dynamodb.DynamoDbClient) {
+        try {
+            client.createTable {
+                tableName = DynamoClient.TABLE_OPERATOR_STATE
+                attributeDefinitions = listOf(
+                    AttributeDefinition { attributeName = "PK"; attributeType = ScalarAttributeType.S }
+                )
+                keySchema = listOf(
+                    KeySchemaElement { attributeName = "PK"; keyType = KeyType.Hash }
+                )
+                billingMode = BillingMode.PayPerRequest
+            }
+        } catch (_: ResourceInUseException) {
+            println("Note: ${DynamoClient.TABLE_OPERATOR_STATE} table already exists")
         }
     }
 }

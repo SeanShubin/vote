@@ -11,6 +11,7 @@ object DynamoClient {
     const val REGION = "us-east-1"
     const val TABLE_DATA = "vote_data"
     const val TABLE_EVENT_LOG = "vote_event_log"
+    const val TABLE_OPERATOR_STATE = "vote_operator_state"
 
     fun create(): DynamoDbClient =
         DynamoDbClient {

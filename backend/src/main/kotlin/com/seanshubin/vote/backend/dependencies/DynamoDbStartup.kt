@@ -1,6 +1,7 @@
 package com.seanshubin.vote.backend.dependencies
 
 import aws.sdk.kotlin.services.dynamodb.DynamoDbClient
+import com.seanshubin.vote.backend.repository.DynamoDbOperatorStateSchema
 import com.seanshubin.vote.backend.repository.DynamoDbSingleTableSchema
 import com.seanshubin.vote.contract.Integrations
 import kotlinx.coroutines.runBlocking
@@ -17,7 +18,8 @@ class DynamoDbStartup(
         runBlocking {
             try {
                 DynamoDbSingleTableSchema.createTables(dynamoDbClient)
-                integrations.emitLine("DynamoDB single-table schema created/verified")
+                DynamoDbOperatorStateSchema.createTable(dynamoDbClient)
+                integrations.emitLine("DynamoDB schemas created/verified")
             } catch (e: Exception) {
                 integrations.emitLine("DynamoDB tables may already exist: ${e.message}")
             }

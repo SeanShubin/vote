@@ -11,10 +11,9 @@ class DynamoDbSystemSettings(
     override fun isEnabled(flag: FeatureFlag): Boolean {
         return runBlocking {
             val response = dynamoDb.getItem(GetItemRequest {
-                tableName = DynamoDbSingleTableSchema.MAIN_TABLE
+                tableName = DynamoDbOperatorStateSchema.TABLE
                 key = mapOf(
-                    "PK" to AttributeValue.S(DynamoDbSingleTableSchema.METADATA_PK),
-                    "SK" to AttributeValue.S(DynamoDbSingleTableSchema.featureFlagSK(flag.name)),
+                    "PK" to AttributeValue.S(DynamoDbOperatorStateSchema.featureFlagPK(flag.name)),
                 )
                 // Strongly-consistent so an owner's flip is visible to every
                 // Lambda on the next request — the whole point of a runtime
@@ -28,10 +27,9 @@ class DynamoDbSystemSettings(
     override fun setEnabled(flag: FeatureFlag, enabled: Boolean) {
         runBlocking {
             dynamoDb.putItem(PutItemRequest {
-                tableName = DynamoDbSingleTableSchema.MAIN_TABLE
+                tableName = DynamoDbOperatorStateSchema.TABLE
                 item = mapOf(
-                    "PK" to AttributeValue.S(DynamoDbSingleTableSchema.METADATA_PK),
-                    "SK" to AttributeValue.S(DynamoDbSingleTableSchema.featureFlagSK(flag.name)),
+                    "PK" to AttributeValue.S(DynamoDbOperatorStateSchema.featureFlagPK(flag.name)),
                     "enabled" to AttributeValue.Bool(enabled),
                 )
             })

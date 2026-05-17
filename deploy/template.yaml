@@ -223,8 +223,9 @@ Resources:
   # The IAM policy on the Lambda function (below) grants ssm:GetParameter
   # on these four paths only.
 
-  # Hard-coded table names (vote_data, vote_event_log) match the constants
-  # in DynamoDbSingleTableSchema.kt — keeps the code simple, locks the stack
+  # Hard-coded table names (vote_data, vote_event_log, vote_operator_state)
+  # match constants in DynamoDbSingleTableSchema.kt and
+  # DynamoDbOperatorStateSchema.kt — keeps the code simple, locks the stack
   # to one deploy per account/region.
   MainTable:
     Type: AWS::DynamoDB::Table
@@ -254,6 +255,25 @@ Resources:
           AttributeType: N
       KeySchema:
         - AttributeName: event_id
+          KeyType: HASH
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+
+  # Operator state — pause flag + feature flags. Physically separated from
+  # vote_data so the datafix nuke/restore tools (which wipe vote_data to
+  # rebuild it from the event log) can't accidentally clobber operator
+  # state that has no event-log source of truth. PK-only because every row
+  # is a standalone setting; no range queries needed.
+  OperatorStateTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: vote_operator_state
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+      KeySchema:
+        - AttributeName: PK
           KeyType: HASH
       PointInTimeRecoverySpecification:
         PointInTimeRecoveryEnabled: true
@@ -333,6 +353,8 @@ Resources:
             TableName: !Ref MainTable
         - DynamoDBCrudPolicy:
             TableName: !Ref EventLogTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref OperatorStateTable
         # Read the four Discord OAuth parameters. Scoped to this stack's
         # parameters so a compromised Lambda can't enumerate other secrets.
         # kms:Decrypt is needed for the SecureString client-secret since it
