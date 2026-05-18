@@ -97,7 +97,7 @@ fun LoginPage(
                 attr("type", "button")
                 onClick { onNavigateToPasteTally() }
             }) {
-                Text("Tally from pasted ballots")
+                Text("Sandbox & Examples")
             }
         }
 

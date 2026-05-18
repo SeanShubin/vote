@@ -140,7 +140,7 @@ fun HomePage(
             Button({
                 onClick { onNavigateToPasteTally() }
             }) {
-                Text("Tally from pasted ballots")
+                Text("Sandbox & Examples")
             }
 
             Button({

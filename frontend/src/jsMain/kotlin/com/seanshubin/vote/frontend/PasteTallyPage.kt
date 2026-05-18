@@ -127,7 +127,7 @@ fun PasteTallyPage(onBack: () -> Unit) {
     }
 
     Div({ classes("container") }) {
-        H1 { Text("Tally from pasted ballots") }
+        H1 { Text("Sandbox & Examples") }
         P {
             Text(
                 "Drop ranked-choice ballots in below and see the Ranked Pairs result. " +
