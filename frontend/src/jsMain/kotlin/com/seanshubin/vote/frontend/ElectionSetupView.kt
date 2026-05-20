@@ -32,6 +32,17 @@ fun ElectionSetupView(
     onElectionRenamed: (String) -> Unit,
     onError: (String) -> Unit,
 ) {
+    // Rename sits at the very top of the Setup tab, just above the
+    // description editor — but it's owner/ADMIN-only, so it stays gated
+    // even though the sections below it are visible to co-managers too.
+    if (canManageManagers) {
+        ElectionNameSection(
+            apiClient = apiClient,
+            electionName = electionName,
+            onElectionRenamed = onElectionRenamed,
+            onError = onError,
+        )
+    }
     DescriptionSection(
         apiClient = apiClient,
         electionName = electionName,
@@ -57,12 +68,6 @@ fun ElectionSetupView(
         onError = onError,
     )
     if (canManageManagers) {
-        ElectionNameSection(
-            apiClient = apiClient,
-            electionName = electionName,
-            onElectionRenamed = onElectionRenamed,
-            onError = onError,
-        )
         // Both manager-related sections need the user list; share one fetch.
         val userNamesFetch = rememberFetchState(
             apiClient = apiClient,
@@ -139,9 +144,9 @@ private fun DescriptionSection(
 }
 
 // Election rename — owner/ADMIN-only (gated by canManageManagers in the
-// parent), grouped with the other structural sections rather than the
-// content editors. The name is the election's identity: it drives the URL,
-// so after a successful rename the page re-navigates to the new route.
+// parent). Rendered at the top of the Setup tab, just above the description
+// editor. The name is the election's identity: it drives the URL, so after
+// a successful rename the page re-navigates to the new route.
 @Composable
 private fun ElectionNameSection(
     apiClient: ApiClient,
