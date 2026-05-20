@@ -7,6 +7,7 @@ import java.net.Socket
 import java.net.URI
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.concurrent.TimeUnit
 import kotlin.io.path.exists
 import kotlin.io.path.readText
 import kotlin.io.path.writeText
@@ -137,11 +138,34 @@ object Procs {
     }
 
     /**
-     * Best-effort kill of any process with the given PID.
+     * Best-effort kill of process [pid] **and its entire descendant tree**,
+     * then block until every one of them has actually exited (or
+     * [timeoutMillis] elapses). Returns true if the target process existed.
+     *
+     * Both halves matter for the dev launcher:
+     *  - A launcher like `gradlew.bat` spawns intermediate JVMs that inherit
+     *    the redirected log-file handle (see [spawnBackground]). Killing only
+     *    the launcher leaves those descendants alive, still holding the log
+     *    file open — so the whole tree has to go.
+     *  - destroyForcibly() merely *requests* termination; on Windows the OS
+     *    releases a process's open file handles a moment later, during
+     *    teardown. A caller that immediately moves those files (log rolling)
+     *    must wait for real exit, not just for the kill request to be sent.
      */
-    fun killPid(pid: Long, force: Boolean = true): Boolean {
+    fun killPid(pid: Long, force: Boolean = true, timeoutMillis: Long = 10_000): Boolean {
         val handle = ProcessHandle.of(pid).orElse(null) ?: return false
-        return if (force) handle.destroyForcibly() else handle.destroy()
+        // Snapshot the tree before destroying anything: once a process dies
+        // its parent/child links are gone and descendants() can't find them.
+        val tree = handle.descendants().collect(java.util.stream.Collectors.toList()) + handle
+        tree.forEach { if (force) it.destroyForcibly() else it.destroy() }
+        val deadline = System.currentTimeMillis() + timeoutMillis
+        tree.forEach { proc ->
+            val remaining = deadline - System.currentTimeMillis()
+            if (remaining > 0) {
+                runCatching { proc.onExit().get(remaining, TimeUnit.MILLISECONDS) }
+            }
+        }
+        return true
     }
 
     /**

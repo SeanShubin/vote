@@ -38,8 +38,10 @@ internal class LaunchPlan(
         // first step doesn't need a leading blank line — strip it inline
         stepCounter = 1
         println("1. Terminating existing processes...")
+        // TerminateAll blocks until every killed process has actually
+        // exited, so the log files are guaranteed released before the
+        // roll step below — no blind sleep needed.
         TerminateAll().run()
-        Thread.sleep(1000)
 
         step("Rolling logs...")
         RollLogs().run()
