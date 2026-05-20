@@ -152,6 +152,21 @@ sealed interface DomainEvent {
     ) : DomainEvent
 
     /**
+     * Election name change after creation. The election name is the
+     * election's identity — it keys candidates, tiers, ballots, and the
+     * manager list — so this cascades across all of them in the projection,
+     * the same shape as [CandidateRenamed]/[TierRenamed] but wider. The
+     * event log itself is never rewritten: old events keep [oldName], and
+     * the projection ends every table on [newName] when it replays.
+     */
+    @Serializable
+    @SerialName("ElectionNameChanged")
+    data class ElectionNameChanged(
+        val oldName: String,
+        val newName: String,
+    ) : DomainEvent
+
+    /**
      * Grant [userName] co-manager authority on [electionName]. A manager can do
      * the same content editing the owner can — candidates, tiers, description —
      * but not delete the election, transfer ownership, or change the manager

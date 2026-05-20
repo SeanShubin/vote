@@ -12,6 +12,7 @@ interface CommandModel {
     fun removeUser(authority: String, userName: String)
     fun addElection(authority: String, owner: String, electionName: String, description: String)
     fun setElectionDescription(authority: String, electionName: String, description: String)
+    fun renameElection(authority: String, oldName: String, newName: String)
     fun setElectionOwner(authority: String, electionName: String, newOwnerName: String)
     fun addElectionManager(authority: String, electionName: String, userName: String)
     fun removeElectionManager(authority: String, electionName: String, userName: String)

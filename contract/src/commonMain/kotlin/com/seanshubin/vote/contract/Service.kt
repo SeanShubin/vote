@@ -56,6 +56,18 @@ interface Service {
     fun listUserNames(accessToken: AccessToken): List<String>
     fun addElection(accessToken: AccessToken, userName: String, electionName: String, description: String)
     fun setElectionDescription(accessToken: AccessToken, electionName: String, description: String)
+
+    /**
+     * Rename an election in place. The election name is the election's
+     * identity, so [newName] cascades across the election's candidates,
+     * tiers, ballots, and manager list. No-op if [newName] equals the
+     * current name; a case-only rename ("Best Pet" → "best pet") is
+     * allowed. Rejected when [newName] collides with another election, or
+     * when the caller isn't the election owner or an ADMIN+ — a co-manager
+     * cannot rename, unlike the description/candidate/tier edits, because
+     * the name is identity rather than content.
+     */
+    fun renameElection(accessToken: AccessToken, oldName: String, newName: String)
     fun updateUser(accessToken: AccessToken, userName: String, userUpdates: UserUpdates)
     fun getUser(accessToken: AccessToken, userName: String): UserNameEmail
     fun getElection(accessToken: AccessToken, electionName: String): ElectionDetail

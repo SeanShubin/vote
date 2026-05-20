@@ -86,6 +86,13 @@ class HttpRecordingBackend(
         recorder.delete("/election/$encodedName", token)
     }
 
+    override fun renameElection(token: AccessToken, oldName: String, newName: String) {
+        val request = RenameElectionRequest(newName)
+        val body = json.encodeToString(request)
+        val encodedName = URLEncoder.encode(oldName, StandardCharsets.UTF_8)
+        recorder.put("/election/$encodedName/name", body, token)
+    }
+
     override fun transferElectionOwnership(token: AccessToken, electionName: String, newOwnerName: String) {
         val request = TransferElectionOwnershipRequest(newOwnerName)
         val body = json.encodeToString(request)

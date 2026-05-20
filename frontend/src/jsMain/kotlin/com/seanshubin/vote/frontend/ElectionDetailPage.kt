@@ -40,6 +40,9 @@ fun ElectionDetailPage(
     isEventLogPaused: Boolean,
     onBack: () -> Unit,
     onElectionDeleted: () -> Unit,
+    // Called after a successful rename. The election's URL is keyed on its
+    // name, so the parent re-navigates to the new route.
+    onElectionRenamed: (newName: String) -> Unit = {},
     onNavigateToHeadToHead: () -> Unit = {},
     onNavigateToProcess: () -> Unit = {},
 ) {
@@ -305,6 +308,14 @@ fun ElectionDetailPage(
                             lastLoadedShell = lastLoadedShell?.let { (e, c) ->
                                 e.copy(managers = e.managers.filter { it != removed }) to c
                             }
+                        },
+                        onElectionRenamed = { newName ->
+                            // The Elections list still shows the old name —
+                            // invalidate so a navigation back picks up fresh.
+                            // The parent re-navigates to the new route, which
+                            // remounts this page with the new electionName.
+                            PageCache.invalidate("elections")
+                            onElectionRenamed(newName)
                         },
                         onOwnerTransferred = { newOwnerName ->
                             successMessage = "Ownership transferred to $newOwnerName"

@@ -56,6 +56,30 @@ class InMemoryCommandModel(private val data: InMemoryData) : CommandModel {
         data.elections[key] = election.copy(description = description)
     }
 
+    override fun renameElection(authority: String, oldName: String, newName: String) {
+        val oldKey = oldName.lowercase()
+        val newKey = newName.lowercase()
+        val election = data.elections.remove(oldKey) ?: error("Election not found: $oldName")
+        data.elections[newKey] = election.copy(electionName = newName)
+
+        // Re-key every per-election collection. On a case-only rename
+        // oldKey == newKey, so remove()-then-put() under the same key just
+        // rewrites the entry — still correct.
+        data.candidates.remove(oldKey)?.let { data.candidates[newKey] = it }
+        data.tiers.remove(oldKey)?.let { data.tiers[newKey] = it }
+        data.electionManagers.remove(oldKey)?.let { data.electionManagers[newKey] = it }
+
+        // Ballots are keyed by (electionKey, voterKey); re-key each and
+        // rewrite the stored display-case electionName.
+        data.ballots.entries
+            .filter { it.key.first == oldKey }
+            .toList()
+            .forEach { (key, ballot) ->
+                data.ballots.remove(key)
+                data.ballots[newKey to key.second] = ballot.copy(electionName = newName)
+            }
+    }
+
     override fun setElectionOwner(authority: String, electionName: String, newOwnerName: String) {
         val key = electionName.lowercase()
         val election = data.elections[key] ?: error("Election not found: $electionName")

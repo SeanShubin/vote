@@ -130,6 +130,11 @@ class TallyFromSnapshot : CliktCommand(name = "tally-from-snapshot") {
                 is DomainEvent.ElectionDeleted -> {
                     states.remove(e.electionName)
                 }
+                is DomainEvent.ElectionNameChanged -> {
+                    // Re-key the state so events cast after the rename (which
+                    // carry the new name) still resolve to this election.
+                    states.remove(e.oldName)?.let { states[e.newName] = it }
+                }
                 is DomainEvent.CandidatesAdded -> {
                     states[e.electionName]?.candidates?.addAll(e.candidateNames)
                 }

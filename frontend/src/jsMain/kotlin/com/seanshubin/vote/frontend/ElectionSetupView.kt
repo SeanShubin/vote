@@ -29,6 +29,7 @@ fun ElectionSetupView(
     onManagerAdded: (String) -> Unit,
     onManagerRemoved: (String) -> Unit,
     onOwnerTransferred: (String) -> Unit,
+    onElectionRenamed: (String) -> Unit,
     onError: (String) -> Unit,
 ) {
     DescriptionSection(
@@ -56,6 +57,12 @@ fun ElectionSetupView(
         onError = onError,
     )
     if (canManageManagers) {
+        ElectionNameSection(
+            apiClient = apiClient,
+            electionName = electionName,
+            onElectionRenamed = onElectionRenamed,
+            onError = onError,
+        )
         // Both manager-related sections need the user list; share one fetch.
         val userNamesFetch = rememberFetchState(
             apiClient = apiClient,
@@ -127,6 +134,65 @@ private fun DescriptionSection(
             onClick { saveDescriptionAction.invoke() }
         }) {
             Text(if (saveDescriptionAction.isLoading) "Saving…" else "Save Description")
+        }
+    }
+}
+
+// Election rename — owner/ADMIN-only (gated by canManageManagers in the
+// parent), grouped with the other structural sections rather than the
+// content editors. The name is the election's identity: it drives the URL,
+// so after a successful rename the page re-navigates to the new route.
+@Composable
+private fun ElectionNameSection(
+    apiClient: ApiClient,
+    electionName: String,
+    onElectionRenamed: (String) -> Unit,
+    onError: (String) -> Unit,
+) {
+    var nameText by remember(electionName) { mutableStateOf(electionName) }
+
+    val renameAction = rememberAsyncAction(
+        apiClient = apiClient,
+        fallbackErrorMessage = "Failed to rename election",
+        onError = onError,
+        action = {
+            val newName = nameText.trim()
+            if (newName.isBlank() || newName == electionName) return@rememberAsyncAction
+            apiClient.renameElection(electionName, newName)
+            onElectionRenamed(newName)
+        },
+    )
+
+    Div({ classes("section") }) {
+        H2 { Text("Election Name") }
+
+        P {
+            Text(
+                "Renaming changes the election's URL. Existing candidates, " +
+                    "tiers, ballots, and managers are carried over."
+            )
+        }
+        Input(InputType.Text) {
+            classes("input")
+            value(nameText)
+            onInput { nameText = it.value }
+        }
+
+        Button({
+            val disabled = renameAction.isLoading ||
+                nameText.trim().isBlank() ||
+                nameText.trim() == electionName
+            if (disabled) attr("disabled", "")
+            onClick {
+                val newName = nameText.trim()
+                val confirmed = window.confirm(
+                    "Rename election \"$electionName\" to \"$newName\"? " +
+                        "The election's URL will change."
+                )
+                if (confirmed) renameAction.invoke()
+            }
+        }) {
+            Text(if (renameAction.isLoading) "Renaming…" else "Rename Election")
         }
     }
 }

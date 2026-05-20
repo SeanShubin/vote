@@ -249,6 +249,9 @@ fun VoteApp(apiClient: ApiClient) {
             isEventLogPaused = isPaused,
             onBack = { router.navigate(Page.Elections) },
             onElectionDeleted = { router.replace(Page.Elections) },
+            // The old name's URL no longer resolves to an election — use
+            // replace so Back doesn't return to that dead route.
+            onElectionRenamed = { newName -> router.replace(Page.ElectionDetail(newName)) },
             onNavigateToHeadToHead = {
                 router.navigate(Page.ElectionHeadToHead(page.electionName))
             },

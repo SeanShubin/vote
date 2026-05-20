@@ -339,6 +339,52 @@ class DynamoDbSingleTableCommandModel(
         }
     }
 
+    override fun renameElection(authority: String, oldName: String, newName: String) {
+        // Every item for an election — the METADATA row plus its candidate,
+        // ballot, and manager rows — shares PK = electionPK(electionName).
+        // Renaming moves them all to the new PK and rewrites the stored
+        // display-case election_name attribute. Each item's SK keys off its
+        // own name (candidate/voter/user), never the election's, so the move
+        // is put-new + delete-old with the SK unchanged.
+        runBlocking {
+            val oldPk = DynamoDbSingleTableSchema.electionPK(oldName)
+            val newPk = DynamoDbSingleTableSchema.electionPK(newName)
+            val items = dynamoDb.query(QueryRequest {
+                tableName = DynamoDbSingleTableSchema.MAIN_TABLE
+                keyConditionExpression = "PK = :pk"
+                expressionAttributeValues = mapOf(":pk" to AttributeValue.S(oldPk))
+            }).items ?: return@runBlocking
+
+            items.forEach { item ->
+                val sk = item["SK"]?.asS() ?: return@forEach
+                val rewritten = item.toMutableMap().apply {
+                    this["PK"] = AttributeValue.S(newPk)
+                    if (containsKey("election_name")) {
+                        this["election_name"] = AttributeValue.S(newName)
+                    }
+                }
+                // Put the new item before deleting the old one so a reader
+                // caught mid-rename sees both keys, never neither.
+                dynamoDb.putItem(PutItemRequest {
+                    tableName = DynamoDbSingleTableSchema.MAIN_TABLE
+                    this.item = rewritten
+                })
+                // On a case-only rename oldPk == newPk: the put above already
+                // overwrote the row in place, so skip the delete that would
+                // otherwise remove what we just wrote.
+                if (oldPk != newPk) {
+                    dynamoDb.deleteItem(DeleteItemRequest {
+                        tableName = DynamoDbSingleTableSchema.MAIN_TABLE
+                        key = mapOf(
+                            "PK" to AttributeValue.S(oldPk),
+                            "SK" to AttributeValue.S(sk),
+                        )
+                    })
+                }
+            }
+        }
+    }
+
     override fun setElectionOwner(authority: String, electionName: String, newOwnerName: String) {
         runBlocking {
             dynamoDb.updateItem(UpdateItemRequest {

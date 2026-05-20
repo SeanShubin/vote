@@ -76,6 +76,21 @@ class MySqlCommandModel(
         }
     }
 
+    override fun renameElection(authority: String, oldName: String, newName: String) {
+        // The election_name foreign key on candidates / tiers / ballots /
+        // election_managers is declared ON UPDATE CASCADE, so updating the
+        // parent row rewrites every child reference in one statement — the
+        // database does the cascade the projection would otherwise spell
+        // out by hand. (rankings key off the surrogate ballot_id, so they
+        // are untouched by the rename.)
+        val sql = queryLoader.load("election-rename")
+        connection.prepareStatement(sql).use { stmt ->
+            stmt.setString(1, newName)
+            stmt.setString(2, oldName)
+            stmt.executeUpdate()
+        }
+    }
+
     override fun setElectionOwner(authority: String, electionName: String, newOwnerName: String) {
         val sql = queryLoader.load("election-update-owner")
         connection.prepareStatement(sql).use { stmt ->

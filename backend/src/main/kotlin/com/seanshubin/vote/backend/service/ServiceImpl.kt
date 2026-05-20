@@ -227,6 +227,41 @@ class ServiceImpl(
         synchronize()
     }
 
+    override fun renameElection(accessToken: AccessToken, oldName: String, newName: String) {
+        // VALIDATION SECTION
+        // Owner-or-ADMIN only — the same gate as delete and transfer. The
+        // name is the election's identity (it drives URLs and how voters
+        // reference it), so it is not a content edit a co-manager may make.
+        val election = requireElectionOwnerOrAdmin(accessToken, oldName)
+        val validNewName = Validation.validateElectionName(newName)
+
+        // Idempotent no-op: renaming to the same exact name doesn't earn an
+        // event. A case-only rename ("Best Pet" → "best pet") does change
+        // display and is allowed to emit — mirrors candidate/tier rename.
+        if (election.electionName == validNewName) return
+
+        // Conflict only if newName collides with a *different* election
+        // (case-insensitively). A case-only rename of the election itself
+        // is allowed.
+        val conflict = queryModel.searchElectionByName(validNewName)
+        if (conflict != null && !conflict.electionName.equals(election.electionName, ignoreCase = true)) {
+            throw ServiceException(
+                ServiceException.Category.CONFLICT,
+                "Election already exists: $validNewName"
+            )
+        }
+
+        // EXECUTION SECTION
+        // Record the canonical stored old name so the audit log and the
+        // projection cascade key off the name exactly as registered.
+        eventLog.appendEvent(
+            accessToken.userName,
+            clock.now(),
+            DomainEvent.ElectionNameChanged(election.electionName, validNewName)
+        )
+        synchronize()
+    }
+
     override fun updateUser(accessToken: AccessToken, userName: String, userUpdates: UserUpdates) {
         // VALIDATION SECTION
         requirePermission(accessToken, Permission.USE_APPLICATION)

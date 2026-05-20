@@ -50,6 +50,17 @@ class ElectionContext(
         testContext.backend.synchronize()
     }
 
+    /**
+     * Rename the election and return a fresh context bound to the new
+     * name. The old [ElectionContext] is stale after this — keep the
+     * returned one.
+     */
+    fun rename(newName: String): ElectionContext {
+        testContext.backend.renameElection(owner.accessToken, name, newName)
+        testContext.backend.synchronize()
+        return ElectionContext(testContext, newName, owner)
+    }
+
     fun transferOwnership(newOwnerName: String) {
         testContext.backend.transferElectionOwnership(owner.accessToken, name, newOwnerName)
         testContext.backend.synchronize()

@@ -180,6 +180,14 @@ class HttpApiClient(
         )
     }
 
+    override suspend fun renameElection(oldName: String, newName: String) {
+        val request = RenameElectionRequest(newName)
+        putWithAuth<RenameElectionRequest, Unit>(
+            "/election/${encodeURIComponent(oldName)}/name",
+            request,
+        )
+    }
+
     override suspend fun addCandidates(electionName: String, candidateNames: List<String>) {
         val request = AddCandidatesRequest(candidateNames)
         postWithAuth<AddCandidatesRequest, Unit>(

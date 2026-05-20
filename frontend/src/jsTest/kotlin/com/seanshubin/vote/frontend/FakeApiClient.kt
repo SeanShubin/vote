@@ -28,6 +28,7 @@ class FakeApiClient : ApiClient {
     val setTiersCalls = mutableListOf<SetTiersCall>()
     val renameTierCalls = mutableListOf<RenameTierCall>()
     val setElectionDescriptionCalls = mutableListOf<SetElectionDescriptionCall>()
+    val renameElectionCalls = mutableListOf<RenameElectionCall>()
     val listTiersCalls = mutableListOf<String>()
     val castBallotCalls = mutableListOf<CastBallotCall>()
     val deleteMyBallotCalls = mutableListOf<String>()
@@ -68,6 +69,7 @@ class FakeApiClient : ApiClient {
     var setTiersResult: Result<Unit> = Result.success(Unit)
     var renameTierResult: Result<Unit> = Result.success(Unit)
     var setElectionDescriptionResult: Result<Unit> = Result.success(Unit)
+    var renameElectionResult: Result<Unit> = Result.success(Unit)
     var listTiersResult: Result<List<String>> = Result.success(emptyList())
     var castBallotResult: Result<String> = Result.success("ballot-confirmation-123")
     var deleteMyBallotResult: Result<Unit> = Result.success(Unit)
@@ -172,6 +174,11 @@ class FakeApiClient : ApiClient {
     override suspend fun setElectionDescription(electionName: String, description: String) {
         setElectionDescriptionCalls.add(SetElectionDescriptionCall(electionName, description))
         setElectionDescriptionResult.getOrThrow()
+    }
+
+    override suspend fun renameElection(oldName: String, newName: String) {
+        renameElectionCalls.add(RenameElectionCall(oldName, newName))
+        renameElectionResult.getOrThrow()
     }
 
     override suspend fun addCandidates(electionName: String, candidateNames: List<String>) {
@@ -338,6 +345,7 @@ class FakeApiClient : ApiClient {
     data class SetTiersCall(val electionName: String, val tiers: List<String>)
     data class RenameTierCall(val electionName: String, val oldName: String, val newName: String)
     data class SetElectionDescriptionCall(val electionName: String, val description: String)
+    data class RenameElectionCall(val oldName: String, val newName: String)
     data class CastBallotCall(val electionName: String, val rankings: List<Ranking>)
     data class SetRoleCall(val userName: String, val role: Role)
     data class TransferElectionOwnershipCall(val electionName: String, val newOwnerName: String)

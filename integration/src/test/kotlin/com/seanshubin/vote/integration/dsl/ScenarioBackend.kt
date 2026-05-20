@@ -33,6 +33,7 @@ interface ScenarioBackend {
     fun setTiers(token: AccessToken, electionName: String, tierNames: List<String>)
     fun renameTier(token: AccessToken, electionName: String, oldName: String, newName: String)
     fun deleteElection(token: AccessToken, electionName: String)
+    fun renameElection(token: AccessToken, oldName: String, newName: String)
     fun transferElectionOwnership(token: AccessToken, electionName: String, newOwnerName: String)
     fun addElectionManager(token: AccessToken, electionName: String, userName: String)
     fun removeElectionManager(token: AccessToken, electionName: String, userName: String)

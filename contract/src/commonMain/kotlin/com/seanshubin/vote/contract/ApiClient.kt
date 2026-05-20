@@ -92,6 +92,14 @@ interface ApiClient {
     suspend fun createElection(electionName: String, description: String = ""): String
     suspend fun getElection(electionName: String): ElectionDetail
     suspend fun setElectionDescription(electionName: String, description: String)
+
+    /**
+     * Rename an election. The new name cascades across the election's
+     * candidates, tiers, ballots, and managers, so existing ballots survive
+     * the change — use this instead of delete-then-recreate. Allowed for the
+     * election owner or ADMIN+; a co-manager cannot rename.
+     */
+    suspend fun renameElection(oldName: String, newName: String)
     /**
      * Append one or more candidates to the election. Names already present
      * are silently skipped (the backend filters to "new only" before

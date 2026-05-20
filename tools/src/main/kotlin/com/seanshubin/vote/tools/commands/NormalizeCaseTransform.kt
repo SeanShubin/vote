@@ -134,6 +134,26 @@ object NormalizeCaseTransform {
             is DomainEvent.ElectionDescriptionChanged -> {
                 event.copy(electionName = lookupElection(event.electionName, eventId, "ElectionDescriptionChanged"))
             }
+            is DomainEvent.ElectionNameChanged -> {
+                val canonicalOld = lookupElection(event.oldName, eventId, "ElectionNameChanged.old")
+                // The new name takes over the slot. If newName's lowercase
+                // already names a *different* election, that's a hard
+                // collision the new code wouldn't allow.
+                val newLower = event.newName.lowercase()
+                val oldLower = canonicalOld.lowercase()
+                if (newLower != oldLower) {
+                    val collide = electionCanonical[newLower]
+                    if (collide != null) {
+                        collisions += "Event #$eventId ElectionNameChanged: renaming '$canonicalOld' → '${event.newName}' would collide with existing election '$collide'"
+                    }
+                    electionCanonical.remove(oldLower)
+                    // Move the per-election candidate/tier tables to the new key.
+                    candidates.remove(oldLower)?.let { candidates[newLower] = it }
+                    tiers.remove(oldLower)?.let { tiers[newLower] = it }
+                }
+                electionCanonical[newLower] = event.newName
+                event.copy(oldName = canonicalOld, newName = event.newName)
+            }
             is DomainEvent.ElectionManagerAdded -> {
                 event.copy(
                     electionName = lookupElection(event.electionName, eventId, "ElectionManagerAdded"),

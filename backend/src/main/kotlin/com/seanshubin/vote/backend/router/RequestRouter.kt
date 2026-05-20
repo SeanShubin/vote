@@ -16,6 +16,7 @@ import com.seanshubin.vote.contract.ErrorResponse
 import com.seanshubin.vote.contract.EventLogPausedException
 import com.seanshubin.vote.contract.Notifications
 import com.seanshubin.vote.contract.RenameCandidateRequest
+import com.seanshubin.vote.contract.RenameElectionRequest
 import com.seanshubin.vote.contract.RenameTierRequest
 import com.seanshubin.vote.contract.Service
 import com.seanshubin.vote.contract.AddCandidatesRequest
@@ -162,6 +163,7 @@ class RequestRouter(
         Route("POST", "/election/[^/]+/manager-add", ::handleAddElectionManager),
         Route("DELETE", "/election/[^/]+/manager/[^/]+", ::handleRemoveElectionManager),
         Route("PUT", "/election/[^/]+/description", ::handleSetDescription),
+        Route("PUT", "/election/[^/]+/name", ::handleRenameElection),
         Route("POST", "/election/[^/]+/candidate-add", ::handleAddCandidates),
         Route("DELETE", "/election/[^/]+/candidate/[^/]+", ::handleRemoveCandidate),
         Route("GET", "/election/[^/]+/candidates", ::handleListCandidates),
@@ -600,6 +602,14 @@ class RequestRouter(
         val setDescriptionRequest = json.decodeFromString<SetDescriptionRequest>(req.body)
         service.setElectionDescription(accessToken, electionName, setDescriptionRequest.description)
         return HttpResponse(200, json.encodeToString(mapOf("status" to "description updated")))
+    }
+
+    private fun handleRenameElection(req: HttpRequest): HttpResponse {
+        val accessToken = extractAccessToken(req)
+        val electionName = extractElectionName(req.target)
+        val request = json.decodeFromString<RenameElectionRequest>(req.body)
+        service.renameElection(accessToken, electionName, request.newName)
+        return HttpResponse(200, json.encodeToString(mapOf("status" to "election renamed")))
     }
 
     private fun handleListTiers(req: HttpRequest): HttpResponse {

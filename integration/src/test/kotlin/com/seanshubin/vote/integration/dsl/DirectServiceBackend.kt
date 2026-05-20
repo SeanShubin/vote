@@ -58,6 +58,10 @@ class DirectServiceBackend(
         service.deleteElection(token, electionName)
     }
 
+    override fun renameElection(token: AccessToken, oldName: String, newName: String) {
+        service.renameElection(token, oldName, newName)
+    }
+
     override fun transferElectionOwnership(token: AccessToken, electionName: String, newOwnerName: String) {
         service.transferElectionOwnership(token, electionName, newOwnerName)
     }
