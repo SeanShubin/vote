@@ -76,3 +76,35 @@ tasks.shadowJar {
     archiveVersion.set("")
     mergeServiceFiles()
 }
+
+// Generates BuildInfo.kt so the running backend can report exactly which
+// commit it was built from. -Pgit.hash is supplied by the deploy workflow;
+// local builds fall back to "dev". Git hash only — no wall-clock timestamp —
+// so the generated source stays stable and a plain rebuild doesn't force a
+// full recompile. The deploy time lives in the deployed-version.json manifest.
+val generatedBuildInfoDir = layout.buildDirectory.dir("generated/buildInfo/kotlin")
+
+val generateBuildInfo by tasks.registering {
+    val gitHash = (project.findProperty("git.hash") as? String) ?: "dev"
+    val outputDir = generatedBuildInfoDir
+    inputs.property("gitHash", gitHash)
+    outputs.dir(outputDir)
+    doLast {
+        val pkgDir = outputDir.get().asFile.resolve("com/seanshubin/vote/backend")
+        pkgDir.mkdirs()
+        pkgDir.resolve("BuildInfo.kt").writeText(
+            """
+            |package com.seanshubin.vote.backend
+            |
+            |object BuildInfo {
+            |    const val GIT_HASH: String = "$gitHash"
+            |}
+            |
+            """.trimMargin()
+        )
+    }
+}
+
+kotlin.sourceSets.named("main") {
+    kotlin.srcDir(generateBuildInfo)
+}

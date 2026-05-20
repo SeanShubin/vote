@@ -1,5 +1,6 @@
 package com.seanshubin.vote.backend.service
 
+import com.seanshubin.vote.backend.BuildInfo
 import com.seanshubin.vote.backend.auth.DiscordConfigProvider
 import com.seanshubin.vote.backend.auth.DiscordOAuthClient
 import com.seanshubin.vote.backend.auth.TokenEncoder
@@ -21,6 +22,9 @@ class ServiceImpl(
     private val relationalProjection: DynamoToRelational,
     private val eventApplier: EventApplier,
     private val devLoginEnabled: Boolean,
+    // Reads the deploy pipeline's published manifest. Defaults to "no
+    // manifest" so tests and non-prod wiring need not supply one.
+    private val deployManifestReader: () -> DeployManifest? = { null },
 ) : Service {
     private val secureRandom = SecureRandom()
     private val clock = integrations.clock
@@ -38,6 +42,51 @@ class ServiceImpl(
             "ok"
         } catch (e: Exception) {
             e.message ?: "error"
+        }
+    }
+
+    override fun deployedVersions(accessToken: AccessToken): DeployedVersions {
+        requireOwner(accessToken, "view deployed versions")
+        return gatherDeployedVersions()
+    }
+
+    override fun emailDeployedVersions(accessToken: AccessToken) {
+        requireOwner(accessToken, "email the deployed-versions report")
+        integrations.notifications.deployedVersionsReported(
+            formatDeployedVersionsReport(gatherDeployedVersions())
+        )
+    }
+
+    private fun gatherDeployedVersions(): DeployedVersions =
+        DeployedVersions(
+            backendGitHash = BuildInfo.GIT_HASH,
+            deployManifest = deployManifestReader(),
+        )
+
+    private fun formatDeployedVersionsReport(versions: DeployedVersions): String = buildString {
+        appendLine("DEPLOYED VERSIONS")
+        appendLine("=================")
+        appendLine()
+        appendLine("Backend (running Lambda)")
+        appendLine("  git hash: ${versions.backendGitHash}")
+        appendLine()
+        val manifest = versions.deployManifest
+        if (manifest == null) {
+            appendLine("Last deploy (pipeline manifest): not available")
+        } else {
+            appendLine("Last deploy (pipeline manifest)")
+            appendLine("  git hash:    ${manifest.gitHash}")
+            appendLine("  git ref:     ${manifest.gitRef}")
+            appendLine("  run number:  ${manifest.runNumber}")
+            appendLine("  deployed at: ${manifest.deployedAt}")
+            appendLine()
+            appendLine(
+                if (manifest.gitHash == versions.backendGitHash) {
+                    "In sync: yes — the running backend matches the last deploy."
+                } else {
+                    "In sync: NO — the running backend is not the last thing deployed."
+                }
+            )
         }
     }
 

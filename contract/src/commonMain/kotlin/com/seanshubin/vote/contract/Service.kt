@@ -41,6 +41,17 @@ interface Service {
     fun setFeatureEnabled(accessToken: AccessToken, flag: FeatureFlag, enabled: Boolean)
 
     /**
+     * Owner-only: the git hash compiled into the running backend, paired
+     * with the deploy pipeline's last-published manifest. Lets an operator
+     * confirm what is actually live — and whether the running backend
+     * matches the last deploy — without digging through AWS.
+     */
+    fun deployedVersions(accessToken: AccessToken): DeployedVersions
+
+    /** Owner-only: email the [deployedVersions] report to the ops address. */
+    fun emailDeployedVersions(accessToken: AccessToken)
+
+    /**
      * Monotonic version of the read model — the id of the last event projected
      * into the query tables. Every write advances it; if it hasn't moved, no
      * data anywhere has changed. Clients poll this to decide whether a refetch

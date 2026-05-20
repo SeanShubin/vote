@@ -124,8 +124,89 @@ fun AdminPage(
             }
         }
 
+        DeployedVersionsSection(
+            apiClient = apiClient,
+            onError = { errorMessage = it },
+        )
+
         Div({ classes("button-row") }) {
             Button({ onClick { onBack() } }) { Text("Back to Home") }
+        }
+    }
+}
+
+// Shows the git hash compiled into the running backend next to the deploy
+// pipeline's last-published manifest, with an in-sync verdict — the panel
+// that answers "did the thing I pushed actually go live?" at a glance.
+// The Email button sends the same report to the ops address.
+@Composable
+private fun DeployedVersionsSection(
+    apiClient: ApiClient,
+    onError: (String) -> Unit,
+) {
+    val versionsFetch = rememberFetchState(
+        apiClient = apiClient,
+        key = "deployed-versions",
+        fallbackErrorMessage = "Failed to load deployed versions",
+    ) {
+        apiClient.deployedVersions()
+    }
+
+    var emailFeedback by remember { mutableStateOf<String?>(null) }
+    val emailAction = rememberAsyncAction(
+        apiClient = apiClient,
+        fallbackErrorMessage = "Failed to email the report",
+        onError = onError,
+        action = {
+            apiClient.emailDeployedVersions()
+            emailFeedback = "Report emailed."
+        },
+    )
+
+    Div({ classes("admin-section") }) {
+        H2 { Text("Deployed Versions") }
+        P {
+            Text(
+                "The commit the running backend was built from, next to what " +
+                    "the deploy pipeline last published. When the two git hashes " +
+                    "disagree, the running backend is not the last thing deployed."
+            )
+        }
+
+        when (val state = versionsFetch.state) {
+            FetchState.Loading -> P { Text("Loading…") }
+            is FetchState.Error -> Div({ classes("error") }) { Text(state.message) }
+            is FetchState.Success -> {
+                val versions = state.value
+                val manifest = versions.deployManifest
+                Div({ classes("admin-flag-card") }) {
+                    P { Text("Backend (running): ${versions.backendGitHash}") }
+                    if (manifest == null) {
+                        P { Text("Last deploy: manifest not available.") }
+                    } else {
+                        P { Text("Last deploy: ${manifest.gitHash}") }
+                        P { Text("Ref: ${manifest.gitRef} • run #${manifest.runNumber}") }
+                        P { Text("Deployed at: ${manifest.deployedAt}") }
+                        val inSync = manifest.gitHash == versions.backendGitHash
+                        Span({
+                            classes("admin-flag-state")
+                            if (inSync) classes("admin-flag-state-on") else classes("admin-flag-state-off")
+                        }) { Text(if (inSync) "IN SYNC" else "OUT OF SYNC") }
+                    }
+                }
+            }
+        }
+
+        Div({ classes("button-row") }) {
+            Button({
+                if (emailAction.isLoading) attr("disabled", "")
+                onClick { emailAction.invoke() }
+            }) {
+                Text(if (emailAction.isLoading) "Emailing…" else "Email Report")
+            }
+            if (emailFeedback != null) {
+                Span({ classes("copy-feedback") }) { Text(emailFeedback!!) }
+            }
         }
     }
 }

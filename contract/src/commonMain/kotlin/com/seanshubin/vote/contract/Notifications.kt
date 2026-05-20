@@ -21,4 +21,11 @@ interface Notifications {
         stackTrace: String?,
         timestamp: String,
     )
+
+    /**
+     * The owner requested a deployed-versions report. Not an error — a
+     * deliberately requested operator email; [report] is the fully
+     * formatted body.
+     */
+    fun deployedVersionsReported(report: String)
 }

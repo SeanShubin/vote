@@ -135,6 +135,8 @@ class RequestRouter(
         Route("POST", "/admin/event-log/resume", ::handleEventLogResume),
         Route("GET", "/admin/feature-flags", { _ -> handleListFeatureFlags() }),
         Route("PUT", "/admin/feature-flags/[^/]+", ::handleSetFeatureFlag),
+        Route("GET", "/admin/deployed-versions", ::handleDeployedVersions),
+        Route("POST", "/admin/deployed-versions/email", ::handleEmailDeployedVersions),
         Route("POST", "/log-client-error", ::handleLogClientError),
         Route("POST", "/refresh", ::handleRefresh),
         Route("POST", "/logout", { _ -> handleLogout() }),
@@ -329,6 +331,18 @@ class RequestRouter(
             )
         service.setFeatureEnabled(accessToken, flag, enabled)
         return HttpResponse(200, json.encodeToString(mapOf(flag.name to enabled)))
+    }
+
+    private fun handleDeployedVersions(req: HttpRequest): HttpResponse {
+        val accessToken = extractAccessToken(req)
+        val versions = service.deployedVersions(accessToken)
+        return HttpResponse(200, json.encodeToString(versions))
+    }
+
+    private fun handleEmailDeployedVersions(req: HttpRequest): HttpResponse {
+        val accessToken = extractAccessToken(req)
+        service.emailDeployedVersions(accessToken)
+        return HttpResponse(200, json.encodeToString(mapOf("status" to "report emailed")))
     }
 
     private fun handleLogClientError(req: HttpRequest): HttpResponse {

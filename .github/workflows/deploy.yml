@@ -45,7 +45,9 @@ jobs:
         uses: gradle/actions/setup-gradle@v3
 
       - name: Build backend shadow JAR
-        run: ./gradlew :backend:shadowJar
+        # -Pgit.hash bakes the commit into BuildInfo.kt so the running
+        # backend can report exactly what it was built from.
+        run: ./gradlew :backend:shadowJar -Pgit.hash=${{ github.sha }}
 
       - name: Upload backend JAR
         uses: actions/upload-artifact@v4
@@ -208,6 +210,29 @@ jobs:
             --delete \
             --exclude "*.html" \
             --cache-control "public, max-age=31536000, immutable"
+
+      - name: Publish deployed-version.json
+        run: |
+          # The Admin "Deployed versions" panel and the owner's emailed
+          # report read this back over HTTPS. Written as its own step AFTER
+          # the frontend sync so the sync's --delete pass (which owns the
+          # non-HTML keys) can't remove it. no-cache so the manifest is
+          # never served stale; the CloudFront invalidation below also covers it.
+          BUCKET=$(aws cloudformation describe-stacks \
+            --stack-name "$STACK_NAME" \
+            --query 'Stacks[0].Outputs[?OutputKey==`BucketName`].OutputValue' \
+            --output text)
+          cat > deployed-version.json <<EOF
+          {
+          "gitHash": "${{ github.sha }}",
+          "gitRef": "${{ github.ref }}",
+          "runNumber": "${{ github.run_number }}",
+          "deployedAt": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          }
+          EOF
+          aws s3 cp deployed-version.json "s3://${BUCKET}/deployed-version.json" \
+            --cache-control "no-cache" \
+            --content-type "application/json"
 
       - name: Invalidate CloudFront
         run: |

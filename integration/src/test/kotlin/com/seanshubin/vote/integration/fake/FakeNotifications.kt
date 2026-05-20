@@ -52,4 +52,8 @@ class FakeNotifications : Notifications {
     ) {
         events.add("client-error: $message @ $url")
     }
+
+    override fun deployedVersionsReported(report: String) {
+        events.add("deployed-versions-reported")
+    }
 }

@@ -6,6 +6,7 @@ import com.seanshubin.vote.backend.auth.DiscordOAuthClient
 import com.seanshubin.vote.backend.auth.JwtCipher
 import com.seanshubin.vote.backend.auth.SsmDiscordConfigProvider
 import com.seanshubin.vote.backend.auth.TokenEncoder
+import com.seanshubin.vote.backend.integration.HttpDeployManifestReader
 import com.seanshubin.vote.backend.router.RequestRouter
 import com.seanshubin.vote.backend.router.SimpleHttpHandler
 import com.seanshubin.vote.backend.service.DynamoToRelational
@@ -78,6 +79,14 @@ class ApplicationRunner(
                 )
             } ?: DiscordConfigProvider { null }
 
+        // Reads the deploy pipeline's deployed-version.json over HTTPS from
+        // the frontend origin. Wired in every environment — when the manifest
+        // isn't there (local dev), the reader just returns null.
+        val deployManifestReader = HttpDeployManifestReader(
+            frontendBaseUrl = configuration.frontendBaseUrl,
+            httpClient = sharedHttpClient,
+        )
+
         val service = ServiceImpl(
             integrations = integrations,
             eventLog = repositories.eventLog,
@@ -91,6 +100,7 @@ class ApplicationRunner(
             relationalProjection = DynamoToRelational(repositories.queryModel, repositories.eventLog),
             eventApplier = EventApplier(repositories.eventLog, repositories.commandModel, repositories.queryModel),
             devLoginEnabled = configuration.devLoginEnabled,
+            deployManifestReader = deployManifestReader::read,
         )
         this.service = service
 

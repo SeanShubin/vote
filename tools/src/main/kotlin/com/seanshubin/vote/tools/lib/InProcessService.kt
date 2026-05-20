@@ -92,4 +92,5 @@ private object NoopNotifications : Notifications {
         stackTrace: String?,
         timestamp: String,
     ) = Unit
+    override fun deployedVersionsReported(report: String) = Unit
 }

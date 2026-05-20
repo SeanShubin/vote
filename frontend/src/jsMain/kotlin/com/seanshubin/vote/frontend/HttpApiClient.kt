@@ -133,6 +133,13 @@ class HttpApiClient(
         )
     }
 
+    override suspend fun deployedVersions(): DeployedVersions =
+        getWithAuth("/admin/deployed-versions")
+
+    override suspend fun emailDeployedVersions() {
+        postEmptyWithAuth("/admin/deployed-versions/email")
+    }
+
     /**
      * POST with an empty body — the pause/resume endpoints don't take a
      * payload; the action is the URL. `postWithAuth` insists on a serializable

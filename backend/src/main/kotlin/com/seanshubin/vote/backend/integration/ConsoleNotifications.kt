@@ -59,4 +59,8 @@ object ConsoleNotifications : Notifications {
                 "  Stack trace: ${stackTrace ?: "none"}"
         )
     }
+
+    override fun deployedVersionsReported(report: String) {
+        println(report)
+    }
 }

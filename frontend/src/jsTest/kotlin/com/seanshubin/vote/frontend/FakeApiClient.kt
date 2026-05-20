@@ -2,6 +2,7 @@ package com.seanshubin.vote.frontend
 
 import com.seanshubin.vote.contract.ApiClient
 import com.seanshubin.vote.contract.AuthResponse
+import com.seanshubin.vote.contract.DeployedVersions
 import com.seanshubin.vote.contract.LoginConfig
 import kotlinx.coroutines.CancellationException
 import com.seanshubin.vote.domain.ElectionDetail
@@ -56,6 +57,11 @@ class FakeApiClient : ApiClient {
     val listFeatureFlagsCalls = mutableListOf<Unit>()
     var setFeatureEnabledResult: Result<Unit> = Result.success(Unit)
     val setFeatureEnabledCalls = mutableListOf<Pair<FeatureFlag, Boolean>>()
+    var deployedVersionsResult: Result<DeployedVersions> =
+        Result.failure(Exception("deployedVersions not configured"))
+    val deployedVersionsCalls = mutableListOf<Unit>()
+    var emailDeployedVersionsResult: Result<Unit> = Result.success(Unit)
+    val emailDeployedVersionsCalls = mutableListOf<Unit>()
     var getMyUserResult: Result<UserNameEmail> = Result.success(UserNameEmail("user"))
     val getMyUserCalls = mutableListOf<Unit>()
     var listElectionsResult: Result<List<ElectionSummary>> = Result.success(emptyList())
@@ -147,6 +153,16 @@ class FakeApiClient : ApiClient {
     override suspend fun setFeatureEnabled(flag: FeatureFlag, enabled: Boolean) {
         setFeatureEnabledCalls.add(flag to enabled)
         setFeatureEnabledResult.getOrThrow()
+    }
+
+    override suspend fun deployedVersions(): DeployedVersions {
+        deployedVersionsCalls.add(Unit)
+        return deployedVersionsResult.getOrThrow()
+    }
+
+    override suspend fun emailDeployedVersions() {
+        emailDeployedVersionsCalls.add(Unit)
+        emailDeployedVersionsResult.getOrThrow()
     }
 
     override var onSessionLost: (() -> Unit)? = null

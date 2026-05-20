@@ -73,6 +73,15 @@ interface ApiClient {
     suspend fun setFeatureEnabled(flag: FeatureFlag, enabled: Boolean)
 
     /**
+     * Owner-only: what's actually running (backend git hash) versus what the
+     * deploy pipeline last published. Backs the Admin "Deployed versions" panel.
+     */
+    suspend fun deployedVersions(): DeployedVersions
+
+    /** Owner-only: email the deployed-versions report to the ops address. */
+    suspend fun emailDeployedVersions()
+
+    /**
      * Set by the SPA shell to perform "you are now logged out" UX (clear
      * userName/role, route to /login). Implementations invoke it exactly when
      * an authenticated request can't be recovered via refresh — e.g. the user

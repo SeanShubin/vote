@@ -86,6 +86,13 @@ class SesNotifications(
         )
     }
 
+    override fun deployedVersionsReported(report: String) {
+        delegate.deployedVersionsReported(report)
+        // A deliberately requested operator email, not an error — the report
+        // is already a formatted body, so send it verbatim.
+        safeEmail(subject = "Deployed versions report", body = report)
+    }
+
     override fun sqlException(name: String, sqlCode: String, message: String) {
         delegate.sqlException(name, sqlCode, message)
         safeEmail(
