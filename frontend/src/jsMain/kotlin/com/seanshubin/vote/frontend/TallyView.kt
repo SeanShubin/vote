@@ -33,7 +33,7 @@ fun TallyView(
             is FetchState.Error -> Div({ classes("error") }) { Text(state.message) }
             is FetchState.Success -> renderTally(
                 apiClient = apiClient,
-                serverTally = state.value,
+                latestTally = state.value,
                 onNavigateToPreferences = onNavigateToPreferences,
                 onNavigateToDecision = onNavigateToDecision,
                 onNavigateToProcess = onNavigateToProcess,
@@ -50,6 +50,13 @@ fun TallyView(
  * grouping) lives in the shared `domain` module so the frontend can rerun it
  * directly.
  *
+ * Freeze-on-touch: with nothing toggled off the screen is a live leaderboard
+ * and adopts every background refetch immediately. Once a ballot is toggled
+ * off the viewer is mid-analysis, so the displayed tally pins to that snapshot
+ * and later refetches surface as an "Update" banner rather than silently
+ * changing the numbers. Adopting the banner — or returning to the unfiltered
+ * state — re-syncs to the latest server tally.
+ *
  * Only `Ballot.Identified` ballots are toggleable: anonymous ballots strip the
  * voter identity and Tally.countBallots only accepts identified input.
  *
@@ -59,26 +66,48 @@ fun TallyView(
 @Composable
 private fun renderTally(
     apiClient: ApiClient,
-    serverTally: ElectionTally,
+    latestTally: ElectionTally,
     onNavigateToPreferences: () -> Unit,
     onNavigateToDecision: () -> Unit,
     onNavigateToProcess: () -> Unit,
 ) {
-    val revealed = serverTally.tally.ballots.filterIsInstance<Ballot.Identified>()
-    val totalToggleable = revealed.size
-    val currentConfirmations = revealed.map { it.confirmation }.toSet()
-
-    // Track the ballots the viewer has explicitly toggled *off*, not the ones
-    // left on. Storing the excluded set means a refetch (e.g. a poll picking
-    // up a ballot cast by someone else) reconciles for free: a new ballot is
-    // absent from `excluded` so it shows on, a removed ballot just falls out
-    // of `active` below, and every existing on/off choice survives untouched.
-    // Keyed on election name only — switching elections clears it; a changing
-    // ballot count no longer wipes the viewer's selection mid-analysis.
-    var excluded by remember(serverTally.tally.electionName) {
+    // The viewer's explicit "off" choices, tracked as the excluded set (not
+    // the kept set) so adopting a fresh tally reconciles for free: a newly
+    // cast ballot is simply absent from `excluded` and shows on. Keyed on
+    // election + side so it clears when either changes, since each side has
+    // its own ballot set with non-overlapping confirmations.
+    var excluded by remember(latestTally.tally.electionName, latestTally.tally.side) {
         mutableStateOf(emptySet<String>())
     }
+
+    // Freeze-on-touch. While `excluded` is empty the screen is a live
+    // leaderboard and `displayedTally` tracks the latest server tally via the
+    // effect below. Once a ballot is toggled off the viewer is doing what-if
+    // analysis, so the display pins to that snapshot — every later toggle
+    // recomputes against the same ballot set — and incoming refetches surface
+    // as an Update banner instead of shifting the numbers underfoot.
+    var displayedTally by remember(latestTally.tally.electionName, latestTally.tally.side) {
+        mutableStateOf(latestTally)
+    }
+    LaunchedEffect(latestTally, excluded) {
+        if (excluded.isEmpty()) displayedTally = latestTally
+    }
+
+    val revealed = displayedTally.tally.ballots.filterIsInstance<Ballot.Identified>()
+    val totalToggleable = revealed.size
+    val currentConfirmations = revealed.map { it.confirmation }.toSet()
     val active = currentConfirmations - excluded
+
+    // A background refetch landed while the viewer was filtering: the pinned
+    // snapshot is now behind the server. The banner lets them adopt it; or
+    // they return to the unfiltered state and the effect above re-syncs.
+    val pendingUpdate = excluded.isNotEmpty() && latestTally != displayedTally
+    val newBallotCount = remember(latestTally, displayedTally) {
+        val shown = displayedTally.tally.ballots
+            .filterIsInstance<Ballot.Identified>().map { it.confirmation }.toSet()
+        latestTally.tally.ballots
+            .filterIsInstance<Ballot.Identified>().count { it.confirmation !in shown }
+    }
 
     val allOn = revealed.isEmpty() || active.size == totalToggleable
     // Coverage runs over every ballot — Identified or Anonymous — because
@@ -87,14 +116,14 @@ private fun renderTally(
     // hidden, so allOn is always true and we use the full ballot list here.
     // When toggling is in play (only when ballots are Identified), narrow
     // to the active subset.
-    val coverageBallots: List<Ballot> = if (allOn) serverTally.tally.ballots
+    val coverageBallots: List<Ballot> = if (allOn) displayedTally.tally.ballots
         else revealed.filter { it.confirmation in active }
     val totalActiveBallots = coverageBallots.size
     // Each ballot contributes at most once per candidate. A candidate "shows
     // up on" a ballot when that ballot has a Ranking for it with a non-null
     // rank — same predicate Tally.countBallots uses to decide a ballot
     // expresses a preference involving the candidate.
-    val ballotsPerCandidate: Map<String, Int> = remember(serverTally, active) {
+    val ballotsPerCandidate: Map<String, Int> = remember(displayedTally, active) {
         coverageBallots
             .flatMap { ballot ->
                 ballot.rankings
@@ -105,7 +134,7 @@ private fun renderTally(
             .groupingBy { it }
             .eachCount()
     }
-    // Memoize the tally recomputation against (serverTally, active). The
+    // Memoize the tally recomputation against (displayedTally, active). The
     // Tideman lock-in pass inside Tally.countBallots is at worst O(n³) on
     // the candidate count (BFS per skipped contest), so without the
     // remember Compose would re-run it on every recomposition (parent
@@ -113,33 +142,53 @@ private fun renderTally(
     // changes. Equality on Set<String> is structural, so toggling a ballot
     // invalidates the cache by design and triggers exactly one recompute.
     val displaySections = if (allOn) {
-        serverTally.sections
+        displayedTally.sections
     } else {
-        remember(serverTally, active) {
+        remember(displayedTally, active) {
             // The server's tally.candidateNames is real candidates + tier
             // markers (the matrix node list). Split it back into the two
             // inputs countBallots wants: real candidates and tiers.
-            val tierSet = serverTally.tiers.toSet()
-            val realCandidates = serverTally.tally.candidateNames.filterNot { it in tierSet }
+            val tierSet = displayedTally.tiers.toSet()
+            val realCandidates = displayedTally.tally.candidateNames.filterNot { it in tierSet }
             val recomputed = Tally.countBallots(
-                electionName = serverTally.tally.electionName,
-                side = serverTally.tally.side,
+                electionName = displayedTally.tally.electionName,
+                side = displayedTally.tally.side,
                 candidates = realCandidates,
-                tiers = serverTally.tiers,
+                tiers = displayedTally.tiers,
                 ballots = revealed.filter { it.confirmation in active },
             )
-            TallySection.compute(recomputed.places, serverTally.tiers)
+            TallySection.compute(recomputed.places, displayedTally.tiers)
         }
     }
 
     P {
         Text(
             if (allOn) {
-                "Total Ballots: ${serverTally.tally.ballots.size}"
+                "Total Ballots: ${displayedTally.tally.ballots.size}"
             } else {
                 "Active Ballots: ${active.size} of $totalToggleable"
             }
         )
+    }
+
+    // While the viewer is filtering, a background refetch is held back rather
+    // than applied. This banner reports how stale the pinned snapshot is and
+    // lets them pull in the latest without losing their toggled-off choices.
+    if (pendingUpdate) {
+        Div({ classes("tally-update-banner") }) {
+            Span({ classes("tally-update-banner-text") }) {
+                Text(
+                    when (newBallotCount) {
+                        0 -> "Results have changed since you started filtering."
+                        1 -> "1 new ballot since you started filtering."
+                        else -> "$newBallotCount new ballots since you started filtering."
+                    }
+                )
+            }
+            Button({
+                onClick { displayedTally = latestTally }
+            }) { Text("Update") }
+        }
     }
 
     H3 { Text("Winners") }
@@ -211,10 +260,10 @@ private fun renderTally(
             Button({
                 onClick {
                     val text = buildTallyText(
-                        electionName = serverTally.tally.electionName,
+                        electionName = displayedTally.tally.electionName,
                         sections = sections,
                         ballotsPerCandidate = ballotsPerCandidate,
-                        totalBallots = serverTally.tally.ballots.size,
+                        totalBallots = displayedTally.tally.ballots.size,
                         activeBallots = totalActiveBallots,
                     )
                     copyTextToClipboard(text, apiClient)
@@ -230,10 +279,10 @@ private fun renderTally(
                 )
                 onClick {
                     val text = PasteTallyFormat.renderAsPasteText(
-                        candidateNames = serverTally.tally.candidateNames,
-                        ballots = serverTally.tally.ballots,
-                        electionName = serverTally.tally.electionName,
-                        tiers = serverTally.tiers,
+                        candidateNames = displayedTally.tally.candidateNames,
+                        ballots = displayedTally.tally.ballots,
+                        electionName = displayedTally.tally.electionName,
+                        tiers = displayedTally.tiers,
                     )
                     copyTextToClipboard(text, apiClient)
                     copyFeedback = "Copied as paste-tally format!"
