@@ -1414,6 +1414,12 @@ tr:nth-child(even) {
     color: #1f3956;
 }
 
+.pair-standing {
+    font-weight: 600;
+    font-size: 0.95rem;
+    color: #1f3956;
+}
+
 .pair-side-row {
     display: flex;
     flex-wrap: wrap;

@@ -32,8 +32,10 @@ import kotlinx.serialization.Serializable
  *      bucket are evaluated independently — no order dependency — so
  *      the decision doesn't depend on alphabetical or any other arbitrary
  *      ordering. A cycle entirely within one bucket skips all of the
- *      cycle's contests, and the candidates in the cycle end up tied at
- *      the same place.
+ *      cycle's contests, which removes every locked edge *among* its
+ *      members — so nothing in the cycle orders them relative to each
+ *      other. They tie unless stronger locked edges from outside the
+ *      cycle still pull them apart.
  *   4. Derive places by topological layering of the locked DAG: at each
  *      step the candidates with no incoming locked edge (among the
  *      still-remaining set) all share a place.
@@ -70,12 +72,33 @@ object RankedPairs {
         @SerialName("skipped")
         data class SkippedByCycle(
             /**
-             * Path from this contest's loser back to its winner through
-             * already-locked contests. At least two nodes; the first is
-             * the contest's loser and the last is the contest's winner.
-             * Adding the contest would have closed this path into a cycle.
+             * A cycle that locking this contest would close, given as the
+             * path from this contest's loser back to its winner. At least
+             * two nodes; the first is the contest's loser and the last is
+             * the contest's winner. This contest's own edge closes the loop.
+             *
+             * When [forcedByStrongerContests] is true this path runs entirely
+             * through strictly-stronger, already-locked contests — the cycle
+             * that forced this contest out. When false it is a representative
+             * closing cycle through the reference graph, and at least one of
+             * its contests is equal in strength to this one.
              */
             val cyclePath: List<String>,
+            /**
+             * True iff a closing cycle exists made up entirely of strictly
+             * stronger contests. The contest is then the uniquely weakest
+             * edge of that cycle, so dropping it is forced — not an arbitrary
+             * tiebreak. False means every closing cycle includes a contest of
+             * equal strength, so this contest is dropped to avoid breaking an
+             * even tie arbitrarily.
+             *
+             * Whether the two candidates end up tied in the final ranking is
+             * a *separate* fact — read it from [Result.places], never infer
+             * it from cycle membership. A contest can sit in an all-equal
+             * cycle whose candidates still split across different places
+             * because stronger contests outside the cycle pull them apart.
+             */
+            val forcedByStrongerContests: Boolean,
         ) : Outcome
     }
 
@@ -234,7 +257,22 @@ object RankedPairs {
                     keepers += contest
                     result += contest
                 } else {
-                    result += contest.copy(outcome = Outcome.SkippedByCycle(cycle))
+                    // The contest closes a cycle. Probe whether a closing
+                    // path exists through strictly-stronger contests only:
+                    // `locked` holds exactly the edges from earlier (stronger)
+                    // buckets, since this bucket's keepers aren't committed
+                    // until the second pass. If such a path exists the drop is
+                    // forced — the contest is the uniquely weakest edge of a
+                    // stronger cycle — and that cycle is the most informative
+                    // one to report. Otherwise every closing cycle includes a
+                    // same-strength contest and the drop avoids an even tie.
+                    val strongerCycle = findPath(locked, from = contest.loser, to = contest.winner)
+                    result += contest.copy(
+                        outcome = Outcome.SkippedByCycle(
+                            cyclePath = strongerCycle ?: cycle,
+                            forcedByStrongerContests = strongerCycle != null,
+                        ),
+                    )
                 }
             }
 

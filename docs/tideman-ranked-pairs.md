@@ -245,34 +245,38 @@ The Apple → Banana contest, which existed and had 2 winning votes, did
 not survive. The report shows it as step 3, status Skipped, with the
 cycle path that blocked it.
 
-## The three reports
+## The two reports
 
-The Results tab links to three detail pages. Each grounds a different
+The Results tab links to two detail pages. Each grounds a different
 question.
 
-1. **Preferences** — *Who voted which way?* For the selected pair, the
-   raw pairwise counts plus the named voter lists behind each total
-   (and an explicit list of voters who abstained on the contest by
-   omitting at least one candidate). This is the auditable "what
-   actually went into the algorithm" view.
+1. **Head-to-Head** — *What happened between these two candidates?*
+   For a selected pair: the raw pairwise counts with the named voter
+   lists behind each total (and the voters who abstained by omitting a
+   candidate); the Tideman verdict — the contest was locked in, was
+   skipped because of a cycle, or never existed because the pair tied
+   in pairwise count; and the pair's actual final standing, read
+   straight from the places list. A skipped contest also shows the
+   cycle that forced the skip, and whether the drop was forced by
+   strictly stronger contests or made to avoid breaking an even tie.
+   This is the answer to "we agreed about A and B; why didn't the
+   algorithm?"
 
-2. **Decision** — *What did Tideman do with the contest between these
-   two candidates?* Same per-pair starting point as Preferences, plus
-   the Tideman verdict: the contest was locked in, was skipped because
-   of a cycle (with the locked path that closed it), or never existed
-   at all because the pair was tied in pairwise count. This is the
-   answer to "we agreed about A and B; why didn't the algorithm?"
-
-3. **Process** — *What did Tideman do, in order, for the whole
+2. **Process** — *What did Tideman do, in order, for the whole
    election?* Every contest as a row in lock-in order, each marked
    Locked or Skipped, each skipped row carrying the cycle path that
    forced it. This is the global narrative — the chronological story
    of how the final ranking was assembled.
 
 Typical flow: a reader curious about why two candidates landed where
-they did opens Preferences for the raw vote, then Decision for the
-algorithm's per-pair verdict, then Process if they want to see where
-in the global order things were decided.
+they did opens Head-to-Head for the per-pair story, then Process if
+they want to see where in the global order things were decided.
+
+Whether two candidates tie is always read from the final places, never
+inferred from cycle membership: a contest can sit in a cycle of
+equal-strength contests and still have its candidates land at
+different places, because stronger contests outside the cycle pull
+them apart.
 
 ## The informed-voter rule and absence shielding
 
@@ -296,7 +300,7 @@ better failure mode: it never puts words in a voter's mouth.
 The Tideman switch makes this trade-off **visible** rather than fixing
 it. Under Schulze the absence shield led to surprising final
 placements that the reports couldn't explain. Under Tideman, the
-shield still exists, but the Decision page can show "this contest
+shield still exists, but the Head-to-Head page can show "this contest
 existed but was skipped because of [these specific stronger contests],
 which themselves existed only because [these specific voters] could be
 counted in them." A reader can see the trade-off rather than be

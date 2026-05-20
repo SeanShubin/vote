@@ -249,33 +249,22 @@ fun VoteApp(apiClient: ApiClient) {
             isEventLogPaused = isPaused,
             onBack = { router.navigate(Page.Elections) },
             onElectionDeleted = { router.replace(Page.Elections) },
-            onNavigateToPreferences = {
-                router.navigate(Page.ElectionPreferences(page.electionName))
-            },
-            onNavigateToDecision = {
-                router.navigate(Page.ElectionDecision(page.electionName))
+            onNavigateToHeadToHead = {
+                router.navigate(Page.ElectionHeadToHead(page.electionName))
             },
             onNavigateToProcess = {
                 router.navigate(Page.ElectionProcess(page.electionName))
             },
         )
-        is Page.ElectionPreferences -> ElectionPreferencesPage(
+        is Page.ElectionHeadToHead -> ElectionHeadToHeadPage(
             apiClient = apiClient,
             electionName = page.electionName,
             currentSide = effectiveSide,
             onSetSide = { currentSide = it },
             secretBallotEnabled = secretBallotEnabled,
-            // Land on the Results tab — that's where the buttons that open
-            // this page live, so it's almost certainly where the user came
+            // Land on the Results tab — that's where the button that opens
+            // this page lives, so it's almost certainly where the user came
             // from. The hash is read by rememberHashTab on the destination.
-            onBack = { router.navigate(Page.ElectionDetail(page.electionName), hash = "tally") },
-        )
-        is Page.ElectionDecision -> ElectionDecisionPage(
-            apiClient = apiClient,
-            electionName = page.electionName,
-            currentSide = effectiveSide,
-            onSetSide = { currentSide = it },
-            secretBallotEnabled = secretBallotEnabled,
             onBack = { router.navigate(Page.ElectionDetail(page.electionName), hash = "tally") },
         )
         is Page.ElectionProcess -> ElectionProcessPage(

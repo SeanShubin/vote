@@ -335,15 +335,12 @@ class TallyFromSnapshot : CliktCommand(name = "tally-from-snapshot") {
         val rows = outcome.cyclePath.zipWithNext().mapNotNull { (from, to) ->
             byEdge[from to to]?.let { it.index + 1 to it.value }
         }
-        val locked = rows.count { it.second.outcome is RankedPairs.Outcome.Locked }
-        val tied = rows.size - locked + 1 // includes current
-        val cycleSize = rows.size + 1
-        val kind = when {
-            tied == 1 -> "LonelyWeakest"
-            tied == cycleSize -> "PureTie"
-            else -> "Mixed (locked=$locked, tied=$tied)"
+        val verdict = if (outcome.forcedByStrongerContests) {
+            "forced out -- every other contest in this cycle is strictly stronger and already locked"
+        } else {
+            "dropped within an equal-strength cycle -- no contest in the cycle outranks the rest"
         }
-        println("  Cycle size: $cycleSize ($kind)")
+        println("  Cycle size: ${rows.size + 1} ($verdict)")
         println()
         rows.forEach { (step, c) ->
             val status = if (c.outcome is RankedPairs.Outcome.Locked) "LOCKED " else "SKIPPED"

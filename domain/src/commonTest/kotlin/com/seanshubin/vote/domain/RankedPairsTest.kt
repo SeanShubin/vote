@@ -71,6 +71,9 @@ class RankedPairsTest {
         // P>R was skipped because the locked path R → S → P already
         // connects the loser (R) to the winner (P).
         assertEquals(listOf("R", "S", "P"), prOutcome.cyclePath)
+        // R>S and S>P are both stronger (7-3) than P>R (6-4) and already
+        // locked, so dropping P>R is forced — not an arbitrary tiebreak.
+        assertTrue(prOutcome.forcedByStrongerContests)
     }
 
     @Test
@@ -184,12 +187,83 @@ class RankedPairsTest {
         // the numbers alone.
         assertEquals(setOf(1), tally.places.map { it.rank }.toSet())
         assertEquals(setOf("A", "B", "C"), tally.places.map { it.candidateName }.toSet())
-        // Every contest in the bucket should report Skipped.
+        // Every contest in the bucket should report Skipped. None is forced
+        // out by a stronger contest — they are all equal strength, so each
+        // is dropped only to avoid breaking an even tie.
         assertEquals(3, tally.contests.size)
         assertTrue(
-            tally.contests.all { it.outcome is RankedPairs.Outcome.SkippedByCycle },
-            "All three equal-strength cycle contests should skip; got ${tally.contests}",
+            tally.contests.all {
+                val outcome = it.outcome
+                outcome is RankedPairs.Outcome.SkippedByCycle &&
+                    !outcome.forcedByStrongerContests
+            },
+            "All three equal-strength cycle contests should skip un-forced; got ${tally.contests}",
         )
+    }
+
+    @Test
+    fun `skipped contest in both a stronger and an equal-strength cycle reports forced-by-stronger`() {
+        // Regression: a skipped contest can sit in TWO closing cycles at
+        // once — one made of strictly stronger contests, one of equal-
+        // strength contests. The verdict must come from whether a
+        // stronger-only cycle exists, not from whichever cycle a path
+        // search happens to reach first.
+        //
+        // Two-candidate ballots (informed-voter rule) give each pair an
+        // independent strength:
+        //   L > A  10-0    A > W  10-0           (strength-10 bucket)
+        //   W > L   5-0    L > X   5-0   X > W  5-0   (strength-5 bucket)
+        // The strength-10 contests lock. The strength-5 contests form the
+        // 3-cycle W→L→X→W and all three skip. W→L is ALSO closed by the
+        // stronger cycle W→L→A→W (L→A, A→W locked), so its drop is forced.
+        // Final locked DAG is L→A, A→W, giving places L=1, X=1, A=3, W=4 —
+        // W and L do NOT tie even though W→L sits in an all-equal cycle.
+        val ballots = buildList {
+            repeat(10) { add(ballot("la-$it", "L" to 1, "A" to 2)) }
+            repeat(10) { add(ballot("aw-$it", "A" to 1, "W" to 2)) }
+            repeat(5) { add(ballot("wl-$it", "W" to 1, "L" to 2)) }
+            repeat(5) { add(ballot("lx-$it", "L" to 1, "X" to 2)) }
+            repeat(5) { add(ballot("xw-$it", "X" to 1, "W" to 2)) }
+        }
+        val tally = Tally.countBallots(
+            electionName = "election",
+            side = RankingSide.PUBLIC,
+            candidates = listOf("A", "L", "W", "X"),
+            tiers = emptyList(),
+            ballots = ballots,
+        )
+
+        assertEquals(
+            listOf(Place(1, "L"), Place(1, "X"), Place(3, "A"), Place(4, "W")),
+            tally.places,
+        )
+
+        val wOverL = tally.contests.first { it.winner == "W" && it.loser == "L" }
+        val wOverLOutcome = wOverL.outcome
+        assertTrue(
+            wOverLOutcome is RankedPairs.Outcome.SkippedByCycle,
+            "W→L should be skipped; got ${wOverL.outcome}",
+        )
+        assertTrue(
+            wOverLOutcome.forcedByStrongerContests,
+            "W→L is closed by the stronger cycle L→A→W, so its drop is forced",
+        )
+        assertEquals(
+            listOf("L", "A", "W"), wOverLOutcome.cyclePath,
+            "the reported cycle should be the stronger one, not the equal-strength one",
+        )
+
+        // The other two strength-5 contests are closed only by equal-
+        // strength contests — nothing stronger forces them out.
+        listOf("L" to "X", "X" to "W").forEach { (winner, loser) ->
+            val outcome = tally.contests
+                .first { it.winner == winner && it.loser == loser }.outcome
+            assertTrue(
+                outcome is RankedPairs.Outcome.SkippedByCycle &&
+                    !outcome.forcedByStrongerContests,
+                "$winner→$loser should skip without a stronger-cycle force; got $outcome",
+            )
+        }
     }
 
     @Test

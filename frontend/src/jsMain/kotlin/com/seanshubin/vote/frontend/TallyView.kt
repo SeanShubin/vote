@@ -20,8 +20,7 @@ fun TallyView(
     currentSide: RankingSide,
     onSetSide: (RankingSide) -> Unit,
     secretBallotEnabled: Boolean,
-    onNavigateToPreferences: () -> Unit,
-    onNavigateToDecision: () -> Unit,
+    onNavigateToHeadToHead: () -> Unit,
     onNavigateToProcess: () -> Unit,
 ) {
     Div({ classes("section") }) {
@@ -34,8 +33,7 @@ fun TallyView(
             is FetchState.Success -> renderTally(
                 apiClient = apiClient,
                 latestTally = state.value,
-                onNavigateToPreferences = onNavigateToPreferences,
-                onNavigateToDecision = onNavigateToDecision,
+                onNavigateToHeadToHead = onNavigateToHeadToHead,
                 onNavigateToProcess = onNavigateToProcess,
             )
         }
@@ -60,15 +58,14 @@ fun TallyView(
  * Only `Ballot.Identified` ballots are toggleable: anonymous ballots strip the
  * voter identity and Tally.countBallots only accepts identified input.
  *
- * The toggle does not flow into the Preferences / Decision / Process detail
- * pages — those are separate routes that fetch their own (unfiltered) tally.
+ * The toggle does not flow into the Head-to-Head / Process detail pages —
+ * those are separate routes that fetch their own (unfiltered) tally.
  */
 @Composable
 private fun renderTally(
     apiClient: ApiClient,
     latestTally: ElectionTally,
-    onNavigateToPreferences: () -> Unit,
-    onNavigateToDecision: () -> Unit,
+    onNavigateToHeadToHead: () -> Unit,
     onNavigateToProcess: () -> Unit,
 ) {
     // The viewer's explicit "off" choices, tracked as the excluded set (not
@@ -308,13 +305,12 @@ private fun renderTally(
         )
     }
 
-    // Detail tables (preferences, decision, process) live on their own
-    // admin-style pages — they get wide quickly and don't belong inside
-    // the aesthetic election shell. See docs/style-guide.md and
+    // Detail tables (head-to-head, process) live on their own admin-style
+    // pages — they get wide quickly and don't belong inside the aesthetic
+    // election shell. See docs/style-guide.md and
     // docs/tideman-ranked-pairs.md for what each report shows.
     Div({ classes("button-row") }) {
-        Button({ onClick { onNavigateToPreferences() } }) { Text("View Preferences") }
-        Button({ onClick { onNavigateToDecision() } }) { Text("View Decision") }
+        Button({ onClick { onNavigateToHeadToHead() } }) { Text("View Head-to-Head") }
         Button({ onClick { onNavigateToProcess() } }) { Text("View Process") }
     }
 }

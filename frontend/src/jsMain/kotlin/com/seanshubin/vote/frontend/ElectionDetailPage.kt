@@ -40,8 +40,7 @@ fun ElectionDetailPage(
     isEventLogPaused: Boolean,
     onBack: () -> Unit,
     onElectionDeleted: () -> Unit,
-    onNavigateToPreferences: () -> Unit = {},
-    onNavigateToDecision: () -> Unit = {},
+    onNavigateToHeadToHead: () -> Unit = {},
     onNavigateToProcess: () -> Unit = {},
 ) {
     var errorMessage by remember { mutableStateOf<String?>(null) }
@@ -356,8 +355,7 @@ fun ElectionDetailPage(
                         currentSide = currentSide,
                         onSetSide = onSetSide,
                         secretBallotEnabled = secretBallotEnabled,
-                        onNavigateToPreferences = onNavigateToPreferences,
-                        onNavigateToDecision = onNavigateToDecision,
+                        onNavigateToHeadToHead = onNavigateToHeadToHead,
                         onNavigateToProcess = onNavigateToProcess,
                     )
                 }

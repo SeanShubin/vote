@@ -4,18 +4,29 @@ import androidx.compose.runtime.*
 import com.seanshubin.vote.contract.ApiClient
 import com.seanshubin.vote.domain.Ballot
 import com.seanshubin.vote.domain.ElectionTally
+import com.seanshubin.vote.domain.Place
 import com.seanshubin.vote.domain.RankedPairs
 import com.seanshubin.vote.domain.Ranking.Companion.prefers
 import com.seanshubin.vote.domain.RankingSide
 import org.jetbrains.compose.web.dom.*
 
 /**
- * Pairwise preferences page. The viewer picks two candidates from a chip
- * arena and the page renders the head-to-head between just those two: the
- * raw count for each direction plus the actual voters whose ballots produced
- * that count. The point is to make every pairwise total auditable — a
- * total isn't an abstract number, it's a list of named voters you can
- * scroll through.
+ * Pairwise Head-to-Head page. The viewer picks two candidates from a chip
+ * arena and the page renders, for just those two:
+ *   - the direct head-to-head: the raw count for each direction plus the
+ *     actual voters whose ballots produced that count, so every pairwise
+ *     total is auditable — a total isn't an abstract number, it's a list
+ *     of named voters you can scroll through.
+ *   - what the Ranked Pairs (Tideman) tally did with the resulting
+ *     contest: locked it in, skipped it because of a cycle (with the
+ *     cycle that closed it), or treated the pair as a tied non-contest.
+ *   - the two candidates' actual positions in the final ranking, read
+ *     straight from the places list — the authoritative answer to "where
+ *     did they end up", independent of the contest's fate.
+ *
+ * A skipped contest is the visual answer to "Goodyng beat Cursed 2-0, so
+ * why does Cursed end up ranked higher?": the contest existed but the
+ * lock-in order had to drop it to avoid a cycle.
  *
  * Selection is sticky-plus-changing: the first pick stays put and the
  * second slot is what gets replaced when a third candidate is clicked.
@@ -23,7 +34,7 @@ import org.jetbrains.compose.web.dom.*
  * fewer than two selected the detail panel is hidden.
  */
 @Composable
-fun ElectionPreferencesPage(
+fun ElectionHeadToHeadPage(
     apiClient: ApiClient,
     electionName: String,
     currentSide: RankingSide,
@@ -40,13 +51,15 @@ fun ElectionPreferencesPage(
     }
 
     Div({ classes("admin-container") }) {
-        H1 { Text("Preferences: $electionName") }
+        H1 { Text("Head-to-Head: $electionName") }
         SideToggle(currentSide, onSetSide, enabled = secretBallotEnabled)
         P({ classes("pair-page-explainer") }) {
             Text(
-                "Direct head-to-head between two candidates. Each total is the count of " +
-                    "voters who ranked both candidates and put one above the other. " +
-                    "Voters who omit either candidate abstain from this contest."
+                "Pick two candidates to see their direct head-to-head — the raw vote " +
+                    "and the voters behind each total — and what the Ranked Pairs tally " +
+                    "did with that contest: locked it into the final ranking, or skipped " +
+                    "it to avoid a cycle. Voters who omit either candidate abstain from " +
+                    "the contest."
             )
         }
 
@@ -56,72 +69,7 @@ fun ElectionPreferencesPage(
                 is FetchState.Error -> Div({ classes("error") }) { Text(state.message) }
                 is FetchState.Success -> {
                     renderPairView(state.value) { a, b ->
-                        renderPreferencesDetail(state.value, a, b)
-                    }
-                }
-            }
-        }
-
-        Div({ classes("button-row") }) {
-            Button({ onClick { onBack() } }) { Text("Back to Election") }
-        }
-    }
-}
-
-/**
- * Per-pair Tideman decision page. For the selected pair the page shows:
- *   - the direct head-to-head, with the same voter-list grounding as the
- *     Preferences page (because every Tideman decision starts there).
- *   - what Tideman did with the resulting contest: locked it in, skipped
- *     it because of a cycle (with the locked-edge path that closed the
- *     cycle), or treated the pair as a tied non-contest. A skipped
- *     contest is the visual answer to "Goodyng beat Cursed 2-0, so why
- *     does Cursed end up ranked higher?" — the lock-in order put
- *     stronger contests in first and the direct verdict got squeezed
- *     out by a cycle.
- *
- * Tier markers are excluded from the chip arena (the page is for
- * candidate comparisons), but they can show up inside a cycle path the
- * algorithm reports, styled distinctly so a reader can tell.
- */
-@Composable
-fun ElectionDecisionPage(
-    apiClient: ApiClient,
-    electionName: String,
-    currentSide: RankingSide,
-    onSetSide: (RankingSide) -> Unit,
-    secretBallotEnabled: Boolean,
-    onBack: () -> Unit,
-) {
-    val tallyFetch = rememberFetchState(
-        apiClient = apiClient,
-        key = "$electionName:$currentSide",
-        fallbackErrorMessage = "Failed to load tally",
-    ) {
-        apiClient.getTally(electionName, currentSide)
-    }
-
-    Div({ classes("admin-container") }) {
-        H1 { Text("Decision: $electionName") }
-        SideToggle(currentSide, onSetSide, enabled = secretBallotEnabled)
-        P({ classes("pair-page-explainer") }) {
-            Text(
-                "What the Ranked Pairs tally did with the direct contest between these " +
-                    "two candidates. A contest locks into the final ranking unless it " +
-                    "would create a cycle with stronger contests already locked, or with " +
-                    "other contests of identical strength that can't all coexist — in " +
-                    "either case the contest is skipped, and contests skipped because of " +
-                    "an equal-strength conflict leave the candidates tied."
-            )
-        }
-
-        Div({ classes("admin-table-scroll") }) {
-            when (val state = tallyFetch.state) {
-                FetchState.Loading -> P { Text("Loading…") }
-                is FetchState.Error -> Div({ classes("error") }) { Text(state.message) }
-                is FetchState.Success -> {
-                    renderPairView(state.value) { a, b ->
-                        renderDecisionDetail(state.value, a, b)
+                        renderHeadToHeadDetail(state.value, a, b)
                     }
                 }
             }
@@ -138,11 +86,11 @@ fun ElectionDecisionPage(
  * order — strongest first — and shows for each contest whether it was
  * locked into the final DAG or skipped because of a cycle with earlier
  * locks. Acts as a global "what the algorithm did, step by step" view
- * that complements the per-pair Decision page.
+ * that complements the per-pair Head-to-Head page.
  *
  * For a reader who wants to understand why one candidate beat another,
- * the typical flow is: read the per-pair Decision for the specific pair
- * in question, then come here to see where in the global order that
+ * the typical flow is: read the per-pair Head-to-Head for the specific
+ * pair in question, then come here to see where in the global order that
  * contest sat and which stronger contests forced its hand.
  */
 @Composable
@@ -194,12 +142,12 @@ fun ElectionProcessPage(
 }
 
 /**
- * Chip arena + detail-panel scaffold shared by the Preferences and
- * Decision pages. Owns the sticky-plus-changing selection state: the
- * first pick is sticky, the second slot rotates as the user explores
- * other candidates against it. Delegates to [detailPanel] when (and only
- * when) two candidates are selected. Resetting [selected] when the
- * election changes prevents stale names from carrying across navigation.
+ * Chip arena + detail-panel scaffold for the Head-to-Head page. Owns the
+ * sticky-plus-changing selection state: the first pick is sticky, the
+ * second slot rotates as the user explores other candidates against it.
+ * Delegates to [detailPanel] when (and only when) two candidates are
+ * selected. Resetting [selected] when the election changes prevents stale
+ * names from carrying across navigation.
  *
  * Tier markers are intentionally excluded from the selection chips — the
  * page is for comparing candidates. Tiers can still appear inside the
@@ -257,24 +205,72 @@ private fun renderPairView(
     }
 }
 
+/**
+ * Detail panel for a chosen pair: the verdict header, the direct
+ * head-to-head with named voters, the pair's actual final standing, and —
+ * when Tideman skipped the contest — the cycle that forced the skip.
+ */
 @Composable
-private fun renderPreferencesDetail(electionTally: ElectionTally, a: String, b: String) {
+private fun renderHeadToHeadDetail(electionTally: ElectionTally, a: String, b: String) {
     val tally = electionTally.tally
     val names = tally.candidateNames
     val ai = names.indexOf(a)
     val bi = names.indexOf(b)
     val aOverB = tally.preferences[ai][bi].strength
     val bOverA = tally.preferences[bi][ai].strength
-    val verdict = when {
-        aOverB > bOverA -> "$a beats $b $aOverB to $bOverA"
-        bOverA > aOverB -> "$b beats $a $bOverA to $aOverB"
-        else -> "$a and $b tied at $aOverB"
-    }
     val revealed = tally.ballots.filterIsInstance<Ballot.Identified>()
 
+    // Tideman emits one directed contest per pair, or none when the pair
+    // tied in pairwise count — so at most one contest matches either
+    // direction.
+    val contest = tally.contests.firstOrNull { c ->
+        (c.winner == a && c.loser == b) || (c.winner == b && c.loser == a)
+    }
+
     Div({ classes("pair-detail") }) {
-        Div({ classes("pair-detail-header") }) { Text(verdict) }
+        Div({ classes("pair-detail-header") }) {
+            Text(headToHeadVerdict(a, b, aOverB, bOverA, contest))
+        }
         renderDirectHeadToHead(a, b, aOverB, bOverA, revealed, (tally.side == RankingSide.SECRET))
+        renderFinalStanding(a, b, tally.places)
+        val outcome = contest?.outcome
+        if (outcome is RankedPairs.Outcome.SkippedByCycle) {
+            renderCycleSection(contest, outcome, tally.contests, electionTally::isTier)
+        }
+    }
+}
+
+/**
+ * One-line verdict for the pair: the direct score plus what Tideman did
+ * with the contest. The skipped wording is keyed on
+ * [RankedPairs.Outcome.SkippedByCycle.forcedByStrongerContests] — never on
+ * a guess at whether the candidates tie, which is the [renderFinalStanding]
+ * line's job.
+ */
+private fun headToHeadVerdict(
+    a: String,
+    b: String,
+    aOverB: Int,
+    bOverA: Int,
+    contest: RankedPairs.Contest?,
+): String {
+    if (contest == null) {
+        return "$a and $b tied in the direct contest, $aOverB to $bOverA — " +
+            "no contest was locked or skipped between them."
+    }
+    val score = "${contest.winningVotes} to ${contest.losingVotes}"
+    return when (val outcome = contest.outcome) {
+        is RankedPairs.Outcome.Locked ->
+            "${contest.winner} beats ${contest.loser} $score — " +
+                "locked into the final ranking."
+        is RankedPairs.Outcome.SkippedByCycle ->
+            if (outcome.forcedByStrongerContests) {
+                "${contest.winner} beat ${contest.loser} $score directly, but this " +
+                    "contest was skipped — stronger contests already locked outrank it."
+            } else {
+                "${contest.winner} beat ${contest.loser} $score directly, but this " +
+                    "contest was skipped — it sits in a cycle of equal-strength contests."
+            }
     }
 }
 
@@ -303,156 +299,12 @@ private fun renderPairSide(
     }
 }
 
-@Composable
-private fun renderDecisionDetail(electionTally: ElectionTally, a: String, b: String) {
-    val tally = electionTally.tally
-    val names = tally.candidateNames
-    val ai = names.indexOf(a)
-    val bi = names.indexOf(b)
-    val aOverB = tally.preferences[ai][bi].strength
-    val bOverA = tally.preferences[bi][ai].strength
-    val revealed = tally.ballots.filterIsInstance<Ballot.Identified>()
-
-    // Find the directed contest between a and b in the Ranked Pairs
-    // lock-in record, if one exists. A tied pair (aOverB == bOverA)
-    // won't appear in `contests` at all because Tideman emits no contest
-    // for ties.
-    val contestIndex = tally.contests.indexOfFirst { contest ->
-        (contest.winner == a && contest.loser == b) ||
-            (contest.winner == b && contest.loser == a)
-    }
-    val contest = contestIndex.takeIf { it >= 0 }?.let { tally.contests[it] }
-    val cycleAnalysis = contest?.let { analyzeCycle(it, contestIndex, tally.contests) }
-
-    Div({ classes("pair-detail") }) {
-        renderDecisionHeader(a, b, contest, contestIndex, tally.contests.size, cycleAnalysis)
-        renderDirectHeadToHead(a, b, aOverB, bOverA, revealed, (tally.side == RankingSide.SECRET))
-        if (cycleAnalysis != null) {
-            renderCycleSection(contest, cycleAnalysis, electionTally::isTier)
-        }
-    }
-}
-
-/**
- * Classification of a skipped contest's cycle, used by both the verdict
- * header and the long-form "why" section so the two stay in sync.
- *
- * Three cases (N = cycle size):
- *   - **LonelyWeakest**: every other contest in the cycle is locked
- *     from an earlier (stronger) bucket. This contest is the uniquely
- *     weakest edge in the cycle and gets dropped to break the loop.
- *   - **PureTie**: every contest in the cycle is at the same strength
- *     as this one. None lock — the algorithm can't pick which to drop
- *     without an arbitrary tiebreak, so all N skip together.
- *   - **Mixed**: some contests in the cycle are stronger and locked,
- *     the remaining T (including this one) are tied at this strength
- *     and skip together for the same reason as PureTie.
- *
- * The same edge can never appear as Skipped-from-a-different-bucket:
- * a skipped contest's cycle path is BFS through
- * (locked edges) ∪ (own-bucket tentative edges), so any Skipped edge
- * in the path must be from this contest's own bucket.
- */
-private enum class CycleKind { LONELY_WEAKEST, PURE_TIE, MIXED }
-
-/** Cycle-path edge: step index (1-based) paired with the contest. */
-private data class CycleEdge(val step: Int, val contest: RankedPairs.Contest)
-
-/**
- * Analysis of [contest]'s cycle, or null if [contest] is not skipped.
- * [edges] lists the cycle-path contests in the order they appear in
- * the path (loser → winner direction), so the current contest
- * implicitly closes the loop by returning to [edges].first()'s winner.
- */
-private data class CycleAnalysis(
-    val kind: CycleKind,
-    val edges: List<CycleEdge>,
-    val skippedStep: Int,
-    val totalSize: Int,
-    val lockedCount: Int,
-    val tiedCount: Int,
-)
-
-private fun analyzeCycle(
-    contest: RankedPairs.Contest,
-    contestIndex: Int,
-    allContests: List<RankedPairs.Contest>,
-): CycleAnalysis? {
-    val outcome = contest.outcome as? RankedPairs.Outcome.SkippedByCycle ?: return null
-    val byEdge: Map<Pair<String, String>, IndexedValue<RankedPairs.Contest>> =
-        allContests.withIndex().associateBy { (_, c) -> c.winner to c.loser }
-    val edges: List<CycleEdge> = outcome.cyclePath.zipWithNext().mapNotNull { (from, to) ->
-        byEdge[from to to]?.let { CycleEdge(it.index + 1, it.value) }
-    }
-    val locked = edges.count { it.contest.outcome is RankedPairs.Outcome.Locked }
-    val tied = edges.size - locked + 1  // +1 for the current contest itself
-    val total = edges.size + 1
-    val kind = when {
-        tied == 1 -> CycleKind.LONELY_WEAKEST
-        tied == total -> CycleKind.PURE_TIE
-        else -> CycleKind.MIXED
-    }
-    return CycleAnalysis(
-        kind = kind,
-        edges = edges,
-        skippedStep = contestIndex + 1,
-        totalSize = total,
-        lockedCount = locked,
-        tiedCount = tied,
-    )
-}
-
-@Composable
-private fun renderDecisionHeader(
-    a: String,
-    b: String,
-    contest: RankedPairs.Contest?,
-    contestIndex: Int,
-    contestTotal: Int,
-    cycleAnalysis: CycleAnalysis?,
-) {
-    val verdict = when {
-        contest == null ->
-            "$a and $b tied in the direct contest — no edge locked, no edge skipped."
-        contest.outcome is RankedPairs.Outcome.Locked ->
-            "${contest.winner} beats ${contest.loser} — contest locked into the final ranking " +
-                "(step ${contestIndex + 1} of $contestTotal)."
-        cycleAnalysis != null -> {
-            val stepInfo = "step ${contestIndex + 1} of $contestTotal"
-            when (cycleAnalysis.kind) {
-                CycleKind.LONELY_WEAKEST ->
-                    "${contest.winner} beat ${contest.loser} directly, but the contest was " +
-                        "skipped ($stepInfo) — stronger contests in its " +
-                        "${cycleAnalysis.totalSize}-cycle already locked, so dropping this " +
-                        "one is what breaks the cycle."
-                CycleKind.PURE_TIE -> {
-                    val n = cycleAnalysis.totalSize
-                    "${contest.winner} beat ${contest.loser} directly, but the contest was " +
-                        "skipped ($stepInfo) — it sits in a cycle of $n equally-strong " +
-                        "contests; none lock, and the candidates involved tie."
-                }
-                CycleKind.MIXED -> {
-                    val tied = cycleAnalysis.tiedCount
-                    val others = tied - 1
-                    val otherWord = if (others == 1) "other contest" else "other contests"
-                    "${contest.winner} beat ${contest.loser} directly, but the contest was " +
-                        "skipped ($stepInfo) — it's tied in strength with $others $otherWord " +
-                        "in its ${cycleAnalysis.totalSize}-cycle, and the algorithm refuses " +
-                        "to pick which of the tied contests to keep."
-                }
-            }
-        }
-        else -> ""
-    }
-    Div({ classes("pair-detail-header") }) { Text(verdict) }
-}
-
 /**
  * Direct head-to-head between [a] and [b]: the two pair-side panels (winner
  * highlighted, ordered with the winner on the left when one exists) plus
- * the abstain section. Shared by the Preferences page (which adds a verdict
- * header above) and the Decision page (which adds the Tideman cycle context
- * around it).
+ * the abstain section. The verdict header sits above it and, when Tideman
+ * skipped the contest, the cycle context sits below — see
+ * [renderHeadToHeadDetail].
  */
 @Composable
 private fun renderDirectHeadToHead(
@@ -492,46 +344,94 @@ private fun renderDirectHeadToHead(
 }
 
 /**
- * Why-it-was-skipped explainer for the Decision page. Lays out each
- * contest in the cycle (including this one) as its own row with the
- * actual outcome attached — Locked (from an earlier, stronger bucket)
- * or Skipped (same bucket as this contest, tied and dropped together).
- * After the last row, a closure indicator shows that the loop closes
- * back to the cycle's starting node, making the closed-loop structure
- * explicit even for N-cycles with N > 3.
+ * The two candidates' actual positions in the final ranking, read straight
+ * from [places]. This is the authoritative answer to "where did they end
+ * up" — and the only sound source for whether they tie. A skipped contest
+ * never on its own implies a tie; the cycle section explains the skip,
+ * this line states the outcome.
+ */
+@Composable
+private fun renderFinalStanding(a: String, b: String, places: List<Place>) {
+    val rankByName = places.associate { it.candidateName to it.rank }
+    val rankA = rankByName[a] ?: return
+    val rankB = rankByName[b] ?: return
+    Div({ classes("pair-standing") }) {
+        Text(
+            if (rankA == rankB) {
+                "Final ranking: $a and $b both place ${ordinal(rankA)}."
+            } else {
+                val leader = if (rankA < rankB) a else b
+                val trailer = if (rankA < rankB) b else a
+                "Final ranking: $leader places ${ordinal(minOf(rankA, rankB))}, " +
+                    "$trailer places ${ordinal(maxOf(rankA, rankB))}."
+            }
+        )
+    }
+}
+
+/**
+ * Why-it-was-skipped explainer. Renders the cycle that locking the contest
+ * would close — each edge as its own row with its real outcome (Locked or
+ * Skipped) — and a closure indicator showing the loop closes back to its
+ * start, making the closed-loop structure explicit even for N-cycles.
  *
- * The intro paragraph branches on the cycle's classification:
- *   - LonelyWeakest: this contest is the uniquely weakest; others locked.
- *   - PureTie:       all N contests are at the same strength; all skip.
- *   - Mixed:         L stronger ones locked, T tied (this one included).
+ * The intro paragraph branches on
+ * [RankedPairs.Outcome.SkippedByCycle.forcedByStrongerContests]:
+ *   - forced: every other contest in this cycle is strictly stronger and
+ *     already locked, so this contest is the uniquely weakest edge and its
+ *     drop is forced.
+ *   - not forced: every closing cycle includes a contest of equal strength,
+ *     so the contest is dropped to avoid breaking an even tie arbitrarily.
  *
- * The wording scales to any N because it talks in terms of counts
- * (L, T, totalSize) rather than enumerating specific positions.
+ * It deliberately makes no claim about whether the two candidates tie in
+ * the final ranking — that is [renderFinalStanding]'s job, read from the
+ * places list. A contest can sit in an all-equal cycle whose candidates
+ * still land at different places.
  */
 @Composable
 private fun renderCycleSection(
     contest: RankedPairs.Contest,
-    cycleAnalysis: CycleAnalysis,
+    outcome: RankedPairs.Outcome.SkippedByCycle,
+    allContests: List<RankedPairs.Contest>,
     isTier: (String) -> Boolean,
 ) {
-    val outcome = contest.outcome as RankedPairs.Outcome.SkippedByCycle
+    val byEdge: Map<Pair<String, String>, IndexedValue<RankedPairs.Contest>> =
+        allContests.withIndex().associateBy { (_, c) -> c.winner to c.loser }
+    val edges: List<IndexedValue<RankedPairs.Contest>> =
+        outcome.cyclePath.zipWithNext().mapNotNull { (from, to) -> byEdge[from to to] }
     val cycleStart = outcome.cyclePath.first()
+    val contestStep = allContests.indexOf(contest) + 1
 
     Div({ classes("rp-cycle-section") }) {
         H3 { Text("Why it was skipped") }
-        P { Text(cycleExplanation(contest, cycleAnalysis)) }
+        P {
+            Text(
+                if (outcome.forcedByStrongerContests) {
+                    "Locking ${contest.winner} → ${contest.loser} would close the cycle " +
+                        "below, and every other contest in it is stronger and already " +
+                        "locked. ${contest.winner} → ${contest.loser} " +
+                        "(${contest.winningVotes} to ${contest.losingVotes}) is the " +
+                        "weakest link, so it is the one dropped to break the cycle."
+                } else {
+                    "Locking ${contest.winner} → ${contest.loser} would close the cycle " +
+                        "below. No contest in the cycle outranks the rest — at least one " +
+                        "is equal in strength to this one — so the algorithm drops this " +
+                        "contest rather than break an even tie arbitrarily."
+                }
+            )
+        }
 
         Div({ classes("rp-cycle-comparison") }) {
-            cycleAnalysis.edges.forEach { edge ->
+            edges.forEach { (index, edgeContest) ->
                 renderCycleEdgeRow(
-                    step = edge.step,
-                    contest = edge.contest,
+                    step = index + 1,
+                    contest = edgeContest,
                     isCurrentContest = false,
                     isTier = isTier,
                 )
             }
             renderCycleEdgeRow(
-                step = cycleAnalysis.skippedStep,
+                step = contestStep,
                 contest = contest,
                 isCurrentContest = true,
                 isTier = isTier,
@@ -545,47 +445,6 @@ private fun renderCycleSection(
                 Span { Text(" closes back to ") }
                 renderNameChip(cycleStart, isTier(cycleStart))
             }
-        }
-    }
-}
-
-private fun cycleExplanation(
-    contest: RankedPairs.Contest,
-    analysis: CycleAnalysis,
-): String {
-    val n = analysis.totalSize
-    val l = analysis.lockedCount
-    val t = analysis.tiedCount
-    val w = contest.winningVotes
-    val ls = contest.losingVotes
-    return when (analysis.kind) {
-        CycleKind.LONELY_WEAKEST ->
-            "These $n contests together form a cycle. Every other contest in the cycle " +
-                "locked into the ranking from a stronger bucket. This contest, at $w " +
-                "winning and $ls losing, is the weakest of the $n — so it's the one " +
-                "that gets dropped to break the loop."
-        CycleKind.PURE_TIE ->
-            "These $n contests together form a cycle, and all $n are tied at the same " +
-                "strength ($w winning · $ls losing). Together they create a cycle, so we " +
-                "can keep at most ${n - 1}. But picking which one to drop would require an " +
-                "arbitrary tiebreaker — the vote counts give no reason to prefer one over " +
-                "the others. So all $n skip together, and the candidates involved end up " +
-                "tied in the final ranking."
-        CycleKind.MIXED -> {
-            val contestWord = if (l == 1) "contest" else "contests"
-            val keepCount = t - 1
-            val tiedWord = if (t == 1) "contest" else "contests"
-            val keepWord = if (keepCount == 1) "one" else "${keepCount} of them"
-            val coherentNote = if (keepCount == 0) {
-                ""
-            } else {
-                "Keeping any $keepWord would be a coherent outcome, but " +
-                    "picking which to keep would be arbitrary. "
-            }
-            "These $n contests together form a cycle. $l stronger $contestWord in the " +
-                "cycle locked into the ranking from earlier buckets. The remaining $t " +
-                "$tiedWord — including this one — are tied at this strength " +
-                "($w winning · $ls losing). ${coherentNote}All $t skip together."
         }
     }
 }
