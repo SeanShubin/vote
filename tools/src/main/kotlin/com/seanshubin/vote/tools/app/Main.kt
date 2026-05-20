@@ -17,6 +17,7 @@ import com.seanshubin.vote.tools.commands.DbSetupMysql
 import com.seanshubin.vote.tools.commands.DbTeardown
 import com.seanshubin.vote.tools.commands.DbTeardownDynamodb
 import com.seanshubin.vote.tools.commands.DbTeardownMysql
+import com.seanshubin.vote.tools.commands.DeleteEvent
 import com.seanshubin.vote.tools.commands.GenerateScenarioEventLog
 import com.seanshubin.vote.tools.commands.InspectDynamodbAll
 import com.seanshubin.vote.tools.commands.InspectDynamodbBallots
@@ -84,6 +85,7 @@ fun main(args: Array<String>) {
             BackupDynamodb(),
             NormalizeCase(),
             NukeDynamodb(),
+            DeleteEvent(),
             RestoreDynamodb(),
             PauseEventLog(),
             ResumeEventLog(),
