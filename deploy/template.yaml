@@ -245,17 +245,26 @@ Resources:
       PointInTimeRecoverySpecification:
         PointInTimeRecoveryEnabled: true
 
+  # event_id alone was the hash key originally; sync then had to Scan the
+  # whole table. Now a constant PK ("EVENT_LOG") partitions the log and
+  # event_id is the sort key, so sync Queries "PK = EVENT_LOG AND event_id
+  # > lastSynced" directly. Changing KeySchema replaces the table — the
+  # migration backs the log up and restores it (see the runbook).
   EventLogTable:
     Type: AWS::DynamoDB::Table
     Properties:
       TableName: vote_event_log
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
         - AttributeName: event_id
           AttributeType: N
       KeySchema:
-        - AttributeName: event_id
+        - AttributeName: PK
           KeyType: HASH
+        - AttributeName: event_id
+          KeyType: RANGE
       PointInTimeRecoverySpecification:
         PointInTimeRecoveryEnabled: true
 

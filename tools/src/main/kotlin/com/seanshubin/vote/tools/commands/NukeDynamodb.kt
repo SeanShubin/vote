@@ -121,7 +121,7 @@ internal suspend fun wipeEventLog(client: DynamoDbClient): Int {
     while (true) {
         val response = client.scan(ScanRequest {
             tableName = DynamoClient.TABLE_EVENT_LOG
-            projectionExpression = "event_id"
+            projectionExpression = "PK, event_id"
             limit = 1000
         })
         val items = response.items ?: emptyList()
@@ -131,6 +131,7 @@ internal suspend fun wipeEventLog(client: DynamoDbClient): Int {
                 WriteRequest {
                     deleteRequest = DeleteRequest {
                         key = mapOf(
+                            "PK" to (item["PK"] ?: error("scan returned row without PK")),
                             "event_id" to (item["event_id"] ?: error("scan returned row without event_id")),
                         )
                     }

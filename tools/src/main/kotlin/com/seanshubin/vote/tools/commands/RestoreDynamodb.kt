@@ -125,6 +125,7 @@ class RestoreDynamodb : CliktCommand(name = "restore-dynamodb") {
                 client.putItem(PutItemRequest {
                     tableName = DynamoClient.TABLE_EVENT_LOG
                     item = mapOf(
+                        "PK" to AttributeValue.S(DynamoDbSingleTableSchema.EVENT_LOG_PK),
                         "event_id" to AttributeValue.N(envelope.eventId.toString()),
                         "authority" to AttributeValue.S(envelope.authority),
                         "event_type" to AttributeValue.S(eventType),

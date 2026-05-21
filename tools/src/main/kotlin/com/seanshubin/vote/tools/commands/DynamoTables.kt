@@ -67,11 +67,16 @@ object DynamoTables {
         try {
             client.createTable {
                 tableName = DynamoClient.TABLE_EVENT_LOG
+                // Constant "PK" partition + event_id sort key, so sync can
+                // Query the log instead of Scanning it. Mirrors
+                // DynamoDbSingleTableSchema.createEventLogTable.
                 attributeDefinitions = listOf(
-                    AttributeDefinition { attributeName = "event_id"; attributeType = ScalarAttributeType.N }
+                    AttributeDefinition { attributeName = "PK"; attributeType = ScalarAttributeType.S },
+                    AttributeDefinition { attributeName = "event_id"; attributeType = ScalarAttributeType.N },
                 )
                 keySchema = listOf(
-                    KeySchemaElement { attributeName = "event_id"; keyType = KeyType.Hash }
+                    KeySchemaElement { attributeName = "PK"; keyType = KeyType.Hash },
+                    KeySchemaElement { attributeName = "event_id"; keyType = KeyType.Range },
                 )
                 billingMode = BillingMode.PayPerRequest
             }

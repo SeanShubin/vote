@@ -33,6 +33,7 @@ class DynamoDbEventLog(
             dynamoDb.putItem(PutItemRequest {
                 tableName = DynamoDbSingleTableSchema.EVENT_LOG_TABLE
                 item = mapOf(
+                    "PK" to AttributeValue.S(DynamoDbSingleTableSchema.EVENT_LOG_PK),
                     "event_id" to AttributeValue.N(eventId.toString()),
                     "authority" to AttributeValue.S(authority),
                     "event_type" to AttributeValue.S(eventType),
@@ -45,20 +46,19 @@ class DynamoDbEventLog(
 
     override fun eventsToSync(lastEventSynced: Long): List<EventEnvelope> {
         return runBlocking {
-            // A single Scan returns at most 1 MB of data and hands back a
-            // lastEvaluatedKey to read the rest. Loop until that key is null —
-            // otherwise an event log larger than 1 MB silently syncs only a
-            // partial slice of events, and the projection drifts with no error.
-            // A filtered page can come back empty while still having more to
-            // read, so the loop keys off lastEvaluatedKey, never the item count.
+            // Query the single EVENT_LOG partition for event_id > lastSynced.
+            // DynamoDB seeks straight to that range and returns rows already
+            // ordered by event_id ascending. Query is still 1 MB-capped per
+            // call, so loop on lastEvaluatedKey until the whole range is read.
             val rawItems = mutableListOf<Map<String, AttributeValue>>()
             var startKey: Map<String, AttributeValue>? = null
             do {
-                val response = dynamoDb.scan(ScanRequest {
+                val response = dynamoDb.query(QueryRequest {
                     tableName = DynamoDbSingleTableSchema.EVENT_LOG_TABLE
-                    filterExpression = "event_id > :lastSynced"
+                    keyConditionExpression = "PK = :pk AND event_id > :lastSynced"
                     expressionAttributeValues = mapOf(
-                        ":lastSynced" to AttributeValue.N(lastEventSynced.toString())
+                        ":pk" to AttributeValue.S(DynamoDbSingleTableSchema.EVENT_LOG_PK),
+                        ":lastSynced" to AttributeValue.N(lastEventSynced.toString()),
                     )
                     exclusiveStartKey = startKey
                 })
@@ -66,6 +66,8 @@ class DynamoDbEventLog(
                 startKey = response.lastEvaluatedKey
             } while (startKey != null)
 
+            // Already ordered by event_id — the Query sort key — across every
+            // page, so no explicit sort is needed.
             rawItems.map { item ->
                 val eventId = item["event_id"]?.asN()?.toLong() ?: error("Missing event_id")
                 val authority = item["authority"]?.asS() ?: error("Missing authority")
@@ -87,19 +89,24 @@ class DynamoDbEventLog(
                     authority = authority,
                     event = domainEvent
                 )
-            }.sortedBy { it.eventId }
+            }
         }
     }
 
     override fun eventCount(): Int {
         return runBlocking {
-            // Select.Count is also capped at 1 MB scanned per call, so a large
-            // event log undercounts without pagination — loop on lastEvaluatedKey.
+            // Count the EVENT_LOG partition. Query (not Scan) so it touches
+            // only the log's own partition; Count is still 1 MB-capped per
+            // call, so loop on lastEvaluatedKey.
             var count = 0
             var startKey: Map<String, AttributeValue>? = null
             do {
-                val response = dynamoDb.scan(ScanRequest {
+                val response = dynamoDb.query(QueryRequest {
                     tableName = DynamoDbSingleTableSchema.EVENT_LOG_TABLE
+                    keyConditionExpression = "PK = :pk"
+                    expressionAttributeValues = mapOf(
+                        ":pk" to AttributeValue.S(DynamoDbSingleTableSchema.EVENT_LOG_PK),
+                    )
                     select = Select.Count
                     exclusiveStartKey = startKey
                 })

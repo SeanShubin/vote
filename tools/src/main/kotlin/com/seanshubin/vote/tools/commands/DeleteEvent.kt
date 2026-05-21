@@ -9,6 +9,7 @@ import com.github.ajalt.clikt.parameters.arguments.argument
 import com.github.ajalt.clikt.parameters.arguments.multiple
 import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.option
+import com.seanshubin.vote.backend.repository.DynamoDbSingleTableSchema
 import com.seanshubin.vote.tools.lib.DynamoClient
 import com.seanshubin.vote.tools.lib.Output
 import kotlinx.coroutines.runBlocking
@@ -48,7 +49,10 @@ class DeleteEvent : CliktCommand(name = "delete-event") {
             for (id in ids) {
                 val item = client.getItem(GetItemRequest {
                     tableName = DynamoClient.TABLE_EVENT_LOG
-                    key = mapOf("event_id" to AttributeValue.N(id.toString()))
+                    key = mapOf(
+                    "PK" to AttributeValue.S(DynamoDbSingleTableSchema.EVENT_LOG_PK),
+                    "event_id" to AttributeValue.N(id.toString()),
+                )
                 }).item
                 if (item == null) {
                     println("  event_id $id — not found, skipping")
@@ -71,7 +75,10 @@ class DeleteEvent : CliktCommand(name = "delete-event") {
             for (id in present) {
                 client.deleteItem(DeleteItemRequest {
                     tableName = DynamoClient.TABLE_EVENT_LOG
-                    key = mapOf("event_id" to AttributeValue.N(id.toString()))
+                    key = mapOf(
+                    "PK" to AttributeValue.S(DynamoDbSingleTableSchema.EVENT_LOG_PK),
+                    "event_id" to AttributeValue.N(id.toString()),
+                )
                 })
                 println("Deleted event_id $id.")
             }

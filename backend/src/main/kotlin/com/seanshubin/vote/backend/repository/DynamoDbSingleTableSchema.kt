@@ -7,6 +7,15 @@ object DynamoDbSingleTableSchema {
     const val MAIN_TABLE = "vote_data"
     const val EVENT_LOG_TABLE = "vote_event_log"
 
+    /**
+     * Constant partition key for every row in [EVENT_LOG_TABLE]. The log
+     * lives in one partition with event_id as the sort key, so sync can
+     * Query "PK = EVENT_LOG AND event_id > lastSynced" directly instead of
+     * scanning the whole table. Append volume is far below the per-partition
+     * write ceiling, so a single partition is fine here.
+     */
+    const val EVENT_LOG_PK = "EVENT_LOG"
+
     // Entity type prefixes
     const val USER_PREFIX = "USER#"
     const val ELECTION_PREFIX = "ELECTION#"
@@ -56,15 +65,23 @@ object DynamoDbSingleTableSchema {
             tableName = EVENT_LOG_TABLE
             keySchema = listOf(
                 KeySchemaElement {
-                    attributeName = "event_id"
+                    attributeName = "PK"
                     keyType = KeyType.Hash
-                }
+                },
+                KeySchemaElement {
+                    attributeName = "event_id"
+                    keyType = KeyType.Range
+                },
             )
             attributeDefinitions = listOf(
                 AttributeDefinition {
+                    attributeName = "PK"
+                    attributeType = ScalarAttributeType.S
+                },
+                AttributeDefinition {
                     attributeName = "event_id"
                     attributeType = ScalarAttributeType.N
-                }
+                },
             )
             billingMode = BillingMode.PayPerRequest
         })

@@ -33,7 +33,7 @@ class DynamoDbRawTableScanner(
         // Column ordering: key attributes first, then the rest alphabetically.
         val priority = when (tableName) {
             DynamoDbSingleTableSchema.MAIN_TABLE -> listOf("PK", "SK")
-            DynamoDbSingleTableSchema.EVENT_LOG_TABLE -> listOf("event_id")
+            DynamoDbSingleTableSchema.EVENT_LOG_TABLE -> listOf("PK", "event_id")
             DynamoDbOperatorStateSchema.TABLE -> listOf("PK")
             else -> emptyList()
         }
