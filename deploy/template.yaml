@@ -245,28 +245,14 @@ Resources:
       PointInTimeRecoverySpecification:
         PointInTimeRecoveryEnabled: true
 
-  # event_id alone was the hash key originally; sync then had to Scan the
-  # whole table. Now a constant PK ("EVENT_LOG") partitions the log and
-  # event_id is the sort key, so sync Queries "PK = EVENT_LOG AND event_id
-  # > lastSynced" directly. Changing KeySchema replaces the table — the
-  # migration backs the log up and restores it (see the runbook).
-  EventLogTable:
-    Type: AWS::DynamoDB::Table
-    Properties:
-      TableName: vote_event_log
-      BillingMode: PAY_PER_REQUEST
-      AttributeDefinitions:
-        - AttributeName: PK
-          AttributeType: S
-        - AttributeName: event_id
-          AttributeType: N
-      KeySchema:
-        - AttributeName: PK
-          KeyType: HASH
-        - AttributeName: event_id
-          KeyType: RANGE
-      PointInTimeRecoverySpecification:
-        PointInTimeRecoveryEnabled: true
+  # vote_event_log is intentionally NOT a CloudFormation resource. Its key
+  # schema (constant PK + event_id sort key, so sync can Query the log
+  # instead of Scanning it) once had to change, and CloudFormation cannot
+  # replace a custom-named table in place. The application owns it instead:
+  # DynamoDbStartup.ensureTables creates it on startup from
+  # DynamoDbSingleTableSchema.createEventLogTable. Recreating it with a new
+  # schema is then just "delete the table; the app remakes it" — no CFN
+  # wall. The Lambda's IAM policy below grants CRUD on it by literal name.
 
   # Operator state — pause flag + feature flags. Physically separated from
   # vote_data so the datafix nuke/restore tools (which wipe vote_data to
@@ -360,8 +346,10 @@ Resources:
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref MainTable
+        # vote_event_log is app-managed, not a CFN resource (see the comment
+        # above the table block) — scope the grant by literal name.
         - DynamoDBCrudPolicy:
-            TableName: !Ref EventLogTable
+            TableName: vote_event_log
         - DynamoDBCrudPolicy:
             TableName: !Ref OperatorStateTable
         # Read the four Discord OAuth parameters. Scoped to this stack's

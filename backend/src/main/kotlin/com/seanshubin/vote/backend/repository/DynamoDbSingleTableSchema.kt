@@ -26,8 +26,22 @@ object DynamoDbSingleTableSchema {
     const val SYNC_SK = "SYNC"
 
     suspend fun createTables(dynamoDb: DynamoDbClient) {
-        createMainTable(dynamoDb)
-        createEventLogTable(dynamoDb)
+        // Each table is created independently so an already-existing one
+        // doesn't abort creation of the others. This matters now that
+        // vote_event_log is app-managed: in production vote_data always
+        // exists, and a single createMainTable-then-createEventLogTable
+        // sequence would throw on the first call and never reach — never
+        // recreate — a missing event-log table.
+        createIfMissing { createMainTable(dynamoDb) }
+        createIfMissing { createEventLogTable(dynamoDb) }
+    }
+
+    private suspend fun createIfMissing(create: suspend () -> Unit) {
+        try {
+            create()
+        } catch (e: ResourceInUseException) {
+            // Table already exists — nothing to do.
+        }
     }
 
     private suspend fun createMainTable(dynamoDb: DynamoDbClient) {
