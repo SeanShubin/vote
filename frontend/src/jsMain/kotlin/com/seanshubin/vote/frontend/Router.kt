@@ -46,7 +46,7 @@ fun pageToPath(page: Page): String = when (page) {
     is Page.DebugTables -> "/admin/debug-tables"
     is Page.UserManagement -> "/admin/users"
     is Page.Admin -> "/admin"
-    is Page.PasteTally -> "/paste-tally"
+    is Page.PasteTally -> "/sandbox"
 }
 
 /**
@@ -88,7 +88,7 @@ fun pathToPage(pathWithQuery: String): Page {
         normalized == "/admin/debug-tables" -> Page.DebugTables
         normalized == "/admin/users" -> Page.UserManagement
         normalized == "/admin" -> Page.Admin
-        normalized == "/paste-tally" -> Page.PasteTally
+        normalized == "/sandbox" -> Page.PasteTally
         else -> Page.Home
     }
 }
