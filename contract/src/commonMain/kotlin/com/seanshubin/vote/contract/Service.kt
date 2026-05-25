@@ -135,6 +135,20 @@ interface Service {
     fun castBallot(accessToken: AccessToken, voterName: String, electionName: String, rankings: List<Ranking>): String
     fun deleteBallot(accessToken: AccessToken, voterName: String, electionName: String)
     fun listRankings(accessToken: AccessToken, voterName: String, electionName: String): List<Ranking>
+
+    /**
+     * The calling voter's most recent BallotCast for [electionName],
+     * sourced from the event log so it survives a BallotDeleted. Returns
+     * null when no prior cast exists. Backs the Vote tab's "Restore last
+     * ballot" affordance — shown when the current ballot is empty and a
+     * prior cast still exists in the log.
+     *
+     * Voter is implicit (the access token's user). Not parameterized on
+     * voterName because the only use case is the voter recovering their
+     * own ballot — exposing another user's deleted ballot would surface
+     * data the projection deliberately forgot.
+     */
+    fun getMyLastBallotRankings(accessToken: AccessToken, electionName: String): LastBallotRecord?
     /**
      * Tally for one side of the election. PUBLIC and SECRET are tallied
      * independently; rankings on one side never influence the other's

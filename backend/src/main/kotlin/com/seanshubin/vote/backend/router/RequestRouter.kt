@@ -178,6 +178,7 @@ class RequestRouter(
         Route("GET", "/election/[^/]+/ballot/[^/]+", ::handleGetBallot),
         Route("DELETE", "/election/[^/]+/ballot/[^/]+", ::handleDeleteBallot),
         Route("GET", "/election/[^/]+/rankings/[^/]+", ::handleListRankings),
+        Route("GET", "/election/[^/]+/my-last-ballot-rankings", ::handleGetMyLastBallotRankings),
         Route("GET", "/election/[^/]+/tally", ::handleTally),
         Route("POST", "/auth/discord/start", { _ -> handleDiscordLoginStart() }),
         Route("GET", "/auth/discord/callback", ::handleDiscordCallback),
@@ -668,6 +669,13 @@ class RequestRouter(
         val voterName = extractVoterOrUserName(req.target)
         val rankings = service.listRankings(accessToken, voterName, electionName)
         return HttpResponse(200, json.encodeToString(rankings))
+    }
+
+    private fun handleGetMyLastBallotRankings(req: HttpRequest): HttpResponse {
+        val accessToken = extractAccessToken(req)
+        val electionName = extractElectionName(req.target)
+        val record = service.getMyLastBallotRankings(accessToken, electionName)
+        return HttpResponse(200, json.encodeToString(record))
     }
 
     private fun handleDiscordLoginStart(): HttpResponse {

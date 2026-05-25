@@ -8,6 +8,7 @@ import kotlinx.coroutines.CancellationException
 import com.seanshubin.vote.domain.ElectionDetail
 import com.seanshubin.vote.domain.ElectionSummary
 import com.seanshubin.vote.domain.FeatureFlag
+import com.seanshubin.vote.domain.LastBallotRecord
 import com.seanshubin.vote.domain.Ranking
 import com.seanshubin.vote.domain.RankingSide
 import com.seanshubin.vote.domain.Role
@@ -81,6 +82,8 @@ class FakeApiClient : ApiClient {
     var deleteMyBallotResult: Result<Unit> = Result.success(Unit)
     var myRankingsResult: Result<List<Ranking>> = Result.success(emptyList())
     val myRankingsCalls = mutableListOf<String>()
+    var myLastBallotRankingsResult: Result<LastBallotRecord?> = Result.success(null)
+    val myLastBallotRankingsCalls = mutableListOf<String>()
     var getTallyResult: Result<ElectionTally> = Result.failure(Exception("Get tally not configured"))
     var deleteElectionResult: Result<Unit> = Result.success(Unit)
     var transferElectionOwnershipResult: Result<Unit> = Result.success(Unit)
@@ -250,6 +253,11 @@ class FakeApiClient : ApiClient {
     override suspend fun getMyRankings(electionName: String): List<Ranking> {
         myRankingsCalls.add(electionName)
         return myRankingsResult.getOrThrow()
+    }
+
+    override suspend fun getMyLastBallotRankings(electionName: String): LastBallotRecord? {
+        myLastBallotRankingsCalls.add(electionName)
+        return myLastBallotRankingsResult.getOrThrow()
     }
 
     override suspend fun getTally(electionName: String, side: RankingSide): ElectionTally {

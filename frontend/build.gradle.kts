@@ -30,6 +30,11 @@ kotlin {
                 // Kotlin
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:${project.property("kotlinx.serialization.version")}")
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:${project.property("kotlinx.coroutines.version")}")
+                // Direct dep so the Vote tab can format the whenCast on a
+                // restored ballot — domain types expose Instant fields but
+                // pull it in as `implementation`, so it isn't transitively
+                // visible here.
+                implementation("org.jetbrains.kotlinx:kotlinx-datetime:${project.property("kotlinx.datetime.version")}")
             }
         }
 

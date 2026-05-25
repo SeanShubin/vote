@@ -856,6 +856,28 @@ class ServiceImpl(
         return queryModel.listRankings(voterName, electionName)
     }
 
+    override fun getMyLastBallotRankings(
+        accessToken: AccessToken,
+        electionName: String,
+    ): LastBallotRecord? {
+        requirePermission(accessToken, Permission.VIEW_APPLICATION)
+        val voterName = accessToken.userName
+        // Scan the event log newest-first so the first BallotCast match is
+        // the most recent — short-circuits without scanning the whole log
+        // when the voter cast recently. Case-insensitive on both names to
+        // match the rest of the app's case-insensitive identity model.
+        return eventLog.eventsToSync(0).asReversed()
+            .firstNotNullOfOrNull { envelope ->
+                val event = envelope.event
+                if (event is DomainEvent.BallotCast &&
+                    event.voterName.equals(voterName, ignoreCase = true) &&
+                    event.electionName.equals(electionName, ignoreCase = true)
+                ) {
+                    LastBallotRecord(event.rankings, event.whenCast)
+                } else null
+            }
+    }
+
     override fun tally(accessToken: AccessToken, electionName: String, side: RankingSide): ElectionTally {
         requirePermission(accessToken, Permission.VIEW_APPLICATION)
         queryModel.searchElectionByName(electionName)

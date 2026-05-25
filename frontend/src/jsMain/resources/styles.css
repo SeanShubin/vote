@@ -440,6 +440,28 @@ button:disabled {
     flex: 1;
 }
 
+/*
+ * "Restore last ballot" banner on the Vote tab. Same notice-color frame as
+ * the tally-update banner so both read as "informational, action available"
+ * rather than as errors. Shown only when the ballot is empty and the event
+ * log still has a prior cast; click on the button re-casts that cast.
+ */
+.ballot-restore-banner {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.75rem 1rem;
+    background-color: var(--color-notice-bg);
+    border: 1px solid var(--color-notice-border);
+    border-radius: 4px;
+    color: var(--color-notice-text);
+    margin-bottom: 1rem;
+}
+
+.ballot-restore-banner-text {
+    flex: 1;
+}
+
 .ballot-side-toggle {
     display: flex;
     flex-wrap: wrap;

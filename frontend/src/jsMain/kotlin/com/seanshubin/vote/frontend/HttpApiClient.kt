@@ -262,6 +262,12 @@ class HttpApiClient(
         )
     }
 
+    override suspend fun getMyLastBallotRankings(electionName: String): LastBallotRecord? {
+        return getWithAuth(
+            "/election/${encodeURIComponent(electionName)}/my-last-ballot-rankings"
+        )
+    }
+
     override suspend fun getTally(electionName: String, side: RankingSide): ElectionTally =
         getWithAuth("/election/${encodeURIComponent(electionName)}/tally?side=$side")
 

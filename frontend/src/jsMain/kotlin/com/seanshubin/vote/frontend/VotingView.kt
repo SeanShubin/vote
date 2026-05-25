@@ -2,6 +2,7 @@ package com.seanshubin.vote.frontend
 
 import androidx.compose.runtime.*
 import com.seanshubin.vote.contract.ApiClient
+import com.seanshubin.vote.domain.LastBallotRecord
 import com.seanshubin.vote.domain.Ranking
 import com.seanshubin.vote.domain.RankingKind
 import com.seanshubin.vote.domain.RankingSide
@@ -71,6 +72,15 @@ fun VotingView(
     }
     var dragSource by remember { mutableStateOf<DragSource?>(null) }
     var isInitialized by remember(electionName, candidates, tiers) { mutableStateOf(false) }
+    // Most recent BallotCast for this voter+election from the event log,
+    // sourced via apiClient.getMyLastBallotRankings. Drives the "Restore last
+    // ballot" affordance shown when the current ballot is empty — survives a
+    // BallotDeleted because the event log keeps the cast even after the
+    // projection drops it. Null when there is no prior cast on record (or
+    // the voter has an active ballot, so recovery would be redundant).
+    var lastBallotRecord by remember(electionName) {
+        mutableStateOf<LastBallotRecord?>(null)
+    }
     // Transient "Copied!" toast next to the copy button.
     var copyFeedback by remember { mutableStateOf<String?>(null) }
     var copyFeedbackToken by remember { mutableStateOf(0) }
@@ -155,6 +165,21 @@ fun VotingView(
         publicState = hydrate(RankingSide.PUBLIC)
         secretState = hydrate(RankingSide.SECRET)
         isInitialized = true
+
+        // Only fetch the recoverable cast when the current ballot is
+        // empty. For an active voter the record would just match what
+        // already pre-populated the editor, so the event-log scan would
+        // produce no actionable UI and only cost server time.
+        lastBallotRecord = if (existing.isEmpty()) {
+            try {
+                apiClient.getMyLastBallotRankings(electionName)
+            } catch (e: Exception) {
+                apiClient.logErrorToServer(e)
+                null
+            }
+        } else {
+            null
+        }
     }
 
     // Auto-save when either side diverges from its last-saved snapshot. We
@@ -190,6 +215,16 @@ fun VotingView(
                 publicState = publicState.copy(savedRanked = emptyList())
                 secretState = secretState.copy(savedRanked = emptyList())
                 onBallotCountChanged(-1)
+                // The just-deleted cast is still in the event log, so refresh
+                // the recovery record. Surfaces the "Restore last ballot"
+                // affordance immediately — no page reload needed before the
+                // voter can undo a clear-all they didn't mean to commit.
+                lastBallotRecord = try {
+                    apiClient.getMyLastBallotRankings(electionName)
+                } catch (e: Exception) {
+                    apiClient.logErrorToServer(e)
+                    null
+                }
             } else {
                 val rankings = toSavePublic.toRankings(RankingSide.PUBLIC) +
                     toSaveSecret.toRankings(RankingSide.SECRET)
@@ -225,6 +260,74 @@ fun VotingView(
                 savedRanked = emptyList(),
             )
             onBallotCountChanged(-1)
+            // Refresh the recovery record so the "Restore last ballot" button
+            // appears right away — the just-deleted cast is still in the
+            // event log and is the obvious candidate for an undo.
+            lastBallotRecord = try {
+                apiClient.getMyLastBallotRankings(electionName)
+            } catch (e: Exception) {
+                apiClient.logErrorToServer(e)
+                null
+            }
+        },
+    )
+
+    // One-click recovery for a deleted or cleared ballot. Reads the most
+    // recent BallotCast from the event log and casts it again immediately —
+    // no draft, no debounce — so the voter never has to wonder whether
+    // their "undo" actually persisted. Filters out candidates and tier
+    // annotations that the election has since dropped (rename/remove since
+    // the last cast); if nothing survives the filter, surfaces an error
+    // rather than casting an empty ballot the backend would reject.
+    val restoreLastBallotAction = rememberAsyncAction(
+        apiClient = apiClient,
+        fallbackErrorMessage = "Failed to restore last ballot",
+        onError = onError,
+        action = {
+            val record = lastBallotRecord ?: return@rememberAsyncAction
+            val candidateSet = candidates.toSet()
+            val tierSet = tiers.toSet()
+            val validRankings = record.rankings
+                .filter { it.rank != null && it.candidateName in candidateSet }
+                .map { r -> if (r.tier != null && r.tier !in tierSet) r.copy(tier = null) else r }
+            if (validRankings.isEmpty()) {
+                onError(
+                    "None of the candidates from your last ballot are still on this election."
+                )
+                return@rememberAsyncAction
+            }
+            apiClient.castBallot(electionName, validRankings)
+            // Re-run the same hydrate logic the mount path uses so the
+            // editor mirrors the restored cast — tier markers materialized
+            // in place when the election has tiers, candidate-only list
+            // otherwise.
+            fun hydrateFromRestored(side: RankingSide): SideState {
+                val sideRankings = validRankings
+                    .filter { it.side == side }
+                    .sortedBy { it.rank }
+                val newRanked: List<RankedItem> = when {
+                    tiers.isEmpty() -> sideRankings.map { RankedItem.Candidate(it.candidateName) }
+                    sideRankings.isEmpty() -> tiers.map { RankedItem.TierMarker(it) }
+                    else -> rankingsToRankedItems(sideRankings, tiers, side)
+                }
+                val rankedCandidateNames = newRanked
+                    .filterIsInstance<RankedItem.Candidate>()
+                    .map { it.name }
+                    .toSet()
+                return SideState(
+                    arena = candidates.filter { it !in rankedCandidateNames },
+                    ranked = newRanked,
+                    savedRanked = newRanked,
+                    selectedTierName = tiers.firstOrNull(),
+                )
+            }
+            publicState = hydrateFromRestored(RankingSide.PUBLIC)
+            secretState = hydrateFromRestored(RankingSide.SECRET)
+            // Trigger condition for the button is "current ballot is empty,"
+            // so this restore is necessarily a 0→1 transition for the count.
+            onBallotCountChanged(+1)
+            // Hide the affordance now that the ballot is back.
+            lastBallotRecord = null
         },
     )
 
@@ -439,6 +542,37 @@ fun VotingView(
         if (!isInitialized) {
             P { Text("Loading…") }
             return@Div
+        }
+
+        // "Restore last ballot" banner. Shown when the ballot is fully
+        // empty (both sides have an empty savedRanked and no in-progress
+        // ranking) and the event log still has a prior cast on record.
+        // Hidden the moment the voter starts ranking — clicking restore
+        // would otherwise overwrite their fresh draft. Also hidden during a
+        // paused event log (cast would 503), but the banner reappears as
+        // soon as the pause lifts since this LaunchedEffect re-evaluates.
+        val publicEmpty = publicState.savedRanked.isNullOrEmpty() &&
+            publicState.ranked.none { it is RankedItem.Candidate }
+        val secretEmpty = secretState.savedRanked.isNullOrEmpty() &&
+            secretState.ranked.none { it is RankedItem.Candidate }
+        val restorable = lastBallotRecord
+        if (restorable != null && publicEmpty && secretEmpty && !isEventLogPaused) {
+            Div({ classes("ballot-restore-banner") }) {
+                Span({ classes("ballot-restore-banner-text") }) {
+                    Text(
+                        "Your previous ballot is still on record " +
+                            "(cast ${formatWhenCast(restorable.whenCast)}). " +
+                            "Restoring will cast it again as your current ballot."
+                    )
+                }
+                Button({
+                    classes("ballot-restore-banner-button")
+                    if (restoreLastBallotAction.isLoading) attr("disabled", "")
+                    onClick { restoreLastBallotAction.invoke() }
+                }) {
+                    Text(if (restoreLastBallotAction.isLoading) "Restoring…" else "Restore last ballot")
+                }
+            }
         }
 
         val ranked = activeState.ranked
@@ -858,6 +992,23 @@ private fun DragAutoScroll(active: Boolean) {
                 window.removeEventListener("dragover", onDragOver)
             }
         }
+    }
+}
+
+/**
+ * Render an Instant for the restore banner ("cast 2026-05-25 17:18").
+ * Delegates to the browser's locale-aware Date formatter so each voter
+ * sees their own time zone — the server stores UTC; the UI presents local.
+ * Falls back to a sliced ISO string if the JS Date constructor rejects
+ * the input (shouldn't happen — Instant.toString is ISO-8601 — but the
+ * fallback keeps the banner readable if it ever does).
+ */
+internal fun formatWhenCast(instant: kotlinx.datetime.Instant): String {
+    return try {
+        val date = js("new Date(instant.toString())")
+        date.toLocaleString().unsafeCast<String>()
+    } catch (e: Throwable) {
+        instant.toString().substring(0, 16).replace("T", " ")
     }
 }
 

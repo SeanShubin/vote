@@ -4,6 +4,7 @@ import com.seanshubin.vote.domain.ElectionDetail
 import com.seanshubin.vote.domain.ElectionSummary
 import com.seanshubin.vote.domain.ElectionTally
 import com.seanshubin.vote.domain.FeatureFlag
+import com.seanshubin.vote.domain.LastBallotRecord
 import com.seanshubin.vote.domain.Ranking
 import com.seanshubin.vote.domain.RankingSide
 import com.seanshubin.vote.domain.Role
@@ -177,6 +178,15 @@ interface ApiClient {
      * hasn't cast a ballot yet.
      */
     suspend fun getMyRankings(electionName: String): List<Ranking>
+
+    /**
+     * The calling voter's most recent BallotCast for [electionName], read
+     * from the event log so it survives a delete. Returns null if no prior
+     * BallotCast exists. The Vote tab queries this when [getMyRankings]
+     * comes back empty so it can offer "Restore last ballot from {date}" —
+     * a one-click recovery for accidental deletions.
+     */
+    suspend fun getMyLastBallotRankings(electionName: String): LastBallotRecord?
 
     /**
      * Tally for one side of the election. PUBLIC and SECRET produce
