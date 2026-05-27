@@ -48,7 +48,7 @@ fun ElectionDetailPage(
 ) {
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var successMessage by remember { mutableStateOf<String?>(null) }
-    var currentView by rememberHashTab("setup", setOf("setup", "vote", "notes", "tally"))
+    var currentView by rememberHashTab("setup", setOf("setup", "vote", "tally", "reviews"))
 
     // Two independent fetches:
     //   shellFetch — election + candidates, in parallel; gates the page UI.
@@ -204,13 +204,13 @@ fun ElectionDetailPage(
                         onClick { currentView = "vote" }
                     }) { Text("Vote") }
                     Button({
-                        if (effectiveView == "notes") classes("active")
-                        onClick { currentView = "notes" }
-                    }) { Text("Notes") }
-                    Button({
                         if (effectiveView == "tally") classes("active")
                         onClick { currentView = "tally" }
                     }) { Text("Results") }
+                    Button({
+                        if (effectiveView == "reviews") classes("active")
+                        onClick { currentView = "reviews" }
+                    }) { Text("Reviews") }
                 }
 
                 when (effectiveView) {
@@ -364,13 +364,6 @@ fun ElectionDetailPage(
                         },
                         onError = { errorMessage = it },
                     )
-                    "notes" -> CandidateNotesSection(
-                        apiClient = apiClient,
-                        electionName = electionName,
-                        candidates = candidates,
-                        currentUserName = currentUserName,
-                        onError = { errorMessage = it },
-                    )
                     "tally" -> TallyView(
                         apiClient = apiClient,
                         state = tallyFetch.state,
@@ -379,6 +372,13 @@ fun ElectionDetailPage(
                         secretBallotEnabled = secretBallotEnabled,
                         onNavigateToHeadToHead = onNavigateToHeadToHead,
                         onNavigateToProcess = onNavigateToProcess,
+                    )
+                    "reviews" -> CandidateNotesSection(
+                        apiClient = apiClient,
+                        electionName = electionName,
+                        candidates = candidates,
+                        currentUserName = currentUserName,
+                        onError = { errorMessage = it },
                     )
                 }
             }
