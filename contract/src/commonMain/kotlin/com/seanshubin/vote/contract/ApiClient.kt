@@ -327,6 +327,14 @@ interface ApiClient {
     ): List<CandidateNote>
 
     /**
+     * Every note for every candidate in an election in one round trip.
+     * Used by the Reviews tab to avoid N sequential per-candidate fetches.
+     */
+    suspend fun listCandidateNotesByElection(
+        electionName: String,
+    ): List<CandidateNote>
+
+    /**
      * Save the current voter's note on a candidate. Empty text deletes the
      * note; non-empty creates-or-replaces. The voter is the current session
      * user; there is no per-voter parameter.

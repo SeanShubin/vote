@@ -33,20 +33,20 @@ fun CandidateNotesSection(
     }
     var expanded by remember(electionName) { mutableStateOf<Set<String>>(emptySet()) }
 
-    // Fetch every candidate's notes on mount. We could lazy-load per-expand,
-    // but the badge needs the count up front and the payload is small —
-    // one query per candidate beats running them sequentially on expand.
+    // Fetch every note in one round trip — the count badge needs all of
+    // them up front, and the old per-candidate loop was sequential N+1
+    // (an election with 19 candidates measured at ~5s in production).
+    // Group client-side so the row renderer can still index by candidate.
     LaunchedEffect(electionName, candidates) {
-        val collected = mutableMapOf<String, List<CandidateNote>>()
-        for (name in candidates) {
-            try {
-                collected[name] = apiClient.listCandidateNotes(electionName, name)
-            } catch (e: Exception) {
-                apiClient.logErrorToServer(e)
-                collected[name] = emptyList()
-            }
+        val collected = try {
+            apiClient.listCandidateNotesByElection(electionName)
+                .groupBy { it.candidateName }
+                .mapValues { (_, notes) -> notes.sortedByDescending { it.lastUpdated } }
+        } catch (e: Exception) {
+            apiClient.logErrorToServer(e)
+            emptyMap()
         }
-        notesByCandidate = collected
+        notesByCandidate = candidates.associateWith { collected[it] ?: emptyList() }
     }
 
     Div({ classes("section") }) {

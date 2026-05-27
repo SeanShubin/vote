@@ -182,6 +182,7 @@ class RequestRouter(
         Route("GET", "/election/[^/]+/my-last-ballot-rankings", ::handleGetMyLastBallotRankings),
         Route("GET", "/election/[^/]+/tally", ::handleTally),
         Route("GET", "/election/[^/]+/candidate/[^/]+/notes", ::handleListCandidateNotes),
+        Route("GET", "/election/[^/]+/notes", ::handleListCandidateNotesByElection),
         Route("PUT", "/election/[^/]+/candidate/[^/]+/note", ::handleSetCandidateNote),
         Route("POST", "/auth/discord/start", { _ -> handleDiscordLoginStart() }),
         Route("GET", "/auth/discord/callback", ::handleDiscordCallback),
@@ -788,6 +789,13 @@ class RequestRouter(
         val electionName = java.net.URLDecoder.decode(parts[2], "UTF-8")
         val candidateName = java.net.URLDecoder.decode(parts[4], "UTF-8")
         val notes = service.listCandidateNotes(accessToken, electionName, candidateName)
+        return HttpResponse(200, json.encodeToString(notes))
+    }
+
+    private fun handleListCandidateNotesByElection(req: HttpRequest): HttpResponse {
+        val accessToken = extractAccessToken(req)
+        val electionName = extractElectionName(req.target)
+        val notes = service.listCandidateNotesByElection(accessToken, electionName)
         return HttpResponse(200, json.encodeToString(notes))
     }
 

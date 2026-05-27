@@ -228,6 +228,17 @@ interface Service {
     ): List<CandidateNote>
 
     /**
+     * All voters' notes for every candidate in an election. Single round
+     * trip alternative to calling [listCandidateNotes] per candidate — the
+     * Reviews tab on the frontend uses this to avoid N sequential fetches.
+     * Same permission and visibility as the per-candidate variant.
+     */
+    fun listCandidateNotesByElection(
+        accessToken: AccessToken,
+        electionName: String,
+    ): List<CandidateNote>
+
+    /**
      * Set (create or replace) the caller's note on a candidate. Empty
      * [text] is interpreted as "delete my note." The voter is implicit
      * (the access token's user) — there is no proxy/delegation path.

@@ -280,6 +280,13 @@ class HttpApiClient(
                 "/candidate/${encodeURIComponent(candidateName)}/notes"
         )
 
+    override suspend fun listCandidateNotesByElection(
+        electionName: String,
+    ): List<CandidateNote> =
+        getWithAuth(
+            "/election/${encodeURIComponent(electionName)}/notes"
+        )
+
     override suspend fun setCandidateNote(
         electionName: String,
         candidateName: String,

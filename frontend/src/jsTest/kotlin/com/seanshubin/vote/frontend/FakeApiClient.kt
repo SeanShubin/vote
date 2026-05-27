@@ -122,6 +122,8 @@ class FakeApiClient : ApiClient {
 
     var listCandidateNotesResult: (String, String) -> List<CandidateNote> = { _, _ -> emptyList() }
     val listCandidateNotesCalls = mutableListOf<Pair<String, String>>()
+    var listCandidateNotesByElectionResult: (String) -> List<CandidateNote> = { _ -> emptyList() }
+    val listCandidateNotesByElectionCalls = mutableListOf<String>()
     var setCandidateNoteResult: Result<Unit> = Result.success(Unit)
     val setCandidateNoteCalls = mutableListOf<SetCandidateNoteCall>()
 
@@ -367,6 +369,13 @@ class FakeApiClient : ApiClient {
     ): List<CandidateNote> {
         listCandidateNotesCalls.add(electionName to candidateName)
         return listCandidateNotesResult(electionName, candidateName)
+    }
+
+    override suspend fun listCandidateNotesByElection(
+        electionName: String,
+    ): List<CandidateNote> {
+        listCandidateNotesByElectionCalls.add(electionName)
+        return listCandidateNotesByElectionResult(electionName)
     }
 
     override suspend fun setCandidateNote(

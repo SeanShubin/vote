@@ -1011,6 +1011,16 @@ class ServiceImpl(
         return queryModel.listCandidateNotes(election.electionName, candidate)
     }
 
+    override fun listCandidateNotesByElection(
+        accessToken: AccessToken,
+        electionName: String,
+    ): List<CandidateNote> {
+        requirePermission(accessToken, Permission.VIEW_APPLICATION)
+        val election = queryModel.searchElectionByName(electionName)
+            ?: throw ServiceException(ServiceException.Category.NOT_FOUND, "Election not found: $electionName")
+        return queryModel.listCandidateNotesByElection(election.electionName)
+    }
+
     override fun setCandidateNote(
         accessToken: AccessToken,
         electionName: String,
