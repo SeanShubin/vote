@@ -50,16 +50,16 @@ fun CandidateNotesSection(
     }
 
     Div({ classes("section") }) {
-        H2 { Text("Candidate notes") }
+        H2 { Text("Candidate reviews") }
         P({ classes("candidate-notes-intro") }) {
             Text(
-                "Attach a free-form note to any candidate. Everyone can read; " +
-                    "only you can edit your own note."
+                "Attach a free-form review to any candidate. Everyone can read; " +
+                    "only you can edit your own review."
             )
         }
         val loaded = notesByCandidate
         if (loaded == null) {
-            P { Text("Loading notes…") }
+            P { Text("Loading reviews…") }
             return@Div
         }
 
@@ -162,9 +162,9 @@ private fun CandidateNotesRow(
             Span({ classes("candidate-notes-row-count") }) {
                 Text(
                     when (notes.size) {
-                        0 -> "no notes"
-                        1 -> "1 note"
-                        else -> "${notes.size} notes"
+                        0 -> "no reviews"
+                        1 -> "1 review"
+                        else -> "${notes.size} reviews"
                     }
                 )
             }
@@ -196,7 +196,7 @@ private fun CandidateNotesRow(
 
                 if (others.isEmpty() && myNote == null) {
                     P({ classes("candidate-notes-empty-hint") }) {
-                        Text("Nobody has attached a note to this candidate yet.")
+                        Text("Nobody has attached a review to this candidate yet.")
                     }
                 } else {
                     others.forEach { note ->
@@ -229,7 +229,7 @@ private fun MyNoteEditor(
 
     val saveAction = rememberAsyncAction(
         apiClient = apiClient,
-        fallbackErrorMessage = "Failed to save note",
+        fallbackErrorMessage = "Failed to save review",
         onError = onError,
         action = {
             apiClient.setCandidateNote(electionName, candidateName, trimmedDraft)
@@ -259,7 +259,7 @@ private fun MyNoteEditor(
         TextArea(draft) {
             classes("candidate-notes-card-textarea")
             attr("rows", "4")
-            attr("placeholder", "Write a note about this candidate…")
+            attr("placeholder", "Write a review about this candidate…")
             onInput { event -> draft = event.value }
             if (saveAction.isLoading) attr("disabled", "")
         }
