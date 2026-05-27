@@ -71,70 +71,68 @@ class DynamoDbSingleTableCommandModel(
             // Cascade: drop ballot items cast by this user. Matches MySQL's
             // FK CASCADE on ballots.voter_name → users(name); without this the
             // ballot items survive and point at a deleted voter.
-            val ballotItems = dynamoDb.scan(ScanRequest {
-                tableName = DynamoDbSingleTableSchema.MAIN_TABLE
-                filterExpression = "begins_with(SK, :prefix) AND voter_name = :voter"
-                expressionAttributeValues = mapOf(
-                    ":prefix" to AttributeValue.S(DynamoDbSingleTableSchema.BALLOT_PREFIX),
-                    ":voter" to AttributeValue.S(userName),
-                )
-            }).items
-            ballotItems?.forEach { item ->
-                val pk = item["PK"]?.asS() ?: return@forEach
-                val sk = item["SK"]?.asS() ?: return@forEach
-                dynamoDb.deleteItem(DeleteItemRequest {
-                    tableName = DynamoDbSingleTableSchema.MAIN_TABLE
-                    key = mapOf(
-                        "PK" to AttributeValue.S(pk),
-                        "SK" to AttributeValue.S(sk),
-                    )
-                })
-            }
+            queryUserItems(
+                indexName = DynamoDbSingleTableSchema.VOTER_NAME_INDEX,
+                hashAttribute = "voter_name",
+                hashValue = userName,
+                skPrefix = DynamoDbSingleTableSchema.BALLOT_PREFIX,
+            ).forEach { item -> deleteByPkSk(item) }
             // Cascade: drop this user from every election's manager list. The
             // InMemory and MySQL stores do the same — managers aren't tied to
             // the user item by a key relationship, so they need explicit cleanup.
-            val managerItems = dynamoDb.scan(ScanRequest {
-                tableName = DynamoDbSingleTableSchema.MAIN_TABLE
-                filterExpression = "begins_with(SK, :prefix) AND user_name = :user"
-                expressionAttributeValues = mapOf(
-                    ":prefix" to AttributeValue.S(DynamoDbSingleTableSchema.MANAGER_PREFIX),
-                    ":user" to AttributeValue.S(userName),
-                )
-            }).items
-            managerItems?.forEach { item ->
-                val pk = item["PK"]?.asS() ?: return@forEach
-                val sk = item["SK"]?.asS() ?: return@forEach
-                dynamoDb.deleteItem(DeleteItemRequest {
-                    tableName = DynamoDbSingleTableSchema.MAIN_TABLE
-                    key = mapOf(
-                        "PK" to AttributeValue.S(pk),
-                        "SK" to AttributeValue.S(sk),
-                    )
-                })
-            }
+            queryUserItems(
+                indexName = DynamoDbSingleTableSchema.MANAGER_USER_INDEX,
+                hashAttribute = "user_name",
+                hashValue = userName,
+                skPrefix = DynamoDbSingleTableSchema.MANAGER_PREFIX,
+            ).forEach { item -> deleteByPkSk(item) }
             // Cascade: drop every candidate note this user authored. Mirrors
             // the InMemory and MySQL ON DELETE cascade — without this their
             // notes would survive as ghost rows referencing a deleted user.
-            val noteItems = dynamoDb.scan(ScanRequest {
-                tableName = DynamoDbSingleTableSchema.MAIN_TABLE
-                filterExpression = "begins_with(SK, :prefix) AND voter_name = :voter"
-                expressionAttributeValues = mapOf(
-                    ":prefix" to AttributeValue.S(DynamoDbSingleTableSchema.NOTE_PREFIX),
-                    ":voter" to AttributeValue.S(userName),
-                )
-            }).items
-            noteItems?.forEach { item ->
-                val pk = item["PK"]?.asS() ?: return@forEach
-                val sk = item["SK"]?.asS() ?: return@forEach
-                dynamoDb.deleteItem(DeleteItemRequest {
-                    tableName = DynamoDbSingleTableSchema.MAIN_TABLE
-                    key = mapOf(
-                        "PK" to AttributeValue.S(pk),
-                        "SK" to AttributeValue.S(sk),
-                    )
-                })
-            }
+            queryUserItems(
+                indexName = DynamoDbSingleTableSchema.VOTER_NAME_INDEX,
+                hashAttribute = "voter_name",
+                hashValue = userName,
+                skPrefix = DynamoDbSingleTableSchema.NOTE_PREFIX,
+            ).forEach { item -> deleteByPkSk(item) }
         }
+    }
+
+    /**
+     * Sparse-GSI helper: Query the user-keyed [indexName] for every item
+     * where the index hash equals [hashValue] and the table SK begins with
+     * [skPrefix]. Replaces the old scan-with-filter pattern across the user
+     * deletion and rename cascades.
+     */
+    private suspend fun queryUserItems(
+        indexName: String,
+        hashAttribute: String,
+        hashValue: String,
+        skPrefix: String,
+    ): List<Map<String, AttributeValue>> {
+        val response = dynamoDb.query(QueryRequest {
+            tableName = DynamoDbSingleTableSchema.MAIN_TABLE
+            this.indexName = indexName
+            keyConditionExpression = "#h = :v AND begins_with(SK, :prefix)"
+            expressionAttributeNames = mapOf("#h" to hashAttribute)
+            expressionAttributeValues = mapOf(
+                ":v" to AttributeValue.S(hashValue),
+                ":prefix" to AttributeValue.S(skPrefix),
+            )
+        })
+        return response.items ?: emptyList()
+    }
+
+    private suspend fun deleteByPkSk(item: Map<String, AttributeValue>) {
+        val pk = item["PK"]?.asS() ?: return
+        val sk = item["SK"]?.asS() ?: return
+        dynamoDb.deleteItem(DeleteItemRequest {
+            tableName = DynamoDbSingleTableSchema.MAIN_TABLE
+            key = mapOf(
+                "PK" to AttributeValue.S(pk),
+                "SK" to AttributeValue.S(sk),
+            )
+        })
     }
 
     override fun setUserName(authority: String, oldUserName: String, newUserName: String) {
@@ -151,14 +149,12 @@ class DynamoDbSingleTableCommandModel(
     // put-new (like managers and ballots). The candidate slot in the SK
     // doesn't change here.
     private suspend fun cascadeUserNameToNotes(oldUserName: String, newUserName: String) {
-        val noteItems = dynamoDb.scan(ScanRequest {
-            tableName = DynamoDbSingleTableSchema.MAIN_TABLE
-            filterExpression = "begins_with(SK, :prefix) AND voter_name = :voter"
-            expressionAttributeValues = mapOf(
-                ":prefix" to AttributeValue.S(DynamoDbSingleTableSchema.NOTE_PREFIX),
-                ":voter" to AttributeValue.S(oldUserName),
-            )
-        }).items ?: return
+        val noteItems = queryUserItems(
+            indexName = DynamoDbSingleTableSchema.VOTER_NAME_INDEX,
+            hashAttribute = "voter_name",
+            hashValue = oldUserName,
+            skPrefix = DynamoDbSingleTableSchema.NOTE_PREFIX,
+        )
 
         noteItems.forEach { item ->
             val pk = item["PK"]?.asS() ?: return@forEach
@@ -212,13 +208,13 @@ class DynamoDbSingleTableCommandModel(
     }
 
     private suspend fun cascadeUserNameToElections(oldUserName: String, newUserName: String) {
-        val elections = dynamoDb.scan(ScanRequest {
+        val elections = dynamoDb.query(QueryRequest {
             tableName = DynamoDbSingleTableSchema.MAIN_TABLE
-            filterExpression = "begins_with(PK, :prefix) AND SK = :sk AND owner_name = :owner"
+            indexName = DynamoDbSingleTableSchema.OWNER_NAME_INDEX
+            keyConditionExpression = "owner_name = :owner AND SK = :sk"
             expressionAttributeValues = mapOf(
-                ":prefix" to AttributeValue.S(DynamoDbSingleTableSchema.ELECTION_PREFIX),
+                ":owner" to AttributeValue.S(oldUserName),
                 ":sk" to AttributeValue.S(DynamoDbSingleTableSchema.METADATA_SK),
-                ":owner" to AttributeValue.S(oldUserName)
             )
         }).items ?: return
 
@@ -237,14 +233,12 @@ class DynamoDbSingleTableCommandModel(
     }
 
     private suspend fun cascadeUserNameToBallots(oldUserName: String, newUserName: String) {
-        val ballotItems = dynamoDb.scan(ScanRequest {
-            tableName = DynamoDbSingleTableSchema.MAIN_TABLE
-            filterExpression = "begins_with(SK, :prefix) AND voter_name = :voter"
-            expressionAttributeValues = mapOf(
-                ":prefix" to AttributeValue.S(DynamoDbSingleTableSchema.BALLOT_PREFIX),
-                ":voter" to AttributeValue.S(oldUserName)
-            )
-        }).items ?: return
+        val ballotItems = queryUserItems(
+            indexName = DynamoDbSingleTableSchema.VOTER_NAME_INDEX,
+            hashAttribute = "voter_name",
+            hashValue = oldUserName,
+            skPrefix = DynamoDbSingleTableSchema.BALLOT_PREFIX,
+        )
 
         ballotItems.forEach { ballotItem ->
             val pk = ballotItem["PK"]?.asS() ?: return@forEach
@@ -271,14 +265,12 @@ class DynamoDbSingleTableCommandModel(
     // The manager SK embeds the lowercased username, so a rename is
     // delete-old + put-new — an in-place attribute update wouldn't move the key.
     private suspend fun cascadeUserNameToManagers(oldUserName: String, newUserName: String) {
-        val managerItems = dynamoDb.scan(ScanRequest {
-            tableName = DynamoDbSingleTableSchema.MAIN_TABLE
-            filterExpression = "begins_with(SK, :prefix) AND user_name = :user"
-            expressionAttributeValues = mapOf(
-                ":prefix" to AttributeValue.S(DynamoDbSingleTableSchema.MANAGER_PREFIX),
-                ":user" to AttributeValue.S(oldUserName)
-            )
-        }).items ?: return
+        val managerItems = queryUserItems(
+            indexName = DynamoDbSingleTableSchema.MANAGER_USER_INDEX,
+            hashAttribute = "user_name",
+            hashValue = oldUserName,
+            skPrefix = DynamoDbSingleTableSchema.MANAGER_PREFIX,
+        )
 
         managerItems.forEach { managerItem ->
             val pk = managerItem["PK"]?.asS() ?: return@forEach

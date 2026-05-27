@@ -34,19 +34,15 @@ class DynamoDbSingleTableQueryModel(
 
     override fun searchUserByDiscordId(discordId: String): User? {
         // Blank discordId never matches anyone — users without a Discord
-        // credential have an empty discord_id attribute.
+        // credential have an empty discord_id attribute (and so don't
+        // appear in the sparse discord-id-index at all).
         if (discordId.isEmpty()) return null
-        // Scan + filter: there is no GSI on discord_id today. The user table
-        // is small (Rippaverse-gated community), so this is fine. If the user
-        // count grows materially, add a discord-index GSI mirroring the
-        // email-index pattern.
         return runBlocking {
-            val response = dynamoDb.scan(ScanRequest {
+            val response = dynamoDb.query(QueryRequest {
                 tableName = DynamoDbSingleTableSchema.MAIN_TABLE
-                filterExpression = "begins_with(PK, :prefix) AND SK = :sk AND discord_id = :did"
+                indexName = DynamoDbSingleTableSchema.DISCORD_ID_INDEX
+                keyConditionExpression = "discord_id = :did"
                 expressionAttributeValues = mapOf(
-                    ":prefix" to AttributeValue.S(DynamoDbSingleTableSchema.USER_PREFIX),
-                    ":sk" to AttributeValue.S(DynamoDbSingleTableSchema.METADATA_SK),
                     ":did" to AttributeValue.S(discordId),
                 )
             })
@@ -362,13 +358,13 @@ class DynamoDbSingleTableQueryModel(
 
     override fun electionsOwnedCount(userName: String): Int {
         return runBlocking {
-            val response = dynamoDb.scan(ScanRequest {
+            val response = dynamoDb.query(QueryRequest {
                 tableName = DynamoDbSingleTableSchema.MAIN_TABLE
-                filterExpression = "begins_with(PK, :prefix) AND SK = :sk AND owner_name = :owner"
+                indexName = DynamoDbSingleTableSchema.OWNER_NAME_INDEX
+                keyConditionExpression = "owner_name = :owner AND SK = :sk"
                 expressionAttributeValues = mapOf(
-                    ":prefix" to AttributeValue.S(DynamoDbSingleTableSchema.ELECTION_PREFIX),
-                    ":sk" to AttributeValue.S(DynamoDbSingleTableSchema.METADATA_SK),
                     ":owner" to AttributeValue.S(userName),
+                    ":sk" to AttributeValue.S(DynamoDbSingleTableSchema.METADATA_SK),
                 )
                 select = Select.Count
             })
@@ -378,12 +374,13 @@ class DynamoDbSingleTableQueryModel(
 
     override fun ballotsCastCount(userName: String): Int {
         return runBlocking {
-            val response = dynamoDb.scan(ScanRequest {
+            val response = dynamoDb.query(QueryRequest {
                 tableName = DynamoDbSingleTableSchema.MAIN_TABLE
-                filterExpression = "begins_with(SK, :prefix) AND voter_name = :voter"
+                indexName = DynamoDbSingleTableSchema.VOTER_NAME_INDEX
+                keyConditionExpression = "voter_name = :voter AND begins_with(SK, :prefix)"
                 expressionAttributeValues = mapOf(
-                    ":prefix" to AttributeValue.S(DynamoDbSingleTableSchema.BALLOT_PREFIX),
                     ":voter" to AttributeValue.S(userName),
+                    ":prefix" to AttributeValue.S(DynamoDbSingleTableSchema.BALLOT_PREFIX),
                 )
                 select = Select.Count
             })

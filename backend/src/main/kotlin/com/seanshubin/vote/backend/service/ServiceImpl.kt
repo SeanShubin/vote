@@ -7,6 +7,9 @@ import com.seanshubin.vote.backend.auth.TokenEncoder
 import com.seanshubin.vote.backend.validation.Validation
 import com.seanshubin.vote.contract.*
 import com.seanshubin.vote.domain.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.runBlocking
 import java.security.SecureRandom
 
 class ServiceImpl(
@@ -29,6 +32,18 @@ class ServiceImpl(
     private val secureRandom = SecureRandom()
     private val clock = integrations.clock
     private val uniqueIdGenerator = integrations.uniqueIdGenerator
+
+    // Per-(electionName, side) memo of the heavy Ranked Pairs pipeline,
+    // invalidated by event-log version bumps. Stores the pre-redaction tally;
+    // the SECRET-side voter-name strip is cheap and runs per request so the
+    // same cache entry serves auditors and ordinary viewers.
+    private data class CachedTally(
+        val version: Long,
+        val rawTally: Tally,
+        val tiers: List<String>,
+        val sections: List<TallySection>,
+    )
+    private val tallyCache = java.util.concurrent.ConcurrentHashMap<Pair<String, RankingSide>, CachedTally>()
 
     override fun synchronize() = eventApplier.synchronize()
 
@@ -359,11 +374,23 @@ class ServiceImpl(
         requirePermission(accessToken, Permission.VIEW_APPLICATION)
         val election = queryModel.searchElectionByName(electionName)
             ?: throw ServiceException(ServiceException.Category.NOT_FOUND, "Election not found: $electionName")
-        val candidateCount = queryModel.candidateCount(electionName)
-        val ballotCount = queryModel.ballotCount(electionName)
-        val tiers = queryModel.listTiers(electionName)
-        val managers = queryModel.listElectionManagers(electionName)
-        return election.toElectionDetail(candidateCount, ballotCount, tiers, managers)
+        // The four follow-up reads are independent — run them in parallel
+        // so the page-load latency is max(call), not sum(call). Each query
+        // method is a blocking call that internally runBlocks a single
+        // DynamoDB/JDBC op; Dispatchers.IO has enough threads to absorb
+        // a handful of concurrent ops per request.
+        return runBlocking {
+            val candidateCount = async(Dispatchers.IO) { queryModel.candidateCount(electionName) }
+            val ballotCount = async(Dispatchers.IO) { queryModel.ballotCount(electionName) }
+            val tiers = async(Dispatchers.IO) { queryModel.listTiers(electionName) }
+            val managers = async(Dispatchers.IO) { queryModel.listElectionManagers(electionName) }
+            election.toElectionDetail(
+                candidateCount.await(),
+                ballotCount.await(),
+                tiers.await(),
+                managers.await(),
+            )
+        }
     }
 
     override fun deleteElection(accessToken: AccessToken, electionName: String) {
@@ -880,24 +907,33 @@ class ServiceImpl(
 
     override fun tally(accessToken: AccessToken, electionName: String, side: RankingSide): ElectionTally {
         requirePermission(accessToken, Permission.VIEW_APPLICATION)
-        queryModel.searchElectionByName(electionName)
+        val election = queryModel.searchElectionByName(electionName)
             ?: throw ServiceException(ServiceException.Category.NOT_FOUND, "Election not found: $electionName")
-        val candidates = queryModel.listCandidates(electionName)
-        val tiers = queryModel.listTiers(electionName)
-        val ballots = queryModel.listBallots(electionName)
-        // Tally projects each ballot into its virtual form (candidates +
-        // materialized tier markers) before running the pairwise +
-        // Ranked Pairs pipeline. Storage only carries candidate rankings
-        // with a tier annotation; the markers are produced at compute time
-        // so a tier rename never invalidates a recorded ballot. When tiers
-        // is empty the projection is a no-op.
-        val rawTally = Tally.countBallots(
-            electionName = electionName,
-            side = side,
-            candidates = candidates,
-            tiers = tiers,
-            ballots = ballots,
-        )
+        // Key the cache on the canonical name so a case-different request
+        // hits the same entry as the one a prior request populated.
+        val cacheKey = election.electionName to side
+        val currentVersion = queryModel.lastSynced() ?: 0
+        val entry = tallyCache[cacheKey]?.takeIf { it.version == currentVersion }
+            ?: run {
+                val candidates = queryModel.listCandidates(election.electionName)
+                val tiers = queryModel.listTiers(election.electionName)
+                val ballots = queryModel.listBallots(election.electionName)
+                // Tally projects each ballot into its virtual form (candidates
+                // + materialized tier markers) before running the pairwise +
+                // Ranked Pairs pipeline. Storage only carries candidate
+                // rankings with a tier annotation; the markers are produced
+                // at compute time so a tier rename never invalidates a
+                // recorded ballot. When tiers is empty the projection is a no-op.
+                val rawTally = Tally.countBallots(
+                    electionName = election.electionName,
+                    side = side,
+                    candidates = candidates,
+                    tiers = tiers,
+                    ballots = ballots,
+                )
+                val sections = TallySection.compute(rawTally.places, tiers)
+                CachedTally(currentVersion, rawTally, tiers, sections).also { tallyCache[cacheKey] = it }
+            }
         // SECRET-side redaction: callers without VIEW_SECRETS see
         // anonymous ballots — confirmation, whenCast, and rankings stay,
         // but voterName is stripped so they can't map a ballot back to
@@ -910,8 +946,8 @@ class ServiceImpl(
         // cast a ballot on this side" query model methods.
         val canSeeSecrets = queryModel.roleHasPermission(accessToken.role, Permission.VIEW_SECRETS)
         val tally = if (side == RankingSide.SECRET && !canSeeSecrets) {
-            rawTally.copy(
-                ballots = rawTally.ballots.map { ballot ->
+            entry.rawTally.copy(
+                ballots = entry.rawTally.ballots.map { ballot ->
                     when (ballot) {
                         is Ballot.Identified -> ballot.makeAnonymous()
                         is Ballot.Anonymous -> ballot
@@ -919,10 +955,9 @@ class ServiceImpl(
                 },
             )
         } else {
-            rawTally
+            entry.rawTally
         }
-        val sections = TallySection.compute(tally.places, tiers)
-        return ElectionTally(tally, tiers, sections)
+        return ElectionTally(tally, entry.tiers, entry.sections)
     }
 
     override fun getBallot(accessToken: AccessToken, voterName: String, electionName: String): BallotSummary? {
