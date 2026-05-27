@@ -216,4 +216,33 @@ interface Service {
      * ServiceException(CONFLICT) when [userName] is already taken.
      */
     fun devCreateAndLogin(userName: String): Tokens
+
+    /**
+     * All voters' notes for a candidate. Open to anyone with VIEW_APPLICATION
+     * — notes are public the moment they are written.
+     */
+    fun listCandidateNotes(
+        accessToken: AccessToken,
+        electionName: String,
+        candidateName: String,
+    ): List<CandidateNote>
+
+    /**
+     * Set (create or replace) the caller's note on a candidate. Empty
+     * [text] is interpreted as "delete my note." The voter is implicit
+     * (the access token's user) — there is no proxy/delegation path.
+     */
+    fun setCandidateNote(
+        accessToken: AccessToken,
+        electionName: String,
+        candidateName: String,
+        text: String,
+    )
+
+    /** Explicit delete path — equivalent to [setCandidateNote] with empty text. */
+    fun deleteCandidateNote(
+        accessToken: AccessToken,
+        electionName: String,
+        candidateName: String,
+    )
 }

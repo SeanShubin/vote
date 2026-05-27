@@ -789,6 +789,18 @@ fun VotingView(
             }
         }
     }
+
+    // Free-form per-candidate notes. Rendered as a separate section so the
+    // drag-drop ranking surface above stays uncluttered. Collapsed by
+    // default per candidate — the count badge in the row header tells you
+    // what's behind the expand before you pay for it.
+    CandidateNotesSection(
+        apiClient = apiClient,
+        electionName = electionName,
+        candidates = candidates,
+        currentUserName = currentUserName,
+        onError = onError,
+    )
 }
 
 /**

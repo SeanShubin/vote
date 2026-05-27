@@ -292,4 +292,33 @@ sealed interface DomainEvent {
         val voterName: String,
         val electionName: String
     ) : DomainEvent
+
+    /**
+     * One voter sets (creates or replaces) their note on one candidate. One
+     * note per (election, candidate, voter); re-emitting overwrites. A voter
+     * can only set their own note — the service rejects mismatches between
+     * [voterName] and the access token, so the event log records only
+     * legitimate authorship.
+     */
+    @Serializable
+    @SerialName("CandidateNoteSet")
+    data class CandidateNoteSet(
+        val electionName: String,
+        val candidateName: String,
+        val voterName: String,
+        val text: String,
+        val whenWritten: Instant,
+    ) : DomainEvent
+
+    /**
+     * One voter removes their note on one candidate. No-op intent if no
+     * note exists — the service filters that case out before emitting.
+     */
+    @Serializable
+    @SerialName("CandidateNoteDeleted")
+    data class CandidateNoteDeleted(
+        val electionName: String,
+        val candidateName: String,
+        val voterName: String,
+    ) : DomainEvent
 }

@@ -73,6 +73,16 @@ class UserContext(
         return testContext.backend.listRankings(accessToken, userName, electionName)
     }
 
+    fun setCandidateNote(electionName: String, candidateName: String, text: String) {
+        testContext.backend.setCandidateNote(accessToken, electionName, candidateName, text)
+        testContext.backend.synchronize()
+    }
+
+    fun listCandidateNotes(electionName: String, candidateName: String): List<com.seanshubin.vote.domain.CandidateNote> {
+        testContext.backend.synchronize()
+        return testContext.backend.listCandidateNotes(accessToken, electionName, candidateName)
+    }
+
     fun listUsers(): List<com.seanshubin.vote.domain.UserNameRole> {
         testContext.backend.synchronize()
         return testContext.backend.listUsers(accessToken)

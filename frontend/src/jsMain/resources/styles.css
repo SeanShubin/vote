@@ -1992,3 +1992,175 @@ tr:nth-child(even) {
     flex-wrap: wrap;
     gap: 0.5rem;
 }
+
+/*
+ * Candidate notes — collapsible cards keyed per candidate inside the Vote
+ * tab. Cool/blue palette to match the app convention; the voter's own card
+ * picks up a slightly stronger blue accent so authorship is obvious at a
+ * glance. Layout is flexbox-based — vertical rows of candidates, each row
+ * stacking its header and (when expanded) its card list.
+ */
+.candidate-notes-intro {
+    color: #555;
+    margin: 0 0 0.75rem;
+}
+
+.candidate-notes-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.candidate-notes-row {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid #c4d2e1;
+    border-radius: 4px;
+    background: #ffffff;
+    overflow: hidden;
+}
+
+.candidate-notes-row-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    width: 100%;
+    text-align: left;
+    background: #f4f7fb;
+    border: none;
+    padding: 0.5rem 0.75rem;
+    color: #1f3956;
+    cursor: pointer;
+    font: inherit;
+}
+
+.candidate-notes-row-header:hover {
+    background: #e6eef9;
+}
+
+.candidate-notes-row-toggle {
+    color: #2c5282;
+    font-family: monospace;
+    width: 1rem;
+    text-align: center;
+}
+
+.candidate-notes-row-name {
+    flex: 1;
+    font-weight: 600;
+}
+
+.candidate-notes-row-count {
+    color: #486581;
+    font-size: 0.9rem;
+}
+
+.candidate-notes-row-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 0.75rem;
+    background: #ffffff;
+}
+
+.candidate-notes-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 0.6rem 0.75rem;
+    border: 1px solid #c4d2e1;
+    border-radius: 4px;
+    background: #fbfcfe;
+}
+
+.candidate-notes-card-mine {
+    border-color: #2c5282;
+    background: #ecf2fb;
+}
+
+.candidate-notes-card-other {
+    border-left-width: 3px;
+}
+
+.candidate-notes-card-header {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: baseline;
+    justify-content: space-between;
+}
+
+.candidate-notes-card-author {
+    font-weight: 600;
+    color: #1f3956;
+}
+
+.candidate-notes-card-timestamp {
+    color: #768aa3;
+    font-size: 0.85rem;
+}
+
+.candidate-notes-card-textarea {
+    width: 100%;
+    min-height: 4.5rem;
+    padding: 0.4rem 0.5rem;
+    border: 1px solid #b8d0f0;
+    border-radius: 4px;
+    background: #ffffff;
+    color: #1f3956;
+    font: inherit;
+    resize: vertical;
+    box-sizing: border-box;
+}
+
+.candidate-notes-card-textarea:focus {
+    outline: none;
+    border-color: #2c5282;
+    box-shadow: 0 0 0 2px rgba(44, 82, 130, 0.2);
+}
+
+.candidate-notes-card-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.candidate-notes-card-save,
+.candidate-notes-card-clear {
+    padding: 0.35rem 0.9rem;
+    border-radius: 4px;
+    border: 1px solid #2c5282;
+    background: #2c5282;
+    color: #ffffff;
+    font: inherit;
+    cursor: pointer;
+}
+
+.candidate-notes-card-save:disabled,
+.candidate-notes-card-clear:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.candidate-notes-card-clear {
+    background: #ffffff;
+    color: #2c5282;
+}
+
+.candidate-notes-card-feedback {
+    color: #2c5282;
+    font-size: 0.9rem;
+}
+
+.candidate-notes-card-text {
+    color: #1f3956;
+    white-space: pre-wrap;
+    line-height: 1.4;
+}
+
+.candidate-notes-empty-hint {
+    color: #768aa3;
+    font-style: italic;
+    margin: 0;
+}

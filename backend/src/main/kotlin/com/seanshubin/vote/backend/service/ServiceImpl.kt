@@ -992,6 +992,113 @@ class ServiceImpl(
         return Tokens(accessToken, refreshToken)
     }
 
+    override fun listCandidateNotes(
+        accessToken: AccessToken,
+        electionName: String,
+        candidateName: String,
+    ): List<CandidateNote> {
+        requirePermission(accessToken, Permission.VIEW_APPLICATION)
+        val election = queryModel.searchElectionByName(electionName)
+            ?: throw ServiceException(ServiceException.Category.NOT_FOUND, "Election not found: $electionName")
+        // Resolve to the canonical candidate name so a case-different lookup
+        // still finds the notes stored under the canonical form.
+        val candidate = queryModel.listCandidates(election.electionName)
+            .firstOrNull { it.equals(candidateName, ignoreCase = true) }
+            ?: throw ServiceException(
+                ServiceException.Category.NOT_FOUND,
+                "Candidate not found: $candidateName",
+            )
+        return queryModel.listCandidateNotes(election.electionName, candidate)
+    }
+
+    override fun setCandidateNote(
+        accessToken: AccessToken,
+        electionName: String,
+        candidateName: String,
+        text: String,
+    ) {
+        // VALIDATION SECTION
+        // VOTE permission gates note authorship for the same reason it gates
+        // ballot casting — notes are a voter-side authoring surface.
+        requirePermission(accessToken, Permission.VOTE)
+
+        val validCandidateName = Validation.validateCandidateName(candidateName)
+        val validText = Validation.validateCandidateNoteText(text)
+
+        val election = queryModel.searchElectionByName(electionName)
+            ?: throw ServiceException(ServiceException.Category.NOT_FOUND, "Election not found: $electionName")
+        // Resolve to the canonical stored candidate name so a case-variant
+        // input ("alice" vs "Alice") still hits the candidate row and the
+        // event records the candidate exactly as the election stores it.
+        val canonicalCandidate = queryModel.listCandidates(election.electionName)
+            .firstOrNull { it.equals(validCandidateName, ignoreCase = true) }
+            ?: throw ServiceException(
+                ServiceException.Category.NOT_FOUND,
+                "Candidate not found: $validCandidateName",
+            )
+
+        // Empty text is the wire shape for "clear my note." Delegate to the
+        // delete path so the same idempotent no-op-when-absent rule applies.
+        if (validText.isEmpty()) {
+            deleteCandidateNoteInternal(accessToken, election.electionName, canonicalCandidate)
+            return
+        }
+
+        // EXECUTION SECTION
+        eventLog.appendEvent(
+            accessToken.userName,
+            clock.now(),
+            DomainEvent.CandidateNoteSet(
+                electionName = election.electionName,
+                candidateName = canonicalCandidate,
+                voterName = accessToken.userName,
+                text = validText,
+                whenWritten = clock.now(),
+            ),
+        )
+        synchronize()
+    }
+
+    override fun deleteCandidateNote(
+        accessToken: AccessToken,
+        electionName: String,
+        candidateName: String,
+    ) {
+        requirePermission(accessToken, Permission.VOTE)
+        val validCandidateName = Validation.validateCandidateName(candidateName)
+        val election = queryModel.searchElectionByName(electionName)
+            ?: throw ServiceException(ServiceException.Category.NOT_FOUND, "Election not found: $electionName")
+        val canonicalCandidate = queryModel.listCandidates(election.electionName)
+            .firstOrNull { it.equals(validCandidateName, ignoreCase = true) }
+            ?: throw ServiceException(
+                ServiceException.Category.NOT_FOUND,
+                "Candidate not found: $validCandidateName",
+            )
+        deleteCandidateNoteInternal(accessToken, election.electionName, canonicalCandidate)
+    }
+
+    private fun deleteCandidateNoteInternal(
+        accessToken: AccessToken,
+        canonicalElectionName: String,
+        canonicalCandidateName: String,
+    ) {
+        // Idempotent: skip emitting a delete event when no note exists.
+        // Keeps the audit log honest — only real state changes earn a row.
+        val existing = queryModel.listCandidateNotes(canonicalElectionName, canonicalCandidateName)
+            .firstOrNull { it.voterName.equals(accessToken.userName, ignoreCase = true) }
+            ?: return
+        eventLog.appendEvent(
+            accessToken.userName,
+            clock.now(),
+            DomainEvent.CandidateNoteDeleted(
+                electionName = canonicalElectionName,
+                candidateName = canonicalCandidateName,
+                voterName = existing.voterName,
+            ),
+        )
+        synchronize()
+    }
+
     override fun loginConfig(): LoginConfig = LoginConfig(devLoginEnabled = devLoginEnabled)
 
     override fun devListUserNames(): List<String> {

@@ -170,6 +170,10 @@ class EventLogHtmlGeneratorWithHttp(private val recorder: DocumentationRecorder)
             "Discord credential linked to <strong>${event.userName}</strong> (${event.discordDisplayName})"
         is DomainEvent.DiscordDisplayNameChanged ->
             "Discord display name for <strong>${event.userName}</strong> updated to <strong>${event.newDiscordDisplayName}</strong>"
+        is DomainEvent.CandidateNoteSet ->
+            "<strong>${event.voterName}</strong> set note on <strong>${event.candidateName}</strong> in <strong>${event.electionName}</strong>"
+        is DomainEvent.CandidateNoteDeleted ->
+            "<strong>${event.voterName}</strong> deleted note on <strong>${event.candidateName}</strong> in <strong>${event.electionName}</strong>"
     }
 
     private fun formatEventDetails(event: DomainEvent): String = when (event) {
@@ -272,6 +276,17 @@ class EventLogHtmlGeneratorWithHttp(private val recorder: DocumentationRecorder)
         is DomainEvent.DiscordDisplayNameChanged -> """
             <div class="detail-row"><span class="label">User:</span> ${event.userName}</div>
             <div class="detail-row"><span class="label">New Discord Name:</span> ${event.newDiscordDisplayName}</div>
+        """.trimIndent()
+        is DomainEvent.CandidateNoteSet -> """
+            <div class="detail-row"><span class="label">Election:</span> ${event.electionName}</div>
+            <div class="detail-row"><span class="label">Candidate:</span> ${event.candidateName}</div>
+            <div class="detail-row"><span class="label">Voter:</span> ${event.voterName}</div>
+            <div class="detail-row"><span class="label">Text:</span> ${escapeHtml(event.text)}</div>
+        """.trimIndent()
+        is DomainEvent.CandidateNoteDeleted -> """
+            <div class="detail-row"><span class="label">Election:</span> ${event.electionName}</div>
+            <div class="detail-row"><span class="label">Candidate:</span> ${event.candidateName}</div>
+            <div class="detail-row"><span class="label">Voter:</span> ${event.voterName}</div>
         """.trimIndent()
     }
 

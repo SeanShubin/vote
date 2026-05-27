@@ -19,7 +19,7 @@ class DynamoToRelational(
     private val eventLog: EventLog,
 ) {
     fun listDebugTableNames(): List<String> = listOf(
-        USERS, ELECTIONS, CANDIDATES, BALLOTS, RANKINGS, SYNC_STATE, EVENT_LOG,
+        USERS, ELECTIONS, CANDIDATES, BALLOTS, RANKINGS, CANDIDATE_NOTES, SYNC_STATE, EVENT_LOG,
     )
 
     fun project(tableName: String): TableData = when (tableName) {
@@ -28,6 +28,7 @@ class DynamoToRelational(
         CANDIDATES -> projectCandidates()
         BALLOTS -> projectBallots()
         RANKINGS -> projectRankings()
+        CANDIDATE_NOTES -> projectCandidateNotes()
         SYNC_STATE -> projectSyncState()
         EVENT_LOG -> projectEventLog()
         else -> throw IllegalArgumentException("Unknown debug table: $tableName")
@@ -118,6 +119,28 @@ class DynamoToRelational(
         return TableData(RANKINGS, columns, rows)
     }
 
+    private fun projectCandidateNotes(): TableData {
+        val columns = listOf(
+            "election_name (-> elections.election_name)",
+            "candidate_name (-> candidates.candidate_name)",
+            "voter_name (-> users.name)",
+            "note_text",
+            "last_updated",
+        )
+        val rows = queryModel.listElections().flatMap { election ->
+            queryModel.listCandidateNotesByElection(election.electionName).map { note ->
+                listOf<String?>(
+                    note.electionName,
+                    note.candidateName,
+                    note.voterName,
+                    note.text,
+                    note.lastUpdated.toString(),
+                )
+            }
+        }
+        return TableData(CANDIDATE_NOTES, columns, rows)
+    }
+
     private fun projectSyncState(): TableData {
         val columns = listOf("id", "last_synced")
         val lastSynced = queryModel.lastSynced()
@@ -156,6 +179,7 @@ class DynamoToRelational(
         const val CANDIDATES = "candidates"
         const val BALLOTS = "ballots"
         const val RANKINGS = "rankings"
+        const val CANDIDATE_NOTES = "candidate_notes"
         const val SYNC_STATE = "sync_state"
         const val EVENT_LOG = "event_log"
     }

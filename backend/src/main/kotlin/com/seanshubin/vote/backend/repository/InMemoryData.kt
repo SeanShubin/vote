@@ -23,6 +23,11 @@ class InMemoryData {
     val electionManagers = mutableMapOf<String, MutableSet<String>>()
     val tiers = mutableMapOf<String, List<String>>()
     val ballots = mutableMapOf<Pair<String, String>, BallotData>()
+    // (electionKey, candidateKey, voterKey) → one voter's note on one candidate.
+    // Three-part key mirrors the natural primary key MySQL stores; the value
+    // carries display-case names so the relational projection can render
+    // them in the canonical form the original write used.
+    val candidateNotes = mutableMapOf<Triple<String, String, String>, CandidateNoteData>()
     var lastSynced: Long? = null
 
     data class UserData(
@@ -66,6 +71,22 @@ class InMemoryData {
             rankings = rankings,
             confirmation = confirmation,
             whenCast = whenCast
+        )
+    }
+
+    data class CandidateNoteData(
+        val electionName: String,
+        val candidateName: String,
+        val voterName: String,
+        val text: String,
+        val lastUpdated: Instant,
+    ) {
+        fun toCandidateNote() = CandidateNote(
+            electionName = electionName,
+            candidateName = candidateName,
+            voterName = voterName,
+            text = text,
+            lastUpdated = lastUpdated,
         )
     }
 }

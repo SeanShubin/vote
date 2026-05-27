@@ -162,6 +162,14 @@ class DirectServiceBackend(
         service.setFeatureEnabled(token, flag, enabled)
     }
 
+    override fun setCandidateNote(token: AccessToken, electionName: String, candidateName: String, text: String) {
+        service.setCandidateNote(token, electionName, candidateName, text)
+    }
+
+    override fun listCandidateNotes(token: AccessToken, electionName: String, candidateName: String): List<CandidateNote> {
+        return service.listCandidateNotes(token, electionName, candidateName)
+    }
+
     override fun synchronize() {
         service.synchronize()
     }

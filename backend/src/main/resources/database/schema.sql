@@ -93,6 +93,23 @@ CREATE TABLE IF NOT EXISTS rankings (
     INDEX idx_ballot_rank (ballot_id, `rank`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Command Model Projection: Candidate Notes
+-- One free-form note per (election, candidate, voter). election_name FK
+-- cascades on election delete and rename, matching candidates/tiers/ballots.
+-- voter_name FKs to users(name) so removing a user drops their notes.
+-- candidate_name is a plain string column (mirrors rankings.candidate_name):
+-- the rename and remove cascades are applied explicitly by the command model.
+CREATE TABLE IF NOT EXISTS candidate_notes (
+    election_name VARCHAR(255) NOT NULL,
+    candidate_name VARCHAR(255) NOT NULL,
+    voter_name VARCHAR(255) NOT NULL,
+    note_text TEXT NOT NULL,
+    last_updated TIMESTAMP NOT NULL,
+    PRIMARY KEY (election_name, candidate_name, voter_name),
+    FOREIGN KEY (election_name) REFERENCES elections(election_name) ON DELETE CASCADE ON UPDATE CASCADE,
+    FOREIGN KEY (voter_name) REFERENCES users(name) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- Sync State Tracking
 CREATE TABLE IF NOT EXISTS sync_state (
     id INT PRIMARY KEY DEFAULT 1,

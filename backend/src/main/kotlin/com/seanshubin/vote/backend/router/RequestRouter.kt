@@ -19,6 +19,7 @@ import com.seanshubin.vote.contract.RenameCandidateRequest
 import com.seanshubin.vote.contract.RenameElectionRequest
 import com.seanshubin.vote.contract.RenameTierRequest
 import com.seanshubin.vote.contract.Service
+import com.seanshubin.vote.contract.SetCandidateNoteRequest
 import com.seanshubin.vote.contract.AddCandidatesRequest
 import com.seanshubin.vote.contract.SetDescriptionRequest
 import com.seanshubin.vote.contract.SetRoleRequest
@@ -180,6 +181,8 @@ class RequestRouter(
         Route("GET", "/election/[^/]+/rankings/[^/]+", ::handleListRankings),
         Route("GET", "/election/[^/]+/my-last-ballot-rankings", ::handleGetMyLastBallotRankings),
         Route("GET", "/election/[^/]+/tally", ::handleTally),
+        Route("GET", "/election/[^/]+/candidate/[^/]+/notes", ::handleListCandidateNotes),
+        Route("PUT", "/election/[^/]+/candidate/[^/]+/note", ::handleSetCandidateNote),
         Route("POST", "/auth/discord/start", { _ -> handleDiscordLoginStart() }),
         Route("GET", "/auth/discord/callback", ::handleDiscordCallback),
         Route("GET", "/auth/config", { _ -> handleLoginConfig() }),
@@ -776,6 +779,27 @@ class RequestRouter(
             else java.net.URLDecoder.decode(pair.substring(0, idx), "UTF-8") to
                 java.net.URLDecoder.decode(pair.substring(idx + 1), "UTF-8")
         }.toMap()
+    }
+
+    private fun handleListCandidateNotes(req: HttpRequest): HttpResponse {
+        val accessToken = extractAccessToken(req)
+        // URL shape: /election/{electionName}/candidate/{candidateName}/notes
+        val parts = req.target.split("/")
+        val electionName = java.net.URLDecoder.decode(parts[2], "UTF-8")
+        val candidateName = java.net.URLDecoder.decode(parts[4], "UTF-8")
+        val notes = service.listCandidateNotes(accessToken, electionName, candidateName)
+        return HttpResponse(200, json.encodeToString(notes))
+    }
+
+    private fun handleSetCandidateNote(req: HttpRequest): HttpResponse {
+        val accessToken = extractAccessToken(req)
+        // URL shape: /election/{electionName}/candidate/{candidateName}/note
+        val parts = req.target.split("/")
+        val electionName = java.net.URLDecoder.decode(parts[2], "UTF-8")
+        val candidateName = java.net.URLDecoder.decode(parts[4], "UTF-8")
+        val request = json.decodeFromString<SetCandidateNoteRequest>(req.body)
+        service.setCandidateNote(accessToken, electionName, candidateName, request.text)
+        return HttpResponse(200, json.encodeToString(mapOf("status" to "note saved")))
     }
 
     private fun handleTally(req: HttpRequest): HttpResponse {

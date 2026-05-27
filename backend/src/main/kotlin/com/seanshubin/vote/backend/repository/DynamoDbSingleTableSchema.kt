@@ -22,6 +22,14 @@ object DynamoDbSingleTableSchema {
     const val CANDIDATE_PREFIX = "CANDIDATE#"
     const val MANAGER_PREFIX = "MANAGER#"
     const val BALLOT_PREFIX = "BALLOT#"
+    /**
+     * Sort-key prefix for candidate-note items, packing candidate and voter
+     * into one SK so `begins_with(SK, NOTE#)` returns every note for an
+     * election in one Query and `begins_with(SK, NOTE#<candidate>#)` returns
+     * every note for one candidate. # is a safe delimiter — already in use
+     * for the entity-prefix separator everywhere else.
+     */
+    const val NOTE_PREFIX = "NOTE#"
     const val METADATA_SK = "METADATA"
     const val SYNC_SK = "SYNC"
 
@@ -113,4 +121,12 @@ object DynamoDbSingleTableSchema {
     fun candidateSK(candidateName: String) = "$CANDIDATE_PREFIX${candidateName.lowercase()}"
     fun managerSK(userName: String) = "$MANAGER_PREFIX${userName.lowercase()}"
     fun ballotSK(voterName: String) = "$BALLOT_PREFIX${voterName.lowercase()}"
+
+    /** SK that packs the (candidate, voter) pair onto an election partition. */
+    fun noteSK(candidateName: String, voterName: String) =
+        "$NOTE_PREFIX${candidateName.lowercase()}#${voterName.lowercase()}"
+
+    /** Prefix that selects every note on one candidate. */
+    fun noteSKPrefixForCandidate(candidateName: String) =
+        "$NOTE_PREFIX${candidateName.lowercase()}#"
 }

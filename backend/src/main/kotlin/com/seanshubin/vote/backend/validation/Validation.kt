@@ -151,6 +151,20 @@ object Validation {
         return validNames
     }
 
+    /**
+     * Trim and length-cap free-form note text. Internal whitespace is
+     * preserved (paragraph breaks are meaningful), unlike name validators
+     * that collapse runs of whitespace. Empty (after trim) is allowed and
+     * is interpreted by the service as "delete my note."
+     */
+    fun validateCandidateNoteText(text: String): String {
+        val trimmed = text.trim()
+        require(trimmed.length <= 4000) {
+            "Note must not be more than 4000 characters long, was ${trimmed.length}"
+        }
+        return trimmed
+    }
+
     fun validateVoterNames(names: List<String>): List<String> {
         require(names.isNotEmpty()) { "Voter list must not be empty" }
         val validNames = names.map { validateUserName(it) }

@@ -146,6 +146,12 @@ class ScenarioHtmlGenerator(private val eventLog: EventLog) {
 
         is DomainEvent.DiscordDisplayNameChanged ->
             "Discord display name updated for <strong>${event.userName}</strong> to <strong>${event.newDiscordDisplayName}</strong>"
+
+        is DomainEvent.CandidateNoteSet ->
+            "<strong>${event.voterName}</strong> set note on <strong>${event.candidateName}</strong>"
+
+        is DomainEvent.CandidateNoteDeleted ->
+            "<strong>${event.voterName}</strong> deleted note on <strong>${event.candidateName}</strong>"
     }
 
     private fun css() = """

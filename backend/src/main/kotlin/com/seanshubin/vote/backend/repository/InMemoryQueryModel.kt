@@ -151,4 +151,30 @@ class InMemoryQueryModel(private val data: InMemoryData) : QueryModel {
 
     override fun ballotsCastCount(userName: String): Int =
         data.ballots.values.count { it.voterName.equals(userName, ignoreCase = true) }
+
+    override fun listCandidateNotes(electionName: String, candidateName: String): List<CandidateNote> {
+        val electionKey = electionName.lowercase()
+        val candidateKey = candidateName.lowercase()
+        return data.candidateNotes
+            .filter { (k, _) -> k.first == electionKey && k.second == candidateKey }
+            .values
+            .sortedByDescending { it.lastUpdated }
+            .map { it.toCandidateNote() }
+    }
+
+    override fun listCandidateNotesByVoter(voterName: String): List<CandidateNote> {
+        val key = voterName.lowercase()
+        return data.candidateNotes
+            .filter { (k, _) -> k.third == key }
+            .values
+            .map { it.toCandidateNote() }
+    }
+
+    override fun listCandidateNotesByElection(electionName: String): List<CandidateNote> {
+        val key = electionName.lowercase()
+        return data.candidateNotes
+            .filter { (k, _) -> k.first == key }
+            .values
+            .map { it.toCandidateNote() }
+    }
 }

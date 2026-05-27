@@ -5,6 +5,7 @@ import com.seanshubin.vote.contract.AuthResponse
 import com.seanshubin.vote.contract.DeployedVersions
 import com.seanshubin.vote.contract.LoginConfig
 import kotlinx.coroutines.CancellationException
+import com.seanshubin.vote.domain.CandidateNote
 import com.seanshubin.vote.domain.ElectionDetail
 import com.seanshubin.vote.domain.ElectionSummary
 import com.seanshubin.vote.domain.FeatureFlag
@@ -118,6 +119,11 @@ class FakeApiClient : ApiClient {
     val devLoginAsExistingCalls = mutableListOf<String>()
     var devCreateAndLoginResult: Result<Unit> = Result.success(Unit)
     val devCreateAndLoginCalls = mutableListOf<String>()
+
+    var listCandidateNotesResult: (String, String) -> List<CandidateNote> = { _, _ -> emptyList() }
+    val listCandidateNotesCalls = mutableListOf<Pair<String, String>>()
+    var setCandidateNoteResult: Result<Unit> = Result.success(Unit)
+    val setCandidateNoteCalls = mutableListOf<SetCandidateNoteCall>()
 
     override suspend fun refresh(): AuthResponse? {
         refreshCalls.add(Unit)
@@ -355,6 +361,23 @@ class FakeApiClient : ApiClient {
         devCreateAndLoginResult.getOrThrow()
     }
 
+    override suspend fun listCandidateNotes(
+        electionName: String,
+        candidateName: String,
+    ): List<CandidateNote> {
+        listCandidateNotesCalls.add(electionName to candidateName)
+        return listCandidateNotesResult(electionName, candidateName)
+    }
+
+    override suspend fun setCandidateNote(
+        electionName: String,
+        candidateName: String,
+        text: String,
+    ) {
+        setCandidateNoteCalls.add(SetCandidateNoteCall(electionName, candidateName, text))
+        setCandidateNoteResult.getOrThrow()
+    }
+
     override fun logErrorToServer(error: Throwable) {
         // Match HttpApiClient: cancellation rethrows so callers' catch blocks
         // exit cleanly instead of recording it.
@@ -374,4 +397,9 @@ class FakeApiClient : ApiClient {
     data class SetRoleCall(val userName: String, val role: Role)
     data class TransferElectionOwnershipCall(val electionName: String, val newOwnerName: String)
     data class ElectionManagerCall(val electionName: String, val userName: String)
+    data class SetCandidateNoteCall(
+        val electionName: String,
+        val candidateName: String,
+        val text: String,
+    )
 }

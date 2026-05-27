@@ -69,5 +69,8 @@ interface ScenarioBackend {
     fun listFeatureFlags(): Map<FeatureFlag, Boolean>
     fun setFeatureEnabled(token: AccessToken, flag: FeatureFlag, enabled: Boolean)
 
+    fun setCandidateNote(token: AccessToken, electionName: String, candidateName: String, text: String)
+    fun listCandidateNotes(token: AccessToken, electionName: String, candidateName: String): List<CandidateNote>
+
     fun synchronize()
 }

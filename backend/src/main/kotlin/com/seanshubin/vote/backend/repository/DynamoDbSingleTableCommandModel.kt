@@ -112,6 +112,28 @@ class DynamoDbSingleTableCommandModel(
                     )
                 })
             }
+            // Cascade: drop every candidate note this user authored. Mirrors
+            // the InMemory and MySQL ON DELETE cascade — without this their
+            // notes would survive as ghost rows referencing a deleted user.
+            val noteItems = dynamoDb.scan(ScanRequest {
+                tableName = DynamoDbSingleTableSchema.MAIN_TABLE
+                filterExpression = "begins_with(SK, :prefix) AND voter_name = :voter"
+                expressionAttributeValues = mapOf(
+                    ":prefix" to AttributeValue.S(DynamoDbSingleTableSchema.NOTE_PREFIX),
+                    ":voter" to AttributeValue.S(userName),
+                )
+            }).items
+            noteItems?.forEach { item ->
+                val pk = item["PK"]?.asS() ?: return@forEach
+                val sk = item["SK"]?.asS() ?: return@forEach
+                dynamoDb.deleteItem(DeleteItemRequest {
+                    tableName = DynamoDbSingleTableSchema.MAIN_TABLE
+                    key = mapOf(
+                        "PK" to AttributeValue.S(pk),
+                        "SK" to AttributeValue.S(sk),
+                    )
+                })
+            }
         }
     }
 
@@ -121,6 +143,45 @@ class DynamoDbSingleTableCommandModel(
             cascadeUserNameToElections(oldUserName, newUserName)
             cascadeUserNameToBallots(oldUserName, newUserName)
             cascadeUserNameToManagers(oldUserName, newUserName)
+            cascadeUserNameToNotes(oldUserName, newUserName)
+        }
+    }
+
+    // Notes pack the voter into the SK suffix, so a rename is delete-old +
+    // put-new (like managers and ballots). The candidate slot in the SK
+    // doesn't change here.
+    private suspend fun cascadeUserNameToNotes(oldUserName: String, newUserName: String) {
+        val noteItems = dynamoDb.scan(ScanRequest {
+            tableName = DynamoDbSingleTableSchema.MAIN_TABLE
+            filterExpression = "begins_with(SK, :prefix) AND voter_name = :voter"
+            expressionAttributeValues = mapOf(
+                ":prefix" to AttributeValue.S(DynamoDbSingleTableSchema.NOTE_PREFIX),
+                ":voter" to AttributeValue.S(oldUserName),
+            )
+        }).items ?: return
+
+        noteItems.forEach { item ->
+            val pk = item["PK"]?.asS() ?: return@forEach
+            val oldSk = item["SK"]?.asS() ?: return@forEach
+            val candidateName = item["candidate_name"]?.asS() ?: return@forEach
+
+            dynamoDb.deleteItem(DeleteItemRequest {
+                tableName = DynamoDbSingleTableSchema.MAIN_TABLE
+                key = mapOf(
+                    "PK" to AttributeValue.S(pk),
+                    "SK" to AttributeValue.S(oldSk),
+                )
+            })
+
+            dynamoDb.putItem(PutItemRequest {
+                tableName = DynamoDbSingleTableSchema.MAIN_TABLE
+                this.item = item.toMutableMap().apply {
+                    this["SK"] = AttributeValue.S(
+                        DynamoDbSingleTableSchema.noteSK(candidateName, newUserName)
+                    )
+                    this["voter_name"] = AttributeValue.S(newUserName)
+                }
+            })
         }
     }
 
@@ -650,6 +711,32 @@ class DynamoDbSingleTableCommandModel(
                     })
                 }
             }
+
+            // Cascade: drop every note attached to a removed candidate.
+            // Notes are keyed on the SK prefix NOTE#<candidate>#<voter>, so
+            // one prefix query per removed candidate covers every voter.
+            for (candidateName in candidateNames) {
+                val noteItems = dynamoDb.query(QueryRequest {
+                    tableName = DynamoDbSingleTableSchema.MAIN_TABLE
+                    keyConditionExpression = "PK = :pk AND begins_with(SK, :prefix)"
+                    expressionAttributeValues = mapOf(
+                        ":pk" to AttributeValue.S(DynamoDbSingleTableSchema.electionPK(electionName)),
+                        ":prefix" to AttributeValue.S(
+                            DynamoDbSingleTableSchema.noteSKPrefixForCandidate(candidateName)
+                        ),
+                    )
+                }).items ?: continue
+                noteItems.forEach { item ->
+                    val sk = item["SK"]?.asS() ?: return@forEach
+                    dynamoDb.deleteItem(DeleteItemRequest {
+                        tableName = DynamoDbSingleTableSchema.MAIN_TABLE
+                        key = mapOf(
+                            "PK" to AttributeValue.S(DynamoDbSingleTableSchema.electionPK(electionName)),
+                            "SK" to AttributeValue.S(sk),
+                        )
+                    })
+                }
+            }
         }
     }
 
@@ -661,8 +748,53 @@ class DynamoDbSingleTableCommandModel(
         // both names momentarily, never neither.
         runBlocking {
             rewriteBallotRankingsForCandidateRename(electionName, oldName, newName)
+            rekeyCandidateNotesForCandidateRename(electionName, oldName, newName)
             putCandidateRow(electionName, newName)
             deleteCandidateRow(electionName, oldName)
+        }
+    }
+
+    // Notes pack the candidate into the SK, so a rename is delete-old +
+    // put-new for each note (one per voter on the renamed candidate).
+    private suspend fun rekeyCandidateNotesForCandidateRename(
+        electionName: String,
+        oldName: String,
+        newName: String,
+    ) {
+        val noteItems = dynamoDb.query(QueryRequest {
+            tableName = DynamoDbSingleTableSchema.MAIN_TABLE
+            keyConditionExpression = "PK = :pk AND begins_with(SK, :prefix)"
+            expressionAttributeValues = mapOf(
+                ":pk" to AttributeValue.S(DynamoDbSingleTableSchema.electionPK(electionName)),
+                ":prefix" to AttributeValue.S(
+                    DynamoDbSingleTableSchema.noteSKPrefixForCandidate(oldName)
+                ),
+            )
+        }).items ?: return
+
+        noteItems.forEach { item ->
+            val oldSk = item["SK"]?.asS() ?: return@forEach
+            val voterName = item["voter_name"]?.asS() ?: return@forEach
+            val newSk = DynamoDbSingleTableSchema.noteSK(newName, voterName)
+
+            dynamoDb.putItem(PutItemRequest {
+                tableName = DynamoDbSingleTableSchema.MAIN_TABLE
+                this.item = item.toMutableMap().apply {
+                    this["SK"] = AttributeValue.S(newSk)
+                    this["candidate_name"] = AttributeValue.S(newName)
+                }
+            })
+            // On case-only rename the old/new SK are equal; skip the delete
+            // that would otherwise remove the row we just wrote.
+            if (oldSk != newSk) {
+                dynamoDb.deleteItem(DeleteItemRequest {
+                    tableName = DynamoDbSingleTableSchema.MAIN_TABLE
+                    key = mapOf(
+                        "PK" to AttributeValue.S(DynamoDbSingleTableSchema.electionPK(electionName)),
+                        "SK" to AttributeValue.S(oldSk),
+                    )
+                })
+            }
         }
     }
 
@@ -823,6 +955,48 @@ class DynamoDbSingleTableCommandModel(
                 key = mapOf(
                     "PK" to AttributeValue.S(DynamoDbSingleTableSchema.electionPK(electionName)),
                     "SK" to AttributeValue.S(DynamoDbSingleTableSchema.ballotSK(voterName))
+                )
+            })
+        }
+    }
+
+    override fun setCandidateNote(
+        authority: String,
+        electionName: String,
+        candidateName: String,
+        voterName: String,
+        text: String,
+        lastUpdated: Instant,
+    ) {
+        runBlocking {
+            dynamoDb.putItem(PutItemRequest {
+                tableName = DynamoDbSingleTableSchema.MAIN_TABLE
+                item = mapOf(
+                    "PK" to AttributeValue.S(DynamoDbSingleTableSchema.electionPK(electionName)),
+                    "SK" to AttributeValue.S(DynamoDbSingleTableSchema.noteSK(candidateName, voterName)),
+                    "entity_type" to AttributeValue.S("NOTE"),
+                    "election_name" to AttributeValue.S(electionName),
+                    "candidate_name" to AttributeValue.S(candidateName),
+                    "voter_name" to AttributeValue.S(voterName),
+                    "note_text" to AttributeValue.S(text),
+                    "last_updated" to AttributeValue.N(lastUpdated.toEpochMilliseconds().toString()),
+                )
+            })
+        }
+    }
+
+    override fun deleteCandidateNote(
+        authority: String,
+        electionName: String,
+        candidateName: String,
+        voterName: String,
+    ) {
+        runBlocking {
+            dynamoDb.deleteItem(DeleteItemRequest {
+                tableName = DynamoDbSingleTableSchema.MAIN_TABLE
+                key = mapOf(
+                    "PK" to AttributeValue.S(DynamoDbSingleTableSchema.electionPK(electionName)),
+                    "SK" to AttributeValue.S(DynamoDbSingleTableSchema.noteSK(candidateName, voterName)),
                 )
             })
         }

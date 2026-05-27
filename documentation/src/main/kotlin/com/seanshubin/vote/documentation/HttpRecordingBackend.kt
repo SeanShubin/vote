@@ -248,6 +248,32 @@ class HttpRecordingBackend(
         recorder.put("/admin/feature-flags/${URLEncoder.encode(flag.name, StandardCharsets.UTF_8)}", body, token)
     }
 
+    override fun setCandidateNote(
+        token: AccessToken,
+        electionName: String,
+        candidateName: String,
+        text: String,
+    ) {
+        val encodedElection = URLEncoder.encode(electionName, StandardCharsets.UTF_8)
+        val encodedCandidate = URLEncoder.encode(candidateName, StandardCharsets.UTF_8)
+        val body = json.encodeToString(SetCandidateNoteRequest(text))
+        recorder.put("/election/$encodedElection/candidate/$encodedCandidate/note", body, token)
+    }
+
+    override fun listCandidateNotes(
+        token: AccessToken,
+        electionName: String,
+        candidateName: String,
+    ): List<CandidateNote> {
+        val encodedElection = URLEncoder.encode(electionName, StandardCharsets.UTF_8)
+        val encodedCandidate = URLEncoder.encode(candidateName, StandardCharsets.UTF_8)
+        val response = recorder.get(
+            "/election/$encodedElection/candidate/$encodedCandidate/notes",
+            token,
+        )
+        return json.decodeFromString(response.body())
+    }
+
     override fun synchronize() {
         recorder.post("/sync", "{}")
     }

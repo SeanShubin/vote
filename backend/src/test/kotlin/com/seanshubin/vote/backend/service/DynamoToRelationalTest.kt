@@ -4,6 +4,7 @@ import com.seanshubin.vote.contract.EventLog
 import com.seanshubin.vote.contract.QueryModel
 import com.seanshubin.vote.domain.Ballot
 import com.seanshubin.vote.domain.BallotSummary
+import com.seanshubin.vote.domain.CandidateNote
 import com.seanshubin.vote.domain.DomainEvent
 import com.seanshubin.vote.domain.ElectionSummary
 import com.seanshubin.vote.domain.EventEnvelope
@@ -179,12 +180,13 @@ class DynamoToRelationalTest {
     }
 
     @Test
-    fun `listDebugTableNames returns the seven schema names`() {
+    fun `listDebugTableNames returns the schema table names`() {
         val sut = DynamoToRelational(stubQueryModel(), stubEventLog())
         assertEquals(
             listOf(
                 "users", "elections", "candidates",
-                "ballots", "rankings", "sync_state", "event_log",
+                "ballots", "rankings", "candidate_notes",
+                "sync_state", "event_log",
             ),
             sut.listDebugTableNames(),
         )
@@ -234,6 +236,9 @@ class DynamoToRelationalTest {
         override fun searchBallot(voterName: String, electionName: String): BallotSummary? = null
         override fun listUserNames(): List<String> = users.map { it.name }
         override fun listPermissions(role: Role): List<Permission> = emptyList()
+        override fun listCandidateNotes(electionName: String, candidateName: String): List<CandidateNote> = emptyList()
+        override fun listCandidateNotesByVoter(voterName: String): List<CandidateNote> = emptyList()
+        override fun listCandidateNotesByElection(electionName: String): List<CandidateNote> = emptyList()
     }
 
     private fun stubEventLog(events: List<EventEnvelope> = emptyList()): EventLog = object : EventLog {

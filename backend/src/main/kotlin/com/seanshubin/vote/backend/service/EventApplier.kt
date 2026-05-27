@@ -129,6 +129,24 @@ class EventApplier(
             is DomainEvent.BallotDeleted -> {
                 commandModel.deleteBallot(authority, event.voterName, event.electionName)
             }
+            is DomainEvent.CandidateNoteSet -> {
+                commandModel.setCandidateNote(
+                    authority = authority,
+                    electionName = event.electionName,
+                    candidateName = event.candidateName,
+                    voterName = event.voterName,
+                    text = event.text,
+                    lastUpdated = event.whenWritten,
+                )
+            }
+            is DomainEvent.CandidateNoteDeleted -> {
+                commandModel.deleteCandidateNote(
+                    authority = authority,
+                    electionName = event.electionName,
+                    candidateName = event.candidateName,
+                    voterName = event.voterName,
+                )
+            }
         }
     }
 }

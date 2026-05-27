@@ -271,6 +271,28 @@ class HttpApiClient(
     override suspend fun getTally(electionName: String, side: RankingSide): ElectionTally =
         getWithAuth("/election/${encodeURIComponent(electionName)}/tally?side=$side")
 
+    override suspend fun listCandidateNotes(
+        electionName: String,
+        candidateName: String,
+    ): List<CandidateNote> =
+        getWithAuth(
+            "/election/${encodeURIComponent(electionName)}" +
+                "/candidate/${encodeURIComponent(candidateName)}/notes"
+        )
+
+    override suspend fun setCandidateNote(
+        electionName: String,
+        candidateName: String,
+        text: String,
+    ) {
+        val request = SetCandidateNoteRequest(text)
+        putWithAuth<SetCandidateNoteRequest, Unit>(
+            "/election/${encodeURIComponent(electionName)}" +
+                "/candidate/${encodeURIComponent(candidateName)}/note",
+            request,
+        )
+    }
+
     override suspend fun deleteElection(electionName: String) {
         deleteWithAuth("/election/${encodeURIComponent(electionName)}")
     }

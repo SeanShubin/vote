@@ -356,6 +356,55 @@ class MySqlQueryModel(
         }
     }
 
+    override fun listCandidateNotes(electionName: String, candidateName: String): List<CandidateNote> {
+        val sql = queryLoader.load("candidate-note-select-by-candidate")
+        return connection.prepareStatement(sql).use { stmt ->
+            stmt.setString(1, electionName)
+            stmt.setString(2, candidateName)
+            val rs = stmt.executeQuery()
+            buildList {
+                while (rs.next()) {
+                    add(rs.toCandidateNote())
+                }
+            }
+        }
+    }
+
+    override fun listCandidateNotesByVoter(voterName: String): List<CandidateNote> {
+        val sql = queryLoader.load("candidate-note-select-by-voter")
+        return connection.prepareStatement(sql).use { stmt ->
+            stmt.setString(1, voterName)
+            val rs = stmt.executeQuery()
+            buildList {
+                while (rs.next()) {
+                    add(rs.toCandidateNote())
+                }
+            }
+        }
+    }
+
+    override fun listCandidateNotesByElection(electionName: String): List<CandidateNote> {
+        val sql = queryLoader.load("candidate-note-select-by-election")
+        return connection.prepareStatement(sql).use { stmt ->
+            stmt.setString(1, electionName)
+            val rs = stmt.executeQuery()
+            buildList {
+                while (rs.next()) {
+                    add(rs.toCandidateNote())
+                }
+            }
+        }
+    }
+
+    private fun ResultSet.toCandidateNote(): CandidateNote =
+        CandidateNote(
+            electionName = getString("election_name"),
+            candidateName = getString("candidate_name"),
+            voterName = getString("voter_name"),
+            text = getString("note_text"),
+            lastUpdated = Instant.fromEpochMilliseconds(getTimestamp("last_updated").time),
+        )
+
     private fun ResultSet.toUser(): User {
         return User(
             name = getString("name"),

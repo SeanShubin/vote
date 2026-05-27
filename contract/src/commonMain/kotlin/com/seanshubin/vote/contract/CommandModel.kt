@@ -63,4 +63,25 @@ interface CommandModel {
         userName: String,
         discordDisplayName: String,
     )
+
+    /**
+     * Create-or-replace one voter's note on one candidate. Idempotent —
+     * resetting to the same text just bumps [lastUpdated].
+     */
+    fun setCandidateNote(
+        authority: String,
+        electionName: String,
+        candidateName: String,
+        voterName: String,
+        text: String,
+        lastUpdated: Instant,
+    )
+
+    /** Remove one voter's note on one candidate. No-op if no note exists. */
+    fun deleteCandidateNote(
+        authority: String,
+        electionName: String,
+        candidateName: String,
+        voterName: String,
+    )
 }

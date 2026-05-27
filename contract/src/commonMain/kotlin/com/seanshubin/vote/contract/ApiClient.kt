@@ -1,5 +1,6 @@
 package com.seanshubin.vote.contract
 
+import com.seanshubin.vote.domain.CandidateNote
 import com.seanshubin.vote.domain.ElectionDetail
 import com.seanshubin.vote.domain.ElectionSummary
 import com.seanshubin.vote.domain.ElectionTally
@@ -315,4 +316,24 @@ interface ApiClient {
      * refresh cookie is set; the caller reloads to pick the session up.
      */
     suspend fun devCreateAndLogin(userName: String)
+
+    /**
+     * All voters' notes on a candidate, most-recent first. Available to any
+     * authenticated viewer — notes are public the moment they are written.
+     */
+    suspend fun listCandidateNotes(
+        electionName: String,
+        candidateName: String,
+    ): List<CandidateNote>
+
+    /**
+     * Save the current voter's note on a candidate. Empty text deletes the
+     * note; non-empty creates-or-replaces. The voter is the current session
+     * user; there is no per-voter parameter.
+     */
+    suspend fun setCandidateNote(
+        electionName: String,
+        candidateName: String,
+        text: String,
+    )
 }

@@ -223,6 +223,18 @@ class MySqlCommandModel(
             stmt.executeBatch()
         }
 
+        // Cascade candidate-note rows the same way — candidate_name on the
+        // notes table has no FK, mirroring rankings.candidate_name.
+        val noteDeleteSql = queryLoader.load("candidate-note-delete-by-candidate")
+        connection.prepareStatement(noteDeleteSql).use { stmt ->
+            for (candidateName in candidateNames) {
+                stmt.setString(1, electionName)
+                stmt.setString(2, candidateName)
+                stmt.addBatch()
+            }
+            stmt.executeBatch()
+        }
+
         val sql = queryLoader.load("candidate-delete")
         connection.prepareStatement(sql).use { stmt ->
             for (candidateName in candidateNames) {
@@ -243,6 +255,16 @@ class MySqlCommandModel(
         // the new name everywhere; never half-applied.
         val rankingSql = queryLoader.load("ranking-rename-candidate")
         connection.prepareStatement(rankingSql).use { stmt ->
+            stmt.setString(1, newName)
+            stmt.setString(2, electionName)
+            stmt.setString(3, oldName)
+            stmt.executeUpdate()
+        }
+        // Same ordering rule for the notes table — candidate_name there has
+        // no FK either, so it has to follow the same all-or-nothing rewrite
+        // before the candidate row moves.
+        val noteSql = queryLoader.load("candidate-note-rename-candidate")
+        connection.prepareStatement(noteSql).use { stmt ->
             stmt.setString(1, newName)
             stmt.setString(2, electionName)
             stmt.setString(3, oldName)
@@ -454,6 +476,40 @@ class MySqlCommandModel(
         connection.prepareStatement(sql).use { stmt ->
             stmt.setString(1, discordDisplayName)
             stmt.setString(2, userName)
+            stmt.executeUpdate()
+        }
+    }
+
+    override fun setCandidateNote(
+        authority: String,
+        electionName: String,
+        candidateName: String,
+        voterName: String,
+        text: String,
+        lastUpdated: Instant,
+    ) {
+        val sql = queryLoader.load("candidate-note-upsert")
+        connection.prepareStatement(sql).use { stmt ->
+            stmt.setString(1, electionName)
+            stmt.setString(2, candidateName)
+            stmt.setString(3, voterName)
+            stmt.setString(4, text)
+            stmt.setTimestamp(5, Timestamp(lastUpdated.toEpochMilliseconds()))
+            stmt.executeUpdate()
+        }
+    }
+
+    override fun deleteCandidateNote(
+        authority: String,
+        electionName: String,
+        candidateName: String,
+        voterName: String,
+    ) {
+        val sql = queryLoader.load("candidate-note-delete")
+        connection.prepareStatement(sql).use { stmt ->
+            stmt.setString(1, electionName)
+            stmt.setString(2, candidateName)
+            stmt.setString(3, voterName)
             stmt.executeUpdate()
         }
     }

@@ -37,6 +37,9 @@ class InMemoryCommandModel(private val data: InMemoryData) : CommandModel {
         data.electionManagers.values.forEach { managers ->
             managers.removeAll { it.equals(userName, ignoreCase = true) }
         }
+        // Cascade: drop every candidate note this user authored.
+        val voterKey = userName.lowercase()
+        data.candidateNotes.keys.removeAll { it.third == voterKey }
     }
 
     override fun addElection(authority: String, owner: String, electionName: String, description: String) {
@@ -78,6 +81,17 @@ class InMemoryCommandModel(private val data: InMemoryData) : CommandModel {
                 data.ballots.remove(key)
                 data.ballots[newKey to key.second] = ballot.copy(electionName = newName)
             }
+
+        // Candidate notes are keyed by (electionKey, candidateKey, voterKey);
+        // re-key each and rewrite the stored display-case electionName.
+        data.candidateNotes.entries
+            .filter { it.key.first == oldKey }
+            .toList()
+            .forEach { (key, note) ->
+                data.candidateNotes.remove(key)
+                data.candidateNotes[Triple(newKey, key.second, key.third)] =
+                    note.copy(electionName = newName)
+            }
     }
 
     override fun setElectionOwner(authority: String, electionName: String, newOwnerName: String) {
@@ -105,6 +119,7 @@ class InMemoryCommandModel(private val data: InMemoryData) : CommandModel {
         data.tiers.remove(key)
         data.electionManagers.remove(key)
         data.ballots.keys.removeIf { (election, _) -> election == key }
+        data.candidateNotes.keys.removeIf { (election, _, _) -> election == key }
     }
 
     override fun addCandidates(authority: String, electionName: String, candidateNames: List<String>) {
@@ -195,6 +210,8 @@ class InMemoryCommandModel(private val data: InMemoryData) : CommandModel {
                     data.ballots[k] = ballot.copy(rankings = filtered)
                 }
             }
+        // Cascade: drop notes for the removed candidates in this election.
+        data.candidateNotes.keys.removeAll { (e, c, _) -> e == key && c in removedKeys }
     }
 
     override fun renameCandidate(authority: String, electionName: String, oldName: String, newName: String) {
@@ -212,6 +229,16 @@ class InMemoryCommandModel(private val data: InMemoryData) : CommandModel {
                 if (rewritten != ballot.rankings) {
                     data.ballots[k] = ballot.copy(rankings = rewritten)
                 }
+            }
+        // Cascade: re-key + relabel notes attached to the renamed candidate.
+        val newKey = newName.lowercase()
+        data.candidateNotes.entries
+            .filter { it.key.first == key && it.key.second == oldKey }
+            .toList()
+            .forEach { (k, note) ->
+                data.candidateNotes.remove(k)
+                data.candidateNotes[Triple(key, newKey, k.third)] =
+                    note.copy(candidateName = newName)
             }
     }
 
@@ -290,6 +317,17 @@ class InMemoryCommandModel(private val data: InMemoryData) : CommandModel {
             val newBallotKey = key.first to newKey
             data.ballots[newBallotKey] = ballot.copy(voterName = newUserName)
         }
+
+        // Update candidate notes — re-key by the new voter slot and rewrite
+        // the stored display-case voterName.
+        data.candidateNotes.entries
+            .filter { it.value.voterName.equals(oldUserName, ignoreCase = true) }
+            .toList()
+            .forEach { (key, note) ->
+                data.candidateNotes.remove(key)
+                data.candidateNotes[Triple(key.first, key.second, newKey)] =
+                    note.copy(voterName = newUserName)
+            }
     }
 
     override fun createUserViaDiscord(
@@ -329,5 +367,33 @@ class InMemoryCommandModel(private val data: InMemoryData) : CommandModel {
         val key = userName.lowercase()
         val user = data.users[key] ?: error("User not found: $userName")
         data.users[key] = user.copy(discordDisplayName = discordDisplayName)
+    }
+
+    override fun setCandidateNote(
+        authority: String,
+        electionName: String,
+        candidateName: String,
+        voterName: String,
+        text: String,
+        lastUpdated: Instant,
+    ) {
+        val key = Triple(electionName.lowercase(), candidateName.lowercase(), voterName.lowercase())
+        data.candidateNotes[key] = InMemoryData.CandidateNoteData(
+            electionName = electionName,
+            candidateName = candidateName,
+            voterName = voterName,
+            text = text,
+            lastUpdated = lastUpdated,
+        )
+    }
+
+    override fun deleteCandidateNote(
+        authority: String,
+        electionName: String,
+        candidateName: String,
+        voterName: String,
+    ) {
+        val key = Triple(electionName.lowercase(), candidateName.lowercase(), voterName.lowercase())
+        data.candidateNotes.remove(key)
     }
 }

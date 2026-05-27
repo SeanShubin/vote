@@ -406,6 +406,72 @@ class DynamoDbSingleTableQueryModel(
         }
     }
 
+    override fun listCandidateNotes(electionName: String, candidateName: String): List<CandidateNote> {
+        return runBlocking {
+            val response = dynamoDb.query(QueryRequest {
+                tableName = DynamoDbSingleTableSchema.MAIN_TABLE
+                keyConditionExpression = "PK = :pk AND begins_with(SK, :sk_prefix)"
+                expressionAttributeValues = mapOf(
+                    ":pk" to AttributeValue.S(DynamoDbSingleTableSchema.electionPK(electionName)),
+                    ":sk_prefix" to AttributeValue.S(
+                        DynamoDbSingleTableSchema.noteSKPrefixForCandidate(candidateName)
+                    ),
+                )
+            })
+            response.items?.mapNotNull { itemToCandidateNote(it) }
+                ?.sortedByDescending { it.lastUpdated }
+                ?: emptyList()
+        }
+    }
+
+    override fun listCandidateNotesByVoter(voterName: String): List<CandidateNote> {
+        // Notes don't have a PK keyed on voter, so this falls back to a Scan
+        // gated on voter_name. Used for the user-removed cascade in the
+        // command model; admin-bounded operation.
+        return runBlocking {
+            val response = dynamoDb.scan(ScanRequest {
+                tableName = DynamoDbSingleTableSchema.MAIN_TABLE
+                filterExpression = "begins_with(SK, :prefix) AND voter_name = :voter"
+                expressionAttributeValues = mapOf(
+                    ":prefix" to AttributeValue.S(DynamoDbSingleTableSchema.NOTE_PREFIX),
+                    ":voter" to AttributeValue.S(voterName),
+                )
+            })
+            response.items?.mapNotNull { itemToCandidateNote(it) } ?: emptyList()
+        }
+    }
+
+    override fun listCandidateNotesByElection(electionName: String): List<CandidateNote> {
+        return runBlocking {
+            val response = dynamoDb.query(QueryRequest {
+                tableName = DynamoDbSingleTableSchema.MAIN_TABLE
+                keyConditionExpression = "PK = :pk AND begins_with(SK, :sk_prefix)"
+                expressionAttributeValues = mapOf(
+                    ":pk" to AttributeValue.S(DynamoDbSingleTableSchema.electionPK(electionName)),
+                    ":sk_prefix" to AttributeValue.S(DynamoDbSingleTableSchema.NOTE_PREFIX),
+                )
+            })
+            response.items?.mapNotNull { itemToCandidateNote(it) } ?: emptyList()
+        }
+    }
+
+    private fun itemToCandidateNote(item: Map<String, AttributeValue>): CandidateNote? {
+        val electionName = item["election_name"]?.asS() ?: return null
+        val candidateName = item["candidate_name"]?.asS() ?: return null
+        val voterName = item["voter_name"]?.asS() ?: return null
+        val text = item["note_text"]?.asS() ?: return null
+        val lastUpdated = item["last_updated"]?.asN()?.toLongOrNull()
+            ?.let { Instant.fromEpochMilliseconds(it) }
+            ?: return null
+        return CandidateNote(
+            electionName = electionName,
+            candidateName = candidateName,
+            voterName = voterName,
+            text = text,
+            lastUpdated = lastUpdated,
+        )
+    }
+
     // Metadata queries
     override fun tableCount(): Int {
         return 3  // vote_data, vote_event_log, vote_operator_state

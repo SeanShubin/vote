@@ -265,6 +265,30 @@ object NormalizeCaseTransform {
                     electionName = lookupElection(event.electionName, eventId, "BallotDeleted"),
                 )
             }
+            is DomainEvent.CandidateNoteSet -> {
+                val canonicalElection = lookupElection(event.electionName, eventId, "CandidateNoteSet")
+                val canonicalVoter = lookupUser(event.voterName, eventId, "CandidateNoteSet.voter")
+                val candidateTable = candidates[canonicalElection.lowercase()] ?: emptyMap()
+                val canonicalCandidate = candidateTable[event.candidateName.lowercase()] ?: event.candidateName
+                if (canonicalCandidate != event.candidateName) rewrites++
+                event.copy(
+                    electionName = canonicalElection,
+                    voterName = canonicalVoter,
+                    candidateName = canonicalCandidate,
+                )
+            }
+            is DomainEvent.CandidateNoteDeleted -> {
+                val canonicalElection = lookupElection(event.electionName, eventId, "CandidateNoteDeleted")
+                val canonicalVoter = lookupUser(event.voterName, eventId, "CandidateNoteDeleted.voter")
+                val candidateTable = candidates[canonicalElection.lowercase()] ?: emptyMap()
+                val canonicalCandidate = candidateTable[event.candidateName.lowercase()] ?: event.candidateName
+                if (canonicalCandidate != event.candidateName) rewrites++
+                event.copy(
+                    electionName = canonicalElection,
+                    voterName = canonicalVoter,
+                    candidateName = canonicalCandidate,
+                )
+            }
         }
 
         private fun introduceUser(name: String, eventId: Long, where: String): String {

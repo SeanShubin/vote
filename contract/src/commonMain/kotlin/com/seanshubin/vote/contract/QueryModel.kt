@@ -49,4 +49,18 @@ interface QueryModel {
     fun listPermissions(role: Role): List<Permission>
     fun electionsOwnedCount(userName: String): Int
     fun ballotsCastCount(userName: String): Int
+
+    /**
+     * Every voter's note on this candidate, ordered most-recent first.
+     * Empty when no notes exist (including when the election or candidate
+     * does not exist — callers responsible for the existence check if they
+     * need to distinguish "no notes" from "no candidate").
+     */
+    fun listCandidateNotes(electionName: String, candidateName: String): List<CandidateNote>
+
+    /** Every note authored anywhere by [voterName]. Used for cascades on user remove/rename. */
+    fun listCandidateNotesByVoter(voterName: String): List<CandidateNote>
+
+    /** Every note in [electionName]. Used by the relational projection. */
+    fun listCandidateNotesByElection(electionName: String): List<CandidateNote>
 }
