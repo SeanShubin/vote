@@ -48,7 +48,7 @@ fun ElectionDetailPage(
 ) {
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var successMessage by remember { mutableStateOf<String?>(null) }
-    var currentView by rememberHashTab("setup", setOf("setup", "vote", "tally"))
+    var currentView by rememberHashTab("setup", setOf("setup", "vote", "notes", "tally"))
 
     // Two independent fetches:
     //   shellFetch — election + candidates, in parallel; gates the page UI.
@@ -204,6 +204,10 @@ fun ElectionDetailPage(
                         onClick { currentView = "vote" }
                     }) { Text("Vote") }
                     Button({
+                        if (effectiveView == "notes") classes("active")
+                        onClick { currentView = "notes" }
+                    }) { Text("Notes") }
+                    Button({
                         if (effectiveView == "tally") classes("active")
                         onClick { currentView = "tally" }
                     }) { Text("Results") }
@@ -358,6 +362,13 @@ fun ElectionDetailPage(
                             currentUserName?.let { PageCache.invalidate("userActivity:$it") }
                             tallyFetch.reload()
                         },
+                        onError = { errorMessage = it },
+                    )
+                    "notes" -> CandidateNotesSection(
+                        apiClient = apiClient,
+                        electionName = electionName,
+                        candidates = candidates,
+                        currentUserName = currentUserName,
                         onError = { errorMessage = it },
                     )
                     "tally" -> TallyView(
