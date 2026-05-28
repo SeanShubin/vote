@@ -3,6 +3,75 @@ package com.seanshubin.vote.backend.repository
 import aws.sdk.kotlin.services.dynamodb.DynamoDbClient
 import aws.sdk.kotlin.services.dynamodb.model.*
 
+/**
+ * Lightweight, stringly-typed value description of a DynamoDB table's shape
+ * — enough to compare what code expects against what's live in DynamoDB and
+ * report any difference in a human-readable form. Intentionally narrower
+ * than the SDK's CreateTableRequest: only the fields that matter for
+ * "would the application work against this table" (keys, attribute types,
+ * GSIs, projections). Things like billing mode, TTL, and PITR settings are
+ * left out because the rebuild-projection tool reasserts them on every
+ * create — drift there is not a correctness problem.
+ */
+data class TableShape(
+    val attributeDefinitions: Set<AttrDef>,
+    val keySchema: List<KeyElement>,
+    val gsis: Set<GsiShape>,
+) {
+    /** Return null if [other] matches; otherwise a human-readable summary of every difference. */
+    fun diffFrom(other: TableShape?): String? {
+        if (other == null) return "live table does not exist"
+        val problems = mutableListOf<String>()
+        val missingAttrs = attributeDefinitions - other.attributeDefinitions
+        val extraAttrs = other.attributeDefinitions - attributeDefinitions
+        if (missingAttrs.isNotEmpty()) problems.add("missing attribute definitions: $missingAttrs")
+        if (extraAttrs.isNotEmpty()) problems.add("unexpected attribute definitions: $extraAttrs")
+        if (keySchema != other.keySchema) {
+            problems.add("key schema differs: expected $keySchema, live ${other.keySchema}")
+        }
+        val expectedGsisByName = gsis.associateBy { it.name }
+        val liveGsisByName = other.gsis.associateBy { it.name }
+        val missingGsis = expectedGsisByName.keys - liveGsisByName.keys
+        val extraGsis = liveGsisByName.keys - expectedGsisByName.keys
+        if (missingGsis.isNotEmpty()) problems.add("missing GSIs: $missingGsis")
+        if (extraGsis.isNotEmpty()) problems.add("unexpected GSIs: $extraGsis")
+        for (name in expectedGsisByName.keys intersect liveGsisByName.keys) {
+            val expected = expectedGsisByName.getValue(name)
+            val live = liveGsisByName.getValue(name)
+            if (expected != live) {
+                problems.add("GSI $name differs: expected $expected, live $live")
+            }
+        }
+        return if (problems.isEmpty()) null else problems.joinToString("; ")
+    }
+}
+
+data class AttrDef(val name: String, val type: String) {
+    fun toAttributeDefinition() = AttributeDefinition {
+        attributeName = name
+        attributeType = ScalarAttributeType.fromValue(type)
+    }
+}
+
+data class KeyElement(val name: String, val keyType: String) {
+    fun toKeySchemaElement() = KeySchemaElement {
+        attributeName = name
+        keyType = KeyType.fromValue(this@KeyElement.keyType)
+    }
+}
+
+data class GsiShape(
+    val name: String,
+    val keySchema: List<KeyElement>,
+    val projectionType: String,
+) {
+    fun toGsi() = GlobalSecondaryIndex {
+        indexName = name
+        keySchema = this@GsiShape.keySchema.map { it.toKeySchemaElement() }
+        projection = Projection { projectionType = ProjectionType.fromValue(this@GsiShape.projectionType) }
+    }
+}
+
 object DynamoDbSingleTableSchema {
     const val MAIN_TABLE = "vote_data"
     const val EVENT_LOG_TABLE = "vote_event_log"
@@ -60,105 +129,155 @@ object DynamoDbSingleTableSchema {
         }
     }
 
+    /**
+     * Declarative description of vote_data's required schema. The canonical
+     * source of truth for the projection table's shape — every code path
+     * that creates, compares, or recreates the table reads from this single
+     * value. Keeping createMainTable, the shape comparison, and the
+     * rebuild-projection tool in lock-step is automatic this way.
+     */
+    val expectedMainTableShape: TableShape = TableShape(
+        attributeDefinitions = setOf(
+            AttrDef("PK", "S"),
+            AttrDef("SK", "S"),
+            AttrDef("discord_id", "S"),
+            AttrDef("voter_name", "S"),
+            AttrDef("owner_name", "S"),
+            AttrDef("user_name", "S"),
+        ),
+        keySchema = listOf(
+            KeyElement("PK", "HASH"),
+            KeyElement("SK", "RANGE"),
+        ),
+        gsis = setOf(
+            GsiShape(
+                name = DISCORD_ID_INDEX,
+                keySchema = listOf(KeyElement("discord_id", "HASH")),
+                projectionType = "ALL",
+            ),
+            GsiShape(
+                name = VOTER_NAME_INDEX,
+                keySchema = listOf(KeyElement("voter_name", "HASH"), KeyElement("SK", "RANGE")),
+                projectionType = "ALL",
+            ),
+            GsiShape(
+                name = OWNER_NAME_INDEX,
+                keySchema = listOf(KeyElement("owner_name", "HASH"), KeyElement("SK", "RANGE")),
+                projectionType = "ALL",
+            ),
+            GsiShape(
+                name = MANAGER_USER_INDEX,
+                keySchema = listOf(KeyElement("user_name", "HASH"), KeyElement("SK", "RANGE")),
+                projectionType = "ALL",
+            ),
+        ),
+    )
+
     private suspend fun createMainTable(dynamoDb: DynamoDbClient) {
-        // Four sparse GSIs back the user-keyed lookups that would otherwise
-        // be table scans. See the deploy/template.yaml MainTable for the
-        // production definition — this code path is what LocalStack
-        // integration tests use, so the two must stay in lock-step.
+        createMainTable(dynamoDb, expectedMainTableShape)
+    }
+
+    /**
+     * CreateTable from a [TableShape]. The rebuild-projection tool calls
+     * this directly after dropping the live table so the new table is
+     * created with all GSIs declared upfront — CreateTable accepts
+     * multi-GSI; UpdateTable enforces a 1-GSI-per-call limit (the entire
+     * reason the projection-rebuild ceremony exists at all).
+     *
+     * Re-asserts PointInTimeRecovery enablement after table creation.
+     * PITR is set via a separate UpdateContinuousBackups call because
+     * CreateTable doesn't accept PITR settings inline. The 35-day
+     * point-in-time backup window PITR provides is partly redundant with
+     * the event-log-as-source-of-truth model (any state can be rebuilt
+     * by replaying events) but cheap insurance against operator error
+     * that affects both vote_data and vote_event_log simultaneously.
+     */
+    suspend fun createMainTable(dynamoDb: DynamoDbClient, shape: TableShape) {
         dynamoDb.createTable(CreateTableRequest {
             tableName = MAIN_TABLE
-            keySchema = listOf(
-                KeySchemaElement {
-                    attributeName = "PK"
-                    keyType = KeyType.Hash
-                },
-                KeySchemaElement {
-                    attributeName = "SK"
-                    keyType = KeyType.Range
-                }
-            )
-            attributeDefinitions = listOf(
-                AttributeDefinition {
-                    attributeName = "PK"
-                    attributeType = ScalarAttributeType.S
-                },
-                AttributeDefinition {
-                    attributeName = "SK"
-                    attributeType = ScalarAttributeType.S
-                },
-                AttributeDefinition {
-                    attributeName = "discord_id"
-                    attributeType = ScalarAttributeType.S
-                },
-                AttributeDefinition {
-                    attributeName = "voter_name"
-                    attributeType = ScalarAttributeType.S
-                },
-                AttributeDefinition {
-                    attributeName = "owner_name"
-                    attributeType = ScalarAttributeType.S
-                },
-                AttributeDefinition {
-                    attributeName = "user_name"
-                    attributeType = ScalarAttributeType.S
-                },
-            )
-            globalSecondaryIndexes = listOf(
-                GlobalSecondaryIndex {
-                    indexName = DISCORD_ID_INDEX
-                    keySchema = listOf(
-                        KeySchemaElement {
-                            attributeName = "discord_id"
-                            keyType = KeyType.Hash
-                        },
-                    )
-                    projection = Projection { projectionType = ProjectionType.All }
-                },
-                GlobalSecondaryIndex {
-                    indexName = VOTER_NAME_INDEX
-                    keySchema = listOf(
-                        KeySchemaElement {
-                            attributeName = "voter_name"
-                            keyType = KeyType.Hash
-                        },
-                        KeySchemaElement {
-                            attributeName = "SK"
-                            keyType = KeyType.Range
-                        },
-                    )
-                    projection = Projection { projectionType = ProjectionType.All }
-                },
-                GlobalSecondaryIndex {
-                    indexName = OWNER_NAME_INDEX
-                    keySchema = listOf(
-                        KeySchemaElement {
-                            attributeName = "owner_name"
-                            keyType = KeyType.Hash
-                        },
-                        KeySchemaElement {
-                            attributeName = "SK"
-                            keyType = KeyType.Range
-                        },
-                    )
-                    projection = Projection { projectionType = ProjectionType.All }
-                },
-                GlobalSecondaryIndex {
-                    indexName = MANAGER_USER_INDEX
-                    keySchema = listOf(
-                        KeySchemaElement {
-                            attributeName = "user_name"
-                            keyType = KeyType.Hash
-                        },
-                        KeySchemaElement {
-                            attributeName = "SK"
-                            keyType = KeyType.Range
-                        },
-                    )
-                    projection = Projection { projectionType = ProjectionType.All }
-                },
-            )
+            keySchema = shape.keySchema.map { it.toKeySchemaElement() }
+            attributeDefinitions = shape.attributeDefinitions.map { it.toAttributeDefinition() }
+            globalSecondaryIndexes = shape.gsis.map { it.toGsi() }
             billingMode = BillingMode.PayPerRequest
         })
+        enablePointInTimeRecovery(dynamoDb, MAIN_TABLE)
+    }
+
+    /**
+     * Best-effort PITR enablement. Swallows errors from LocalStack (whose
+     * Community edition doesn't implement UpdateContinuousBackups) so the
+     * local integration tests that exercise [createMainTable] don't fail.
+     * In production this call succeeds; in LocalStack the absence of PITR
+     * is harmless because the test data is ephemeral.
+     */
+    private suspend fun enablePointInTimeRecovery(dynamoDb: DynamoDbClient, table: String) {
+        try {
+            dynamoDb.updateContinuousBackups(UpdateContinuousBackupsRequest {
+                tableName = table
+                pointInTimeRecoverySpecification = PointInTimeRecoverySpecification {
+                    pointInTimeRecoveryEnabled = true
+                }
+            })
+        } catch (_: Exception) {
+            // LocalStack Community: UpdateContinuousBackups is not implemented.
+            // Production: this call doesn't throw. Either way, swallow.
+        }
+    }
+
+    /**
+     * Drop the projection table. Used by the rebuild-projection tool before
+     * recreating with possibly-different shape. Caller is responsible for
+     * pausing the event log first if writes need to be blocked during the
+     * gap.
+     */
+    suspend fun deleteMainTable(dynamoDb: DynamoDbClient) {
+        try {
+            dynamoDb.deleteTable(DeleteTableRequest { tableName = MAIN_TABLE })
+        } catch (_: ResourceNotFoundException) {
+            // Already gone; idempotent for retries.
+        }
+    }
+
+    /**
+     * Read the live shape of vote_data via DescribeTable, returning null if
+     * the table doesn't exist. The shape comparison logic in
+     * [TableShape.compareTo] uses this output to decide whether
+     * rebuild-projection needs to recreate the table or can no-op.
+     */
+    suspend fun readLiveMainTableShape(dynamoDb: DynamoDbClient): TableShape? {
+        val table = try {
+            dynamoDb.describeTable(DescribeTableRequest { tableName = MAIN_TABLE }).table
+                ?: return null
+        } catch (_: ResourceNotFoundException) {
+            return null
+        }
+        return TableShape(
+            attributeDefinitions = (table.attributeDefinitions ?: emptyList()).map {
+                AttrDef(
+                    name = it.attributeName ?: error("AttributeDefinition missing name"),
+                    type = it.attributeType?.value ?: error("AttributeDefinition missing type"),
+                )
+            }.toSet(),
+            keySchema = (table.keySchema ?: emptyList()).map {
+                KeyElement(
+                    name = it.attributeName ?: error("KeySchemaElement missing name"),
+                    keyType = it.keyType?.value ?: error("KeySchemaElement missing type"),
+                )
+            },
+            gsis = (table.globalSecondaryIndexes ?: emptyList()).map { gsi ->
+                GsiShape(
+                    name = gsi.indexName ?: error("GSI missing name"),
+                    keySchema = (gsi.keySchema ?: emptyList()).map {
+                        KeyElement(
+                            name = it.attributeName ?: error("GSI KeySchemaElement missing name"),
+                            keyType = it.keyType?.value ?: error("GSI KeySchemaElement missing type"),
+                        )
+                    },
+                    projectionType = gsi.projection?.projectionType?.value
+                        ?: error("GSI missing projection type"),
+                )
+            }.toSet(),
+        )
     }
 
     private suspend fun createEventLogTable(dynamoDb: DynamoDbClient) {

@@ -11,12 +11,35 @@ class EventApplier(
     private val commandModel: CommandModel,
     private val queryModel: QueryModel,
 ) {
-    fun synchronize() {
+    /**
+     * Replay strategy for the projection cursor (`last_synced`).
+     *
+     * [PerEvent] writes the cursor after every event apply — safe under
+     * partial failure on the request-time sync path (next call resumes
+     * exactly where we left off).
+     *
+     * [EndOfBatch] writes the cursor once, after the entire batch lands —
+     * cuts ~1000 writes to 1 for a full projection rebuild. Safe only when
+     * the projection starts from empty (e.g., the rebuild-projection tool
+     * drops vote_data before calling this), because a partial failure
+     * mid-replay leaves the cursor at its prior value and the next call
+     * replays everything again — which is fine starting from empty,
+     * not fine layered on a partially-built projection.
+     */
+    enum class CursorUpdate { PerEvent, EndOfBatch }
+
+    fun synchronize(cursorUpdate: CursorUpdate = CursorUpdate.PerEvent) {
         val lastSynced = queryModel.lastSynced() ?: 0
         val newEvents = eventLog.eventsToSync(lastSynced)
+        if (newEvents.isEmpty()) return
         newEvents.forEach { envelope ->
             apply(envelope.authority, envelope.event)
-            commandModel.setLastSynced(envelope.eventId)
+            if (cursorUpdate == CursorUpdate.PerEvent) {
+                commandModel.setLastSynced(envelope.eventId)
+            }
+        }
+        if (cursorUpdate == CursorUpdate.EndOfBatch) {
+            commandModel.setLastSynced(newEvents.last().eventId)
         }
     }
 

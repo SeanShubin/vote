@@ -49,6 +49,7 @@ import com.seanshubin.vote.tools.commands.PadTables
 import com.seanshubin.vote.tools.commands.PauseEventLog
 import com.seanshubin.vote.tools.commands.PurgeDynamodb
 import com.seanshubin.vote.tools.commands.PurgeMysql
+import com.seanshubin.vote.tools.commands.RebuildProjection
 import com.seanshubin.vote.tools.commands.RestoreDynamodb
 import com.seanshubin.vote.tools.commands.ResumeEventLog
 import com.seanshubin.vote.tools.commands.RollLogs
@@ -86,6 +87,7 @@ fun main(args: Array<String>) {
             NormalizeCase(),
             NukeDynamodb(),
             DeleteEvent(),
+            RebuildProjection(),
             RestoreDynamodb(),
             PauseEventLog(),
             ResumeEventLog(),

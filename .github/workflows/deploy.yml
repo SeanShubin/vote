@@ -1,19 +1,15 @@
 name: Deploy
 
-# Two modes, both via push to master:
-#   normal:  code-only deploy (default).
-#   rewrite: pause -> backup -> deploy -> nuke -> restore -> resume.
-#            Use for schema changes where the new code can't read old data.
-#            Trigger by including a `Deploy-Mode: rewrite` line on its own
-#            in the commit message body (same shape as Co-Authored-By),
-#            or by manually dispatching with mode=rewrite. Substring matches
-#            like `[rewrite]` are deliberately NOT honored — a docs commit
-#            that merely mentions the feature must not trigger the ceremony.
+# Single deploy mode. Every push to master runs the same pipeline:
+#   build artifacts -> CFN deploy -> S3 sync + CF invalidate ->
+#     vote-dev rebuild-projection (idempotent — no-op when vote_data's
+#     live shape already matches code's expected shape; full
+#     drop+recreate+replay when the projection schema changed) ->
+#     smoke test.
 #
-# Rewrite-mode failure handling: any failure after the pause step leaves the
-# event log paused. The final step prints state-by-state recovery instructions.
-# A backup of vote_event_log is uploaded as an artifact (90-day retention) so
-# the data is always recoverable, even if the restore step itself fails.
+# There are no deploy modes. The previous Deploy-Mode: rewrite ceremony
+# was replaced by application-managed vote_data + the rebuild-projection
+# tool. See deploy/README.md for the rationale and recovery story.
 
 on:
   push:
@@ -24,16 +20,6 @@ on:
       - 'docs/**'
       - 'documentation/**'
   workflow_dispatch:
-    inputs:
-      mode:
-        description: 'normal = code-only. rewrite = full ceremony for schema changes.'
-        type: choice
-        options: [normal, rewrite]
-        default: normal
-      reason:
-        description: 'Optional: why is this manual run needed? (logged for audit)'
-        required: false
-        type: string
 
 permissions:
   id-token: write
@@ -55,34 +41,6 @@ env:
 # gradle.properties, persisted across runs by setup-gradle) keeps the
 # unavoidable per-job recompilation cheap on warm runs.
 jobs:
-  detect-mode:
-    # Decides whether this run does the rewrite ceremony. Output is consumed
-    # by the deploy job to gate the pause/backup/nuke/restore/resume steps.
-    runs-on: ubuntu-latest
-    outputs:
-      mode: ${{ steps.detect.outputs.mode }}
-    steps:
-      - uses: actions/checkout@v4
-      - id: detect
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            MODE="${{ inputs.mode }}"
-          else
-            # Pull the message from git rather than ${{ github.event.head_commit.message }}
-            # so backticks or $() in the commit body can't get interpreted by bash.
-            # Match `Deploy-Mode: rewrite` as a standalone line (footer form,
-            # like Co-Authored-By). A substring marker would mis-fire on
-            # commits that merely reference the feature in prose.
-            MSG=$(git log -1 --pretty=%B)
-            if echo "$MSG" | grep -qE '^Deploy-Mode:[[:space:]]+rewrite[[:space:]]*$'; then
-              MODE=rewrite
-            else
-              MODE=normal
-            fi
-          fi
-          echo "mode=$MODE" >> "$GITHUB_OUTPUT"
-          echo "Deploy mode: $MODE"
-
   build-backend:
     runs-on: ubuntu-latest
     steps:
@@ -139,10 +97,8 @@ jobs:
           retention-days: 1
 
   build-tools:
-    # Builds the vote-dev CLI used by rewrite-mode deploys to drive
-    # pause/backup/nuke/restore/resume against production DynamoDB. Runs on
-    # every push (not just rewrite-mode pushes) so that gating build-tools
-    # doesn't cascade-skip the deploy job. Cost is ~30s on a warm cache.
+    # Builds the vote-dev CLI. The deploy job uses it to run
+    # `rebuild-projection --prod --yes` after the CFN step.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -202,21 +158,13 @@ jobs:
           if-no-files-found: warn
 
   deploy:
-    needs: [detect-mode, build-backend, build-frontend, build-tools, generate-docs]
+    needs: [build-backend, build-frontend, build-tools, generate-docs]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Log run mode
-        run: |
-          echo "Mode: ${{ needs.detect-mode.outputs.mode }}"
-          if [ -n "${{ inputs.reason }}" ]; then
-            echo "Reason: ${{ inputs.reason }}"
-          fi
-
       - name: Set up JDK 21
-        # vote-dev is a Gradle application-plugin launcher that needs java on PATH.
-        if: needs.detect-mode.outputs.mode == 'rewrite'
+        # vote-dev (the rebuild-projection step) needs java on PATH.
         uses: actions/setup-java@v4
         with:
           distribution: corretto
@@ -244,7 +192,6 @@ jobs:
           path: frontend/build/dist/js/productionExecutable/
 
       - name: Download tools install
-        if: needs.detect-mode.outputs.mode == 'rewrite'
         uses: actions/download-artifact@v4
         with:
           name: tools-install
@@ -252,31 +199,7 @@ jobs:
 
       - name: Make vote-dev executable
         # actions/upload-artifact strips Unix exec bits.
-        if: needs.detect-mode.outputs.mode == 'rewrite'
         run: chmod +x tools/build/install/vote-dev/bin/vote-dev
-
-      - name: Pause event log
-        if: needs.detect-mode.outputs.mode == 'rewrite'
-        id: pause
-        run: ./tools/build/install/vote-dev/bin/vote-dev pause-event-log --prod --yes
-
-      - name: Backup event log
-        if: needs.detect-mode.outputs.mode == 'rewrite'
-        id: backup
-        run: |
-          ./tools/build/install/vote-dev/bin/vote-dev backup-dynamodb \
-            event-log-backup-${{ github.run_id }}.jsonl --prod --force
-
-      - name: Upload backup artifact (recovery safety net)
-        # 90 days so a failed deploy is always recoverable from the artifact
-        # even if vote_event_log was nuked before restore failed.
-        if: always() && steps.backup.outcome == 'success'
-        uses: actions/upload-artifact@v4
-        with:
-          name: event-log-backup-${{ github.run_id }}
-          path: event-log-backup-${{ github.run_id }}.jsonl
-          retention-days: 90
-          if-no-files-found: error
 
       - name: Resolve bootstrap outputs (zone + artifacts bucket)
         id: meta
@@ -376,21 +299,13 @@ jobs:
             --distribution-id "$DIST" \
             --paths "/*"
 
-      - name: Nuke DynamoDB (purge vote_data + vote_event_log)
-        if: needs.detect-mode.outputs.mode == 'rewrite'
-        id: nuke
-        run: ./tools/build/install/vote-dev/bin/vote-dev nuke-dynamodb --prod --yes
-
-      - name: Restore event log from backup (rebuilds projection)
-        if: needs.detect-mode.outputs.mode == 'rewrite'
-        id: restore
-        run: |
-          ./tools/build/install/vote-dev/bin/vote-dev restore-dynamodb \
-            event-log-backup-${{ github.run_id }}.jsonl --prod --yes
-
-      - name: Resume event log
-        if: needs.detect-mode.outputs.mode == 'rewrite'
-        run: ./tools/build/install/vote-dev/bin/vote-dev resume-event-log --prod --yes
+      - name: Reconcile vote_data projection shape
+        # Idempotent: a single DescribeTable when nothing changed; the full
+        # drop+recreate+replay when DynamoDbSingleTableSchema.expectedMainTableShape
+        # has diverged from the live table. The pause/resume of the event log
+        # is internal to the tool — it only pauses when it actually has work
+        # to do, so normal deploys leave the event log untouched.
+        run: ./tools/build/install/vote-dev/bin/vote-dev rebuild-projection --prod --yes
 
       - name: Smoke-test backend
         run: |
@@ -408,27 +323,3 @@ jobs:
           done
           echo "Backend smoke test failed."
           exit 1
-
-      - name: Recovery instructions on rewrite failure
-        # Intentionally no auto-resume: if nuke succeeded but restore failed,
-        # vote_event_log is empty and resuming would let writes hit an empty
-        # log. A human must inspect, then run the appropriate recovery below.
-        if: failure() && needs.detect-mode.outputs.mode == 'rewrite'
-        run: |
-          cat <<'EOF'
-          ::error::Rewrite-mode deploy failed. Event log is likely PAUSED.
-
-          State diagnosis (check which step failed above):
-            - Pause failed     -> event log accepting normally, no action needed.
-            - Backup failed    -> paused; resume: vote-dev resume-event-log --prod
-            - Deploy failed    -> paused, data intact; resume: vote-dev resume-event-log --prod
-            - Nuke failed      -> paused, data partial; re-run nuke + restore + resume manually.
-            - Restore failed   -> paused, vote_event_log EMPTY. Recovery:
-                                  1. Download artifact "event-log-backup-${{ github.run_id }}" from this run.
-                                  2. vote-dev restore-dynamodb <artifact-path> --prod --yes
-                                  3. vote-dev resume-event-log --prod --yes
-            - Resume failed    -> everything else OK; just: vote-dev resume-event-log --prod
-            - Smoke test failed-> deploy complete but health endpoint sick; investigate Lambda logs.
-
-          Backup artifact (90-day retention): event-log-backup-${{ github.run_id }}
-          EOF

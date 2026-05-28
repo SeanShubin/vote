@@ -19,67 +19,61 @@ deploys run.
 ## CI
 
 `.github/workflows/deploy.yml` runs on every push to `master`/`main`
-(except docs-only changes). The workflow has two modes; `detect-mode`
-picks which to run.
+(except docs-only changes). There is exactly one deploy mode.
 
-### Normal mode (default)
+Pipeline:
 
-Standard code-only deploy:
-
-1. Builds the backend shadow JAR (`./gradlew :backend:shadowJar`).
-2. Builds the production frontend bundle, baking in `/api` as the API URL.
-3. Resolves Route 53 zone ID + the deploy-artifacts bucket from the
+1. Builds backend shadow JAR, frontend bundle, vote-dev tools install, and
+   documentation (in parallel).
+2. Resolves Route 53 zone ID + the deploy-artifacts bucket from the
    bootstrap stack outputs.
-4. Runs `aws cloudformation package` — uploads the JAR to the artifacts
-   bucket, rewrites `CodeUri` references in the template.
-5. Runs `aws cloudformation deploy` against the application stack.
-6. `aws s3 sync` the frontend bundle to the frontend bucket.
-7. Creates a CloudFront invalidation.
-8. Smoke-tests `https://pairwisevote.com/api/health`.
+3. `aws cloudformation package` uploads the JAR + rewrites `CodeUri`.
+4. `aws cloudformation deploy` against the application stack.
+5. `aws s3 sync` the frontend bundle, then a CloudFront invalidation.
+6. **`vote-dev rebuild-projection --prod --yes`** — idempotent. Compares
+   the live `vote_data` table shape against
+   `DynamoDbSingleTableSchema.expectedMainTableShape`. No-op (~1 DescribeTable
+   call) when they match. When they differ: pause event log → drop
+   vote_data → CreateTable with all GSIs declared upfront → replay event
+   log into the empty projection → resume event log.
+7. Smoke-tests `https://pairwisevote.com/api/health`.
 
 First run takes ~5-10 minutes (cert validation + CloudFront propagation).
-Subsequent deploys are ~2-3 minutes.
+Subsequent normal deploys ~2-3 minutes. Deploys that hit step 6's
+non-no-op path (projection-shape changes) add ~5-15s for the rebuild
+itself, scaling with event log size.
 
-### Rewrite mode (for schema changes)
+### Why the rebuild step lives in CI, not in the Lambda startup
 
-When a schema change makes the new code unable to read existing event-log
-or projection data, use rewrite mode to bracket the deploy with a full
-event-log rebuild. The flow becomes: pause → backup → deploy → nuke →
-restore → resume. The event log is the source of truth; the new code
-rebuilds the `vote_data` projection from it.
+Lambda's `DynamoDbStartup.ensureTables` also verifies the live vote_data
+shape on every cold init, but it **fails closed** (throws
+`ProjectionShapeMismatchException`, Lambda returns 500s on every
+invocation) rather than reconciling inline. The reasoning: rebuild
+currently takes 5-15s per 1000 events (sequential `putItem` through
+the projection logic), which exceeds Lambda's 30s request timeout for
+large event logs. Reconciling in CI keeps the rebuild off the
+user-facing request path while preserving Lambda's check as a safety
+net for deploys that bypassed CI.
 
-**Trigger from a push**: include `Deploy-Mode: rewrite` as a standalone
-line in the commit message body (footer-style, like `Co-Authored-By`):
+If perf is improved later (batched + parallel writes to drop rebuild
+under 1s) the Lambda startup hook can switch from fail-closed to
+auto-reconcile, and the CI step becomes redundant.
 
-```bash
-git commit -m "$(cat <<'EOF'
-Migrate ballot to ranked tiers
+### Recovery if the rebuild step fails
 
-Deploy-Mode: rewrite
-EOF
-)"
-```
-
-Substring matches like `[rewrite]` are deliberately NOT honored — the
-marker must be a complete line, so a docs commit that merely mentions
-the feature can't trigger the ceremony.
-
-**Trigger manually**: Actions → Deploy → Run workflow → mode = rewrite.
-
-**On failure**: any failure after the pause step leaves the event log
-paused. The final workflow step prints state-specific recovery
-instructions. A backup artifact (90-day retention) is uploaded right
-after the backup step so data is recoverable even if restore itself
-fails. Recovery uses the `vote-dev` CLI:
+The tool leaves the event log PAUSED on mid-rebuild failure, so writes
+are blocked while the projection is in an inconsistent state. Recovery
+is just to re-run the tool — it's idempotent, so it will pick up from
+wherever it stopped:
 
 ```powershell
-.\scripts\dev.ps1 nuke-dynamodb --prod --yes
-.\scripts\dev.ps1 restore-dynamodb <backup.jsonl> --prod --yes
-.\scripts\dev.ps1 resume-event-log --prod --yes
+.\scripts\dev.ps1 rebuild-projection --prod --yes
+.\scripts\dev.ps1 resume-event-log --prod   # only if the tool exits with the event log still paused
 ```
 
-Rewrite-mode deploys take ~5-8 minutes because of the sequential
-`putItem` calls during restore.
+If vote_data is missing entirely (the delete succeeded but the create
+or replay failed), the next `rebuild-projection` run will recreate it
+from scratch.
 
 ## Pre-deploy step (only once, after pulling the monitoring changes)
 
