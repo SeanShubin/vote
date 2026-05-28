@@ -162,14 +162,6 @@ class InMemoryQueryModel(private val data: InMemoryData) : QueryModel {
             .map { it.toCandidateNote() }
     }
 
-    override fun listCandidateNotesByVoter(voterName: String): List<CandidateNote> {
-        val key = voterName.lowercase()
-        return data.candidateNotes
-            .filter { (k, _) -> k.third == key }
-            .values
-            .map { it.toCandidateNote() }
-    }
-
     override fun listCandidateNotesByElection(electionName: String): List<CandidateNote> {
         val key = electionName.lowercase()
         return data.candidateNotes

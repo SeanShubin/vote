@@ -13,6 +13,7 @@ import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.option
 import com.seanshubin.vote.tools.lib.DynamoClient
 import com.seanshubin.vote.tools.lib.Output
+import com.seanshubin.vote.tools.lib.retryOnThrottle
 import kotlinx.coroutines.runBlocking
 
 class NukeDynamodb : CliktCommand(name = "nuke-dynamodb") {
@@ -73,11 +74,14 @@ internal suspend fun countTable(client: DynamoDbClient, table: String): Int {
         var count = 0
         var startKey: Map<String, AttributeValue>? = null
         do {
-            val response = client.scan(ScanRequest {
-                tableName = table
-                exclusiveStartKey = startKey
-                select = aws.sdk.kotlin.services.dynamodb.model.Select.Count
-            })
+            val captured = startKey
+            val response = retryOnThrottle("scan-count($table)") {
+                client.scan(ScanRequest {
+                    tableName = table
+                    exclusiveStartKey = captured
+                    select = aws.sdk.kotlin.services.dynamodb.model.Select.Count
+                })
+            }
             count += response.count ?: 0
             startKey = response.lastEvaluatedKey
         } while (startKey != null)
@@ -90,11 +94,13 @@ internal suspend fun countTable(client: DynamoDbClient, table: String): Int {
 internal suspend fun wipeMainTable(client: DynamoDbClient): Int {
     var deleted = 0
     while (true) {
-        val response = client.scan(ScanRequest {
-            tableName = DynamoClient.TABLE_DATA
-            projectionExpression = "PK, SK"
-            limit = 1000
-        })
+        val response = retryOnThrottle("scan(${DynamoClient.TABLE_DATA})") {
+            client.scan(ScanRequest {
+                tableName = DynamoClient.TABLE_DATA
+                projectionExpression = "PK, SK"
+                limit = 1000
+            })
+        }
         val items = response.items ?: emptyList()
         if (items.isEmpty()) break
         items.chunked(25).forEach { batch ->
@@ -119,11 +125,13 @@ internal suspend fun wipeMainTable(client: DynamoDbClient): Int {
 internal suspend fun wipeEventLog(client: DynamoDbClient): Int {
     var deleted = 0
     while (true) {
-        val response = client.scan(ScanRequest {
-            tableName = DynamoClient.TABLE_EVENT_LOG
-            projectionExpression = "PK, event_id"
-            limit = 1000
-        })
+        val response = retryOnThrottle("scan(${DynamoClient.TABLE_EVENT_LOG})") {
+            client.scan(ScanRequest {
+                tableName = DynamoClient.TABLE_EVENT_LOG
+                projectionExpression = "PK, event_id"
+                limit = 1000
+            })
+        }
         val items = response.items ?: emptyList()
         if (items.isEmpty()) break
         items.chunked(25).forEach { batch ->
@@ -152,9 +160,12 @@ private suspend fun executeBatchDelete(
 ) {
     var pending: Map<String, List<WriteRequest>>? = mapOf(table to requests)
     while (!pending.isNullOrEmpty()) {
-        val response = client.batchWriteItem(BatchWriteItemRequest {
-            requestItems = pending
-        })
+        val captured = pending
+        val response = retryOnThrottle("batchWriteItem($table)") {
+            client.batchWriteItem(BatchWriteItemRequest {
+                requestItems = captured
+            })
+        }
         pending = response.unprocessedItems
     }
 }

@@ -19,6 +19,7 @@ import com.seanshubin.vote.domain.EventEnvelope
 import com.seanshubin.vote.tools.lib.DynamoClient
 import com.seanshubin.vote.tools.lib.NarrativeEvent
 import com.seanshubin.vote.tools.lib.Output
+import com.seanshubin.vote.tools.lib.retryOnThrottle
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -122,31 +123,35 @@ class RestoreDynamodb : CliktCommand(name = "restore-dynamodb") {
         private suspend fun putEvents(client: DynamoDbClient, envelopes: List<EventEnvelope>, json: Json) {
             envelopes.forEach { envelope ->
                 val eventType = envelope.event::class.simpleName ?: "Unknown"
-                client.putItem(PutItemRequest {
-                    tableName = DynamoClient.TABLE_EVENT_LOG
-                    item = mapOf(
-                        "PK" to AttributeValue.S(DynamoDbSingleTableSchema.EVENT_LOG_PK),
-                        "event_id" to AttributeValue.N(envelope.eventId.toString()),
-                        "authority" to AttributeValue.S(envelope.authority),
-                        "event_type" to AttributeValue.S(eventType),
-                        "event_data" to AttributeValue.S(json.encodeToString(envelope.event)),
-                        "created_at" to AttributeValue.N(envelope.whenHappened.toEpochMilliseconds().toString()),
-                    )
-                })
+                retryOnThrottle("putItem(${DynamoClient.TABLE_EVENT_LOG}/${envelope.eventId})") {
+                    client.putItem(PutItemRequest {
+                        tableName = DynamoClient.TABLE_EVENT_LOG
+                        item = mapOf(
+                            "PK" to AttributeValue.S(DynamoDbSingleTableSchema.EVENT_LOG_PK),
+                            "event_id" to AttributeValue.N(envelope.eventId.toString()),
+                            "authority" to AttributeValue.S(envelope.authority),
+                            "event_type" to AttributeValue.S(eventType),
+                            "event_data" to AttributeValue.S(json.encodeToString(envelope.event)),
+                            "created_at" to AttributeValue.N(envelope.whenHappened.toEpochMilliseconds().toString()),
+                        )
+                    })
+                }
             }
         }
 
         private suspend fun setEventCounter(client: DynamoDbClient, value: Long) {
-            client.updateItem(UpdateItemRequest {
-                tableName = DynamoDbSingleTableSchema.MAIN_TABLE
-                key = mapOf(
-                    "PK" to AttributeValue.S("METADATA"),
-                    "SK" to AttributeValue.S("EVENT_COUNTER"),
-                )
-                updateExpression = "SET next_event_id = :v"
-                expressionAttributeValues = mapOf(":v" to AttributeValue.N(value.toString()))
-                returnValues = ReturnValue.None
-            })
+            retryOnThrottle("updateItem(EVENT_COUNTER)") {
+                client.updateItem(UpdateItemRequest {
+                    tableName = DynamoDbSingleTableSchema.MAIN_TABLE
+                    key = mapOf(
+                        "PK" to AttributeValue.S("METADATA"),
+                        "SK" to AttributeValue.S("EVENT_COUNTER"),
+                    )
+                    updateExpression = "SET next_event_id = :v"
+                    expressionAttributeValues = mapOf(":v" to AttributeValue.N(value.toString()))
+                    returnValues = ReturnValue.None
+                })
+            }
         }
     }
 }

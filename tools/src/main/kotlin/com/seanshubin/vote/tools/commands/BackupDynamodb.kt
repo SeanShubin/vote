@@ -11,6 +11,7 @@ import com.seanshubin.vote.domain.DomainEvent
 import com.seanshubin.vote.tools.lib.DynamoClient
 import com.seanshubin.vote.tools.lib.NarrativeEvent
 import com.seanshubin.vote.tools.lib.Output
+import com.seanshubin.vote.tools.lib.retryOnThrottle
 import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.Instant
 import kotlinx.serialization.encodeToString
@@ -50,10 +51,13 @@ class BackupDynamodb : CliktCommand(name = "backup-dynamodb") {
                 val rows = mutableListOf<Pair<Long, NarrativeEvent>>()
                 var startKey: Map<String, AttributeValue>? = null
                 do {
-                    val response = client.scan(ScanRequest {
-                        tableName = DynamoClient.TABLE_EVENT_LOG
-                        exclusiveStartKey = startKey
-                    })
+                    val captured = startKey
+                    val response = retryOnThrottle("scan(${DynamoClient.TABLE_EVENT_LOG})") {
+                        client.scan(ScanRequest {
+                            tableName = DynamoClient.TABLE_EVENT_LOG
+                            exclusiveStartKey = captured
+                        })
+                    }
                     response.items?.forEach { item ->
                         rows.add(parseRow(item, json))
                     }

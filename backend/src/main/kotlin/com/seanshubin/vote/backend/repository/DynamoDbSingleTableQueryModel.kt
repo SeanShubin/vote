@@ -421,23 +421,6 @@ class DynamoDbSingleTableQueryModel(
         }
     }
 
-    override fun listCandidateNotesByVoter(voterName: String): List<CandidateNote> {
-        // Notes don't have a PK keyed on voter, so this falls back to a Scan
-        // gated on voter_name. Used for the user-removed cascade in the
-        // command model; admin-bounded operation.
-        return runBlocking {
-            val response = dynamoDb.scan(ScanRequest {
-                tableName = DynamoDbSingleTableSchema.MAIN_TABLE
-                filterExpression = "begins_with(SK, :prefix) AND voter_name = :voter"
-                expressionAttributeValues = mapOf(
-                    ":prefix" to AttributeValue.S(DynamoDbSingleTableSchema.NOTE_PREFIX),
-                    ":voter" to AttributeValue.S(voterName),
-                )
-            })
-            response.items?.mapNotNull { itemToCandidateNote(it) } ?: emptyList()
-        }
-    }
-
     override fun listCandidateNotesByElection(electionName: String): List<CandidateNote> {
         return runBlocking {
             val response = dynamoDb.query(QueryRequest {

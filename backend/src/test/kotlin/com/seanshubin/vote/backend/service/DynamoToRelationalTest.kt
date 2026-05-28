@@ -237,7 +237,6 @@ class DynamoToRelationalTest {
         override fun listUserNames(): List<String> = users.map { it.name }
         override fun listPermissions(role: Role): List<Permission> = emptyList()
         override fun listCandidateNotes(electionName: String, candidateName: String): List<CandidateNote> = emptyList()
-        override fun listCandidateNotesByVoter(voterName: String): List<CandidateNote> = emptyList()
         override fun listCandidateNotesByElection(electionName: String): List<CandidateNote> = emptyList()
     }
 

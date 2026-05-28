@@ -370,19 +370,6 @@ class MySqlQueryModel(
         }
     }
 
-    override fun listCandidateNotesByVoter(voterName: String): List<CandidateNote> {
-        val sql = queryLoader.load("candidate-note-select-by-voter")
-        return connection.prepareStatement(sql).use { stmt ->
-            stmt.setString(1, voterName)
-            val rs = stmt.executeQuery()
-            buildList {
-                while (rs.next()) {
-                    add(rs.toCandidateNote())
-                }
-            }
-        }
-    }
-
     override fun listCandidateNotesByElection(electionName: String): List<CandidateNote> {
         val sql = queryLoader.load("candidate-note-select-by-election")
         return connection.prepareStatement(sql).use { stmt ->

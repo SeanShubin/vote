@@ -58,9 +58,6 @@ interface QueryModel {
      */
     fun listCandidateNotes(electionName: String, candidateName: String): List<CandidateNote>
 
-    /** Every note authored anywhere by [voterName]. Used for cascades on user remove/rename. */
-    fun listCandidateNotesByVoter(voterName: String): List<CandidateNote>
-
     /** Every note in [electionName]. Used by the relational projection. */
     fun listCandidateNotesByElection(electionName: String): List<CandidateNote>
 }

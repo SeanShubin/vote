@@ -5,6 +5,8 @@ import aws.sdk.kotlin.services.dynamodb.DynamoDbClient
 import aws.sdk.kotlin.services.dynamodb.model.AttributeValue
 import aws.smithy.kotlin.runtime.auth.awscredentials.Credentials
 import aws.smithy.kotlin.runtime.net.url.Url
+import kotlinx.coroutines.delay
+import kotlin.random.Random
 
 object DynamoClient {
     const val ENDPOINT = "http://localhost:8000"
@@ -62,4 +64,43 @@ object DynamoClient {
 
     fun bool(item: Map<String, AttributeValue>, key: String): Boolean? =
         (item[key] as? AttributeValue.Bool)?.value
+}
+
+/**
+ * Retry a DynamoDB operation when it fails with a throttling exception.
+ * On-demand tables can take ~30s to fully scale up under burst load, so
+ * the AWS SDK's default retry policy (3 attempts, max ~20s total) isn't
+ * enough for bulk operations like the rewrite-mode deploy ceremony's
+ * nuke + restore steps. We use 8 attempts with exponential backoff +
+ * jitter, capped at 30s per delay, for ~2 minutes of total tolerance.
+ *
+ * Matches by message rather than exception class because the AWS SDK
+ * Kotlin throws the generic `DynamoDbException` (not the specific
+ * `ProvisionedThroughputExceededException`) when on-demand auto-scaling
+ * returns an error code outside the operation's known error mappings —
+ * which is exactly the case that bit the first rewrite-mode deploy.
+ */
+internal suspend fun <T> retryOnThrottle(opName: String, block: suspend () -> T): T {
+    var delayMs = 500L
+    var lastError: Exception? = null
+    repeat(8) { attempt ->
+        try {
+            return block()
+        } catch (e: Exception) {
+            val msg = e.message ?: ""
+            val isThrottle = "Throughput exceeds" in msg ||
+                "automatically scaling" in msg ||
+                "Rate exceeded" in msg ||
+                "Throttling" in msg ||
+                "RequestLimit" in msg
+            if (!isThrottle) throw e
+            lastError = e
+            val jitter = Random.nextLong(0, delayMs / 2 + 1)
+            val totalDelay = delayMs + jitter
+            println("[$opName] throttled (attempt ${attempt + 1}/8), backing off ${totalDelay}ms")
+            delay(totalDelay)
+            delayMs = minOf(delayMs * 2, 30_000L)
+        }
+    }
+    throw lastError ?: error("retryOnThrottle($opName) exhausted without an error")
 }
