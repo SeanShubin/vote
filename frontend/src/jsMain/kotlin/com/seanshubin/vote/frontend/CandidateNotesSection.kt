@@ -36,16 +36,13 @@ fun CandidateNotesSection(
     var editing by remember(electionName) { mutableStateOf(false) }
 
     LaunchedEffect(electionName, candidates) {
-        val collected = mutableMapOf<String, List<CandidateNote>>()
-        for (name in candidates) {
-            try {
-                collected[name] = apiClient.listCandidateNotes(electionName, name)
-            } catch (e: Exception) {
-                apiClient.logErrorToServer(e)
-                collected[name] = emptyList()
-            }
+        notesByCandidate = try {
+            apiClient.listCandidateNotesByElection(electionName)
+                .groupBy { it.candidateName }
+        } catch (e: Exception) {
+            apiClient.logErrorToServer(e)
+            emptyMap()
         }
-        notesByCandidate = collected
     }
 
     Div({ classes("section") }) {
