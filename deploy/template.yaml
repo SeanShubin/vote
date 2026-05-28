@@ -232,7 +232,7 @@ Resources:
   # DynamoDbStartup.ensureTables creates it if missing, using
   # DynamoDbSingleTableSchema.expectedMainTableShape as the canonical
   # source of truth for the schema (key schema, attribute definitions,
-  # four sparse GSIs).
+  # five sparse GSIs).
   #
   # On each deploy, the CI workflow runs `vote-dev rebuild-projection
   # --prod` after the CFN step. That command is idempotent: a no-op when

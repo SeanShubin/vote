@@ -371,6 +371,8 @@ class DynamoDbSingleTableCommandModel(
                     "election_name" to AttributeValue.S(electionName),
                     "owner_name" to AttributeValue.S(owner),
                     "description" to AttributeValue.S(description),
+                    DynamoDbSingleTableSchema.ELECTION_LISTING_ATTR to
+                        AttributeValue.S(DynamoDbSingleTableSchema.ELECTION_LISTING_VALUE),
                 )
             })
         }
