@@ -2,6 +2,7 @@ package com.seanshubin.vote.tools.commands
 
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.Context
+import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.options.pair
 import com.github.ajalt.clikt.parameters.options.required
@@ -59,6 +60,13 @@ class TallyFromSnapshot : CliktCommand(name = "tally-from-snapshot") {
             "Requires --election."
     ).pair()
 
+    private val pairwiseReport: Boolean by option(
+        "--pairwise-report",
+        help = "Print every head-to-head grouped by candidate, in tally-results order. " +
+            "Pairs with no preference information (no voter ranked both) are omitted. " +
+            "Requires --election; mutually exclusive with --pair."
+    ).flag()
+
     override fun help(context: Context) =
         "Replay a JSONL event log in-process, then compute and print the Ranked Pairs " +
             "tally for one election. Pass --election to pick the election; add --pair to drill " +
@@ -74,8 +82,12 @@ class TallyFromSnapshot : CliktCommand(name = "tally-from-snapshot") {
         val name = electionNameOpt
         if (name == null) {
             if (pairOpt != null) Output.error("--pair requires --election.")
+            if (pairwiseReport) Output.error("--pairwise-report requires --election.")
             listElections(electionStates)
             return
+        }
+        if (pairOpt != null && pairwiseReport) {
+            Output.error("--pair and --pairwise-report are mutually exclusive.")
         }
 
         val state = electionStates[name]
@@ -90,10 +102,30 @@ class TallyFromSnapshot : CliktCommand(name = "tally-from-snapshot") {
         )
 
         val pair = pairOpt
-        if (pair != null) {
-            printPair(tally, pair.first, pair.second)
-        } else {
-            printFullTally(tally, state)
+        when {
+            pairwiseReport -> printPairwiseReport(tally)
+            pair != null -> printPair(tally, pair.first, pair.second)
+            else -> printFullTally(tally, state)
+        }
+    }
+
+    private fun printPairwiseReport(tally: Tally) {
+        Output.banner("Pairwise: ${tally.electionName}")
+        val names = tally.candidateNames
+        names.forEachIndexed { i, candidate ->
+            Output.section(candidate)
+            names.forEachIndexed { j, opponent ->
+                if (i == j) return@forEachIndexed
+                val forStrength = tally.preferences[i][j].strength
+                val againstStrength = tally.preferences[j][i].strength
+                val line = when {
+                    forStrength == 0 && againstStrength == 0 -> null
+                    forStrength > againstStrength -> "beats $opponent, $forStrength to $againstStrength"
+                    againstStrength > forStrength -> "loses to $opponent, $forStrength to $againstStrength"
+                    else -> "ties $opponent, $forStrength to $againstStrength"
+                }
+                if (line != null) println("  $line")
+            }
         }
     }
 

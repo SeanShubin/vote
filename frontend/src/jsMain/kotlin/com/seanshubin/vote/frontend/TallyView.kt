@@ -138,8 +138,8 @@ private fun renderTally(
     // reposes, hover, etc.) — not just when the active set actually
     // changes. Equality on Set<String> is structural, so toggling a ballot
     // invalidates the cache by design and triggers exactly one recompute.
-    val displaySections = if (allOn) {
-        displayedTally.sections
+    val activeTally: Tally = if (allOn) {
+        displayedTally.tally
     } else {
         remember(displayedTally, active) {
             // The server's tally.candidateNames is real candidates + tier
@@ -147,14 +147,20 @@ private fun renderTally(
             // inputs countBallots wants: real candidates and tiers.
             val tierSet = displayedTally.tiers.toSet()
             val realCandidates = displayedTally.tally.candidateNames.filterNot { it in tierSet }
-            val recomputed = Tally.countBallots(
+            Tally.countBallots(
                 electionName = displayedTally.tally.electionName,
                 side = displayedTally.tally.side,
                 candidates = realCandidates,
                 tiers = displayedTally.tiers,
                 ballots = revealed.filter { it.confirmation in active },
             )
-            TallySection.compute(recomputed.places, displayedTally.tiers)
+        }
+    }
+    val displaySections = if (allOn) {
+        displayedTally.sections
+    } else {
+        remember(activeTally) {
+            TallySection.compute(activeTally.places, displayedTally.tiers)
         }
     }
 
@@ -268,6 +274,19 @@ private fun renderTally(
                     copyFeedbackToken += 1
                 }
             }) { Text("Copy results as text") }
+            Button({
+                attr(
+                    "title",
+                    "Copy every pairwise comparison grouped by candidate, in results order. " +
+                        "Pairs with no preference information (no voter ranked both) are omitted."
+                )
+                onClick {
+                    val text = buildPairwiseReportText(activeTally)
+                    copyTextToClipboard(text, apiClient)
+                    copyFeedback = "Copied as pairwise report!"
+                    copyFeedbackToken += 1
+                }
+            }) { Text("Copy as pairwise report") }
             Button({
                 attr(
                     "title",
@@ -385,6 +404,39 @@ internal fun buildTallyText(
         section.places.forEach { place ->
             val count = ballotsPerCandidate[place.candidateName] ?: 0
             lines += "- ${ordinal(place.rank)}: ${place.candidateName} ($count/$activeBallots)"
+        }
+    }
+    return lines.joinToString("\n")
+}
+
+/**
+ * Plain-text pairwise report: one section per candidate (in tally-results
+ * order) listing every head-to-head against the other candidates in the
+ * same order. Pairs where no voter ranked both candidates are dropped —
+ * a 0-0 line carries no information.
+ *
+ * Mirrors the `tally-from-snapshot --pairwise-report` CLI output but
+ * without the banner equals lines, since clipboard targets are usually
+ * chat / docs where the equals stripes look like noise.
+ */
+internal fun buildPairwiseReportText(tally: Tally): String {
+    val lines = mutableListOf<String>()
+    lines += "Pairwise: ${tally.electionName}"
+    val names = tally.candidateNames
+    names.forEachIndexed { i, candidate ->
+        lines += ""
+        lines += candidate
+        names.forEachIndexed { j, opponent ->
+            if (i == j) return@forEachIndexed
+            val forStrength = tally.preferences[i][j].strength
+            val againstStrength = tally.preferences[j][i].strength
+            val line = when {
+                forStrength == 0 && againstStrength == 0 -> null
+                forStrength > againstStrength -> "beats $opponent, $forStrength to $againstStrength"
+                againstStrength > forStrength -> "loses to $opponent, $forStrength to $againstStrength"
+                else -> "ties $opponent, $forStrength to $againstStrength"
+            }
+            if (line != null) lines += "  $line"
         }
     }
     return lines.joinToString("\n")
