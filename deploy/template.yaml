@@ -237,68 +237,24 @@ Resources:
           AttributeType: S
         - AttributeName: SK
           AttributeType: S
-        # Sparse-GSI key attributes — defined here so CFN knows the type,
-        # but only items that carry the attribute appear in the matching
-        # index. discord_id lives on user METADATA items; voter_name on
-        # ballots + notes; owner_name on election METADATA; user_name on
-        # manager rows. None overlap, so each index stays small and
-        # purpose-built.
-        - AttributeName: discord_id
-          AttributeType: S
-        - AttributeName: voter_name
-          AttributeType: S
-        - AttributeName: owner_name
-          AttributeType: S
-        - AttributeName: user_name
-          AttributeType: S
       KeySchema:
         - AttributeName: PK
           KeyType: HASH
         - AttributeName: SK
           KeyType: RANGE
-      GlobalSecondaryIndexes:
-        # Discord login lookup — every authenticated request hits this on
-        # token refresh too, so it must be a single PK GetItem against
-        # the index, not a table scan.
-        - IndexName: discord-id-index
-          KeySchema:
-            - AttributeName: discord_id
-              KeyType: HASH
-          Projection:
-            ProjectionType: ALL
-        # Voter-side lookups: "how many ballots has X cast" and the
-        # ballot/note cascades on user deletion or rename. Range key SK
-        # lets a Query distinguish ballots from notes by SK prefix
-        # without a separate filter.
-        - IndexName: voter-name-index
-          KeySchema:
-            - AttributeName: voter_name
-              KeyType: HASH
-            - AttributeName: SK
-              KeyType: RANGE
-          Projection:
-            ProjectionType: ALL
-        # Owner-side lookups: "how many elections does X own" and the
-        # owner cascade on user rename. Only election METADATA items
-        # carry owner_name, so this index is sparse and tiny.
-        - IndexName: owner-name-index
-          KeySchema:
-            - AttributeName: owner_name
-              KeyType: HASH
-            - AttributeName: SK
-              KeyType: RANGE
-          Projection:
-            ProjectionType: ALL
-        # Manager cascade on user deletion or rename. user_name is set
-        # only on MANAGER# rows.
-        - IndexName: manager-user-index
-          KeySchema:
-            - AttributeName: user_name
-              KeyType: HASH
-            - AttributeName: SK
-              KeyType: RANGE
-          Projection:
-            ProjectionType: ALL
+      # Four GSIs live on this table but are NOT declared here:
+      #   discord-id-index, voter-name-index, owner-name-index,
+      #   manager-user-index.
+      # Reason: CFN's DynamoDB resource handler can only create one GSI
+      # per stack update; declaring all four together fails with
+      # "Cannot perform more than one GSI creation or deletion in a
+      # single update". They were added out-of-band via aws dynamodb
+      # update-table, one at a time. The application code (Service
+      # + repository) and DynamoDbSingleTableSchema.createMainTable
+      # (LocalStack tests) both depend on them.
+      # If the table is ever recreated from scratch, the four GSIs must
+      # be added back — declare one at a time across four sequential
+      # deploys, or run the same update-table CLI calls used originally.
       PointInTimeRecoverySpecification:
         PointInTimeRecoveryEnabled: true
 
