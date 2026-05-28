@@ -227,16 +227,80 @@ Resources:
   # match constants in DynamoDbSingleTableSchema.kt and
   # DynamoDbOperatorStateSchema.kt — keeps the code simple, locks the stack
   # to one deploy per account/region.
-  # MainTable (vote_data) is intentionally NOT declared in this deploy.
-  # Mid-surgery state: previous deploy set DeletionPolicy: Retain on
-  # MainTable; this deploy removes the resource block so CFN drops it from
-  # stack management (the live table stays alive thanks to Retain). After
-  # this deploy lands, the live table is deleted out-of-band via CLI, and
-  # the very next deploy re-adds MainTable here with all four GSIs declared
-  # (CreateTable supports multi-GSI; UpdateTable does not — which is why we
-  # have to recreate rather than just add GSIs to the existing table).
-  # The Lambda IAM policy below uses the literal table name "vote_data"
-  # during this interim deploy since !Ref MainTable would no longer resolve.
+  # MainTable holds the projection (vote_data). Recreated via CFN with all
+  # four sparse GSIs declared upfront — CreateTable allows multi-GSI in one
+  # call, which is why this resource was recreated rather than have GSIs
+  # added incrementally to the original table (UpdateTable enforces a
+  # 1-GSI-per-call limit). The GSI key schemas and projection types match
+  # DynamoDbSingleTableSchema.createMainTable (LocalStack tests); keep
+  # both in lock-step. Retain policies guard against accidental deletion
+  # on future template edits.
+  MainTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: vote_data
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+        - AttributeName: discord_id
+          AttributeType: S
+        - AttributeName: voter_name
+          AttributeType: S
+        - AttributeName: owner_name
+          AttributeType: S
+        - AttributeName: user_name
+          AttributeType: S
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        # Sparse — only USER items carry discord_id, so the index contains
+        # exactly the user rows needed for Discord-OAuth login lookups.
+        - IndexName: discord-id-index
+          KeySchema:
+            - AttributeName: discord_id
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+        # Sparse — only BALLOT and NOTE items carry voter_name. SK range
+        # lets queries narrow by entity prefix (BALLOT# vs NOTE#).
+        - IndexName: voter-name-index
+          KeySchema:
+            - AttributeName: voter_name
+              KeyType: HASH
+            - AttributeName: SK
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        # Sparse — only ELECTION metadata items carry owner_name. Used for
+        # the "elections owned by" lookup on the activity panel.
+        - IndexName: owner-name-index
+          KeySchema:
+            - AttributeName: owner_name
+              KeyType: HASH
+            - AttributeName: SK
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        # Sparse — only MANAGER items carry user_name. Used to list every
+        # election where a given user has manager permissions.
+        - IndexName: manager-user-index
+          KeySchema:
+            - AttributeName: user_name
+              KeyType: HASH
+            - AttributeName: SK
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
 
   # vote_event_log is intentionally NOT a CloudFormation resource. Its key
   # schema (constant PK + event_id sort key, so sync can Query the log
@@ -337,11 +401,8 @@ Resources:
           EMAIL_FROM_ADDRESS: !Ref EmailFromAddress
           EMAIL_TO_ADDRESS: !Ref AlertEmail
       Policies:
-        # Interim: MainTable resource is dropped from this template during
-        # GSI drift surgery. Switch back to !Ref MainTable in the next deploy
-        # once the resource is re-declared with all GSIs.
         - DynamoDBCrudPolicy:
-            TableName: vote_data
+            TableName: !Ref MainTable
         # vote_event_log is app-managed, not a CFN resource (see the comment
         # above the table block) — scope the grant by literal name.
         - DynamoDBCrudPolicy:
