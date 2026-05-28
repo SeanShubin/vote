@@ -6,16 +6,19 @@ import com.seanshubin.vote.domain.CandidateNote
 import org.jetbrains.compose.web.dom.*
 
 /**
- * Free-form per-candidate notes attached by voters.
+ * Free-form per-candidate reviews attached by voters.
  *
- * One row per candidate, collapsed-by-default. The header carries a count
- * badge ("3 notes") so the voter can see what's behind the expand without
- * paying for the lookup. On expand, every note is shown as an
- * author-attributed card; the current voter's card is editable inline,
- * other voters' cards are read-only.
+ * Read-dominant by default. Every candidate's reviews are shown at once as
+ * read-only cards, with a sticky header per candidate so the reader always
+ * knows whose reviews they're scrolling through. The current voter's review
+ * renders as just another read-only card alongside the others — distinguished
+ * only by a "(you)" suffix — so the browsing surface is uniform.
  *
- * One note per (candidate, voter): a voter may freely edit their own note,
- * but every other voter sees the most-recent saved text.
+ * A page-level "Edit my reviews" toggle flips the section into edit mode.
+ * In edit mode the current voter's card per candidate morphs into a textarea
+ * + Save (per-candidate save granularity); candidates the voter hasn't
+ * reviewed yet show an empty editor so the mode itself is the invitation to
+ * write. Other voters' cards stay read-only. Clicking "Done" flips back.
  */
 @Composable
 fun CandidateNotesSection(
@@ -27,67 +30,78 @@ fun CandidateNotesSection(
 ) {
     if (candidates.isEmpty()) return
 
-    // Per-candidate note state; null = not yet loaded.
     var notesByCandidate by remember(electionName, candidates) {
         mutableStateOf<Map<String, List<CandidateNote>>?>(null)
     }
-    var expanded by remember(electionName) { mutableStateOf<Set<String>>(emptySet()) }
+    var editing by remember(electionName) { mutableStateOf(false) }
 
-    // Fetch every note in one round trip — the count badge needs all of
-    // them up front, and the old per-candidate loop was sequential N+1
-    // (an election with 19 candidates measured at ~5s in production).
-    // Group client-side so the row renderer can still index by candidate.
     LaunchedEffect(electionName, candidates) {
-        val collected = try {
-            apiClient.listCandidateNotesByElection(electionName)
-                .groupBy { it.candidateName }
-                .mapValues { (_, notes) -> notes.sortedByDescending { it.lastUpdated } }
-        } catch (e: Exception) {
-            apiClient.logErrorToServer(e)
-            emptyMap()
+        val collected = mutableMapOf<String, List<CandidateNote>>()
+        for (name in candidates) {
+            try {
+                collected[name] = apiClient.listCandidateNotes(electionName, name)
+            } catch (e: Exception) {
+                apiClient.logErrorToServer(e)
+                collected[name] = emptyList()
+            }
         }
-        notesByCandidate = candidates.associateWith { collected[it] ?: emptyList() }
+        notesByCandidate = collected
     }
 
     Div({ classes("section") }) {
         H2 { Text("Candidate reviews") }
         P({ classes("candidate-notes-intro") }) {
             Text(
-                "Attach a free-form review to any candidate. Everyone can read; " +
-                    "only you can edit your own review."
+                "Browse every voter's free-form review of each candidate. " +
+                    "Click \"Edit my reviews\" to write or update your own."
             )
         }
+
         val loaded = notesByCandidate
         if (loaded == null) {
             P { Text("Loading reviews…") }
             return@Div
         }
 
+        if (currentUserName != null) {
+            Div({ classes("candidate-notes-toolbar") }) {
+                Button({
+                    classes("candidate-notes-toolbar-button")
+                    onClick { editing = !editing }
+                }) {
+                    Text(if (editing) "Done" else "Edit my reviews")
+                }
+            }
+        }
+
         // Sort candidates alphabetically so the section order is stable and
-        // independent of the ranked-ballot ordering above. Casing-insensitive
+        // independent of the ranked-ballot ordering above. Case-insensitive
         // to match the app's name-handling convention everywhere else.
         val ordered = candidates.sortedWith(String.CASE_INSENSITIVE_ORDER)
-        Div({ classes("candidate-notes-list") }) {
-            ordered.forEach { candidateName ->
+        // View mode is read-dominant — hide candidates with zero reviews so
+        // the reader isn't scrolling past empty blocks. Edit mode keeps every
+        // candidate visible so the voter can add a review for any of them.
+        val visible = if (editing) ordered else ordered.filter { (loaded[it] ?: emptyList()).isNotEmpty() }
+        if (visible.isEmpty()) {
+            P({ classes("candidate-notes-empty-hint") }) {
+                Text(
+                    if (currentUserName != null) "No reviews yet. Click \"Edit my reviews\" to write one."
+                    else "No reviews yet."
+                )
+            }
+            return@Div
+        }
+        Div({ classes("candidate-notes-sections") }) {
+            visible.forEach { candidateName ->
                 val notes = loaded[candidateName] ?: emptyList()
-                val isExpanded = candidateName in expanded
-                CandidateNotesRow(
+                CandidateNotesBlock(
                     apiClient = apiClient,
                     electionName = electionName,
                     candidateName = candidateName,
                     notes = notes,
                     currentUserName = currentUserName,
-                    isExpanded = isExpanded,
-                    onToggle = {
-                        expanded = if (isExpanded) expanded - candidateName
-                        else expanded + candidateName
-                    },
+                    editing = editing,
                     onNoteSaved = { newText ->
-                        // Patch local state in place so the count badge and the
-                        // expanded card update immediately. The server is the
-                        // source of truth — a background refetch after the save
-                        // would also work but feels slower without buying us
-                        // anything for this single-author surface.
                         notesByCandidate = patchOwnNote(
                             loaded = notesByCandidate ?: emptyMap(),
                             candidateName = candidateName,
@@ -119,9 +133,6 @@ private fun patchOwnNote(
     val updated = if (text.isBlank()) {
         withoutMine
     } else {
-        // Use a sentinel epoch for the in-memory copy; the real lastUpdated
-        // will land on the next refetch. Sorting puts the just-saved note at
-        // the top for the optimistic update.
         val mine = CandidateNote(
             electionName = existing.firstOrNull()?.electionName ?: "",
             candidateName = candidateName,
@@ -135,31 +146,27 @@ private fun patchOwnNote(
 }
 
 @Composable
-private fun CandidateNotesRow(
+private fun CandidateNotesBlock(
     apiClient: ApiClient,
     electionName: String,
     candidateName: String,
     notes: List<CandidateNote>,
     currentUserName: String?,
-    isExpanded: Boolean,
-    onToggle: () -> Unit,
+    editing: Boolean,
     onNoteSaved: (String) -> Unit,
     onError: (String) -> Unit,
 ) {
-    Div({ classes("candidate-notes-row") }) {
-        Button({
-            classes("candidate-notes-row-header")
-            onClick { onToggle() }
-            attr(
-                "aria-expanded",
-                if (isExpanded) "true" else "false",
-            )
-        }) {
-            Span({ classes("candidate-notes-row-toggle") }) {
-                Text(if (isExpanded) "▾" else "▸")
-            }
-            Span({ classes("candidate-notes-row-name") }) { Text(candidateName) }
-            Span({ classes("candidate-notes-row-count") }) {
+    val myNote = currentUserName?.let { voter ->
+        notes.firstOrNull { it.voterName.equals(voter, ignoreCase = true) }
+    }
+    val others = notes.filter { note ->
+        currentUserName == null || !note.voterName.equals(currentUserName, ignoreCase = true)
+    }
+
+    Div({ classes("candidate-notes-block") }) {
+        Div({ classes("candidate-notes-block-header") }) {
+            Span({ classes("candidate-notes-block-name") }) { Text(candidateName) }
+            Span({ classes("candidate-notes-block-count") }) {
                 Text(
                     when (notes.size) {
                         0 -> "no reviews"
@@ -170,39 +177,23 @@ private fun CandidateNotesRow(
             }
         }
 
-        if (isExpanded) {
-            Div({ classes("candidate-notes-row-body") }) {
-                val myNote = currentUserName?.let { voter ->
-                    notes.firstOrNull { it.voterName.equals(voter, ignoreCase = true) }
-                }
-                val others = notes.filter { note ->
-                    currentUserName == null || !note.voterName.equals(currentUserName, ignoreCase = true)
-                }
+        Div({ classes("candidate-notes-block-body") }) {
+            if (editing && currentUserName != null) {
+                MyNoteEditor(
+                    apiClient = apiClient,
+                    electionName = electionName,
+                    candidateName = candidateName,
+                    currentUserName = currentUserName,
+                    existing = myNote,
+                    onSaved = onNoteSaved,
+                    onError = onError,
+                )
+            } else if (myNote != null) {
+                ReadOnlyNoteCard(myNote, isMine = true)
+            }
 
-                // Always render the current voter's editor first so their own
-                // card is the obvious entry point. Others render below in
-                // most-recent-first order (the server already sorts).
-                if (currentUserName != null) {
-                    MyNoteEditor(
-                        apiClient = apiClient,
-                        electionName = electionName,
-                        candidateName = candidateName,
-                        currentUserName = currentUserName,
-                        existing = myNote,
-                        onSaved = onNoteSaved,
-                        onError = onError,
-                    )
-                }
-
-                if (others.isEmpty() && myNote == null) {
-                    P({ classes("candidate-notes-empty-hint") }) {
-                        Text("Nobody has attached a review to this candidate yet.")
-                    }
-                } else {
-                    others.forEach { note ->
-                        ReadOnlyNoteCard(note)
-                    }
-                }
+            others.forEach { note ->
+                ReadOnlyNoteCard(note, isMine = false)
             }
         }
     }
@@ -291,10 +282,12 @@ private fun MyNoteEditor(
 }
 
 @Composable
-private fun ReadOnlyNoteCard(note: CandidateNote) {
+private fun ReadOnlyNoteCard(note: CandidateNote, isMine: Boolean) {
     Div({ classes("candidate-notes-card", "candidate-notes-card-other") }) {
         Div({ classes("candidate-notes-card-header") }) {
-            Span({ classes("candidate-notes-card-author") }) { Text(note.voterName) }
+            Span({ classes("candidate-notes-card-author") }) {
+                Text(if (isMine) "${note.voterName} (you)" else note.voterName)
+            }
             Span({ classes("candidate-notes-card-timestamp") }) {
                 Text(formatWhenCast(note.lastUpdated))
             }
