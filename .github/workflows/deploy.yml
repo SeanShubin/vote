@@ -4,8 +4,11 @@ name: Deploy
 #   normal:  code-only deploy (default).
 #   rewrite: pause -> backup -> deploy -> nuke -> restore -> resume.
 #            Use for schema changes where the new code can't read old data.
-#            Trigger by including [rewrite] in the head commit message,
-#            or by manually dispatching with mode=rewrite.
+#            Trigger by including a `Deploy-Mode: rewrite` line on its own
+#            in the commit message body (same shape as Co-Authored-By),
+#            or by manually dispatching with mode=rewrite. Substring matches
+#            like `[rewrite]` are deliberately NOT honored — a docs commit
+#            that merely mentions the feature must not trigger the ceremony.
 #
 # Rewrite-mode failure handling: any failure after the pause step leaves the
 # event log paused. The final step prints state-by-state recovery instructions.
@@ -67,8 +70,11 @@ jobs:
           else
             # Pull the message from git rather than ${{ github.event.head_commit.message }}
             # so backticks or $() in the commit body can't get interpreted by bash.
+            # Match `Deploy-Mode: rewrite` as a standalone line (footer form,
+            # like Co-Authored-By). A substring marker would mis-fire on
+            # commits that merely reference the feature in prose.
             MSG=$(git log -1 --pretty=%B)
-            if echo "$MSG" | grep -qF '[rewrite]'; then
+            if echo "$MSG" | grep -qE '^Deploy-Mode:[[:space:]]+rewrite[[:space:]]*$'; then
               MODE=rewrite
             else
               MODE=normal

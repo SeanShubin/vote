@@ -19,11 +19,15 @@ deploys run.
 ## CI
 
 `.github/workflows/deploy.yml` runs on every push to `master`/`main`
-(except docs-only changes). It:
+(except docs-only changes). The workflow has two modes; `detect-mode`
+picks which to run.
+
+### Normal mode (default)
+
+Standard code-only deploy:
 
 1. Builds the backend shadow JAR (`./gradlew :backend:shadowJar`).
-2. Builds the production frontend bundle, baking in
-   `https://api.pairwisevote.com` as the API URL.
+2. Builds the production frontend bundle, baking in `/api` as the API URL.
 3. Resolves Route 53 zone ID + the deploy-artifacts bucket from the
    bootstrap stack outputs.
 4. Runs `aws cloudformation package` — uploads the JAR to the artifacts
@@ -31,10 +35,51 @@ deploys run.
 5. Runs `aws cloudformation deploy` against the application stack.
 6. `aws s3 sync` the frontend bundle to the frontend bucket.
 7. Creates a CloudFront invalidation.
-8. Smoke-tests `https://api.pairwisevote.com/health`.
+8. Smoke-tests `https://pairwisevote.com/api/health`.
 
 First run takes ~5-10 minutes (cert validation + CloudFront propagation).
 Subsequent deploys are ~2-3 minutes.
+
+### Rewrite mode (for schema changes)
+
+When a schema change makes the new code unable to read existing event-log
+or projection data, use rewrite mode to bracket the deploy with a full
+event-log rebuild. The flow becomes: pause → backup → deploy → nuke →
+restore → resume. The event log is the source of truth; the new code
+rebuilds the `vote_data` projection from it.
+
+**Trigger from a push**: include `Deploy-Mode: rewrite` as a standalone
+line in the commit message body (footer-style, like `Co-Authored-By`):
+
+```bash
+git commit -m "$(cat <<'EOF'
+Migrate ballot to ranked tiers
+
+Deploy-Mode: rewrite
+EOF
+)"
+```
+
+Substring matches like `[rewrite]` are deliberately NOT honored — the
+marker must be a complete line, so a docs commit that merely mentions
+the feature can't trigger the ceremony.
+
+**Trigger manually**: Actions → Deploy → Run workflow → mode = rewrite.
+
+**On failure**: any failure after the pause step leaves the event log
+paused. The final workflow step prints state-specific recovery
+instructions. A backup artifact (90-day retention) is uploaded right
+after the backup step so data is recoverable even if restore itself
+fails. Recovery uses the `vote-dev` CLI:
+
+```powershell
+.\scripts\dev.ps1 nuke-dynamodb --prod --yes
+.\scripts\dev.ps1 restore-dynamodb <backup.jsonl> --prod --yes
+.\scripts\dev.ps1 resume-event-log --prod --yes
+```
+
+Rewrite-mode deploys take ~5-8 minutes because of the sequential
+`putItem` calls during restore.
 
 ## Pre-deploy step (only once, after pulling the monitoring changes)
 

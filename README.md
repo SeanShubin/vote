@@ -230,6 +230,12 @@ Every push to `master` triggers `.github/workflows/deploy.yml`, which:
 First deploy is ~5-10 min (cert validation + CloudFront propagation).
 Subsequent deploys ~2-3 min.
 
+For schema changes that require an event-log rebuild, include
+`Deploy-Mode: rewrite` as a standalone line in the commit body. This
+brackets the deploy with pause → backup → nuke → restore → resume. See
+[deploy/README.md](deploy/README.md#rewrite-mode-for-schema-changes) for
+the full ceremony and recovery steps.
+
 See **[deploy/README.md](deploy/README.md)** for stack details and
 **[deploy/MONITORING.md](deploy/MONITORING.md)** for where to watch
 progress (CFN console, Actions logs, ACM, Route 53, Lambda, etc.).
