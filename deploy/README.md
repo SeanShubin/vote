@@ -28,18 +28,21 @@ Pipeline:
 2. Resolves Route 53 zone ID + the deploy-artifacts bucket from the
    bootstrap stack outputs.
 3. `aws cloudformation package` uploads the JAR + rewrites `CodeUri`.
-4. `aws cloudformation deploy` against the application stack.
-5. `aws s3 sync` the frontend bundle, then a CloudFront invalidation.
-6. **`vote-dev rebuild-projection --prod --yes`** — idempotent. Compares
+4. **`vote-dev rebuild-projection --prod --yes`** — idempotent. Compares
    the live `vote_data` table shape against
    `DynamoDbSingleTableSchema.expectedMainTableShape`. No-op (~1 DescribeTable
    call) when they match. When they differ: pause event log → drop
    vote_data → CreateTable with all GSIs declared upfront → replay event
-   log into the empty projection → resume event log.
+   log into the empty projection → resume event log. Must run BEFORE the
+   CFN deploy: CFN's `AWS::Lambda::Version` stabilization probe invokes
+   the new Lambda once to verify it starts, and the new code's cold-init
+   fail-closes if the live table is missing the GSIs it expects.
+5. `aws cloudformation deploy` against the application stack.
+6. `aws s3 sync` the frontend bundle, then a CloudFront invalidation.
 7. Smoke-tests `https://pairwisevote.com/api/health`.
 
 First run takes ~5-10 minutes (cert validation + CloudFront propagation).
-Subsequent normal deploys ~2-3 minutes. Deploys that hit step 6's
+Subsequent normal deploys ~2-3 minutes. Deploys that hit step 4's
 non-no-op path (projection-shape changes) add ~5-15s for the rebuild
 itself, scaling with event log size.
 

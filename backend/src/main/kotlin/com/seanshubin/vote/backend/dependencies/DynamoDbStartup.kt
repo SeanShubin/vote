@@ -21,10 +21,12 @@ import kotlinx.coroutines.runBlocking
  * design: better to refuse traffic than to serve queries against the wrong
  * shape and corrupt or fail-mysteriously.
  *
- * The CI deploy workflow runs `vote-dev rebuild-projection --prod` after
- * every CFN deploy, so a healthy deploy gets the table reconciled before
- * Lambda traffic resumes. Lambda's check is the safety net that catches
- * deploys that bypassed CI (or for which the post-deploy step failed).
+ * The CI deploy workflow runs `vote-dev rebuild-projection --prod` BEFORE
+ * the CFN deploy step, so a healthy deploy gets the table reconciled
+ * before CFN ever publishes the new Lambda version (whose stabilization
+ * probe runs this same verify). Lambda's check is the safety net that
+ * catches deploys that bypassed CI (or for which the pre-deploy
+ * reconcile step failed).
  */
 class DynamoDbStartup(
     private val integrations: Integrations,

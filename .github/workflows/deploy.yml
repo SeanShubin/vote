@@ -221,6 +221,23 @@ jobs:
             --s3-bucket "${{ steps.meta.outputs.artifacts_bucket }}" \
             --output-template-file /tmp/packaged-template.yaml
 
+      - name: Reconcile vote_data projection shape
+        # Must run BEFORE the CFN deploy. When the schema has changed,
+        # the CFN deploy creates a new AWS::Lambda::Version, and AWS
+        # probes the new version for stabilization by invoking it once.
+        # The new Lambda's cold-init runs DynamoDbStartup.verifyMainTableShape,
+        # which fail-closes (throws ProjectionShapeMismatchException) if the
+        # live table is missing GSIs/attrs the new code expects. If the
+        # rebuild step ran AFTER CFN, that probe would always fail on
+        # schema-change deploys and CFN would roll back.
+        #
+        # Idempotent: a single DescribeTable when nothing changed; the full
+        # drop+recreate+replay when DynamoDbSingleTableSchema.expectedMainTableShape
+        # has diverged from the live table. The pause/resume of the event log
+        # is internal to the tool — it only pauses when it actually has work
+        # to do, so normal deploys leave the event log untouched.
+        run: ./tools/build/install/vote-dev/bin/vote-dev rebuild-projection --prod --yes
+
       - name: Deploy CloudFormation stack
         run: |
           aws cloudformation deploy \
@@ -298,14 +315,6 @@ jobs:
           aws cloudfront create-invalidation \
             --distribution-id "$DIST" \
             --paths "/*"
-
-      - name: Reconcile vote_data projection shape
-        # Idempotent: a single DescribeTable when nothing changed; the full
-        # drop+recreate+replay when DynamoDbSingleTableSchema.expectedMainTableShape
-        # has diverged from the live table. The pause/resume of the event log
-        # is internal to the tool — it only pauses when it actually has work
-        # to do, so normal deploys leave the event log untouched.
-        run: ./tools/build/install/vote-dev/bin/vote-dev rebuild-projection --prod --yes
 
       - name: Smoke-test backend
         run: |
