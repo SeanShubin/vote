@@ -16,12 +16,8 @@ import org.jetbrains.compose.web.dom.Text
 fun MaintenanceBanner() {
     Div({ classes("maintenance-banner") }) {
         Span({ classes("maintenance-banner-title") }) {
-            Text("Scheduled maintenance in progress.")
+            Text("Voting and editing are temporarily paused while I deploy an update.")
         }
-        Text(
-            " Voting and editing are temporarily paused while we ship an" +
-                " update. Reads still work; new writes will resume in a few" +
-                " minutes."
-        )
+        Text(" Reads still work; new writes will resume in a few minutes.")
     }
 }
