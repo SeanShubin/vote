@@ -227,43 +227,16 @@ Resources:
   # match constants in DynamoDbSingleTableSchema.kt and
   # DynamoDbOperatorStateSchema.kt — keeps the code simple, locks the stack
   # to one deploy per account/region.
-  MainTable:
-    Type: AWS::DynamoDB::Table
-    # Retain on remove + replace so the next deploy can drop this resource
-    # block (PR #2 of the GSI drift reconciliation surgery) without CFN
-    # destroying the live table. After surgery completes and the resource is
-    # re-added with all four GSIs declared, these policies can stay — they
-    # protect against accidental table loss on future template edits.
-    DeletionPolicy: Retain
-    UpdateReplacePolicy: Retain
-    Properties:
-      TableName: vote_data
-      BillingMode: PAY_PER_REQUEST
-      AttributeDefinitions:
-        - AttributeName: PK
-          AttributeType: S
-        - AttributeName: SK
-          AttributeType: S
-      KeySchema:
-        - AttributeName: PK
-          KeyType: HASH
-        - AttributeName: SK
-          KeyType: RANGE
-      # Four GSIs live on this table but are NOT declared here:
-      #   discord-id-index, voter-name-index, owner-name-index,
-      #   manager-user-index.
-      # Reason: CFN's DynamoDB resource handler can only create one GSI
-      # per stack update; declaring all four together fails with
-      # "Cannot perform more than one GSI creation or deletion in a
-      # single update". They were added out-of-band via aws dynamodb
-      # update-table, one at a time. The application code (Service
-      # + repository) and DynamoDbSingleTableSchema.createMainTable
-      # (LocalStack tests) both depend on them.
-      # If the table is ever recreated from scratch, the four GSIs must
-      # be added back — declare one at a time across four sequential
-      # deploys, or run the same update-table CLI calls used originally.
-      PointInTimeRecoverySpecification:
-        PointInTimeRecoveryEnabled: true
+  # MainTable (vote_data) is intentionally NOT declared in this deploy.
+  # Mid-surgery state: previous deploy set DeletionPolicy: Retain on
+  # MainTable; this deploy removes the resource block so CFN drops it from
+  # stack management (the live table stays alive thanks to Retain). After
+  # this deploy lands, the live table is deleted out-of-band via CLI, and
+  # the very next deploy re-adds MainTable here with all four GSIs declared
+  # (CreateTable supports multi-GSI; UpdateTable does not — which is why we
+  # have to recreate rather than just add GSIs to the existing table).
+  # The Lambda IAM policy below uses the literal table name "vote_data"
+  # during this interim deploy since !Ref MainTable would no longer resolve.
 
   # vote_event_log is intentionally NOT a CloudFormation resource. Its key
   # schema (constant PK + event_id sort key, so sync can Query the log
@@ -364,8 +337,11 @@ Resources:
           EMAIL_FROM_ADDRESS: !Ref EmailFromAddress
           EMAIL_TO_ADDRESS: !Ref AlertEmail
       Policies:
+        # Interim: MainTable resource is dropped from this template during
+        # GSI drift surgery. Switch back to !Ref MainTable in the next deploy
+        # once the resource is re-declared with all GSIs.
         - DynamoDBCrudPolicy:
-            TableName: !Ref MainTable
+            TableName: vote_data
         # vote_event_log is app-managed, not a CFN resource (see the comment
         # above the table block) — scope the grant by literal name.
         - DynamoDBCrudPolicy:
