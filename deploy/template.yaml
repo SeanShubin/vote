@@ -229,6 +229,13 @@ Resources:
   # to one deploy per account/region.
   MainTable:
     Type: AWS::DynamoDB::Table
+    # Retain on remove + replace so the next deploy can drop this resource
+    # block (PR #2 of the GSI drift reconciliation surgery) without CFN
+    # destroying the live table. After surgery completes and the resource is
+    # re-added with all four GSIs declared, these policies can stay — they
+    # protect against accidental table loss on future template edits.
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Properties:
       TableName: vote_data
       BillingMode: PAY_PER_REQUEST
