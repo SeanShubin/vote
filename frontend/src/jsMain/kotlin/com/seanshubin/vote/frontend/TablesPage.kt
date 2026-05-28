@@ -94,7 +94,7 @@ fun TablesPage(
 }
 
 @Composable
-private fun renderTable(data: TableData) {
+internal fun renderTable(data: TableData) {
     if (data.columnNames.isEmpty()) {
         P { Text("(no columns)") }
         return

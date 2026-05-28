@@ -109,6 +109,22 @@ interface Service {
     fun tableData(accessToken: AccessToken, tableName: String): TableData
     fun debugTableData(accessToken: AccessToken, tableName: String): TableData
     fun eventData(accessToken: AccessToken): TableData
+
+    /**
+     * Name of the query language this backend speaks ("PartiQL", "SQL", ...)
+     * or empty when the backend has no text-query surface. Unauthenticated —
+     * the frontend reads it to decide whether to show the Query nav button,
+     * which happens before any per-page auth gate runs.
+     */
+    fun queryDialect(): String
+
+    /**
+     * Execute an ad-hoc, read-only query against the backend's native dialect
+     * and return the result as a [TableData]. VIEW_SECRETS-gated. Throws when
+     * the dialect is empty (no query surface) or when the statement is rejected
+     * by the executor (e.g. PartiQL writes are blocked).
+     */
+    fun executeQuery(accessToken: AccessToken, query: String): TableData
     fun addCandidates(accessToken: AccessToken, electionName: String, candidateNames: List<String>)
     fun removeCandidate(accessToken: AccessToken, electionName: String, candidateName: String)
     fun listCandidates(accessToken: AccessToken, electionName: String): List<String>

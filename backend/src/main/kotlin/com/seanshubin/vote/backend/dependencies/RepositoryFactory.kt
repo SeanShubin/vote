@@ -27,6 +27,7 @@ class RepositoryFactory(
                 commandModel = InMemoryCommandModel(sharedData),
                 queryModel = InMemoryQueryModel(sharedData),
                 rawTableScanner = InMemoryRawTableScanner(),
+                queryExecutor = InMemoryQueryExecutor(),
                 systemSettings = InMemorySystemSettings(),
             )
         }
@@ -38,6 +39,7 @@ class RepositoryFactory(
                 queryModel = MySqlQueryModel(sqlConnection, queryLoader, json),
                 // MySQL backend has no admin raw view in this iteration.
                 rawTableScanner = InMemoryRawTableScanner(),
+                queryExecutor = InMemoryQueryExecutor(),
                 systemSettings = MySqlSystemSettings(sqlConnection, queryLoader),
             )
         }
@@ -48,6 +50,7 @@ class RepositoryFactory(
                 commandModel = DynamoDbSingleTableCommandModel(client, json),
                 queryModel = DynamoDbSingleTableQueryModel(client, json),
                 rawTableScanner = DynamoDbRawTableScanner(client),
+                queryExecutor = DynamoDbQueryExecutor(client),
                 systemSettings = DynamoDbSystemSettings(client),
             )
         }

@@ -8,6 +8,7 @@ import com.seanshubin.vote.backend.repository.InMemoryCommandModel
 import com.seanshubin.vote.backend.repository.InMemoryData
 import com.seanshubin.vote.backend.repository.InMemoryEventLog
 import com.seanshubin.vote.backend.repository.InMemoryQueryModel
+import com.seanshubin.vote.backend.repository.InMemoryQueryExecutor
 import com.seanshubin.vote.backend.repository.InMemoryRawTableScanner
 import com.seanshubin.vote.backend.repository.InMemorySystemSettings
 import com.seanshubin.vote.backend.service.DynamoToRelational
@@ -39,6 +40,7 @@ class InProcessService {
     private val commandModel = InMemoryCommandModel(data)
     private val queryModel = InMemoryQueryModel(data)
     private val rawTableScanner = InMemoryRawTableScanner()
+    private val queryExecutor = InMemoryQueryExecutor()
     private val tokenEncoder = TokenEncoder(JwtCipher("dev-jwt-secret-DO-NOT-USE-IN-PROD"))
     private val integrations = ToolsIntegrations()
 
@@ -48,6 +50,7 @@ class InProcessService {
         commandModel = commandModel,
         queryModel = queryModel,
         rawTableScanner = rawTableScanner,
+        queryExecutor = queryExecutor,
         systemSettings = InMemorySystemSettings(),
         tokenEncoder = tokenEncoder,
         discordConfigProvider = DiscordConfigProvider { null },

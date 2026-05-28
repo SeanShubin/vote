@@ -18,6 +18,7 @@ class ServiceImpl(
     private val commandModel: CommandModel,
     private val queryModel: QueryModel,
     private val rawTableScanner: RawTableScanner,
+    private val queryExecutor: QueryExecutor,
     private val systemSettings: SystemSettings,
     private val tokenEncoder: TokenEncoder,
     private val discordConfigProvider: DiscordConfigProvider,
@@ -571,6 +572,13 @@ class ServiceImpl(
     override fun eventData(accessToken: AccessToken): TableData {
         requirePermission(accessToken, Permission.VIEW_SECRETS)
         return relationalProjection.project(DynamoToRelational.EVENT_LOG)
+    }
+
+    override fun queryDialect(): String = queryExecutor.dialect()
+
+    override fun executeQuery(accessToken: AccessToken, query: String): TableData {
+        requirePermission(accessToken, Permission.VIEW_SECRETS)
+        return queryExecutor.execute(query)
     }
 
     override fun addCandidates(accessToken: AccessToken, electionName: String, candidateNames: List<String>) {

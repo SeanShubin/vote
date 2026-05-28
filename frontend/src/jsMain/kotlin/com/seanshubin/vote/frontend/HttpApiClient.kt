@@ -356,6 +356,21 @@ class HttpApiClient(
     override suspend fun debugTableData(tableName: String): TableData =
         getWithAuth("/debug-table/${encodeURIComponent(tableName)}")
 
+    override suspend fun queryDialect(): String {
+        // Unauthenticated GET — the Home page reads it to decide whether to
+        // show the Query nav button, which is a pre-auth decision. The value
+        // is a deployment-static label ("PartiQL", "SQL", "").
+        val response = fetch("$baseUrl/query/dialect", RequestInit(
+            method = "GET",
+            headers = json("Content-Type" to "application/json"),
+        )).await()
+        val body = handleResponse<Map<String, String>>(response)
+        return body["dialect"] ?: ""
+    }
+
+    override suspend fun executeQuery(query: String): TableData =
+        postWithAuth("/query", ExecuteQueryRequest(query))
+
     override suspend fun discordLoginStartUrl(): String {
         // Unauthenticated POST — server sets the state cookie and returns the
         // authorize URL. The frontend then navigates the browser to that URL.

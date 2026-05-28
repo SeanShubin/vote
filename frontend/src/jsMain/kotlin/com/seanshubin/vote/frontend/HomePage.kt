@@ -15,6 +15,7 @@ fun HomePage(
     onNavigateToElections: () -> Unit,
     onNavigateToRawTables: () -> Unit,
     onNavigateToDebugTables: () -> Unit,
+    onNavigateToQuery: () -> Unit,
     onNavigateToUserManagement: () -> Unit,
     onNavigateToAdmin: () -> Unit,
     onNavigateToPasteTally: () -> Unit,
@@ -32,6 +33,18 @@ fun HomePage(
         apiClient.getUserActivity()
     }
     val activity = (activityFetch.state as? FetchState.Success)?.value
+
+    // Deployment-static label ("PartiQL"/"SQL"/""); empty means the active
+    // backend has no text-query surface, so the Query nav button is omitted
+    // entirely rather than routing to a page that can only throw.
+    val queryDialectFetch = rememberCachedFetchState(
+        apiClient = apiClient,
+        cacheKey = "queryDialect",
+        fallbackErrorMessage = "Failed to load query dialect",
+    ) {
+        apiClient.queryDialect()
+    }
+    val queryDialect = (queryDialectFetch.state as? FetchState.Success)?.value.orEmpty()
 
     val deleteAction = rememberAsyncAction(
         apiClient = apiClient,
@@ -112,6 +125,14 @@ fun HomePage(
                     onClick { onNavigateToDebugTables() }
                 }) {
                     Text("Debug Tables")
+                }
+
+                if (queryDialect.isNotEmpty()) {
+                    Button({
+                        onClick { onNavigateToQuery() }
+                    }) {
+                        Text("Query ($queryDialect)")
+                    }
                 }
             }
 

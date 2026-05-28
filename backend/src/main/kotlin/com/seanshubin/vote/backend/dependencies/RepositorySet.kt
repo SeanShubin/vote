@@ -2,6 +2,7 @@ package com.seanshubin.vote.backend.dependencies
 
 import com.seanshubin.vote.contract.CommandModel
 import com.seanshubin.vote.contract.EventLog
+import com.seanshubin.vote.contract.QueryExecutor
 import com.seanshubin.vote.contract.QueryModel
 import com.seanshubin.vote.contract.RawTableScanner
 import com.seanshubin.vote.contract.SystemSettings
@@ -11,5 +12,6 @@ data class RepositorySet(
     val commandModel: CommandModel,
     val queryModel: QueryModel,
     val rawTableScanner: RawTableScanner,
+    val queryExecutor: QueryExecutor,
     val systemSettings: SystemSettings,
 )

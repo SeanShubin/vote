@@ -267,6 +267,23 @@ interface ApiClient {
     suspend fun debugTableData(tableName: String): TableData
 
     /**
+     * Name of the query language this backend speaks ("PartiQL", "SQL", ...)
+     * or empty when the backend has no ad-hoc query surface. The Home page
+     * reads it to decide whether to show the Query nav button — the
+     * InMemory and (current) MySQL backends report empty and the button is
+     * hidden entirely. Unauthenticated.
+     */
+    suspend fun queryDialect(): String
+
+    /**
+     * Admin: run a read-only query in the backend's native dialect (see
+     * [queryDialect]) and return the row-shaped result. The backing
+     * [QueryExecutor] rejects writes — PartiQL INSERT/UPDATE/DELETE would
+     * bypass the event log and corrupt event-sourced state.
+     */
+    suspend fun executeQuery(query: String): TableData
+
+    /**
      * Record a frontend exception for server-side observability.
      *
      * If [error] is a [kotlinx.coroutines.CancellationException], this method

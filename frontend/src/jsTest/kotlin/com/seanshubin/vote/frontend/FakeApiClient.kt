@@ -95,10 +95,14 @@ class FakeApiClient : ApiClient {
     var tableDataResult: Result<TableData> = Result.success(TableData("", emptyList(), emptyList()))
     var listDebugTablesResult: Result<List<String>> = Result.success(emptyList())
     var debugTableDataResult: Result<TableData> = Result.success(TableData("", emptyList(), emptyList()))
+    var queryDialectResult: Result<String> = Result.success("")
+    var executeQueryResult: Result<TableData> = Result.success(TableData("", emptyList(), emptyList()))
     val listTablesCalls = mutableListOf<Unit>()
     val tableDataCalls = mutableListOf<String>()
     val listDebugTablesCalls = mutableListOf<Unit>()
     val debugTableDataCalls = mutableListOf<String>()
+    val queryDialectCalls = mutableListOf<Unit>()
+    val executeQueryCalls = mutableListOf<String>()
     var listUsersResult: Result<List<UserNameRole>> = Result.success(emptyList())
     var listUserNamesResult: Result<List<String>> = Result.success(emptyList())
     var setRoleResult: Result<Unit> = Result.success(Unit)
@@ -316,6 +320,16 @@ class FakeApiClient : ApiClient {
     override suspend fun debugTableData(tableName: String): TableData {
         debugTableDataCalls.add(tableName)
         return debugTableDataResult.getOrThrow()
+    }
+
+    override suspend fun queryDialect(): String {
+        queryDialectCalls.add(Unit)
+        return queryDialectResult.getOrThrow()
+    }
+
+    override suspend fun executeQuery(query: String): TableData {
+        executeQueryCalls.add(query)
+        return executeQueryResult.getOrThrow()
     }
 
     override suspend fun listUsers(): List<UserNameRole> {

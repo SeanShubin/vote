@@ -93,6 +93,7 @@ class ApplicationRunner(
             commandModel = repositories.commandModel,
             queryModel = repositories.queryModel,
             rawTableScanner = repositories.rawTableScanner,
+            queryExecutor = repositories.queryExecutor,
             systemSettings = repositories.systemSettings,
             tokenEncoder = tokenEncoder,
             discordConfigProvider = discordConfigProvider,

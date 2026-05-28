@@ -19,6 +19,7 @@ sealed class Page {
     object Elections : Page()
     object RawTables : Page()
     object DebugTables : Page()
+    object Query : Page()
     object UserManagement : Page()
     object Admin : Page()
     data class ElectionDetail(val electionName: String) : Page()
@@ -44,6 +45,7 @@ fun pageToPath(page: Page): String = when (page) {
     is Page.ElectionProcess -> "/elections/${encodeUriComponent(page.electionName)}/process"
     is Page.RawTables -> "/admin/raw-tables"
     is Page.DebugTables -> "/admin/debug-tables"
+    is Page.Query -> "/admin/query"
     is Page.UserManagement -> "/admin/users"
     is Page.Admin -> "/admin"
     is Page.PasteTally -> "/sandbox"
@@ -86,6 +88,7 @@ fun pathToPage(pathWithQuery: String): Page {
         }
         normalized == "/admin/raw-tables" -> Page.RawTables
         normalized == "/admin/debug-tables" -> Page.DebugTables
+        normalized == "/admin/query" -> Page.Query
         normalized == "/admin/users" -> Page.UserManagement
         normalized == "/admin" -> Page.Admin
         normalized == "/sandbox" -> Page.PasteTally

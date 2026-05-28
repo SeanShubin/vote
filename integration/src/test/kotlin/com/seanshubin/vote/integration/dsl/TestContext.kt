@@ -8,6 +8,7 @@ import com.seanshubin.vote.backend.repository.InMemoryCommandModel
 import com.seanshubin.vote.backend.repository.InMemoryData
 import com.seanshubin.vote.backend.repository.InMemoryEventLog
 import com.seanshubin.vote.backend.repository.InMemoryQueryModel
+import com.seanshubin.vote.backend.repository.InMemoryQueryExecutor
 import com.seanshubin.vote.backend.repository.InMemoryRawTableScanner
 import com.seanshubin.vote.backend.repository.InMemorySystemSettings
 import com.seanshubin.vote.backend.service.DynamoToRelational
@@ -48,6 +49,7 @@ class TestContext(
         commandModel = commandModel,
         queryModel = queryModel,
         rawTableScanner = InMemoryRawTableScanner(),
+        queryExecutor = InMemoryQueryExecutor(),
         systemSettings = InMemorySystemSettings(),
         tokenEncoder = tokenEncoder,
         discordConfigProvider = DiscordConfigProvider { null },

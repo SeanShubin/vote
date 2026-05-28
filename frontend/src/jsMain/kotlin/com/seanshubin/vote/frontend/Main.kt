@@ -201,6 +201,7 @@ fun VoteApp(apiClient: ApiClient) {
             onNavigateToElections = { router.navigate(Page.Elections) },
             onNavigateToRawTables = { router.navigate(Page.RawTables) },
             onNavigateToDebugTables = { router.navigate(Page.DebugTables) },
+            onNavigateToQuery = { router.navigate(Page.Query) },
             onNavigateToUserManagement = { router.navigate(Page.UserManagement) },
             onNavigateToAdmin = { router.navigate(Page.Admin) },
             onNavigateToPasteTally = { router.navigate(Page.PasteTally) },
@@ -292,6 +293,10 @@ fun VoteApp(apiClient: ApiClient) {
             emptyMessage = "No debug tables available.",
             loadNames = { apiClient.listDebugTables() },
             loadData = { name -> apiClient.debugTableData(name) },
+            onBack = { router.navigate(Page.Home) },
+        )
+        is Page.Query -> QueryPage(
+            apiClient = apiClient,
             onBack = { router.navigate(Page.Home) },
         )
         is Page.UserManagement -> UserManagementPage(

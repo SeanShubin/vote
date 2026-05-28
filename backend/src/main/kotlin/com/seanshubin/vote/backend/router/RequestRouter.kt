@@ -14,6 +14,7 @@ import com.seanshubin.vote.contract.ClientErrorRequest
 import com.seanshubin.vote.contract.DevLoginRequest
 import com.seanshubin.vote.contract.ErrorResponse
 import com.seanshubin.vote.contract.EventLogPausedException
+import com.seanshubin.vote.contract.ExecuteQueryRequest
 import com.seanshubin.vote.contract.Notifications
 import com.seanshubin.vote.contract.RenameCandidateRequest
 import com.seanshubin.vote.contract.RenameElectionRequest
@@ -157,6 +158,8 @@ class RequestRouter(
         Route("GET", "/table/[^/]+", ::handleTableData),
         Route("GET", "/debug-tables", ::handleListDebugTables),
         Route("GET", "/debug-table/[^/]+", ::handleDebugTableData),
+        Route("GET", "/query/dialect", { _ -> handleQueryDialect() }),
+        Route("POST", "/query", ::handleExecuteQuery),
         Route("POST", "/election", ::handleAddElection),
         Route("GET", "/elections", ::handleListElections),
         Route("GET", "/elections/count", ::handleElectionCount),
@@ -489,6 +492,16 @@ class RequestRouter(
     private fun handleEventData(req: HttpRequest): HttpResponse {
         val accessToken = extractAccessToken(req)
         val tableData = service.eventData(accessToken)
+        return HttpResponse(200, json.encodeToString(tableData))
+    }
+
+    private fun handleQueryDialect(): HttpResponse =
+        HttpResponse(200, json.encodeToString(mapOf("dialect" to service.queryDialect())))
+
+    private fun handleExecuteQuery(req: HttpRequest): HttpResponse {
+        val accessToken = extractAccessToken(req)
+        val request = json.decodeFromString<ExecuteQueryRequest>(req.body)
+        val tableData = service.executeQuery(accessToken, request.query)
         return HttpResponse(200, json.encodeToString(tableData))
     }
 
