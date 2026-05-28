@@ -101,16 +101,28 @@ class DynamoDbSingleTableQueryModel(
     // Election queries
     override fun electionCount(): Int {
         return runBlocking {
-            val response = dynamoDb.scan(ScanRequest {
-                tableName = DynamoDbSingleTableSchema.MAIN_TABLE
-                filterExpression = "begins_with(PK, :prefix) AND SK = :sk"
-                expressionAttributeValues = mapOf(
-                    ":prefix" to AttributeValue.S(DynamoDbSingleTableSchema.ELECTION_PREFIX),
-                    ":sk" to AttributeValue.S(DynamoDbSingleTableSchema.METADATA_SK)
-                )
-                select = Select.Count
-            })
-            response.count ?: 0
+            // Query the election-listing GSI's single partition — sparse to
+            // election METADATA rows — instead of scanning the whole table.
+            // Count is still 1MB-capped per Query call, so loop on
+            // lastEvaluatedKey to cover the full set.
+            var count = 0
+            var startKey: Map<String, AttributeValue>? = null
+            do {
+                val response = dynamoDb.query(QueryRequest {
+                    tableName = DynamoDbSingleTableSchema.MAIN_TABLE
+                    indexName = DynamoDbSingleTableSchema.ELECTION_LISTING_INDEX
+                    keyConditionExpression = "#h = :v"
+                    expressionAttributeNames = mapOf("#h" to DynamoDbSingleTableSchema.ELECTION_LISTING_ATTR)
+                    expressionAttributeValues = mapOf(
+                        ":v" to AttributeValue.S(DynamoDbSingleTableSchema.ELECTION_LISTING_VALUE),
+                    )
+                    select = Select.Count
+                    exclusiveStartKey = startKey
+                })
+                count += response.count ?: 0
+                startKey = response.lastEvaluatedKey
+            } while (startKey != null)
+            count
         }
     }
 
@@ -130,16 +142,27 @@ class DynamoDbSingleTableQueryModel(
 
     override fun listElections(): List<ElectionSummary> {
         return runBlocking {
-            val response = dynamoDb.scan(ScanRequest {
-                tableName = DynamoDbSingleTableSchema.MAIN_TABLE
-                filterExpression = "begins_with(PK, :prefix) AND SK = :sk"
-                expressionAttributeValues = mapOf(
-                    ":prefix" to AttributeValue.S(DynamoDbSingleTableSchema.ELECTION_PREFIX),
-                    ":sk" to AttributeValue.S(DynamoDbSingleTableSchema.METADATA_SK)
-                )
-            })
-
-            response.items?.map { itemToElectionSummary(it) } ?: emptyList()
+            // Query the sparse election-listing GSI (one partition, sorted by
+            // election_name) instead of scanning the whole table. Loop on
+            // lastEvaluatedKey so a list larger than one 1MB page still
+            // returns in full.
+            val items = mutableListOf<Map<String, AttributeValue>>()
+            var startKey: Map<String, AttributeValue>? = null
+            do {
+                val response = dynamoDb.query(QueryRequest {
+                    tableName = DynamoDbSingleTableSchema.MAIN_TABLE
+                    indexName = DynamoDbSingleTableSchema.ELECTION_LISTING_INDEX
+                    keyConditionExpression = "#h = :v"
+                    expressionAttributeNames = mapOf("#h" to DynamoDbSingleTableSchema.ELECTION_LISTING_ATTR)
+                    expressionAttributeValues = mapOf(
+                        ":v" to AttributeValue.S(DynamoDbSingleTableSchema.ELECTION_LISTING_VALUE),
+                    )
+                    exclusiveStartKey = startKey
+                })
+                response.items?.let { items.addAll(it) }
+                startKey = response.lastEvaluatedKey
+            } while (startKey != null)
+            items.map { itemToElectionSummary(it) }
         }
     }
 

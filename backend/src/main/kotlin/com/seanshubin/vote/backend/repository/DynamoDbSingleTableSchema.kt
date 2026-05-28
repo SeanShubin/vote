@@ -83,6 +83,17 @@ object DynamoDbSingleTableSchema {
     const val VOTER_NAME_INDEX = "voter-name-index"
     const val OWNER_NAME_INDEX = "owner-name-index"
     const val MANAGER_USER_INDEX = "manager-user-index"
+    const val ELECTION_LISTING_INDEX = "election-listing-index"
+
+    /**
+     * Sparse-GSI marker attribute carried only by election METADATA items.
+     * Constant value so every election lands in one partition under
+     * [ELECTION_LISTING_INDEX], turning `listElections` into a Query
+     * instead of a full-table Scan. Other entity types never set this
+     * attribute, so the index stays sparse to elections only.
+     */
+    const val ELECTION_LISTING_ATTR = "election_listing"
+    const val ELECTION_LISTING_VALUE = "ALL"
 
     /**
      * Constant partition key for every row in [EVENT_LOG_TABLE]. The log
@@ -144,6 +155,8 @@ object DynamoDbSingleTableSchema {
             AttrDef("voter_name", "S"),
             AttrDef("owner_name", "S"),
             AttrDef("user_name", "S"),
+            AttrDef(ELECTION_LISTING_ATTR, "S"),
+            AttrDef("election_name", "S"),
         ),
         keySchema = listOf(
             KeyElement("PK", "HASH"),
@@ -168,6 +181,14 @@ object DynamoDbSingleTableSchema {
             GsiShape(
                 name = MANAGER_USER_INDEX,
                 keySchema = listOf(KeyElement("user_name", "HASH"), KeyElement("SK", "RANGE")),
+                projectionType = "ALL",
+            ),
+            GsiShape(
+                name = ELECTION_LISTING_INDEX,
+                keySchema = listOf(
+                    KeyElement(ELECTION_LISTING_ATTR, "HASH"),
+                    KeyElement("election_name", "RANGE"),
+                ),
                 projectionType = "ALL",
             ),
         ),
