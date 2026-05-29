@@ -81,7 +81,13 @@ private object UuidGenerator : UniqueIdGenerator {
 private object NoopNotifications : Notifications {
     override fun databaseEvent(name: String, statement: String) = Unit
     override fun httpRequestEvent(method: String, path: String) = Unit
-    override fun httpResponseEvent(method: String, path: String, status: Int) = Unit
+    override fun httpResponseEvent(
+        method: String,
+        path: String,
+        routePattern: String,
+        status: Int,
+        durationMs: Long,
+    ) = Unit
     override fun serviceRequestEvent(name: String, request: String) = Unit
     override fun serviceResponseEvent(name: String, request: String, response: String) = Unit
     override fun topLevelException(message: String, stackTrace: String) = Unit

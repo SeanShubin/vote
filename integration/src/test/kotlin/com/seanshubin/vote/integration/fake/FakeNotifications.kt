@@ -14,7 +14,13 @@ class FakeNotifications : Notifications {
         events.add("http-request: $method $path")
     }
 
-    override fun httpResponseEvent(method: String, path: String, status: Int) {
+    override fun httpResponseEvent(
+        method: String,
+        path: String,
+        routePattern: String,
+        status: Int,
+        durationMs: Long,
+    ) {
         events.add("http-response: $method $path - $status")
     }
 

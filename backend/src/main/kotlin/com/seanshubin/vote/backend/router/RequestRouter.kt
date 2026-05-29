@@ -69,11 +69,19 @@ class RequestRouter(
     )
 
     fun route(req: HttpRequest): HttpResponse {
+        val startNanos = System.nanoTime()
         notifications.httpRequestEvent(req.method, req.target)
 
         if (req.method == "OPTIONS") {
-            notifications.httpResponseEvent(req.method, req.target, 200)
-            return HttpResponse(200, "")
+            val response = HttpResponse(200, "")
+            notifications.httpResponseEvent(
+                method = req.method,
+                path = req.target,
+                routePattern = "OPTIONS *",
+                status = response.status,
+                durationMs = elapsedMs(startNanos),
+            )
+            return response
         }
 
         // CloudFront proxies /api/... → API Gateway → Lambda. Frontend always
@@ -82,8 +90,15 @@ class RequestRouter(
         val normalized = req.target.removePrefix("/api").ifEmpty { "/" }
         val normalizedReq = if (normalized == req.target) req else req.withTarget(normalized)
 
+        // Match outside the try so the route pattern is available for the
+        // httpResponseEvent log line even when the handler throws — that's
+        // the case where the pattern matters most (slow/failing route).
+        val match = routes.firstOrNull { it.matches(normalizedReq.method, normalizedReq.target) }
+        val routePattern = match?.let { "${it.method} ${it.pathPattern}" } ?: "NOT_FOUND"
+
         val response = try {
-            dispatch(normalizedReq)
+            if (match == null) errorResponse(404, "Not found: ${req.method} ${req.target}")
+            else match.handler(normalizedReq)
         } catch (e: IllegalArgumentException) {
             errorResponse(400, e.message ?: "Bad request")
         } catch (e: EventLogPausedException) {
@@ -119,9 +134,18 @@ class RequestRouter(
             )
             errorResponse(500, e.message ?: "Unknown error")
         }
-        notifications.httpResponseEvent(req.method, req.target, response.status)
+        notifications.httpResponseEvent(
+            method = req.method,
+            path = req.target,
+            routePattern = routePattern,
+            status = response.status,
+            durationMs = elapsedMs(startNanos),
+        )
         return response
     }
+
+    private fun elapsedMs(startNanos: Long): Long =
+        (System.nanoTime() - startNanos) / 1_000_000
 
     /**
      * Single source of truth for routes. Each entry is [method, pathPattern,
@@ -195,15 +219,9 @@ class RequestRouter(
         Route("POST", "/auth/dev/create", ::handleDevCreate),
     )
 
-    private fun dispatch(req: HttpRequest): HttpResponse {
-        val match = routes.firstOrNull { it.matches(req.method, req.target) }
-            ?: return errorResponse(404, "Not found: ${req.method} ${req.target}")
-        return match.handler(req)
-    }
-
     private class Route(
         val method: String,
-        pathPattern: String,
+        val pathPattern: String,
         val handler: (HttpRequest) -> HttpResponse,
     ) {
         // Patterns with `[^/]+` are compiled to regex once; literal patterns

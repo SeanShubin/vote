@@ -3,16 +3,31 @@ package com.seanshubin.vote.backend.integration
 import com.seanshubin.vote.contract.Notifications
 
 object ConsoleNotifications : Notifications {
+    // Per-request DB-call counter. ThreadLocal because Jetty serves requests
+    // on a per-request thread and Lambda runs one invocation per container
+    // thread — either way, no cross-request leakage. Reset at the start of
+    // each request, drained into the response log line at the end.
+    private val dbCallCount = ThreadLocal.withInitial { 0 }
+
     override fun databaseEvent(name: String, statement: String) {
+        dbCallCount.set(dbCallCount.get() + 1)
         println("[$name] $statement")
     }
 
     override fun httpRequestEvent(method: String, path: String) {
+        dbCallCount.set(0)
         println("HTTP Request: $method $path")
     }
 
-    override fun httpResponseEvent(method: String, path: String, status: Int) {
-        println("HTTP Response: $method $path -> $status")
+    override fun httpResponseEvent(
+        method: String,
+        path: String,
+        routePattern: String,
+        status: Int,
+        durationMs: Long,
+    ) {
+        val dbCalls = dbCallCount.get()
+        println("HTTP Response: $method $path -> $status [route=$routePattern dur=${durationMs}ms db=$dbCalls]")
     }
 
     override fun serviceRequestEvent(name: String, request: String) {
