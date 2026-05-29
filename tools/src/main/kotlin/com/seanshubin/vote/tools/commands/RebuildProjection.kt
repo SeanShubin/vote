@@ -113,6 +113,17 @@ class RebuildProjection : CliktCommand(name = "rebuild-projection") {
                 applier.synchronize(EventApplier.CursorUpdate.EndOfBatch)
             }
             println("Replay finished in ${elapsedMs}ms (${eventCount} events).")
+
+            // Dropping vote_data wiped the EVENT_COUNTER item along with the
+            // cursor. The cursor was re-seeded by the replay above (EndOfBatch
+            // set last_synced to the max event id); the counter must be seeded
+            // to the same value or the next appendEvent restarts at 1 — handing
+            // out IDs at or below the cursor, which silently overwrites old
+            // events and drops them from sync. After the replay, last_synced IS
+            // the max event id (0 when the log is empty).
+            val maxEventId = queryModel.lastSynced() ?: 0
+            eventLog.seedEventCounter(maxEventId)
+            println("Seeded EVENT_COUNTER = $maxEventId (next event id ${maxEventId + 1}).")
         } catch (e: Exception) {
             // Don't resume on failure — the event log is in a known-paused
             // state, but the projection is in an unknown state. Surface

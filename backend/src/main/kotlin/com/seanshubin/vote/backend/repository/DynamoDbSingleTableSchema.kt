@@ -121,6 +121,18 @@ object DynamoDbSingleTableSchema {
     const val METADATA_SK = "METADATA"
     const val SYNC_SK = "SYNC"
 
+    /**
+     * Partition holding event-derived system singletons in vote_data: the
+     * projection cursor ([SYNC_SK], `last_synced`) and the event-id counter
+     * ([EVENT_COUNTER_SK], `next_event_id`). Both are wiped when
+     * rebuild-projection drops vote_data, so both must be re-seeded on
+     * rebuild — see DynamoDbStartup's counter-invariant guard.
+     */
+    const val METADATA_PK = "METADATA"
+    const val EVENT_COUNTER_SK = "EVENT_COUNTER"
+    const val NEXT_EVENT_ID_ATTR = "next_event_id"
+    const val LAST_SYNCED_ATTR = "last_synced"
+
     suspend fun createTables(dynamoDb: DynamoDbClient) {
         // Each table is created independently so an already-existing one
         // doesn't abort creation of the others. This matters now that

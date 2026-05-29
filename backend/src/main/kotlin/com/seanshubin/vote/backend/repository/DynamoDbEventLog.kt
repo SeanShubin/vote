@@ -151,15 +151,39 @@ class DynamoDbEventLog(
             val response = dynamoDb.updateItem(UpdateItemRequest {
                 tableName = DynamoDbSingleTableSchema.MAIN_TABLE
                 key = mapOf(
-                    "PK" to AttributeValue.S("METADATA"),
-                    "SK" to AttributeValue.S("EVENT_COUNTER")
+                    "PK" to AttributeValue.S(DynamoDbSingleTableSchema.METADATA_PK),
+                    "SK" to AttributeValue.S(DynamoDbSingleTableSchema.EVENT_COUNTER_SK)
                 )
-                updateExpression = "ADD next_event_id :inc"
+                updateExpression = "ADD ${DynamoDbSingleTableSchema.NEXT_EVENT_ID_ATTR} :inc"
                 expressionAttributeValues = mapOf(":inc" to AttributeValue.N("1"))
                 returnValues = ReturnValue.UpdatedNew
             })
 
-            response.attributes?.get("next_event_id")?.asN()?.toLong() ?: 1L
+            response.attributes?.get(DynamoDbSingleTableSchema.NEXT_EVENT_ID_ATTR)?.asN()?.toLong() ?: 1L
+        }
+    }
+
+    /**
+     * Force the event-id counter to [value] so the next [appendEvent] assigns
+     * `value + 1`. Used by rebuild-projection: dropping vote_data wipes the
+     * EVENT_COUNTER item, and unless it is re-seeded to the max event id the
+     * counter silently restarts at 1 — assigning IDs at or below the projection
+     * cursor, so every subsequent event is appended over an old row AND skipped
+     * by sync. Mirrors the cursor re-seed (`initializeLastSynced`) that already
+     * happens on rebuild.
+     */
+    fun seedEventCounter(value: Long) {
+        runBlocking {
+            dynamoDb.updateItem(UpdateItemRequest {
+                tableName = DynamoDbSingleTableSchema.MAIN_TABLE
+                key = mapOf(
+                    "PK" to AttributeValue.S(DynamoDbSingleTableSchema.METADATA_PK),
+                    "SK" to AttributeValue.S(DynamoDbSingleTableSchema.EVENT_COUNTER_SK),
+                )
+                updateExpression = "SET ${DynamoDbSingleTableSchema.NEXT_EVENT_ID_ATTR} = :val"
+                expressionAttributeValues = mapOf(":val" to AttributeValue.N(value.toString()))
+                returnValues = ReturnValue.None
+            })
         }
     }
 
