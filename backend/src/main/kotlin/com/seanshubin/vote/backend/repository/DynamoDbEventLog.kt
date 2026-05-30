@@ -16,32 +16,73 @@ class DynamoDbEventLog(
     private val json: Json
 ) : EventLog {
 
+    /**
+     * Append [event] to the log. The id is derived from the log itself —
+     * `max(event_id) + 1` — so the append-only log is the *sole* source of
+     * truth for id allocation. (The SQL backend gets this for free via the
+     * table's AUTO_INCREMENT; this is the DynamoDB equivalent.) No id-allocation
+     * state lives in the projection, so dropping/rebuilding the projection can
+     * never desync a counter and cause id reuse — the failure mode that
+     * silently overwrote events when the counter lived in vote_data.
+     *
+     * Concurrency: two appenders can read the same max and target the same id.
+     * The conditional put (`attribute_not_exists(event_id)`) lets exactly one
+     * win; the loser re-reads max and retries. This same condition is what makes
+     * the log append-only — a write can never overwrite an existing id. At this
+     * write volume real contention is rare, so a small bounded retry suffices.
+     */
     override fun appendEvent(authority: String, whenHappened: Instant, event: DomainEvent) {
-        // Read-then-write rather than a conditional PutItem because pause is
-        // an operator-driven flag, not a contended race — and a clear
-        // exception is far more useful than a ConditionalCheckFailed wrapper.
         if (isPaused()) throw EventLogPausedException()
 
         val eventType = event::class.simpleName ?: "Unknown"
         val eventData = json.encodeToString(event)
 
-        // Generate next event ID using atomic counter
-        val eventId = getNextEventId()
-
-        // Store the event
         runBlocking {
-            dynamoDb.putItem(PutItemRequest {
-                tableName = DynamoDbSingleTableSchema.EVENT_LOG_TABLE
-                item = mapOf(
-                    "PK" to AttributeValue.S(DynamoDbSingleTableSchema.EVENT_LOG_PK),
-                    "event_id" to AttributeValue.N(eventId.toString()),
-                    "authority" to AttributeValue.S(authority),
-                    "event_type" to AttributeValue.S(eventType),
-                    "event_data" to AttributeValue.S(eventData),
-                    "created_at" to AttributeValue.N(whenHappened.toEpochMilliseconds().toString())
-                )
-            })
+            repeat(MAX_APPEND_ATTEMPTS) {
+                val eventId = maxEventId() + 1
+                try {
+                    dynamoDb.putItem(PutItemRequest {
+                        tableName = DynamoDbSingleTableSchema.EVENT_LOG_TABLE
+                        conditionExpression = "attribute_not_exists(event_id)"
+                        item = mapOf(
+                            "PK" to AttributeValue.S(DynamoDbSingleTableSchema.EVENT_LOG_PK),
+                            "event_id" to AttributeValue.N(eventId.toString()),
+                            "authority" to AttributeValue.S(authority),
+                            "event_type" to AttributeValue.S(eventType),
+                            "event_data" to AttributeValue.S(eventData),
+                            "created_at" to AttributeValue.N(whenHappened.toEpochMilliseconds().toString())
+                        )
+                    })
+                    return@runBlocking
+                } catch (e: ConditionalCheckFailedException) {
+                    // Another appender claimed this id first. Re-read max and retry.
+                }
+            }
+            throw IllegalStateException(
+                "appendEvent gave up after $MAX_APPEND_ATTEMPTS id-collision retries — " +
+                    "unexpected sustained contention on the event log."
+            )
         }
+    }
+
+    /**
+     * Highest event id currently in the log, or 0 when the log is empty.
+     * Strongly consistent so a sequential append reads the id it just wrote and
+     * lands on the first attempt; the conditional put still backstops the rare
+     * concurrent case where two appenders read the same max.
+     */
+    private suspend fun maxEventId(): Long {
+        val response = dynamoDb.query(QueryRequest {
+            tableName = DynamoDbSingleTableSchema.EVENT_LOG_TABLE
+            keyConditionExpression = "PK = :pk"
+            expressionAttributeValues = mapOf(
+                ":pk" to AttributeValue.S(DynamoDbSingleTableSchema.EVENT_LOG_PK),
+            )
+            scanIndexForward = false
+            limit = 1
+            consistentRead = true
+        })
+        return response.items?.firstOrNull()?.get("event_id")?.asN()?.toLong() ?: 0
     }
 
     override fun eventsToSync(lastEventSynced: Long): List<EventEnvelope> {
@@ -145,51 +186,17 @@ class DynamoDbEventLog(
         }
     }
 
-    private fun getNextEventId(): Long {
-        return runBlocking {
-            // Use main table with PK=METADATA, SK=EVENT_COUNTER for atomic counter
-            val response = dynamoDb.updateItem(UpdateItemRequest {
-                tableName = DynamoDbSingleTableSchema.MAIN_TABLE
-                key = mapOf(
-                    "PK" to AttributeValue.S(DynamoDbSingleTableSchema.METADATA_PK),
-                    "SK" to AttributeValue.S(DynamoDbSingleTableSchema.EVENT_COUNTER_SK)
-                )
-                updateExpression = "ADD ${DynamoDbSingleTableSchema.NEXT_EVENT_ID_ATTR} :inc"
-                expressionAttributeValues = mapOf(":inc" to AttributeValue.N("1"))
-                returnValues = ReturnValue.UpdatedNew
-            })
-
-            response.attributes?.get(DynamoDbSingleTableSchema.NEXT_EVENT_ID_ATTR)?.asN()?.toLong() ?: 1L
-        }
-    }
-
-    /**
-     * Force the event-id counter to [value] so the next [appendEvent] assigns
-     * `value + 1`. Used by rebuild-projection: dropping vote_data wipes the
-     * EVENT_COUNTER item, and unless it is re-seeded to the max event id the
-     * counter silently restarts at 1 — assigning IDs at or below the projection
-     * cursor, so every subsequent event is appended over an old row AND skipped
-     * by sync. Mirrors the cursor re-seed (`initializeLastSynced`) that already
-     * happens on rebuild.
-     */
-    fun seedEventCounter(value: Long) {
-        runBlocking {
-            dynamoDb.updateItem(UpdateItemRequest {
-                tableName = DynamoDbSingleTableSchema.MAIN_TABLE
-                key = mapOf(
-                    "PK" to AttributeValue.S(DynamoDbSingleTableSchema.METADATA_PK),
-                    "SK" to AttributeValue.S(DynamoDbSingleTableSchema.EVENT_COUNTER_SK),
-                )
-                updateExpression = "SET ${DynamoDbSingleTableSchema.NEXT_EVENT_ID_ATTR} = :val"
-                expressionAttributeValues = mapOf(":val" to AttributeValue.N(value.toString()))
-                returnValues = ReturnValue.None
-            })
-        }
-    }
-
     private fun <T> runBlocking(block: suspend () -> T): T {
         return kotlinx.coroutines.runBlocking {
             block()
         }
+    }
+
+    private companion object {
+        // Append derives its id from the log's current max and guards the write
+        // with attribute_not_exists; a lost race retries with a fresh max. This
+        // bounds the retries so a pathological hot loop fails loudly instead of
+        // spinning. Generous — real contention at this volume is near-zero.
+        const val MAX_APPEND_ATTEMPTS = 16
     }
 }

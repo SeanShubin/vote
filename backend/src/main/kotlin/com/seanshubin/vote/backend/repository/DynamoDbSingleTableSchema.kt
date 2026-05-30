@@ -122,15 +122,15 @@ object DynamoDbSingleTableSchema {
     const val SYNC_SK = "SYNC"
 
     /**
-     * Partition holding event-derived system singletons in vote_data: the
-     * projection cursor ([SYNC_SK], `last_synced`) and the event-id counter
-     * ([EVENT_COUNTER_SK], `next_event_id`). Both are wiped when
-     * rebuild-projection drops vote_data, so both must be re-seeded on
-     * rebuild — see DynamoDbStartup's counter-invariant guard.
+     * Partition holding the projection's sync-cursor singleton in vote_data
+     * ([SYNC_SK], `last_synced`). The cursor is wiped when rebuild-projection
+     * drops vote_data and re-derived by replaying the log — a wiped cursor is
+     * self-healing, it just triggers a full re-sync. Event-id allocation keeps
+     * no singleton here: appendEvent derives the next id from the log itself
+     * (max + 1), so the projection holds no id-allocation state that could
+     * desync from the append-only log.
      */
     const val METADATA_PK = "METADATA"
-    const val EVENT_COUNTER_SK = "EVENT_COUNTER"
-    const val NEXT_EVENT_ID_ATTR = "next_event_id"
     const val LAST_SYNCED_ATTR = "last_synced"
 
     suspend fun createTables(dynamoDb: DynamoDbClient) {
