@@ -237,14 +237,19 @@ object DynamoDbSingleTableSchema {
     }
 
     /**
-     * Best-effort PITR enablement. Swallows errors from LocalStack (whose
-     * Community edition doesn't implement UpdateContinuousBackups) so the
-     * local integration tests that exercise [createMainTable] don't fail.
-     * In production this call succeeds; in LocalStack the absence of PITR
-     * is harmless because the test data is ephemeral.
+     * Best-effort PITR enablement, called right after a fresh create (and so
+     * once per environment, never on the already-exists cold-start path).
+     * Waits for the table to go ACTIVE first — UpdateContinuousBackups rejects
+     * a CREATING table, and skipping the wait is why a just-created table could
+     * silently end up without PITR. Swallows errors from LocalStack (whose
+     * Community edition doesn't implement UpdateContinuousBackups) so the local
+     * integration tests don't fail; in production this succeeds provided the
+     * role allows dynamodb:UpdateContinuousBackups. `internal` so the
+     * operator-state schema can reuse it for its own non-rebuildable table.
      */
-    private suspend fun enablePointInTimeRecovery(dynamoDb: DynamoDbClient, table: String) {
+    internal suspend fun enablePointInTimeRecovery(dynamoDb: DynamoDbClient, table: String) {
         try {
+            awaitTableActive(dynamoDb, table)
             dynamoDb.updateContinuousBackups(UpdateContinuousBackupsRequest {
                 tableName = table
                 pointInTimeRecoverySpecification = PointInTimeRecoverySpecification {
@@ -337,7 +342,23 @@ object DynamoDbSingleTableSchema {
                 },
             )
             billingMode = BillingMode.PayPerRequest
+            // The append-only log is the system's only non-rebuildable data, so
+            // guard it against an accidental delete-table at the table level.
+            deletionProtectionEnabled = true
         })
+        // PITR is the last-resort recovery for the log and isn't a CreateTable
+        // parameter — enable it once the fresh table is ACTIVE.
+        enablePointInTimeRecovery(dynamoDb, EVENT_LOG_TABLE)
+    }
+
+    /** Poll until [table] is ACTIVE (PITR can't be set on a CREATING table). */
+    private suspend fun awaitTableActive(dynamoDb: DynamoDbClient, table: String) {
+        repeat(30) {
+            val status = dynamoDb.describeTable(DescribeTableRequest { tableName = table })
+                .table?.tableStatus
+            if (status == TableStatus.Active) return
+            kotlinx.coroutines.delay(1000)
+        }
     }
 
     // Helper functions to build keys.

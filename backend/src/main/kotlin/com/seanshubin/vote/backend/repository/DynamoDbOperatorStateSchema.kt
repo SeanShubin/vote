@@ -38,6 +38,10 @@ object DynamoDbOperatorStateSchema {
                 }
             )
             billingMode = BillingMode.PayPerRequest
+            // Operator state (pause flag, feature flags) has no event-log source
+            // of truth, so it can't be rebuilt — protect it like the event log.
+            deletionProtectionEnabled = true
         })
+        DynamoDbSingleTableSchema.enablePointInTimeRecovery(dynamoDb, TABLE)
     }
 }
