@@ -359,6 +359,19 @@ Resources:
             TableName: vote_event_log
         - DynamoDBCrudPolicy:
             TableName: !Ref OperatorStateTable
+        # Read-only PartiQL on the two app-managed tables, for the admin
+        # "query" button. DynamoDBCrudPolicy does not include PartiQL* —
+        # those are separate IAM actions and have to be granted explicitly.
+        # Select only (no Insert/Update/Delete) so a compromised session
+        # can read state but not mutate it; writes still go through the
+        # event-log append path.
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:PartiQLSelect
+              Resource:
+                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/vote_data"
+                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/vote_event_log"
         # Read the four Discord OAuth parameters. Scoped to this stack's
         # parameters so a compromised Lambda can't enumerate other secrets.
         # kms:Decrypt is needed for the SecureString client-secret since it
