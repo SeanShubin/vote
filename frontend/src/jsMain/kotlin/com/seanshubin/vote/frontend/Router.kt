@@ -21,7 +21,28 @@ sealed class Page {
     object DebugTables : Page()
     object Query : Page()
     object UserManagement : Page()
-    object Admin : Page()
+
+    /**
+     * Landing page for the admin section — a fan-out menu that picks among
+     * the role-gated sub-pages (System, Diagnostics, Manage Users, Raw/Debug
+     * Tables, Query). Keeps Home uncluttered for non-admin users.
+     */
+    object AdminHome : Page()
+
+    /**
+     * Owner-only runtime console: event-log pause/resume, feature flags, and
+     * the deployed-versions report. Was previously [Page.Admin]; renamed when
+     * the admin landing page was introduced so the URL self-describes.
+     */
+    object System : Page()
+
+    /**
+     * Owner-only diagnostics: ring-buffer view of recent HTTP responses,
+     * server exceptions, and reported client errors from this backend
+     * process.
+     */
+    object Diagnostics : Page()
+
     data class ElectionDetail(val electionName: String) : Page()
     data class ElectionHeadToHead(val electionName: String) : Page()
     data class ElectionProcess(val electionName: String) : Page()
@@ -47,7 +68,9 @@ fun pageToPath(page: Page): String = when (page) {
     is Page.DebugTables -> "/admin/debug-tables"
     is Page.Query -> "/admin/query"
     is Page.UserManagement -> "/admin/users"
-    is Page.Admin -> "/admin"
+    is Page.AdminHome -> "/admin"
+    is Page.System -> "/admin/system"
+    is Page.Diagnostics -> "/admin/diagnostics"
     is Page.PasteTally -> "/sandbox"
 }
 
@@ -90,7 +113,9 @@ fun pathToPage(pathWithQuery: String): Page {
         normalized == "/admin/debug-tables" -> Page.DebugTables
         normalized == "/admin/query" -> Page.Query
         normalized == "/admin/users" -> Page.UserManagement
-        normalized == "/admin" -> Page.Admin
+        normalized == "/admin/system" -> Page.System
+        normalized == "/admin/diagnostics" -> Page.Diagnostics
+        normalized == "/admin" -> Page.AdminHome
         normalized == "/sandbox" -> Page.PasteTally
         else -> Page.Home
     }

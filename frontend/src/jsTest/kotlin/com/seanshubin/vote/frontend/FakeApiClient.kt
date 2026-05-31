@@ -3,6 +3,7 @@ package com.seanshubin.vote.frontend
 import com.seanshubin.vote.contract.ApiClient
 import com.seanshubin.vote.contract.AuthResponse
 import com.seanshubin.vote.contract.DeployedVersions
+import com.seanshubin.vote.contract.DiagnosticsSnapshot
 import com.seanshubin.vote.contract.LoginConfig
 import kotlinx.coroutines.CancellationException
 import com.seanshubin.vote.domain.CandidateNote
@@ -64,6 +65,9 @@ class FakeApiClient : ApiClient {
     val deployedVersionsCalls = mutableListOf<Unit>()
     var emailDeployedVersionsResult: Result<Unit> = Result.success(Unit)
     val emailDeployedVersionsCalls = mutableListOf<Unit>()
+    var diagnosticsResult: Result<DiagnosticsSnapshot> =
+        Result.success(DiagnosticsSnapshot(events = emptyList(), capacity = 0, droppedSinceStart = 0))
+    val diagnosticsCalls = mutableListOf<Unit>()
     var getMyUserResult: Result<UserNameEmail> = Result.success(UserNameEmail("user"))
     val getMyUserCalls = mutableListOf<Unit>()
     var listElectionsResult: Result<List<ElectionSummary>> = Result.success(emptyList())
@@ -178,6 +182,11 @@ class FakeApiClient : ApiClient {
     override suspend fun emailDeployedVersions() {
         emailDeployedVersionsCalls.add(Unit)
         emailDeployedVersionsResult.getOrThrow()
+    }
+
+    override suspend fun diagnostics(): DiagnosticsSnapshot {
+        diagnosticsCalls.add(Unit)
+        return diagnosticsResult.getOrThrow()
     }
 
     override var onSessionLost: (() -> Unit)? = null

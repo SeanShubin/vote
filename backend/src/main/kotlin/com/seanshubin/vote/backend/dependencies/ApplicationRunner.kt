@@ -6,6 +6,7 @@ import com.seanshubin.vote.backend.auth.DiscordOAuthClient
 import com.seanshubin.vote.backend.auth.JwtCipher
 import com.seanshubin.vote.backend.auth.SsmDiscordConfigProvider
 import com.seanshubin.vote.backend.auth.TokenEncoder
+import com.seanshubin.vote.backend.integration.BufferedNotifications
 import com.seanshubin.vote.backend.integration.HttpDeployManifestReader
 import com.seanshubin.vote.backend.router.RequestRouter
 import com.seanshubin.vote.backend.router.SimpleHttpHandler
@@ -112,15 +113,25 @@ class ApplicationRunner(
         service.synchronize()
         CandidateTierCollisionCheck(repositories.queryModel).verify()
 
+        // Outermost notifications layer: buffers HTTP responses + every error
+        // shape into an in-memory ring for the /admin/diagnostics panel.
+        // Wraps integrations.notifications so the underlying console/SES
+        // behavior is unchanged — the buffer is bonus, not a replacement.
+        val bufferedNotifications = BufferedNotifications(
+            delegate = integrations.notifications,
+            clock = integrations.clock,
+        )
+
         val router = RequestRouter(
             service = service,
             json = json,
             tokenEncoder = tokenEncoder,
             refreshCookie = configuration.cookieConfig,
             frontendBaseUrl = configuration.frontendBaseUrl,
-            notifications = integrations.notifications,
+            notifications = bufferedNotifications,
+            diagnosticsSource = bufferedNotifications,
         )
-        val httpHandler = SimpleHttpHandler(router, integrations.notifications)
+        val httpHandler = SimpleHttpHandler(router, bufferedNotifications)
         server = Server(configuration.port)
         server!!.handler = httpHandler
 

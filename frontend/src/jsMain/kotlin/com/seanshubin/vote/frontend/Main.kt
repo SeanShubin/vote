@@ -199,11 +199,7 @@ fun VoteApp(apiClient: ApiClient) {
             role = role,
             onNavigateToCreateElection = { router.navigate(Page.CreateElection) },
             onNavigateToElections = { router.navigate(Page.Elections) },
-            onNavigateToRawTables = { router.navigate(Page.RawTables) },
-            onNavigateToDebugTables = { router.navigate(Page.DebugTables) },
-            onNavigateToQuery = { router.navigate(Page.Query) },
-            onNavigateToUserManagement = { router.navigate(Page.UserManagement) },
-            onNavigateToAdmin = { router.navigate(Page.Admin) },
+            onNavigateToAdmin = { router.navigate(Page.AdminHome) },
             onNavigateToPasteTally = { router.navigate(Page.PasteTally) },
             onLogout = {
                 scope.launch {
@@ -285,7 +281,7 @@ fun VoteApp(apiClient: ApiClient) {
             emptyMessage = "No raw tables (this backend has no physical tables to expose).",
             loadNames = { apiClient.listTables() },
             loadData = { name -> apiClient.tableData(name) },
-            onBack = { router.navigate(Page.Home) },
+            onBack = { router.navigate(Page.AdminHome) },
         )
         is Page.DebugTables -> TablesPage(
             apiClient = apiClient,
@@ -293,19 +289,30 @@ fun VoteApp(apiClient: ApiClient) {
             emptyMessage = "No debug tables available.",
             loadNames = { apiClient.listDebugTables() },
             loadData = { name -> apiClient.debugTableData(name) },
-            onBack = { router.navigate(Page.Home) },
+            onBack = { router.navigate(Page.AdminHome) },
         )
         is Page.Query -> QueryPage(
             apiClient = apiClient,
-            onBack = { router.navigate(Page.Home) },
+            onBack = { router.navigate(Page.AdminHome) },
         )
         is Page.UserManagement -> UserManagementPage(
             apiClient = apiClient,
             currentUserName = userName ?: "",
             currentRole = role,
+            onBack = { router.navigate(Page.AdminHome) },
+        )
+        is Page.AdminHome -> AdminHomePage(
+            apiClient = apiClient,
+            role = role,
+            onNavigateToSystem = { router.navigate(Page.System) },
+            onNavigateToDiagnostics = { router.navigate(Page.Diagnostics) },
+            onNavigateToUserManagement = { router.navigate(Page.UserManagement) },
+            onNavigateToRawTables = { router.navigate(Page.RawTables) },
+            onNavigateToDebugTables = { router.navigate(Page.DebugTables) },
+            onNavigateToQuery = { router.navigate(Page.Query) },
             onBack = { router.navigate(Page.Home) },
         )
-        is Page.Admin -> AdminPage(
+        is Page.System -> SystemPage(
             apiClient = apiClient,
             role = role,
             isEventLogPaused = isPaused,
@@ -314,7 +321,12 @@ fun VoteApp(apiClient: ApiClient) {
             onFeatureFlagToggled = { flag, enabled ->
                 flagsState.value = flagsState.value + (flag to enabled)
             },
-            onBack = { router.navigate(Page.Home) },
+            onBack = { router.navigate(Page.AdminHome) },
+        )
+        is Page.Diagnostics -> DiagnosticsPage(
+            apiClient = apiClient,
+            role = role,
+            onBack = { router.navigate(Page.AdminHome) },
         )
         is Page.PasteTally -> PasteTallyPage(
             onBack = {

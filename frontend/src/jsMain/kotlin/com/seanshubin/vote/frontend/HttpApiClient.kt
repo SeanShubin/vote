@@ -140,6 +140,9 @@ class HttpApiClient(
         postEmptyWithAuth("/admin/deployed-versions/email")
     }
 
+    override suspend fun diagnostics(): DiagnosticsSnapshot =
+        getWithAuth("/admin/diagnostics")
+
     /**
      * POST with an empty body — the pause/resume endpoints don't take a
      * payload; the action is the URL. `postWithAuth` insists on a serializable

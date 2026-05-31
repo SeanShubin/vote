@@ -84,6 +84,16 @@ interface ApiClient {
     suspend fun emailDeployedVersions()
 
     /**
+     * Owner-only: snapshot of the in-app diagnostics ring buffer for this
+     * process. Contains the most recent HTTP responses (with timing + db-call
+     * counts), server exceptions, and reported client errors — newest first.
+     *
+     * Per-process (per-Lambda-container in prod), so the panel only reflects
+     * activity served by whichever container handled this read.
+     */
+    suspend fun diagnostics(): DiagnosticsSnapshot
+
+    /**
      * Set by the SPA shell to perform "you are now logged out" UX (clear
      * userName/role, route to /login). Implementations invoke it exactly when
      * an authenticated request can't be recovered via refresh — e.g. the user

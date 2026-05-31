@@ -13,10 +13,6 @@ fun HomePage(
     role: Role?,
     onNavigateToCreateElection: () -> Unit,
     onNavigateToElections: () -> Unit,
-    onNavigateToRawTables: () -> Unit,
-    onNavigateToDebugTables: () -> Unit,
-    onNavigateToQuery: () -> Unit,
-    onNavigateToUserManagement: () -> Unit,
     onNavigateToAdmin: () -> Unit,
     onNavigateToPasteTally: () -> Unit,
     onLogout: () -> Unit,
@@ -33,18 +29,6 @@ fun HomePage(
         apiClient.getUserActivity()
     }
     val activity = (activityFetch.state as? FetchState.Success)?.value
-
-    // Deployment-static label ("PartiQL"/"SQL"/""); empty means the active
-    // backend has no text-query surface, so the Query nav button is omitted
-    // entirely rather than routing to a page that can only throw.
-    val queryDialectFetch = rememberCachedFetchState(
-        apiClient = apiClient,
-        cacheKey = "queryDialect",
-        fallbackErrorMessage = "Failed to load query dialect",
-    ) {
-        apiClient.queryDialect()
-    }
-    val queryDialect = (queryDialectFetch.state as? FetchState.Success)?.value.orEmpty()
 
     val deleteAction = rememberAsyncAction(
         apiClient = apiClient,
@@ -102,48 +86,16 @@ fun HomePage(
                 Text("View Elections")
             }
 
-            // ADMIN+ get user management. UX shortcut — the backend re-checks
-            // MANAGE_USERS on every request.
+            // ADMIN+ get a single "Admin" button that fans out to the
+            // role-gated sub-pages on AdminHomePage (Manage Users, Raw/Debug
+            // Tables, Query, System, Diagnostics). Keeps Home uncluttered for
+            // everyone else. The backend re-checks the relevant permission
+            // on every request — this gate is just UX.
             if (role != null && role >= Role.ADMIN) {
-                Button({
-                    onClick { onNavigateToUserManagement() }
-                }) {
-                    Text("Manage Users")
-                }
-            }
-
-            // AUDITOR+ get the admin data browser. The role gate here is a UX
-            // shortcut — the backend re-checks VIEW_SECRETS on every request.
-            if (role != null && role >= Role.AUDITOR) {
-                Button({
-                    onClick { onNavigateToRawTables() }
-                }) {
-                    Text("Raw Tables")
-                }
-
-                Button({
-                    onClick { onNavigateToDebugTables() }
-                }) {
-                    Text("Debug Tables")
-                }
-
-                if (queryDialect.isNotEmpty()) {
-                    Button({
-                        onClick { onNavigateToQuery() }
-                    }) {
-                        Text("Query ($queryDialect)")
-                    }
-                }
-            }
-
-            // OWNER-only system console: pause/resume the event log and
-            // toggle feature flags. The backend re-checks Role.OWNER on
-            // every mutating call there.
-            if (role == Role.OWNER) {
                 Button({
                     onClick { onNavigateToAdmin() }
                 }) {
-                    Text("System")
+                    Text("Admin")
                 }
             }
 

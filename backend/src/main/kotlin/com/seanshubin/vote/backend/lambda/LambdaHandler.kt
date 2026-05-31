@@ -16,6 +16,7 @@ import com.seanshubin.vote.backend.dependencies.DynamoDbStartup
 import com.seanshubin.vote.backend.dependencies.RepositoryFactory
 import com.seanshubin.vote.backend.http.HttpRequest
 import com.seanshubin.vote.backend.http.SetCookie
+import com.seanshubin.vote.backend.integration.BufferedNotifications
 import com.seanshubin.vote.backend.integration.ProductionIntegrations
 import com.seanshubin.vote.backend.router.RequestRouter
 import com.seanshubin.vote.backend.service.DynamoToRelational
@@ -180,13 +181,23 @@ class LambdaHandler : RequestHandler<APIGatewayV2HTTPEvent, APIGatewayV2HTTPResp
                 devLoginEnabled = configuration.devLoginEnabled,
             )
 
+            // Outermost notifications layer: see ApplicationRunner for the
+            // rationale. Each Lambda container has its own buffer — the
+            // /admin/diagnostics panel only reflects the container that
+            // happened to serve that read.
+            val bufferedNotifications = BufferedNotifications(
+                delegate = integrations.notifications,
+                clock = integrations.clock,
+            )
+
             return RequestRouter(
                 service = service,
                 json = json,
                 tokenEncoder = tokenEncoder,
                 refreshCookie = configuration.cookieConfig,
                 frontendBaseUrl = configuration.frontendBaseUrl,
-                notifications = integrations.notifications,
+                notifications = bufferedNotifications,
+                diagnosticsSource = bufferedNotifications,
             )
         }
     }

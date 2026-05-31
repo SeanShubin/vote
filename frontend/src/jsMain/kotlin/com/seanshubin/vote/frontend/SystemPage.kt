@@ -10,7 +10,7 @@ import org.jetbrains.compose.web.dom.*
  * Owner-only system console. Houses the event-log pause/resume toggle and
  * the feature-flag map — both are runtime operator state that doesn't
  * belong in the user-facing Home page. Non-owners who land here (deep
- * link, role downgrade mid-session) are bounced to Home.
+ * link, role downgrade mid-session) are bounced to the admin landing.
  *
  * State propagation: [isEventLogPaused] and [featureFlags] come from the
  * root pollers (rememberPauseState / rememberFeatureFlags). The owner's
@@ -18,7 +18,7 @@ import org.jetbrains.compose.web.dom.*
  * tick — so the buttons here feel instant.
  */
 @Composable
-fun AdminPage(
+fun SystemPage(
     apiClient: ApiClient,
     role: com.seanshubin.vote.domain.Role?,
     isEventLogPaused: Boolean,
@@ -29,7 +29,7 @@ fun AdminPage(
 ) {
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
-    // Non-owners bounce to Home. The backend re-checks Role.OWNER on every
+    // Non-owners bounce out. The backend re-checks Role.OWNER on every
     // mutating call anyway; this is just UX so a stale token holder doesn't
     // see a useless page full of disabled buttons.
     LaunchedEffect(role) {
@@ -130,7 +130,7 @@ fun AdminPage(
         )
 
         Div({ classes("button-row") }) {
-            Button({ onClick { onBack() } }) { Text("Back to Home") }
+            Button({ onClick { onBack() } }) { Text("Back to Admin") }
         }
     }
 }
