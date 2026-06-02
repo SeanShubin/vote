@@ -17,6 +17,7 @@ import com.seanshubin.vote.backend.dependencies.RepositoryFactory
 import com.seanshubin.vote.backend.http.HttpRequest
 import com.seanshubin.vote.backend.http.SetCookie
 import com.seanshubin.vote.backend.integration.BufferedNotifications
+import com.seanshubin.vote.backend.integration.HttpDeployManifestReader
 import com.seanshubin.vote.backend.integration.ProductionIntegrations
 import com.seanshubin.vote.backend.router.RequestRouter
 import com.seanshubin.vote.backend.service.DynamoToRelational
@@ -163,6 +164,14 @@ class LambdaHandler : RequestHandler<APIGatewayV2HTTPEvent, APIGatewayV2HTTPResp
                     )
                 } ?: DiscordConfigProvider { null }
 
+            // Reads the deploy pipeline's deployed-version.json over HTTPS from
+            // the frontend origin so /admin/deployed-versions can show what the
+            // pipeline last published alongside what the running JAR reports.
+            val deployManifestReader = HttpDeployManifestReader(
+                frontendBaseUrl = configuration.frontendBaseUrl,
+                httpClient = sharedHttpClient,
+            )
+
             val service = ServiceImpl(
                 integrations = integrations,
                 eventLog = repositories.eventLog,
@@ -179,6 +188,7 @@ class LambdaHandler : RequestHandler<APIGatewayV2HTTPEvent, APIGatewayV2HTTPResp
                 // parseLambdaConfiguration hard-codes this false — the
                 // dev-login bypass cannot exist in production.
                 devLoginEnabled = configuration.devLoginEnabled,
+                deployManifestReader = deployManifestReader::read,
             )
 
             // Outermost notifications layer: see ApplicationRunner for the
