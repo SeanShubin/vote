@@ -277,6 +277,43 @@ object DynamoDbSingleTableSchema {
     }
 
     /**
+     * Read the projection's `last_synced` cursor from the singleton METADATA/SYNC
+     * row in vote_data. Returns 0 when the row is absent (freshly-created table
+     * or wiped projection — both self-heal by replaying from the start).
+     * Strongly consistent so callers see the true tail, not a stale replica.
+     */
+    suspend fun readLastSynced(dynamoDb: DynamoDbClient): Long {
+        val response = dynamoDb.getItem(GetItemRequest {
+            tableName = MAIN_TABLE
+            key = mapOf(
+                "PK" to AttributeValue.S(METADATA_PK),
+                "SK" to AttributeValue.S(SYNC_SK),
+            )
+            consistentRead = true
+        })
+        return response.item?.get(LAST_SYNCED_ATTR)?.asN()?.toLong() ?: 0
+    }
+
+    /**
+     * Highest event_id in vote_event_log, or 0 when empty. Strongly consistent
+     * — both startup invariants and rebuild-projection's reconciliation depend
+     * on seeing the actual tail, not a replica lagged behind a recent delete.
+     */
+    suspend fun readMaxEventId(dynamoDb: DynamoDbClient): Long {
+        val response = dynamoDb.query(QueryRequest {
+            tableName = EVENT_LOG_TABLE
+            keyConditionExpression = "PK = :pk"
+            expressionAttributeValues = mapOf(
+                ":pk" to AttributeValue.S(EVENT_LOG_PK),
+            )
+            scanIndexForward = false
+            limit = 1
+            consistentRead = true
+        })
+        return response.items?.firstOrNull()?.get("event_id")?.asN()?.toLong() ?: 0
+    }
+
+    /**
      * Read the live shape of vote_data via DescribeTable, returning null if
      * the table doesn't exist. The shape comparison logic in
      * [TableShape.compareTo] uses this output to decide whether

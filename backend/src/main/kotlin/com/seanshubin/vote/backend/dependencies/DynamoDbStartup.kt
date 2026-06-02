@@ -1,9 +1,6 @@
 package com.seanshubin.vote.backend.dependencies
 
 import aws.sdk.kotlin.services.dynamodb.DynamoDbClient
-import aws.sdk.kotlin.services.dynamodb.model.AttributeValue
-import aws.sdk.kotlin.services.dynamodb.model.GetItemRequest
-import aws.sdk.kotlin.services.dynamodb.model.QueryRequest
 import com.seanshubin.vote.backend.repository.DynamoDbOperatorStateSchema
 import com.seanshubin.vote.backend.repository.DynamoDbSingleTableSchema
 import com.seanshubin.vote.contract.Integrations
@@ -70,51 +67,14 @@ class DynamoDbStartup(
      * rather than serve a projection built on a phantom suffix.
      */
     private suspend fun verifyCursorWithinLog(dynamoDbClient: DynamoDbClient) {
-        val lastSynced = readMetadataNumber(
-            dynamoDbClient,
-            DynamoDbSingleTableSchema.SYNC_SK,
-            DynamoDbSingleTableSchema.LAST_SYNCED_ATTR,
-        )
-        val maxEventId = readMaxEventId(dynamoDbClient)
+        val lastSynced = DynamoDbSingleTableSchema.readLastSynced(dynamoDbClient)
+        val maxEventId = DynamoDbSingleTableSchema.readMaxEventId(dynamoDbClient)
         if (lastSynced > maxEventId) {
             throw CursorAheadOfLogException(lastSynced, maxEventId)
         }
         integrations.emitLine(
             "cursor invariant verified (last_synced=$lastSynced <= max_event_id=$maxEventId)"
         )
-    }
-
-    /** Read a numeric attribute from a METADATA-partition singleton; 0 if absent. */
-    private suspend fun readMetadataNumber(
-        dynamoDbClient: DynamoDbClient,
-        sortKey: String,
-        attribute: String,
-    ): Long {
-        val response = dynamoDbClient.getItem(GetItemRequest {
-            tableName = DynamoDbSingleTableSchema.MAIN_TABLE
-            key = mapOf(
-                "PK" to AttributeValue.S(DynamoDbSingleTableSchema.METADATA_PK),
-                "SK" to AttributeValue.S(sortKey),
-            )
-            consistentRead = true
-        })
-        return response.item?.get(attribute)?.asN()?.toLong() ?: 0
-    }
-
-    /** Highest event id in the log, or 0 when empty. Strongly consistent so the
-     *  cold-init check reflects the true tail, not a stale replica. */
-    private suspend fun readMaxEventId(dynamoDbClient: DynamoDbClient): Long {
-        val response = dynamoDbClient.query(QueryRequest {
-            tableName = DynamoDbSingleTableSchema.EVENT_LOG_TABLE
-            keyConditionExpression = "PK = :pk"
-            expressionAttributeValues = mapOf(
-                ":pk" to AttributeValue.S(DynamoDbSingleTableSchema.EVENT_LOG_PK),
-            )
-            scanIndexForward = false
-            limit = 1
-            consistentRead = true
-        })
-        return response.items?.firstOrNull()?.get("event_id")?.asN()?.toLong() ?: 0
     }
 }
 

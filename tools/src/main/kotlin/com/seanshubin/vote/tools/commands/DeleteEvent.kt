@@ -22,6 +22,15 @@ import kotlinx.coroutines.runBlocking
  * synchronize() throw (which freezes the projection for every event after
  * it). Once the bad event is gone, synchronize() can advance past it again.
  * Deleting an event that later events depend on will corrupt the replay.
+ *
+ * After the delete(s) succeed, this command chains to
+ * [ProjectionRebuilder.rebuild]: drops vote_data and replays the (now
+ * shortened) event log so the projection no longer references deleted events.
+ * Without this chain a tail-event delete leaves last_synced > max(event_id),
+ * which fails the next Lambda cold-init invariant and blocks deploys until
+ * an operator remembers to run rebuild-projection. `--skip-rebuild` opts out
+ * for the rare case where you intend to rewrite the log further before
+ * rebuilding (e.g. multiple delete/restore steps in one maintenance window).
  */
 class DeleteEvent : CliktCommand(name = "delete-event") {
     private val eventIds: List<String> by argument(
@@ -30,9 +39,15 @@ class DeleteEvent : CliktCommand(name = "delete-event") {
     ).multiple(required = true)
     private val prod by option("--prod", help = "Target real AWS DynamoDB instead of DynamoDB Local.").flag()
     private val yes by option("--yes", help = "Skip the confirmation prompt (scripted use).").flag()
+    private val skipRebuild by option(
+        "--skip-rebuild",
+        help = "Do NOT rebuild the projection after delete. Use only when chaining further log surgery; " +
+            "the next deploy/cold-init will fail until rebuild-projection runs.",
+    ).flag()
 
     override fun help(context: Context) =
-        "Delete event(s) from vote_event_log by event_id. Source-of-truth surgery — use with care."
+        "Delete event(s) from vote_event_log by event_id, then rebuild the projection. " +
+            "Source-of-truth surgery — use with care."
 
     override fun run() = runBlocking {
         val ids = eventIds
@@ -83,6 +98,16 @@ class DeleteEvent : CliktCommand(name = "delete-event") {
                 println("Deleted event_id $id.")
             }
             Output.success("Deleted ${present.size} event(s).")
+
+            if (skipRebuild) {
+                println(
+                    "Skipping projection rebuild (--skip-rebuild). The projection still references " +
+                        "deleted events; run rebuild-projection before the next deploy.",
+                )
+            } else {
+                Output.banner("Rebuilding projection so it no longer references deleted events")
+                ProjectionRebuilder.rebuild(client)
+            }
         }
     }
 
