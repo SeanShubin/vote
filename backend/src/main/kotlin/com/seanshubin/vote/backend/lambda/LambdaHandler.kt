@@ -184,10 +184,18 @@ class LambdaHandler : RequestHandler<APIGatewayV2HTTPEvent, APIGatewayV2HTTPResp
             // Outermost notifications layer: see ApplicationRunner for the
             // rationale. Each Lambda container has its own buffer — the
             // /admin/diagnostics panel only reflects the container that
-            // happened to serve that read.
+            // happened to serve that read. The log stream name is per-
+            // container (Lambda gives each container its own stream) and
+            // survives across warm invocations, so it's a stable id the UI
+            // can use to tell two refreshes apart. The "" fallback shouldn't
+            // hit in real Lambda, but covers the local-Lambda-test case.
+            val containerId = System.getenv("AWS_LAMBDA_LOG_STREAM_NAME")
+                ?.takeIf { it.isNotBlank() }
+                ?: "lambda-${java.util.UUID.randomUUID()}"
             val bufferedNotifications = BufferedNotifications(
                 delegate = integrations.notifications,
                 clock = integrations.clock,
+                containerId = containerId,
             )
 
             return RequestRouter(

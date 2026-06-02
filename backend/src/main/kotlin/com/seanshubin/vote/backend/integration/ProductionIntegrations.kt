@@ -1,5 +1,6 @@
 package com.seanshubin.vote.backend.integration
 
+import com.seanshubin.vote.backend.BuildInfo
 import com.seanshubin.vote.backend.dependencies.EnvVars
 import com.seanshubin.vote.contract.*
 
@@ -25,9 +26,22 @@ class ProductionIntegrations(
                 fromAddress = from,
                 toAddress = to,
                 region = region,
+                runtimeIdentity = buildRuntimeIdentity(),
             )
         } else {
             ConsoleNotifications
         }
+    }
+
+    // Identifying lines included in every alert email so an incident
+    // is self-describing without cross-referencing deployed-version.json
+    // or CloudWatch console state. Build is the commit baked into the JAR;
+    // Lambda function version is the immutable Lambda::Version that
+    // executed (e.g. "42" vs "$LATEST"); log stream is the direct
+    // pointer into CloudWatch for the full trace.
+    private fun buildRuntimeIdentity(): String = buildString {
+        appendLine("Build: ${BuildInfo.GIT_HASH}")
+        appendLine("Lambda version: ${getEnv("AWS_LAMBDA_FUNCTION_VERSION") ?: "(unset)"}")
+        append("Log stream: ${getEnv("AWS_LAMBDA_LOG_STREAM_NAME") ?: "(unset)"}")
     }
 }

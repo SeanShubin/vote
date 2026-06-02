@@ -66,7 +66,7 @@ class FakeApiClient : ApiClient {
     var emailDeployedVersionsResult: Result<Unit> = Result.success(Unit)
     val emailDeployedVersionsCalls = mutableListOf<Unit>()
     var diagnosticsResult: Result<DiagnosticsSnapshot> =
-        Result.success(DiagnosticsSnapshot(events = emptyList(), capacity = 0, droppedSinceStart = 0))
+        Result.success(DiagnosticsSnapshot(containerId = "fake", events = emptyList(), capacity = 0, droppedSinceStart = 0))
     val diagnosticsCalls = mutableListOf<Unit>()
     var getMyUserResult: Result<UserNameEmail> = Result.success(UserNameEmail("user"))
     val getMyUserCalls = mutableListOf<Unit>()

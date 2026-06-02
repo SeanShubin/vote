@@ -643,6 +643,28 @@ button:disabled {
     font-size: 0.85rem;
     color: var(--color-label);
     margin: 0.25rem 0 0.75rem;
+    font-family: monospace;
+}
+
+/*
+ * Top-of-page callout explaining the per-container fragmentation that
+ * Lambda imposes on the in-memory buffer. Subtle blue border (no alarm
+ * red — this is informational, not an error) so the operator notices it
+ * once and ignores it on repeat visits.
+ */
+.diag-callout {
+    margin-top: 0.5rem;
+    padding: 0.6rem 0.9rem;
+    background-color: var(--color-notice-bg);
+    border-left: 4px solid var(--color-notice-border);
+    border-radius: 4px;
+    color: var(--color-paragraph);
+}
+
+.diag-callout p {
+    margin: 0;
+    font-size: 0.9rem;
+    line-height: 1.4;
 }
 
 .diag-no-errors {

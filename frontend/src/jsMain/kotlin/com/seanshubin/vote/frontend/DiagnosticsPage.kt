@@ -52,12 +52,30 @@ fun DiagnosticsPage(
                 val allEvents = snapshot.events
                 val errors = allEvents.filter { it.isError }
 
+                // Lambda routes each request to whatever container is warm,
+                // and the buffer is per-container. Calling this out up front
+                // so an operator who sees a tiny count doesn't conclude the
+                // recorder is broken — they're just looking at one container.
+                Div({ classes("diag-callout") }) {
+                    P {
+                        B { Text("Per-container view. ") }
+                        Text(
+                            "In prod each Lambda container has its own buffer. " +
+                                "Refreshing this page may land on a different container " +
+                                "and show different events — when the Container ID below " +
+                                "changes between refreshes, that's why. Errors are also " +
+                                "emailed (durable, cross-container)."
+                        )
+                    }
+                }
+
                 P({ classes("diag-meta") }) {
                     val dropped = if (snapshot.droppedSinceStart > 0) {
                         " • ${snapshot.droppedSinceStart} evicted since start"
                     } else ""
                     Text(
-                        "Buffer: ${allEvents.size} / ${snapshot.capacity} events$dropped" +
+                        "Container: ${snapshot.containerId} • " +
+                            "Buffer: ${allEvents.size} / ${snapshot.capacity} events$dropped" +
                             " • newest first • backend restart clears this buffer"
                     )
                 }

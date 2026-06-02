@@ -117,9 +117,12 @@ class ApplicationRunner(
         // shape into an in-memory ring for the /admin/diagnostics panel.
         // Wraps integrations.notifications so the underlying console/SES
         // behavior is unchanged — the buffer is bonus, not a replacement.
+        // Local dev runs one JVM, so a random per-startup id is enough to
+        // tell two different runs apart in the panel.
         val bufferedNotifications = BufferedNotifications(
             delegate = integrations.notifications,
             clock = integrations.clock,
+            containerId = "local-${java.util.UUID.randomUUID()}",
         )
 
         val router = RequestRouter(

@@ -31,6 +31,7 @@ class SesNotifications(
     private val fromAddress: String,
     private val toAddress: String,
     private val region: String,
+    private val runtimeIdentity: String,
     private val nowUtc: () -> Instant = Instant::now,
     private val sendEmail: (String, String) -> Unit = { subject, body ->
         defaultSendEmail(fromAddress, toAddress, region, subject, body)
@@ -125,6 +126,7 @@ class SesNotifications(
         appendLine("=".repeat(kind.length))
         appendLine()
         appendLine("Server time (UTC): ${nowUtc()}")
+        appendLine(runtimeIdentity)
         appendLine("Message: $message")
         for ((label, value) in extras) {
             appendLine("$label: $value")
