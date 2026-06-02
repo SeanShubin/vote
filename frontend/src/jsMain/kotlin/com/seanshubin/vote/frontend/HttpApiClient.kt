@@ -587,7 +587,16 @@ class HttpApiClient(
     }
 
     private fun encodeURIComponent(str: String): String {
-        return js("encodeURIComponent")(str) as String
+        // Double-encode path segments. AWS API Gateway HTTP API v2 URL-decodes
+        // the path once and then re-parses for query separators — so an encoded
+        // "?" (%3F) arrives at Lambda with everything after it stripped off
+        // (rawPath = ".../prefix", everything past the ? gone). Encoding twice
+        // means API Gateway's decode leaves the once-encoded form intact, and
+        // the backend's URLDecoder.decode in extractElectionName/etc. handles
+        // the remaining layer. Jetty (local dev) decodes path-segments once
+        // the same way, so the round-trip works identically in both runtimes.
+        val once = js("encodeURIComponent")(str) as String
+        return js("encodeURIComponent")(once) as String
     }
 }
 

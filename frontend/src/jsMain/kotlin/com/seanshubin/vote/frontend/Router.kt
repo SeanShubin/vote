@@ -193,8 +193,17 @@ fun rememberRouter(): Router {
 /** Pages that don't require authentication. Anything else bounces to /login on auth fail. */
 fun isPublicPage(page: Page): Boolean = page is Page.Login || page is Page.PasteTally
 
-private fun encodeUriComponent(s: String): String =
-    js("encodeURIComponent")(s) as String
+// Path segments are double-encoded so they survive AWS API Gateway HTTP API v2's
+// decode-then-reparse behavior (it decodes %3F to ? and treats it as a query
+// separator, truncating the path). The matching double-decode happens in
+// pathToPage / the backend's URLDecoder.decode. See HttpApiClient.kt for the
+// API-call side of the same trick.
+private fun encodeUriComponent(s: String): String {
+    val once = js("encodeURIComponent")(s) as String
+    return js("encodeURIComponent")(once) as String
+}
 
-private fun decodeUriComponent(s: String): String =
-    js("decodeURIComponent")(s) as String
+private fun decodeUriComponent(s: String): String {
+    val once = js("decodeURIComponent")(s) as String
+    return js("decodeURIComponent")(once) as String
+}
