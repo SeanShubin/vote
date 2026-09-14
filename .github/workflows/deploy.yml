@@ -18,7 +18,6 @@ on:
       - '**.md'
       - '.gitignore'
       - 'docs/**'
-      - 'documentation/**'
   workflow_dispatch:
 
 permissions:
@@ -332,3 +331,67 @@ jobs:
           done
           echo "Backend smoke test failed."
           exit 1
+
+  publish-docs:
+    # Publishes the generated reports to GitHub Pages so
+    # generated/documentation/index.html (and everything it links to,
+    # including ../code-structure/browse/_index.html) is browsable at
+    # https://seanshubin.github.io/vote/ instead of only being a
+    # download-and-unzip workflow artifact.
+    #
+    # Reuses the artifact generate-docs already uploaded — no second
+    # Gradle build. Independent of the AWS `deploy` job: docs publish even
+    # when the CFN/S3 deploy fails, and a Pages failure never blocks prod.
+    needs: [generate-docs]
+    runs-on: ubuntu-latest
+    permissions:
+      # Job-level permissions override the workflow-level block, so only
+      # this job's token can write Pages.
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Download generated reports
+        uses: actions/download-artifact@v4
+        with:
+          name: generated-reports-${{ github.run_number }}
+          path: site/
+
+      - name: Add site root redirect and disable Jekyll
+        run: |
+          # .nojekyll: the code-structure report's table of contents is
+          # browse/_index.html, and Jekyll drops leading-underscore paths.
+          # The Actions publishing path does not run Jekyll anyway, this
+          # keeps it true if the source ever changes.
+          touch site/.nojekyll
+          # The generator emits no page at the root of generated/, so send
+          # the Pages root straight to the documentation index.
+          cat > site/index.html <<'HTML'
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+            <meta charset="UTF-8">
+            <meta http-equiv="refresh" content="0; url=documentation/index.html">
+            <link rel="canonical" href="documentation/index.html">
+            <title>Vote System Documentation</title>
+          </head>
+          <body>
+            <p><a href="documentation/index.html">Vote System Documentation</a></p>
+          </body>
+          </html>
+          HTML
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site/
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

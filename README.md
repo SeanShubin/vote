@@ -2,6 +2,9 @@
 
 A ranked-choice voting system demonstrating clean architecture with multiple database backends unified behind a relational projection layer.
 
+- Live app: <https://pairwisevote.com>
+- Generated documentation: <https://seanshubin.github.io/vote/> — data model, scenario walkthrough, MySQL/DynamoDB dumps, event log, and code-structure analysis, regenerated on every push to `master`
+
 ## Overview
 
 This project implements a Condorcet voting system (ranked-choice with pairwise comparisons) with three different database backends that share the same API and business logic:
@@ -75,14 +78,18 @@ See `frontend-testing-root-cause-found.md` for technical details on testing Comp
 
 ### Static Analysis Documentation
 
-Generate and view static analysis reports:
+Published on every push to `master`:
+**<https://seanshubin.github.io/vote/>**
+
+To generate and view the same reports locally:
 
 ```bash
 # Generate all static analysis reports
-./scripts/generate-docs.sh
+# (needs Docker for TestContainers, and graphviz for the schema SVG)
+./gradlew :documentation:generateDocumentation
 
 # View the report index
-open schema-diagram/index.html
+open generated/documentation/index.html
 ```
 
 The reports include:
@@ -226,6 +233,12 @@ Every push to `master` triggers `.github/workflows/deploy.yml`, which:
 4. `aws cloudformation deploy` applies the stack
 5. `aws s3 sync` the frontend, then a CloudFront invalidation
 6. Smoke-tests `https://api.pairwisevote.com/health`
+
+In parallel with the AWS deploy, the `publish-docs` job takes the reports
+`generate-docs` already built and publishes them to GitHub Pages at
+<https://seanshubin.github.io/vote/>. It is independent of the AWS `deploy`
+job in both directions: docs still publish if the CFN/S3 deploy fails, and a
+Pages failure never blocks production.
 
 First deploy is ~5-10 min (cert validation + CloudFront propagation).
 Subsequent deploys ~2-3 min.
