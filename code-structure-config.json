@@ -5,11 +5,11 @@
   "sourcePrefix" : "https://github.com/SeanShubin/vote/blob/master/",
   "sourceFileRegexPatterns" : {
     "include" : [ ".*/src/(main|jvmMain|commonMain)/(kotlin|java)/.*\\.(kt|java)" ],
-    "exclude" : [ ]
+    "exclude" : [ ".*\\.claude/worktrees/.*" ]
   },
   "binaryFileRegexPatterns" : {
     "include" : [ ".*/build/classes/.*/main/.*\\.class" ],
-    "exclude" : [ ".*/testdata/.*", ".*/generated/.*" ]
+    "exclude" : [ ".*/testdata/.*", ".*/generated/.*", ".*\\.claude/worktrees/.*" ]
   },
   "countAsErrors" : {
     "inDirectCycle" : true,
