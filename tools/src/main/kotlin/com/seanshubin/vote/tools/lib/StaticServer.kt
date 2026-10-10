@@ -13,8 +13,13 @@ import org.eclipse.jetty.servlet.DefaultServlet
 import org.eclipse.jetty.servlet.FilterHolder
 import org.eclipse.jetty.servlet.ServletContextHandler
 import org.eclipse.jetty.servlet.ServletHolder
+import java.net.URI
+import java.net.http.HttpClient
+import java.net.http.HttpRequest
+import java.net.http.HttpResponse
 import java.nio.file.Files
 import java.nio.file.Path
+import java.time.Duration
 import java.util.EnumSet
 
 object StaticServer {
@@ -30,12 +35,28 @@ object StaticServer {
      * even though the route works in production (where CloudFront / S3
      * map unmatched paths to index.html). Matches that production behavior
      * locally so deep links survive a refresh during development.
+     *
+     * Paths in [PROXIED_PREFIXES] are sent to [backendBaseUrl] instead,
+     * mirroring the CloudFront behaviors that route them to API Gateway in
+     * production. Without this the SPA fallback would swallow them: a shared
+     * review page is server-rendered HTML at a path with no file extension,
+     * so it looks exactly like a client-side route and would be answered
+     * with index.html.
      */
-    fun start(rootDir: Path, port: Int): Server {
+    fun start(rootDir: Path, port: Int, backendBaseUrl: String): Server {
         val server = Server(port)
         val handler = ServletContextHandler()
         handler.contextPath = "/"
         handler.baseResource = org.eclipse.jetty.util.resource.Resource.newResource(rootDir.toFile())
+
+        // Registered before the SPA fallback so a proxied path never reaches
+        // it. Order matters: the fallback would otherwise answer these with
+        // index.html, which is the bug this exists to prevent.
+        handler.addFilter(
+            FilterHolder(BackendProxyFilter(backendBaseUrl)),
+            "/*",
+            EnumSet.of(DispatcherType.REQUEST),
+        )
 
         // Filter runs BEFORE the DefaultServlet so we can rewrite the
         // request path to /index.html when the requested file does not
@@ -57,6 +78,69 @@ object StaticServer {
         server.handler = handler
         server.start()
         return server
+    }
+
+    /**
+     * Path prefixes served by the backend rather than the SPA bundle, one
+     * per CloudFront behavior that targets the API origin.
+     *
+     * /api is deliberately absent: in production CloudFront proxies it so
+     * the browser sees one origin and cookies travel as same-origin, but
+     * locally the SPA is built with an absolute api.base.url and calls the
+     * backend directly, so there is nothing to proxy.
+     */
+    val PROXIED_PREFIXES = listOf("/review")
+
+    fun isProxied(path: String): Boolean = PROXIED_PREFIXES.any { prefix ->
+        path == prefix || path.startsWith("$prefix/")
+    }
+}
+
+/**
+ * Forwards [StaticServer.PROXIED_PREFIXES] to the backend so local URLs
+ * behave like deployed ones.
+ *
+ * Uses the JDK client rather than Jetty's ProxyServlet to avoid pulling in
+ * jetty-proxy for a dev-only convenience. Read-only and deliberately plain:
+ * these paths are unauthenticated GETs, so there are no cookies, credentials
+ * or request bodies to carry across.
+ */
+private class BackendProxyFilter(private val backendBaseUrl: String) : Filter {
+    private val client = HttpClient.newBuilder()
+        .connectTimeout(Duration.ofSeconds(5))
+        .followRedirects(HttpClient.Redirect.NEVER)
+        .build()
+
+    override fun init(filterConfig: FilterConfig?) {}
+    override fun destroy() {}
+
+    override fun doFilter(request: ServletRequest, response: ServletResponse, chain: FilterChain) {
+        val req = request as HttpServletRequest
+        val res = response as HttpServletResponse
+        if (req.method != "GET" || !StaticServer.isProxied(req.requestURI)) {
+            chain.doFilter(request, response)
+            return
+        }
+
+        val query = req.queryString?.let { "?$it" } ?: ""
+        val target = URI.create(backendBaseUrl.trimEnd('/') + req.requestURI + query)
+        try {
+            val upstream = client.send(
+                HttpRequest.newBuilder(target).GET().build(),
+                HttpResponse.BodyHandlers.ofByteArray(),
+            )
+            res.status = upstream.statusCode()
+            upstream.headers().firstValue("content-type").ifPresent { res.contentType = it }
+            res.outputStream.write(upstream.body())
+        } catch (e: Exception) {
+            // Almost always the backend not being up. Say so plainly rather
+            // than letting it surface as a stack trace or, worse, falling
+            // through to the SPA and looking like a routing bug.
+            res.status = HttpServletResponse.SC_BAD_GATEWAY
+            res.contentType = "text/plain; charset=utf-8"
+            res.writer.println("Could not reach the backend at $backendBaseUrl to serve ${req.requestURI}")
+            res.writer.println("Reason: ${e.message}")
+        }
     }
 }
 

@@ -69,7 +69,7 @@ class ServeFrontend : CliktCommand(name = "serve-frontend") {
         }
 
         println("Serving frontend from $dist on http://localhost:$FRONTEND_PORT")
-        val server = StaticServer.start(dist, FRONTEND_PORT)
+        val server = StaticServer.start(dist, FRONTEND_PORT, "http://localhost:$BACKEND_PORT")
         Runtime.getRuntime().addShutdownHook(Thread { runCatching { server.stop() } })
         server.join()
     }
