@@ -14,10 +14,10 @@ import kotlin.test.assertTrue
  * The wire-format contract: an HTTP 503 response from any write endpoint
  * surfaces as a distinct exception type so call sites (rememberAsyncAction,
  * VotingView's auto-save) can recognize the planned-maintenance case and
- * silently skip — the global banner is the single source of truth. Any other
- * non-2xx is a real error and must continue to surface as a plain
- * ApiException, otherwise the silent-skip logic above would swallow real
- * failures too.
+ * silently skip — the global banner is the single source of truth. A 5xx
+ * must continue to surface as a plain ApiException, otherwise the
+ * silent-skip logic above would swallow real failures too. (4xx has its own
+ * subtype, RequestRejectedException — see HttpApiClientRequestRejectedTest.)
  */
 class HttpApiClientMaintenancePausedTest {
 

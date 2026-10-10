@@ -24,7 +24,9 @@ class AsyncAction(val isLoading: Boolean, val invoke: () -> Unit)
  *
  * The action's exception is forwarded to [ApiClient.logErrorToServer], which
  * rethrows CancellationException so the launch coroutine cancels cleanly
- * when the composable disposes mid-action.
+ * when the composable disposes mid-action, and which drops a 4xx rejection
+ * rather than reporting it — the user is still shown the reason via
+ * [onError], but the operator is not alarmed about ordinary input.
  */
 @Composable
 fun rememberAsyncAction(

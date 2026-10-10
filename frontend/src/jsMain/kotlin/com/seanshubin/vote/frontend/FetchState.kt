@@ -31,7 +31,9 @@ class Fetched<T>(val state: FetchState<T>, val reload: () -> Unit)
  * changes), and expose the result as [FetchState]. On failure, the
  * exception is forwarded to [ApiClient.logErrorToServer] for server-side
  * observability — and CancellationException is rethrown by that method,
- * so navigating away mid-fetch produces no spurious error state.
+ * so navigating away mid-fetch produces no spurious error state. A 4xx
+ * rejection still becomes [FetchState.Error] and is shown, but that method
+ * leaves it unreported, being an answer rather than a fault.
  *
  * The returned [Fetched.reload] lets the caller force a refetch (typical
  * use: a SubmitButton's onSuccess callback triggers a reload to refresh

@@ -440,6 +440,14 @@ class HttpApiClient(
         // `catch (CancellationException) { throw e }` at every call site.
         if (error is CancellationException) throw error
 
+        // A rejection is the server answering the user, not a defect in this
+        // frontend. Reporting it alarms the operator every time someone
+        // types too much or reuses a name, which buries the real faults this
+        // channel exists to surface. Filtered here, at the one choke point,
+        // rather than at each of the ~17 call sites — a new call site should
+        // not have to remember.
+        if (error is RequestRejectedException) return
+
         try {
             val errorRequest = ClientErrorRequest(
                 message = error.message ?: error.toString(),
@@ -576,6 +584,12 @@ class HttpApiClient(
             // logErrorToServer + per-page error toast — the global banner
             // already conveys the state. Any other non-2xx is a real error.
             if (response.status.toInt() == 503) throw MaintenancePausedException(error.error)
+            // A 4xx is the server declining a request it understood, with a
+            // stated reason: text too long, name already taken, election
+            // gone. Distinct subtype so the reason still reaches the user
+            // while logErrorToServer can leave it out of the frontend-error
+            // alarm. 5xx stays a plain ApiException — those are real faults.
+            if (response.status.toInt() in 400..499) throw RequestRejectedException(error.error)
             throw ApiException(error.error)
         }
 
@@ -601,6 +615,14 @@ class HttpApiClient(
 }
 
 open class ApiException(message: String) : Exception(message)
+
+/**
+ * The server understood the request and declined it, explaining why: an HTTP
+ * 4xx. The message is meant for the user and should be shown to them, but
+ * the condition is not a frontend defect, so [ApiClient.logErrorToServer]
+ * deliberately does not report it.
+ */
+class RequestRejectedException(message: String) : ApiException(message)
 
 /**
  * Raised by [HttpApiClient] when an authenticated request can't be recovered
