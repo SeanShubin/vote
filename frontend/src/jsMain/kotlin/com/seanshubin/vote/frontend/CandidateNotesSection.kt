@@ -19,6 +19,14 @@ import org.jetbrains.compose.web.dom.*
  * + Save (per-candidate save granularity); candidates the voter hasn't
  * reviewed yet show an empty editor so the mode itself is the invitation to
  * write. Other voters' cards stay read-only. Clicking "Done" flips back.
+ *
+ * Errors are presented *inside* this section rather than handed to a
+ * page-level banner. A per-candidate Save sits arbitrarily far down a long
+ * page (one block per candidate), so a banner at the top of the page is
+ * off-screen exactly when it matters and leaves the voter staring at a
+ * button that looks like it did nothing. Keeping the reason next to the
+ * control that failed also means a successful retry can't leave a stale
+ * failure behind somewhere the voter isn't looking.
  */
 @Composable
 fun CandidateNotesSection(
@@ -26,7 +34,6 @@ fun CandidateNotesSection(
     electionName: String,
     candidates: List<String>,
     currentUserName: String?,
-    onError: (String) -> Unit,
 ) {
     if (candidates.isEmpty()) return
 
@@ -34,13 +41,19 @@ fun CandidateNotesSection(
         mutableStateOf<Map<String, List<CandidateNote>>?>(null)
     }
     var editing by remember(electionName) { mutableStateOf(false) }
+    var loadError by remember(electionName, candidates) { mutableStateOf<String?>(null) }
 
     LaunchedEffect(electionName, candidates) {
         notesByCandidate = try {
+            loadError = null
             apiClient.listCandidateNotesByElection(electionName)
                 .groupBy { it.candidateName }
         } catch (e: Exception) {
             apiClient.logErrorToServer(e)
+            // An empty map here is indistinguishable from "nobody has
+            // reviewed anything yet", so the voter would be told a fetch
+            // failure is an empty election. Record the reason instead.
+            loadError = e.message ?: "Failed to load reviews"
             emptyMap()
         }
     }
@@ -57,6 +70,11 @@ fun CandidateNotesSection(
         val loaded = notesByCandidate
         if (loaded == null) {
             P { Text("Loading reviews…") }
+            return@Div
+        }
+
+        if (loadError != null) {
+            Div({ classes("candidate-notes-load-error") }) { Text(loadError!!) }
             return@Div
         }
 
@@ -106,7 +124,6 @@ fun CandidateNotesSection(
                             text = newText,
                         )
                     },
-                    onError = onError,
                 )
             }
         }
@@ -151,7 +168,6 @@ private fun CandidateNotesBlock(
     currentUserName: String?,
     editing: Boolean,
     onNoteSaved: (String) -> Unit,
-    onError: (String) -> Unit,
 ) {
     val myNote = currentUserName?.let { voter ->
         notes.firstOrNull { it.voterName.equals(voter, ignoreCase = true) }
@@ -183,7 +199,6 @@ private fun CandidateNotesBlock(
                     currentUserName = currentUserName,
                     existing = myNote,
                     onSaved = onNoteSaved,
-                    onError = onError,
                 )
             } else if (myNote != null) {
                 ReadOnlyNoteCard(myNote, isMine = true)
@@ -204,12 +219,12 @@ private fun MyNoteEditor(
     currentUserName: String,
     existing: CandidateNote?,
     onSaved: (String) -> Unit,
-    onError: (String) -> Unit,
 ) {
     var draft by remember(electionName, candidateName, existing?.text) {
         mutableStateOf(existing?.text ?: "")
     }
     var savedFeedback by remember { mutableStateOf<String?>(null) }
+    var saveError by remember(electionName, candidateName) { mutableStateOf<String?>(null) }
 
     val trimmedDraft = draft.trim()
     val storedText = existing?.text?.trim() ?: ""
@@ -218,8 +233,11 @@ private fun MyNoteEditor(
     val saveAction = rememberAsyncAction(
         apiClient = apiClient,
         fallbackErrorMessage = "Failed to save review",
-        onError = onError,
+        onError = { message -> saveError = message },
         action = {
+            // Drop a previous reason as the retry starts, so the card never
+            // shows a stale failure beside an in-flight save.
+            saveError = null
             apiClient.setCandidateNote(electionName, candidateName, trimmedDraft)
             onSaved(trimmedDraft)
             savedFeedback = if (trimmedDraft.isEmpty()) "Cleared" else "Saved"
@@ -248,7 +266,14 @@ private fun MyNoteEditor(
             classes("candidate-notes-card-textarea")
             attr("rows", "4")
             attr("placeholder", "Write a review about this candidate…")
-            onInput { event -> draft = event.value }
+            onInput { event ->
+                draft = event.value
+                // The reason can quote specifics about the text that just
+                // changed (e.g. a character count), so it stops being true
+                // as soon as the voter edits. Retract it on the first
+                // keystroke rather than let a wrong number sit there.
+                saveError = null
+            }
             if (saveAction.isLoading) attr("disabled", "")
         }
         Div({ classes("candidate-notes-card-actions") }) {
@@ -274,6 +299,9 @@ private fun MyNoteEditor(
             if (savedFeedback != null) {
                 Span({ classes("candidate-notes-card-feedback") }) { Text(savedFeedback!!) }
             }
+        }
+        if (saveError != null) {
+            Div({ classes("candidate-notes-card-error") }) { Text(saveError!!) }
         }
     }
 }

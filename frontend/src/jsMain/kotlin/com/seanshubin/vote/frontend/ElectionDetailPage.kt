@@ -373,12 +373,15 @@ fun ElectionDetailPage(
                         onNavigateToHeadToHead = onNavigateToHeadToHead,
                         onNavigateToProcess = onNavigateToProcess,
                     )
+                    // No onError hook: the section reports failures inline,
+                    // next to the per-candidate control that failed. The
+                    // page-level banner above is too far up a long reviews
+                    // page to be seen.
                     "reviews" -> CandidateNotesSection(
                         apiClient = apiClient,
                         electionName = electionName,
                         candidates = candidates,
                         currentUserName = currentUserName,
-                        onError = { errorMessage = it },
                     )
                 }
             }
