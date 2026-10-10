@@ -36,7 +36,7 @@ object StaticServer {
      * map unmatched paths to index.html). Matches that production behavior
      * locally so deep links survive a refresh during development.
      *
-     * Paths in [PROXIED_PREFIXES] are sent to [backendBaseUrl] instead,
+     * Paths matched by ProxiedPaths are sent to [backendBaseUrl] instead,
      * mirroring the CloudFront behaviors that route them to API Gateway in
      * production. Without this the SPA fallback would swallow them: a shared
      * review page is server-rendered HTML at a path with no file extension,
@@ -80,25 +80,11 @@ object StaticServer {
         return server
     }
 
-    /**
-     * Path prefixes served by the backend rather than the SPA bundle, one
-     * per CloudFront behavior that targets the API origin.
-     *
-     * /api is deliberately absent: in production CloudFront proxies it so
-     * the browser sees one origin and cookies travel as same-origin, but
-     * locally the SPA is built with an absolute api.base.url and calls the
-     * backend directly, so there is nothing to proxy.
-     */
-    val PROXIED_PREFIXES = listOf("/review")
-
-    fun isProxied(path: String): Boolean = PROXIED_PREFIXES.any { prefix ->
-        path == prefix || path.startsWith("$prefix/")
-    }
 }
 
 /**
- * Forwards [StaticServer.PROXIED_PREFIXES] to the backend so local URLs
- * behave like deployed ones.
+ * Forwards the paths in [ProxiedPaths] to the backend so local URLs behave
+ * like deployed ones.
  *
  * Uses the JDK client rather than Jetty's ProxyServlet to avoid pulling in
  * jetty-proxy for a dev-only convenience. Read-only and deliberately plain:
@@ -117,7 +103,7 @@ private class BackendProxyFilter(private val backendBaseUrl: String) : Filter {
     override fun doFilter(request: ServletRequest, response: ServletResponse, chain: FilterChain) {
         val req = request as HttpServletRequest
         val res = response as HttpServletResponse
-        if (req.method != "GET" || !StaticServer.isProxied(req.requestURI)) {
+        if (req.method != "GET" || !ProxiedPaths.isProxied(req.requestURI)) {
             chain.doFilter(request, response)
             return
         }
