@@ -5,6 +5,7 @@ import com.seanshubin.vote.contract.ApiClient
 import com.seanshubin.vote.domain.ElectionDetail
 import com.seanshubin.vote.domain.RankingSide
 import com.seanshubin.vote.domain.Role
+import kotlinx.browser.document
 import kotlinx.browser.window
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -142,8 +143,26 @@ fun ElectionDetailPage(
             }
         }
 
+        // The banner sits above the tab content, so any action further down a
+        // long tab reports into a part of the page the voter is not looking
+        // at — the click reads as having done nothing. Bring the banner to
+        // them. The reviews tab keeps its reasons inline instead, next to the
+        // per-candidate control that failed; this covers every other action
+        // on the page, including ones that would be missed one by one.
+        LaunchedEffect(errorMessage) {
+            if (errorMessage != null) {
+                document.getElementById(ERROR_BANNER_ID)
+                    ?.asDynamic()?.scrollIntoView(errorScrollOptions())
+            }
+        }
         if (errorMessage != null) {
-            Div({ classes("error") }) { Text(errorMessage!!) }
+            Div({
+                classes("error")
+                attr("id", ERROR_BANNER_ID)
+                // The box appears with no focus change, so without this a
+                // screen reader would never announce that anything failed.
+                attr("role", "alert")
+            }) { Text(errorMessage!!) }
         }
         if (successMessage != null) {
             Div({ classes("success") }) { Text(successMessage!!) }
@@ -417,3 +436,12 @@ fun ElectionDetailPage(
         }
     }
 }
+
+private const val ERROR_BANNER_ID = "election-detail-error"
+
+/**
+ * Centre the banner rather than aligning it to the top of the viewport, so
+ * the surrounding page stays visible and the jump reads as a scroll rather
+ * than a navigation.
+ */
+private fun errorScrollOptions(): dynamic = js("({ behavior: 'smooth', block: 'center' })")
