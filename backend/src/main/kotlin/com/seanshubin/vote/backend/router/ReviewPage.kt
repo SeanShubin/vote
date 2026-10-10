@@ -1,6 +1,8 @@
 package com.seanshubin.vote.backend.router
 
 import com.seanshubin.vote.domain.CandidateNote
+import com.seanshubin.vote.domain.HtmlEscape
+import com.seanshubin.vote.domain.MarkdownLite
 
 /**
  * The HTML for a shared review page.
@@ -42,11 +44,12 @@ object ReviewPage {
             appendLine("<h1>${escape(note.candidateName)}</h1>")
             val date = note.lastUpdated.toString().take(10)
             appendLine("""<p class="byline">Reviewed by ${escape(note.voterName)} &middot; $date</p>""")
-            // The review's own newlines go in untouched, held by
-            // white-space: pre-wrap. No surrounding whitespace, or the
-            // indentation would become part of what the reader sees.
-            append("""<div class="text">""")
-            append(escape(note.text))
+            // Rendered as the small markdown dialect in MarkdownLite,
+            // which escapes every string it carries and emits only its own
+            // fixed set of tags — a review can add formatting but never
+            // markup or behavior.
+            appendLine("""<div class="text">""")
+            appendLine(MarkdownLite.toHtml(note.text))
             appendLine("</div>")
             appendLine("</article>")
             appendLine(
@@ -56,7 +59,10 @@ object ReviewPage {
         }
         return document(
             title = "${note.voterName} on ${note.candidateName}",
-            description = excerpt(note.text),
+            // Markdown stripped, not rendered: a description is an attribute
+            // value, so a reviewer's ## and ** would otherwise show up in
+            // everyone's link preview.
+            description = excerpt(MarkdownLite.toPlainText(note.text)),
             canonicalUrl = canonicalUrl,
             body = body,
         )
@@ -100,15 +106,11 @@ object ReviewPage {
     }
 
     /**
-     * Escapes for both text nodes and quoted attribute values. Ampersand
-     * first, or the entities introduced below would be double-escaped.
+     * Escapes for both text nodes and quoted attribute values. Delegates to
+     * the shared implementation in :domain, which MarkdownLite also uses, so
+     * the page and the review body cannot escape differently.
      */
-    fun escape(raw: String): String = raw
-        .replace("&", "&amp;")
-        .replace("<", "&lt;")
-        .replace(">", "&gt;")
-        .replace("\"", "&quot;")
-        .replace("'", "&#39;")
+    fun escape(raw: String): String = HtmlEscape.text(raw)
 
     private fun document(
         title: String,
@@ -176,13 +178,23 @@ object ReviewPage {
         .election { margin: 0; color: #768aa3; font-size: 0.9rem; }
         h1 { margin: 0; font-size: 1.4rem; color: #2c5282; }
         .byline { margin: 0; color: #768aa3; font-size: 0.9rem; }
-        .text { white-space: pre-wrap; }
+        .text > :first-child { margin-top: 0; }
+        .text > :last-child { margin-bottom: 0; }
+        .text p { margin: 0 0 0.75rem; }
+        .text h2, .text h3, .text h4, .text h5, .text h6 {
+          margin: 1.25rem 0 0.5rem;
+          font-size: 1.05rem;
+          color: #2c5282;
+        }
+        .text ul, .text ol { margin: 0 0 0.75rem; padding-left: 1.5rem; }
+        .text li { margin: 0.15rem 0; }
         .app-link { margin: 0; font-size: 0.9rem; }
         a { color: #2c5282; }
         @media (prefers-color-scheme: dark) {
           body { background: #0f1722; color: #d6e2f0; }
           .review { background: #16202e; border-color: #2a3a4f; }
           h1, a { color: #8ab4e8; }
+          .text h2, .text h3, .text h4, .text h5, .text h6 { color: #8ab4e8; }
           .election, .byline { color: #8da2bb; }
         }
     """.trimIndent()

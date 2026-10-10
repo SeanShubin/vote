@@ -121,12 +121,48 @@ class ReviewPageTest {
     }
 
     @Test
-    fun `the review text keeps its paragraph breaks in the body`() {
-        // Only the description is collapsed; the review itself should read as
-        // the voter wrote it, which is what white-space: pre-wrap is for.
-        val html = ReviewPage.found(noteWith(text = "one\n\ntwo"), CANONICAL, APP)
-        assertTrue(html.contains("one\n\ntwo"), "paragraph break lost from the body")
-        assertTrue(html.contains("white-space: pre-wrap"))
+    fun `the review body is rendered as markdown`() {
+        // Paragraph structure is now carried by real elements rather than
+        // white-space: pre-wrap, so the reviewer shape survives and a
+        // heading or list reads as one.
+        val html = ReviewPage.found(
+            noteWith(text = "one\n\ntwo\n\n# Verdict\n- a\n- b"),
+            CANONICAL,
+            APP,
+        )
+        assertTrue(html.contains("<p>one</p>"), "got: $html")
+        assertTrue(html.contains("<p>two</p>"), "got: $html")
+        assertTrue(html.contains("<h2>Verdict</h2>"), "got: $html")
+        assertTrue(html.contains("<li>a</li>"), "got: $html")
+    }
+
+    @Test
+    fun `markdown in a review cannot introduce markup`() {
+        // The reason this page can render markdown at all: MarkdownLite
+        // escapes every string it carries and emits only its own tags.
+        val html = ReviewPage.found(
+            noteWith(text = "# Head\n\n<script>alert(1)</script>\n\n[x](javascript:alert(1))"),
+            CANONICAL,
+            APP,
+        )
+        assertFalse(html.contains("<script>alert"), "script survived")
+        // The page has one anchor of its own (the link back to the app),
+        // so the check is that the review link syntax stayed literal
+        // rather than becoming a second one.
+        assertTrue(html.contains("[x](javascript:alert(1))"), "link syntax was consumed")
+        assertTrue(html.contains("&lt;script&gt;"), "got: $html")
+    }
+
+    @Test
+    fun `the link preview shows no markdown syntax`() {
+        // An og:description is an attribute value. A heading marker and
+        // bold markers must not appear in everyone preview card.
+        val html = ReviewPage.found(
+            noteWith(text = "# Verdict\n\nIt was **very** good."),
+            CANONICAL,
+            APP,
+        )
+        assertTrue(html.contains("""content="Verdict It was very good.""""), "got: $html")
     }
 
     @Test
