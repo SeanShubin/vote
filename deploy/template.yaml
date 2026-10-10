@@ -114,6 +114,29 @@ Resources:
             # AWS-managed AllViewerExceptHostHeader — forwards cookies, auth,
             # query strings; lets API Gateway use its own Host header.
             OriginRequestPolicyId: b689b0a8-53d0-40ab-baf2-68738e2966ac
+          # Shared review pages (GET /review/{election}/{candidate}/{reviewer})
+          # are server-rendered HTML, so they have to reach Lambda rather than
+          # the SPA bucket. Without this behavior they would miss in S3, hit
+          # the 403 -> /index.html rule below, and return the SPA shell — which
+          # is exactly the case the server rendering exists to avoid, since
+          # Discord's crawler runs no JavaScript and would preview nothing.
+          #
+          # RequestRouter only strips a leading /api, so these arrive at the
+          # router as /review/... and match their own route.
+          - PathPattern: /review/*
+            TargetOriginId: ApiOrigin
+            ViewerProtocolPolicy: redirect-to-https
+            # Read-only and unauthenticated; no write methods belong here.
+            AllowedMethods: [GET, HEAD, OPTIONS]
+            CachedMethods: [GET, HEAD]
+            Compress: true
+            # AWS-managed CachingDisabled. These pages are cheap to render and
+            # an edited review should not keep serving its old text from an
+            # edge cache, which is the same reason /api/* is uncached.
+            CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad
+            # AWS-managed AllViewerExceptHostHeader, as above — API Gateway
+            # needs its own Host header.
+            OriginRequestPolicyId: b689b0a8-53d0-40ab-baf2-68738e2966ac
         # SPA fallback for client-side routing (bookmarks, deep links, refresh
         # on /elections/Foo): when the user hits a path that isn't an actual
         # asset in S3, S3 returns 403 (the OAC bucket policy grants only
