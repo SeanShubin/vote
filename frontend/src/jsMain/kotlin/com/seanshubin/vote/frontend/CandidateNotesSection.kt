@@ -3,6 +3,8 @@ package com.seanshubin.vote.frontend
 import androidx.compose.runtime.*
 import com.seanshubin.vote.contract.ApiClient
 import com.seanshubin.vote.domain.CandidateNote
+import com.seanshubin.vote.domain.ReviewLink
+import kotlinx.browser.window
 import org.jetbrains.compose.web.dom.*
 
 /**
@@ -201,11 +203,11 @@ private fun CandidateNotesBlock(
                     onSaved = onNoteSaved,
                 )
             } else if (myNote != null) {
-                ReadOnlyNoteCard(myNote, isMine = true)
+                ReadOnlyNoteCard(myNote, isMine = true, electionName = electionName, apiClient = apiClient)
             }
 
             others.forEach { note ->
-                ReadOnlyNoteCard(note, isMine = false)
+                ReadOnlyNoteCard(note, isMine = false, electionName = electionName, apiClient = apiClient)
             }
         }
     }
@@ -330,7 +332,21 @@ private fun withThousands(value: Int): String {
 }
 
 @Composable
-private fun ReadOnlyNoteCard(note: CandidateNote, isMine: Boolean) {
+private fun ReadOnlyNoteCard(
+    note: CandidateNote,
+    isMine: Boolean,
+    electionName: String,
+    apiClient: ApiClient,
+) {
+    var copied by remember(note.candidateName, note.voterName) { mutableStateOf(false) }
+
+    LaunchedEffect(copied) {
+        if (copied) {
+            kotlinx.coroutines.delay(1500)
+            copied = false
+        }
+    }
+
     Div({ classes("candidate-notes-card", "candidate-notes-card-other") }) {
         Div({ classes("candidate-notes-card-header") }) {
             Span({ classes("candidate-notes-card-author") }) {
@@ -338,6 +354,26 @@ private fun ReadOnlyNoteCard(note: CandidateNote, isMine: Boolean) {
             }
             Span({ classes("candidate-notes-card-timestamp") }) {
                 Text(formatWhenCast(note.lastUpdated))
+            }
+            Button({
+                classes("candidate-notes-card-share")
+                attr("title", "Copy a link to this review that anyone can open")
+                onClick {
+                    // Built from the election name passed down the tree, not
+                    // note.electionName: a note patched in locally right
+                    // after saving the first review for a candidate carries
+                    // an empty one, which would make a link that resolves to
+                    // nothing.
+                    val path = ReviewLink.path(
+                        electionName = electionName,
+                        candidateName = note.candidateName,
+                        reviewerName = note.voterName,
+                    )
+                    copyTextToClipboard(window.location.origin + path, apiClient)
+                    copied = true
+                }
+            }) {
+                Text(if (copied) "Link copied" else "Copy link")
             }
         }
         // Preserve paragraph breaks the voter wrote — the textarea editor

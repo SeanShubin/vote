@@ -2356,6 +2356,31 @@ tr:nth-child(even) {
     line-height: 1.4;
 }
 
+/* Quiet, link-like affordance in the card header. Deliberately understated:
+   browsing reviews is the common act and sharing one is the occasional act,
+   so this should be findable without competing with the text. */
+.candidate-notes-card-share {
+    padding: 0.1rem 0.4rem;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    background: none;
+    color: #2c5282;
+    font: inherit;
+    font-size: 0.85rem;
+    cursor: pointer;
+}
+
+.candidate-notes-card-share:hover {
+    border-color: #b8d0f0;
+    background: #f0f5fc;
+}
+
+.candidate-notes-card-share:focus-visible {
+    outline: none;
+    border-color: #2c5282;
+    box-shadow: 0 0 0 2px rgba(44, 82, 130, 0.2);
+}
+
 .candidate-notes-card-text {
     color: #1f3956;
     white-space: pre-wrap;
