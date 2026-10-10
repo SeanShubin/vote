@@ -272,4 +272,26 @@ interface Service {
         electionName: String,
         candidateName: String,
     )
+
+    /**
+     * Resolve a shared review address (see ReviewLink in :domain) to the note
+     * it names, or null when nothing matches.
+     *
+     * Takes no access token, and that is the point: these addresses are
+     * readable by anyone who has one. Deliberately a separate entry point
+     * rather than a relaxation of [listCandidateNotes], so the authenticated
+     * surface keeps its VIEW_APPLICATION requirement unchanged and the public
+     * surface is exactly one note — no listing, nothing to walk.
+     *
+     * Slugs are lossy, so more than one candidate or author can match; the
+     * checksum decides which triple the address meant. Returns null rather
+     * than throwing, because a dead link is an ordinary outcome: the review
+     * was deleted, or a name was changed and the note moved with it.
+     */
+    fun findSharedReview(
+        electionSlug: String,
+        candidateSlug: String,
+        reviewerSlug: String,
+        checksum: String,
+    ): CandidateNote?
 }

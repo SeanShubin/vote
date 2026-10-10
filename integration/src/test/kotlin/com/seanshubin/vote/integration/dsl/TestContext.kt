@@ -43,7 +43,9 @@ class TestContext(
     // round-trip via the same TokenEncoder the production wiring uses.
     private val tokenEncoder = TokenEncoder(JwtCipher("dev-jwt-secret-DO-NOT-USE-IN-PROD"))
 
-    private val service = ServiceImpl(
+    // Exposed so tests can reach the unauthenticated entry points, which
+    // take no token and so have no representation in ScenarioBackend.
+    val service = ServiceImpl(
         integrations = integrations,
         eventLog = eventLog,
         commandModel = commandModel,

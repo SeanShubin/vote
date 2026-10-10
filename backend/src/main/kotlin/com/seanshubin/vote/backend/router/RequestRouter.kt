@@ -29,6 +29,7 @@ import com.seanshubin.vote.contract.SetRoleRequest
 import com.seanshubin.vote.contract.SetTiersRequest
 import com.seanshubin.vote.contract.Tokens
 import com.seanshubin.vote.contract.TransferElectionOwnershipRequest
+import com.seanshubin.vote.domain.ReviewLink
 import com.seanshubin.vote.domain.Role
 import com.seanshubin.vote.domain.UserUpdates
 import kotlinx.serialization.encodeToString
@@ -168,6 +169,11 @@ class RequestRouter(
         Route("POST", "/admin/deployed-versions/email", ::handleEmailDeployedVersions),
         Route("GET", "/admin/diagnostics", ::handleDiagnostics),
         Route("POST", "/log-client-error", ::handleLogClientError),
+        // Public, unauthenticated, and HTML rather than JSON. Three segments
+        // exactly: a shared review is a deep link, so /review/{election} and
+        // /review/{election}/{candidate} match nothing and fall through to
+        // the 404 handler rather than becoming listing pages.
+        Route("GET", "/review/[^/]+/[^/]+/[^/]+", ::handleSharedReview),
         Route("POST", "/refresh", ::handleRefresh),
         Route("POST", "/logout", { _ -> handleLogout() }),
         Route("GET", "/me/activity", ::handleGetUserActivity),
@@ -261,6 +267,67 @@ class RequestRouter(
         val parts = target.split("/")
         return java.net.URLDecoder.decode(parts[2], "UTF-8")
     }
+
+    /**
+     * Render one shared review as a standalone HTML page. See ReviewLink in
+     * :domain for the address format.
+     *
+     * Answers HTML for both outcomes, including the miss: the reader followed
+     * a link from a chat message and a JSON error body would be nonsense to
+     * them. The status still says 404 so crawlers and caches are not told a
+     * dead link is fine.
+     */
+    private fun handleSharedReview(req: HttpRequest): HttpResponse {
+        val parts = req.target.split("/")
+        // Slugs are already path-safe by construction, but the request may
+        // carry anything, so decode before matching.
+        val electionSlug = decodeSegment(parts[2])
+        val candidateSlug = decodeSegment(parts[3])
+        val reviewerSegment = ReviewLink.parseReviewerSegment(decodeSegment(parts[4]))
+        val note = reviewerSegment?.let {
+            service.findSharedReview(
+                electionSlug = electionSlug,
+                candidateSlug = candidateSlug,
+                reviewerSlug = it.slug,
+                checksum = it.checksum,
+            )
+        }
+        return if (note == null) {
+            htmlResponse(404, ReviewPage.notFound(appUrl = frontendBaseUrl))
+        } else {
+            htmlResponse(
+                200,
+                ReviewPage.found(
+                    note = note,
+                    canonicalUrl = frontendBaseUrl + ReviewLink.path(
+                        electionName = note.electionName,
+                        candidateName = note.candidateName,
+                        reviewerName = note.voterName,
+                    ),
+                    appUrl = electionUrl(note.electionName),
+                ),
+            )
+        }
+    }
+
+    /**
+     * Deep link into the SPA's reviews tab. Single-encoded, unlike the
+     * frontend's API calls: this is a browser address, not a path that passes
+     * through API Gateway's decode-then-reparse.
+     */
+    private fun electionUrl(electionName: String): String {
+        val encoded = java.net.URLEncoder.encode(electionName, "UTF-8").replace("+", "%20")
+        return "$frontendBaseUrl/elections/$encoded#reviews"
+    }
+
+    private fun htmlResponse(status: Int, html: String): HttpResponse = HttpResponse(
+        status = status,
+        body = html,
+        headers = mapOf("Content-Type" to "text/html; charset=utf-8"),
+    )
+
+    private fun decodeSegment(segment: String): String =
+        java.net.URLDecoder.decode(segment, "UTF-8")
 
     private fun extractElectionName(target: String): String {
         val parts = target.split("/")

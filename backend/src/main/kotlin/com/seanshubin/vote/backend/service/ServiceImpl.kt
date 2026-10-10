@@ -1112,6 +1112,43 @@ class ServiceImpl(
         synchronize()
     }
 
+    override fun findSharedReview(
+        electionSlug: String,
+        candidateSlug: String,
+        reviewerSlug: String,
+        checksum: String,
+    ): CandidateNote? {
+        // No requirePermission call. A shared review is readable by anyone
+        // holding the address, which is the whole feature; the authenticated
+        // listing paths above keep their own checks.
+        //
+        // Walks candidates whose slug matches and then that candidate's
+        // notes, because slugs are lossy and several can match. The checksum
+        // over the exact names picks the intended triple. The widths here are
+        // an election's candidates and one candidate's notes, so the scan is
+        // bounded by the size of a single election.
+        val elections = queryModel.listElections()
+            .filter { Slug.of(it.electionName) == electionSlug }
+        elections.forEach { election ->
+            val candidates = queryModel.listCandidates(election.electionName)
+                .filter { Slug.of(it) == candidateSlug }
+            candidates.forEach { candidate ->
+                val match = queryModel.listCandidateNotes(election.electionName, candidate)
+                    .filter { Slug.of(it.voterName) == reviewerSlug }
+                    .firstOrNull {
+                        ReviewLink.matches(
+                            electionName = election.electionName,
+                            candidateName = candidate,
+                            reviewerName = it.voterName,
+                            checksum = checksum,
+                        )
+                    }
+                if (match != null) return match
+            }
+        }
+        return null
+    }
+
     override fun deleteCandidateNote(
         accessToken: AccessToken,
         electionName: String,
