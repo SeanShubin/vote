@@ -226,9 +226,12 @@ private fun MyNoteEditor(
     var savedFeedback by remember { mutableStateOf<String?>(null) }
     var saveError by remember(electionName, candidateName) { mutableStateOf<String?>(null) }
 
+    // The server trims before it counts, so count the trimmed text here or
+    // the readout would disagree with the rule it is reporting on.
     val trimmedDraft = draft.trim()
     val storedText = existing?.text?.trim() ?: ""
     val dirty = trimmedDraft != storedText
+    val overBy = trimmedDraft.length - CandidateNote.MAX_TEXT_LENGTH
 
     val saveAction = rememberAsyncAction(
         apiClient = apiClient,
@@ -276,10 +279,25 @@ private fun MyNoteEditor(
             }
             if (saveAction.isLoading) attr("disabled", "")
         }
+        Div({
+            classes("candidate-notes-card-counter")
+            if (overBy > 0) classes("candidate-notes-card-counter-over")
+        }) {
+            Text("${withThousands(trimmedDraft.length)} / ${withThousands(CandidateNote.MAX_TEXT_LENGTH)}")
+        }
+        if (overBy > 0) {
+            // Said before the voter presses Save, and phrased as the amount
+            // to cut, which is the number they actually need. The server
+            // would reject this too, but finding out on Save means writing
+            // into a limit you cannot see.
+            Div({ classes("candidate-notes-card-error") }) {
+                Text("${withThousands(overBy)} characters over the limit — trim to save.")
+            }
+        }
         Div({ classes("candidate-notes-card-actions") }) {
             Button({
                 classes("candidate-notes-card-save")
-                if (!dirty || saveAction.isLoading) attr("disabled", "")
+                if (!dirty || saveAction.isLoading || overBy > 0) attr("disabled", "")
                 onClick { saveAction.invoke() }
             }) {
                 Text(if (saveAction.isLoading) "Saving…" else "Save")
@@ -304,6 +322,11 @@ private fun MyNoteEditor(
             Div({ classes("candidate-notes-card-error") }) { Text(saveError!!) }
         }
     }
+}
+
+private fun withThousands(value: Int): String {
+    val digits = value.toString()
+    return digits.reversed().chunked(3).joinToString(",").reversed()
 }
 
 @Composable

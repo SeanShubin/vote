@@ -2312,6 +2312,20 @@ tr:nth-child(even) {
     font-size: 0.9rem;
 }
 
+/* Live length readout under the editor. Right-aligned and quiet until it
+   matters, so it informs without competing with the review being written. */
+.candidate-notes-card-counter {
+    align-self: flex-end;
+    color: #768aa3;
+    font-size: 0.85rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.candidate-notes-card-counter-over {
+    color: #c33;
+    font-weight: 600;
+}
+
 /* Failure reason for one candidate's save, rendered inside the card so it
    lands next to the Save button that produced it rather than in the
    page-level banner far above a long reviews page. */
