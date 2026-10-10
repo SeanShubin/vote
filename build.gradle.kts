@@ -49,6 +49,17 @@ tasks.register<JavaExec>("analyzeCodeStructure") {
     outputs.dir(layout.projectDirectory.dir("generated/code-structure"))
     inputs.file(layout.projectDirectory.file("code-structure-config.json"))
 
+    // Always rerun. The declared inputs were the config file alone, but what
+    // the analyzer actually reads is every module's compiled output, so
+    // changing code left the task UP-TO-DATE and it quietly did not run —
+    // `./gradlew analyzeCodeStructure` would report success on a tree that
+    // CI then failed. Declaring the class directories as inputs would be the
+    // narrower fix, but they are spread across modules and source sets and a
+    // missed one restores the same false assurance. The run takes about ten
+    // seconds, and a verification gate that might not verify is worth less
+    // than the time saved.
+    outputs.upToDateWhen { false }
+
     // The analyzer reads compiled .class files. Make sure all JVM modules
     // are built before scanning. (Frontend's pure-JS target is naturally
     // skipped since it produces no .class output.)
