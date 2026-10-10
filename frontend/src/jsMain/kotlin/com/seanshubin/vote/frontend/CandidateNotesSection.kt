@@ -65,7 +65,12 @@ fun CandidateNotesSection(
         P({ classes("candidate-notes-intro") }) {
             Text(
                 "Browse every voter's free-form review of each candidate. " +
-                    "Click \"Edit my reviews\" to write or update your own."
+                    "Click \"Edit my reviews\" to write or update your own. " +
+                    // Worth saying now that formatting is meaningful: a
+                    // reviewer typing # or - should know it will render, and
+                    // one expecting a link should know it will not.
+                    "Formatting: # headings, - bullets, 1. numbered lists, " +
+                    "**bold**, *italic*. Links and HTML are not supported."
             )
         }
 
@@ -376,11 +381,11 @@ private fun ReadOnlyNoteCard(
                 Text(if (copied) "Link copied" else "Copy link")
             }
         }
-        // Preserve paragraph breaks the voter wrote — the textarea editor
-        // sends literal \n, so render with white-space:pre-wrap on the
-        // wrapper rather than collapsing into one line.
+        // Rendered as the same small markdown dialect the shared review
+        // page uses, from the same parser in :domain, so a review that
+        // shows a heading or a list in a shared link shows one here too.
         Div({ classes("candidate-notes-card-text") }) {
-            Text(note.text)
+            MarkdownText(note.text)
         }
     }
 }

@@ -2383,8 +2383,45 @@ tr:nth-child(even) {
 
 .candidate-notes-card-text {
     color: #1f3956;
-    white-space: pre-wrap;
     line-height: 1.4;
+}
+
+/* Markdown now renders as real elements, so white-space: pre-wrap is gone —
+   keeping it would double every gap. Spacing is collapsed at the edges so a
+   review still sits flush inside its card. */
+.candidate-notes-card-text > :first-child {
+    margin-top: 0;
+}
+
+.candidate-notes-card-text > :last-child {
+    margin-bottom: 0;
+}
+
+.candidate-notes-card-text p {
+    margin: 0 0 0.6rem;
+}
+
+/* One size for every heading level a review can use. The level differs
+   between this page and the shared one — each is correct for the document it
+   sits in — but a reader should see the same review either way. */
+.candidate-notes-card-text h3,
+.candidate-notes-card-text h4,
+.candidate-notes-card-text h5,
+.candidate-notes-card-text h6 {
+    margin: 0.9rem 0 0.4rem;
+    font-size: 1rem;
+    font-weight: 600;
+    color: #2c5282;
+}
+
+.candidate-notes-card-text ul,
+.candidate-notes-card-text ol {
+    margin: 0 0 0.6rem;
+    padding-left: 1.4rem;
+}
+
+.candidate-notes-card-text li {
+    margin: 0.1rem 0;
 }
 
 .candidate-notes-empty-hint {
