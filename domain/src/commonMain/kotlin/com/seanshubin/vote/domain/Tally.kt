@@ -1,5 +1,7 @@
 package com.seanshubin.vote.domain
 
+import com.seanshubin.vote.domain.Place.Companion.appearanceCounts
+import com.seanshubin.vote.domain.Place.Companion.orderTiesByAppearances
 import com.seanshubin.vote.domain.Ranking.Companion.prefers
 import kotlinx.serialization.Serializable
 
@@ -115,6 +117,15 @@ data class Tally(
                 // what voters cast, not the synthesized expansion.
                 val preferences = projectedBallots.map { it.rankings }.fold(emptyPreferences, ::accumulateRankings)
                 val rankedPairs = RankedPairs.run(candidates, preferences)
+                // Candidates sharing a rank come back alphabetically, which
+                // is stable but says nothing. Order them by how many ballots
+                // they appear on instead, so the most broadly ranked of a
+                // tied group reads first. Ranks are unchanged — the tie is
+                // still a tie. Counted from rawBallots, what voters actually
+                // cast, so tier markers (which exist only in the projection)
+                // contribute nothing and fall to the end of their group.
+                val places = rankedPairs.places
+                    .orderTiesByAppearances(Place.appearanceCounts(rawBallots))
                 val whoVoted = rawBallots.map { it.voterName }.sorted()
                 // Ballots flow through unchanged — display sees the same data the
                 // algorithm sees. No synthesis of "last place" entries for omitted
@@ -139,7 +150,7 @@ data class Tally(
                     ballots,
                     preferences,
                     rankedPairs.contests,
-                    rankedPairs.places,
+                    places,
                     whoVoted,
                 )
             }
