@@ -4,6 +4,15 @@ import com.seanshubin.vote.domain.Ranking
 import com.seanshubin.vote.domain.RankingKind
 
 object Validation {
+    /**
+     * Cap on a single candidate note. Generous on purpose — these are
+     * long-form reviews, and the earlier 4000 turned away real ones. Well
+     * clear of the 400KB DynamoDB item limit even at 4 bytes per character,
+     * so storage is not the binding constraint; this exists to stop a
+     * runaway paste, not to shape how much a voter may say.
+     */
+    const val MAX_NOTE_LENGTH = 10000
+
     private val whitespacePattern = Regex("\\s+")
 
     fun validateUserName(userName: String): String {
@@ -159,8 +168,8 @@ object Validation {
      */
     fun validateCandidateNoteText(text: String): String {
         val trimmed = text.trim()
-        require(trimmed.length <= 4000) {
-            "Note must not be more than 4000 characters long, was ${trimmed.length}"
+        require(trimmed.length <= MAX_NOTE_LENGTH) {
+            "Note must not be more than $MAX_NOTE_LENGTH characters long, was ${trimmed.length}"
         }
         return trimmed
     }

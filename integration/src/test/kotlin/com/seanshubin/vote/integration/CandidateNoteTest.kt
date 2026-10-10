@@ -105,10 +105,18 @@ class CandidateNoteTest {
         alice.setCandidateNote(election.name, "Tea", "   hot and strong   ")
         assertEquals("hot and strong", alice.listCandidateNotes(election.name, "Tea")[0].text)
 
+        // Exactly at the cap is accepted — guards an off-by-one that would
+        // reject the longest legal note.
+        alice.setCandidateNote(election.name, "Tea", "x".repeat(10000))
+        assertEquals(10000, alice.listCandidateNotes(election.name, "Tea")[0].text.length)
+
         val ex = assertFailsWith<IllegalArgumentException> {
-            alice.setCandidateNote(election.name, "Tea", "x".repeat(4001))
+            alice.setCandidateNote(election.name, "Tea", "x".repeat(10001))
         }
-        assertTrue(ex.message!!.contains("4000"))
+        // The message carries both the cap and the actual length, so a voter
+        // who is over knows by how much.
+        assertTrue(ex.message!!.contains("10000"))
+        assertTrue(ex.message!!.contains("10001"))
     }
 
     @Test
