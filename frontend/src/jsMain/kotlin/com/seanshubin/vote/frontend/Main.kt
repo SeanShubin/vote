@@ -83,7 +83,12 @@ fun VoteApp(apiClient: ApiClient) {
     // tally fetches under the hood.
     val effectiveSide = if (secretBallotEnabled) currentSide else RankingSide.PUBLIC
     LaunchedEffect(currentSide) {
-        kotlinx.browser.window.localStorage.setItem(SIDE_STORAGE_KEY, currentSide.name)
+        // Guarded because localStorage throws, rather than no-opping, when
+        // site data is blocked. The read below is already wrapped; losing the
+        // sticky side is not worth taking the page down over.
+        runCatching {
+            kotlinx.browser.window.localStorage.setItem(SIDE_STORAGE_KEY, currentSide.name)
+        }
     }
     DisposableEffect(effectiveSide) {
         val cls = "secret-mode"
