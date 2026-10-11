@@ -22,6 +22,24 @@ fun main() {
 
     renderComposable(rootElementId = "root") {
         VoteApp(integrations.apiClient)
+        CornerControls()
+    }
+}
+
+/**
+ * Persistent bottom-right chrome, rendered as a sibling of VoteApp so it
+ * survives the early returns inside it and appears on every page — the login
+ * screen and the awaiting-approval stub included.
+ *
+ * A flex row rather than two independently fixed elements: the build stamp
+ * used to own this corner alone, and giving the width toggle its own fixed
+ * position would mean hard-coding an offset that breaks the moment either
+ * label changes length.
+ */
+@Composable
+private fun CornerControls() {
+    Div({ classes("corner-controls") }) {
+        WidthToggle()
         BuildStamp()
     }
 }

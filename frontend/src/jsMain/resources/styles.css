@@ -1972,17 +1972,64 @@ tr:nth-child(even) {
     margin-right: 0.35rem;
 }
 
+/*
+ * Positioning moved to .corner-controls, which now holds this and the width
+ * toggle in one flex row. Keeping a second `position: fixed` here would mean
+ * offsetting one of them by a magic number tied to the other's label width.
+ */
 .build-stamp {
-    position: fixed;
-    bottom: 4px;
-    right: 6px;
     font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
     font-size: 10px;
     color: #aaa;
     opacity: 0.6;
     pointer-events: auto;
     user-select: text;
+}
+
+.corner-controls {
+    position: fixed;
+    bottom: 4px;
+    right: 6px;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
     z-index: 1;
+}
+
+/*
+ * Deliberately small and quiet. The bare `button` rule above is sized for
+ * page actions (0.75rem/1.5rem padding, filled background); inheriting it
+ * would put a full-size blue button in the corner of every page.
+ */
+.width-toggle {
+    padding: 1px 6px;
+    font-size: 10px;
+    font-family: inherit;
+    line-height: 1.6;
+    background-color: var(--color-side-button-bg);
+    border: 1px solid var(--color-side-button-border);
+    border-radius: 4px;
+    color: var(--color-side-button-text);
+    opacity: 0.6;
+    cursor: pointer;
+}
+
+.width-toggle:hover,
+.width-toggle:focus-visible {
+    opacity: 1;
+}
+
+/*
+ * The whole feature, as far as layout is concerned.
+ *
+ * On <html> rather than <body> so the shared review page can set it from
+ * <head> before first paint; the app matches so one selector describes both.
+ * Targets .container only — .admin-container never had a max-width, because
+ * the data tables already reclaim the full window, so admin pages are
+ * unaffected by design rather than by omission.
+ */
+html.width-wide .container {
+    max-width: none;
 }
 
 .build-stamp a {

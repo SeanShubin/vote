@@ -1,6 +1,7 @@
 package com.seanshubin.vote.backend.router
 
 import com.seanshubin.vote.domain.CandidateNote
+import com.seanshubin.vote.domain.WidthPreference
 import kotlinx.datetime.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -193,6 +194,58 @@ class ReviewPageTest {
             assertTrue(html.trimEnd().endsWith("</html>"), "document not closed")
         }
     }
+
+    @Test
+    fun `both pages carry the width toggle with both of its labels`() {
+        // Both labels ship and CSS reveals one, so the button reads correctly
+        // in the first paint rather than being relabelled by script.
+        listOf(ReviewPage.found(noteWith(), CANONICAL, APP), ReviewPage.notFound(APP)).forEach { html ->
+            assertTrue(html.contains("""class="width-toggle""""), "no toggle")
+            assertTrue(html.contains("""onclick="voteToggleWidth()""""), "no handler")
+            assertTrue(html.contains("width-toggle-to-wide"), "no wide label")
+            assertTrue(html.contains("width-toggle-to-fixed"), "no fixed label")
+        }
+    }
+
+    @Test
+    fun `the inline script is built from the shared constants`() {
+        // The app applies the same preference from Kotlin/JS in another
+        // module. A key or class spelled differently here would not fail to
+        // compile — the toggle would just quietly stop agreeing with the app
+        // about what the reader chose. This is the test that catches that.
+        val script = scriptOf(ReviewPage.found(noteWith(), CANONICAL, APP))
+
+        assertTrue(script.contains("'${WidthPreference.STORAGE_KEY}'"), "got: $script")
+        assertTrue(script.contains("'${WidthPreference.WIDE_CLASS}'"), "got: $script")
+        assertTrue(script.contains("'${WidthPreference.HAS_JS_CLASS}'"), "got: $script")
+        assertTrue(script.contains("'${WidthPreference.WIDE}'"), "got: $script")
+        assertTrue(script.contains("'${WidthPreference.FIXED}'"), "got: $script")
+    }
+
+    @Test
+    fun `the inline script is the same no matter what the review says`() {
+        // The script is the one executable thing on a page assembled entirely
+        // from user-supplied values. It must stay a fixed constant: if any
+        // review text, name, or url could reach it, escaping would no longer
+        // be the only thing standing between a review and script execution.
+        val hostile = ReviewPage.found(
+            noteWith(
+                electionName = "'; alert(1); var x = '",
+                candidateName = "</script><script>alert(2)</script>",
+                voterName = "\'; alert(3); //",
+                text = "</script>alert(4)<script>",
+            ),
+            canonicalUrl = "https://example.com/'+alert(5)+'",
+            appUrl = "javascript:alert(6)",
+        )
+
+        assertEquals(scriptOf(ReviewPage.found(noteWith(), CANONICAL, APP)), scriptOf(hostile))
+        // One script block, so nothing above opened a second one.
+        assertEquals(1, Regex("<script>").findAll(hostile).count(), "got: $hostile")
+    }
+
+    private fun scriptOf(html: String): String =
+        html.substringAfter("<script>").substringBefore("</script>")
 
     private fun noteWith(
         electionName: String = "Favorite Rippaverse Book",

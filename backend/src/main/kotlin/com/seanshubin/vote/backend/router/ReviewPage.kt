@@ -3,6 +3,7 @@ package com.seanshubin.vote.backend.router
 import com.seanshubin.vote.domain.CandidateNote
 import com.seanshubin.vote.domain.HtmlEscape
 import com.seanshubin.vote.domain.MarkdownLite
+import com.seanshubin.vote.domain.WidthPreference
 
 /**
  * The HTML for a shared review page.
@@ -142,12 +143,77 @@ object ReviewPage {
         appendLine("<style>")
         appendLine(STYLE)
         appendLine("</style>")
+        // In <head>, and synchronous, so the width class is on the root
+        // element before the first paint. Deferring it would widen the page
+        // visibly after the reader already saw it narrow.
+        //
+        // This is the only script on the page. If a Content-Security-Policy
+        // is ever added, it needs a hash or nonce for this block.
+        appendLine("<script>")
+        appendLine(SCRIPT)
+        appendLine("</script>")
         appendLine("</head>")
         appendLine("<body>")
         append(body)
+        appendLine(WIDTH_TOGGLE)
         appendLine("</body>")
         appendLine("</html>")
     }
+
+    /**
+     * Applies the saved width preference and exposes the toggle's handler.
+     *
+     * The interpolated values are the shared constants, so the key and class
+     * names cannot drift from the ones the app uses — a mismatch here would
+     * not fail to compile, it would just silently stop remembering. They are
+     * all single-line, which is why trimIndent is safe despite the warning
+     * in this file's header: that trap only springs on interpolated values
+     * that carry their own newlines, the way a review body does.
+     *
+     * The handler only toggles a class and writes storage. It does not touch
+     * the button's label, because the label is two spans and CSS picks which
+     * one shows — that way the button reads correctly in the first paint
+     * instead of being corrected by script afterwards.
+     */
+    private val SCRIPT = """
+        (function () {
+          var root = document.documentElement;
+          root.classList.add('${WidthPreference.HAS_JS_CLASS}');
+          try {
+            if (localStorage.getItem('${WidthPreference.STORAGE_KEY}') === '${WidthPreference.WIDE}') {
+              root.classList.add('${WidthPreference.WIDE_CLASS}');
+            }
+          } catch (ignored) {}
+          window.voteToggleWidth = function () {
+            var wide = root.classList.toggle('${WidthPreference.WIDE_CLASS}');
+            try {
+              localStorage.setItem(
+                '${WidthPreference.STORAGE_KEY}',
+                wide ? '${WidthPreference.WIDE}' : '${WidthPreference.FIXED}'
+              );
+            } catch (ignored) {}
+          };
+        })();
+    """.trimIndent()
+
+    /**
+     * Both labels ship in the markup and CSS reveals one. The arrows carry
+     * the verb — outward to expand, inward to contract — because a corner
+     * button reading "Wide" could be taken for a status rather than an
+     * action. The aria-label is phrased to stay true in both states, so no
+     * script has to keep it in sync.
+     *
+     * Written as entities rather than literal arrows: the glyphs would be
+     * correct either way given the charset, but entities survive any later
+     * change to how this file or the response is encoded.
+     */
+    private val WIDTH_TOGGLE =
+        """<button class="width-toggle" type="button" """ +
+            """title="Switch between fixed and full-window width" """ +
+            """aria-label="Toggle page width" onclick="voteToggleWidth()">""" +
+            """<span class="width-toggle-to-wide">&#8676;&#8677; Wide</span>""" +
+            """<span class="width-toggle-to-fixed">&#8677;&#8676; Fixed</span>""" +
+            "</button>"
 
     // No interpolation in here, so trimIndent behaves predictably.
     private val STYLE = """
@@ -190,12 +256,44 @@ object ReviewPage {
         .text li { margin: 0.15rem 0; }
         .app-link { margin: 0; font-size: 0.9rem; }
         a { color: #2c5282; }
+        /*
+         * Hidden until the head script proves a script can run. This page is
+         * readable with JavaScript off on purpose, and a button that cannot
+         * do anything is worse than no button.
+         */
+        .width-toggle { display: none; }
+        html.has-js .width-toggle {
+          display: block;
+          position: fixed;
+          bottom: 6px;
+          right: 8px;
+          padding: 1px 6px;
+          font: 10px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif;
+          background: #f4f7fb;
+          border: 1px solid #c4d2e1;
+          border-radius: 4px;
+          color: #2c5282;
+          opacity: 0.6;
+          cursor: pointer;
+        }
+        .width-toggle:hover, .width-toggle:focus-visible { opacity: 1; }
+        /* CSS picks the label, so the button is right in the first paint. */
+        .width-toggle-to-fixed { display: none; }
+        html.width-wide .width-toggle-to-wide { display: none; }
+        html.width-wide .width-toggle-to-fixed { display: inline; }
+        /* The feature itself. Same selector shape the app's stylesheet uses. */
+        html.width-wide .review { max-width: none; }
         @media (prefers-color-scheme: dark) {
           body { background: #0f1722; color: #d6e2f0; }
           .review { background: #16202e; border-color: #2a3a4f; }
           h1, a { color: #8ab4e8; }
           .text h2, .text h3, .text h4, .text h5, .text h6 { color: #8ab4e8; }
           .election, .byline { color: #8da2bb; }
+          html.has-js .width-toggle {
+            background: #1b2838;
+            border-color: #2a3a4f;
+            color: #8ab4e8;
+          }
         }
     """.trimIndent()
 }
