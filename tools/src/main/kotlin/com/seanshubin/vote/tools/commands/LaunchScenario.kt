@@ -128,9 +128,9 @@ internal class ScenarioLauncher(
         println("Voters:     $voterCount")
         println("Ballots:    $ballotCount")
         println()
-        println("Login credentials:")
-        println("  Owner: $ownerName / password")
-        println("  All voters: <voter-name> / password")
+        println("Sign in with the \"Local dev login\" panel on the login page")
+        println("  Owner: $ownerName")
+        println("  Voters: pick any <voter-name> from the list")
         println()
         println("To stop: scripts/dev terminate-all")
     }
@@ -144,7 +144,7 @@ internal class ScenarioLauncher(
         val ballots = (scenario["ballots"] as? kotlinx.serialization.json.JsonArray) ?: error("missing ballots")
 
         println("   Registering owner ($ownerName)...")
-        val ownerToken = register(http, ownerName, "owner@example.com")
+        val ownerToken = register(http, ownerName)
         Output.success("Owner registered")
 
         println("   Registering ${voters.size} voters...")
@@ -152,8 +152,7 @@ internal class ScenarioLauncher(
         voters.forEach { voterEl ->
             val voter = voterEl.jsonObject
             val voterName = (voter["displayName"] as JsonPrimitive).content
-            val voterEmail = (voter["email"] as JsonPrimitive).content
-            voterTokens[voterName] = register(http, voterName, voterEmail)
+            voterTokens[voterName] = register(http, voterName)
         }
         Output.success("Registered ${voters.size} voters")
 
@@ -172,14 +171,16 @@ internal class ScenarioLauncher(
         Output.success("Election created")
 
         val candidateNames = candidates.map { (it.jsonObject["displayName"] as JsonPrimitive).content }
+        // The old "replace the whole candidate list" PUT is gone; candidates
+        // are added through the additive primitive the UI uses.
         http.ensureSuccess(
-            "PUT", "$electionPath/candidates",
-            http.put(
-                "$electionPath/candidates",
+            "POST", "$electionPath/candidate-add",
+            http.post(
+                "$electionPath/candidate-add",
                 """{"candidateNames":${jsonArrayOfStrings(candidateNames)}}""",
                 ownerToken
             ),
-            "Set candidates"
+            "Add candidates"
         )
         Output.success("Added ${candidateNames.size} candidates")
 
@@ -209,11 +210,27 @@ internal class ScenarioLauncher(
         Output.success("Cast ${ballots.size} ballots")
     }
 
-    private fun register(http: Http, userName: String, email: String): String {
-        val body = """{"userName":${escape(userName)},"email":${escape(email)},"password":"password"}"""
+    /**
+     * Create a scenario user and return their access token.
+     *
+     * Uses the dev-login bypass rather than a password registration endpoint:
+     * under Discord-only authentication there is no `POST /register` to call,
+     * and a scenario can't drive a real OAuth round-trip. The endpoint only
+     * exists when the backend was started with `devLoginEnabled` — which is
+     * every local launch, and never the deployed Lambda.
+     *
+     * Role assignment is positional and matters here: `devCreateAndLogin`
+     * makes the very first user in an empty database the OWNER and everyone
+     * after them a VOTER. The scenario purges the database in step 3 and
+     * registers the election owner first, so the owner lands with enough
+     * authority to create the election and the voters land with enough to
+     * cast ballots.
+     */
+    private fun register(http: Http, userName: String): String {
+        val body = """{"userName":${escape(userName)}}"""
         val response = http.ensureSuccess(
-            "POST", "/register",
-            http.post("/register", body),
+            "POST", "/auth/dev/create",
+            http.post("/auth/dev/create", body),
             "Register $userName"
         )
         return response.fieldOrNull("accessToken")

@@ -34,7 +34,7 @@ class TestLifecycle : CliktCommand(name = "test-lifecycle") {
         log("")
 
         log("3. Register first user (alice - becomes OWNER)")
-        val aliceToken = register(http, "alice", "alice@example.com", "password123")
+        val aliceToken = register(http, "alice")
         log("   [OK] Alice registered (OWNER)")
         log("")
 
@@ -46,14 +46,14 @@ class TestLifecycle : CliktCommand(name = "test-lifecycle") {
         log("   [OK] Users: $initialUserCount, Elections: $initialElectionCount")
         log("")
 
-        log("5. Register second user (bob - becomes USER)")
-        val bobToken = register(http, "bob", "bob@example.com", "password456")
-        log("   [OK] Bob registered (USER)")
+        log("5. Register second user (bob - becomes VOTER)")
+        val bobToken = register(http, "bob")
+        log("   [OK] Bob registered (VOTER)")
         log("")
 
-        log("6. Register third user (charlie - becomes USER)")
-        val charlieToken = register(http, "charlie", "charlie@example.com", "password789")
-        log("   [OK] Charlie registered (USER)")
+        log("6. Register third user (charlie - becomes VOTER)")
+        val charlieToken = register(http, "charlie")
+        log("   [OK] Charlie registered (VOTER)")
         log("")
 
         log("7. List all users")
@@ -78,17 +78,17 @@ class TestLifecycle : CliktCommand(name = "test-lifecycle") {
         log("   [OK] Election created")
         log("")
 
-        log("9. Set candidates")
+        log("9. Add candidates")
         http.ensureSuccess(
-            "PUT", "$electionPath/candidates",
-            http.put(
-                "$electionPath/candidates",
+            "POST", "$electionPath/candidate-add",
+            http.post(
+                "$electionPath/candidate-add",
                 """{"candidateNames":["Kotlin","Python","Rust","TypeScript"]}""",
                 aliceToken
             ),
-            "Set candidates"
+            "Add candidates"
         )
-        log("   [OK] Candidates set")
+        log("   [OK] Candidates added")
         log("")
 
         log("10. Cast ballots")
@@ -148,7 +148,7 @@ class TestLifecycle : CliktCommand(name = "test-lifecycle") {
         log("")
 
         log("21. Verify system returns to empty state")
-        val verifyToken = register(http, "verify", "verify@example.com", "verify123")
+        val verifyToken = register(http, "verify")
         val verifyUserCount = countField(http, "/users/count", verifyToken)
         val verifyElectionCount = countField(http, "/elections/count", verifyToken)
         http.ensureSuccess("DELETE", "/user/verify", http.delete("/user/verify", verifyToken), "Delete verify user")
@@ -164,7 +164,6 @@ class TestLifecycle : CliktCommand(name = "test-lifecycle") {
         log("  - Started empty (0 users, 0 elections)")
         log("  - Created 3 users")
         log("  - Created 1 election with 4 candidates")
-        log("  - Set eligible voters")
         log("  - Cast 3 ballots")
         log("  - Deleted election")
         log("  - Deleted all users (including self-deletion)")
@@ -174,12 +173,23 @@ class TestLifecycle : CliktCommand(name = "test-lifecycle") {
     private fun log(message: String) = println("[TEST] $message")
     private fun fail(message: String): Nothing = Output.error(message)
 
-    private fun register(http: Http, userName: String, email: String, password: String): String {
+    /**
+     * Create a user and return their access token, via the dev-login bypass.
+     * There is no password-registration endpoint under Discord-only
+     * authentication, and this lifecycle check can't drive a real OAuth
+     * round-trip — so it uses the same `/auth/dev/create` the local login
+     * page offers, which exists only when the backend ran with
+     * `devLoginEnabled` (every local launch, never the deployed Lambda).
+     *
+     * The first user created in an empty database becomes OWNER; everyone
+     * after them becomes VOTER.
+     */
+    private fun register(http: Http, userName: String): String {
         val response = http.ensureSuccess(
-            "POST", "/register",
+            "POST", "/auth/dev/create",
             http.post(
-                "/register",
-                """{"userName":"$userName","email":"$email","password":"$password"}"""
+                "/auth/dev/create",
+                """{"userName":"$userName"}"""
             ),
             "Register $userName"
         )
