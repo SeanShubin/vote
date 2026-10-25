@@ -34,8 +34,9 @@ class DynamoDbSingleTableQueryModel(
 
     override fun searchUserByDiscordId(discordId: String): User? {
         // Blank discordId never matches anyone — users without a Discord
-        // credential have an empty discord_id attribute (and so don't
-        // appear in the sparse discord-id-index at all).
+        // credential carry no discord_id attribute at all (an empty string
+        // is not a legal GSI key value), so they are absent from the sparse
+        // discord-id-index and unreachable by this lookup by construction.
         if (discordId.isEmpty()) return null
         return runBlocking {
             val response = dynamoDb.query(QueryRequest {

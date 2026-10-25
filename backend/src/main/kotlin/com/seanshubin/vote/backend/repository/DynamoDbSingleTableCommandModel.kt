@@ -316,15 +316,26 @@ class DynamoDbSingleTableCommandModel(
         runBlocking {
             dynamoDb.putItem(PutItemRequest {
                 tableName = DynamoDbSingleTableSchema.MAIN_TABLE
-                item = mapOf(
-                    "PK" to AttributeValue.S(DynamoDbSingleTableSchema.userPK(userName)),
-                    "SK" to AttributeValue.S(DynamoDbSingleTableSchema.METADATA_SK),
-                    "entity_type" to AttributeValue.S("USER"),
-                    "name" to AttributeValue.S(userName),
-                    "role" to AttributeValue.S(role.name),
-                    "discord_id" to AttributeValue.S(discordId),
-                    "discord_display_name" to AttributeValue.S(discordDisplayName),
-                )
+                item = buildMap {
+                    put("PK", AttributeValue.S(DynamoDbSingleTableSchema.userPK(userName)))
+                    put("SK", AttributeValue.S(DynamoDbSingleTableSchema.METADATA_SK))
+                    put("entity_type", AttributeValue.S("USER"))
+                    put("name", AttributeValue.S(userName))
+                    put("role", AttributeValue.S(role.name))
+                    put("discord_display_name", AttributeValue.S(discordDisplayName))
+                    // A user with no Discord credential (the dev-login bypass,
+                    // DomainEvent.UserRegistered) gets NO discord_id attribute
+                    // rather than an empty one: discord_id is the hash key of
+                    // discord-id-index, and DynamoDB rejects an empty string
+                    // for a key attribute outright. Omitting it is also what
+                    // keeps the GSI sparse — the item simply isn't in the
+                    // index, which is exactly right for a user who can never
+                    // be found by Discord id. Readers already default a
+                    // missing attribute to "" (see itemToUser).
+                    if (discordId.isNotEmpty()) {
+                        put("discord_id", AttributeValue.S(discordId))
+                    }
+                }
             })
         }
     }
