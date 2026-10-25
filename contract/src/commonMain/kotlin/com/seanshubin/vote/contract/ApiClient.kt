@@ -253,7 +253,12 @@ interface ApiClient {
      */
     suspend fun setRole(userName: String, role: Role)
 
-    /** Admin: remove a user. Only allowed against users with strictly lesser roles. */
+    /**
+     * Remove a user — the caller themselves, or (for a caller with
+     * MANAGE_USERS) any user with a strictly lesser role. Cascades to the
+     * user's ballots, notes and manager grants, and deletes every election
+     * they own along with everything inside it.
+     */
     suspend fun removeUser(userName: String)
 
     /**

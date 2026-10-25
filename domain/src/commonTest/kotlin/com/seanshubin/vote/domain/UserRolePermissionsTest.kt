@@ -87,6 +87,58 @@ class UserRolePermissionsTest {
     }
 
     @Test
+    fun `canRemove denies caller without MANAGE_USERS`() {
+        val caller = caller(Role.OBSERVER, listOf(Permission.VIEW_APPLICATION))
+        val denied = assertIs<RoleChangeResult.Denied>(caller.canRemove(target()))
+        assertEquals("must have ${Permission.MANAGE_USERS} permission", denied.reason)
+    }
+
+    @Test
+    fun `canRemove denies self`() {
+        val caller = caller(Role.ADMIN, listOf(Permission.MANAGE_USERS))
+        val denied = assertIs<RoleChangeResult.Denied>(caller.canRemove(UserRole("caller", Role.ADMIN)))
+        assertEquals("may not remove self", denied.reason)
+    }
+
+    @Test
+    fun `canRemove denies self regardless of name case`() {
+        // The caller's token name and the stored name can differ in case;
+        // a case-only mismatch must not open a self-delete through the
+        // moderation path, which skips the orphan-election checks.
+        val caller = caller(Role.ADMIN, listOf(Permission.MANAGE_USERS))
+        val denied = assertIs<RoleChangeResult.Denied>(caller.canRemove(UserRole("CALLER", Role.ADMIN)))
+        assertEquals("may not remove self", denied.reason)
+    }
+
+    @Test
+    fun `canRemove denies peer and superior`() {
+        val caller = caller(Role.ADMIN, listOf(Permission.MANAGE_USERS))
+        val peer = assertIs<RoleChangeResult.Denied>(caller.canRemove(target("eve", Role.ADMIN)))
+        assertEquals("may only remove users with lesser roles", peer.reason)
+        assertIs<RoleChangeResult.Denied>(caller.canRemove(target("auditor", Role.AUDITOR)))
+        assertIs<RoleChangeResult.Denied>(caller.canRemove(target("owner", Role.OWNER)))
+    }
+
+    @Test
+    fun `canRemove allows admin to remove a lesser role`() {
+        val caller = caller(Role.ADMIN, listOf(Permission.MANAGE_USERS))
+        assertIs<RoleChangeResult.Ok>(caller.canRemove(target("bob", Role.USER)))
+        assertIs<RoleChangeResult.Ok>(caller.canRemove(target("carol", Role.NO_ACCESS)))
+    }
+
+    @Test
+    fun `canRemove has no TRANSFER_OWNER escape hatch`() {
+        // Unlike canChangeRole, there is no special case that lets the OWNER
+        // act on a peer — nobody can delete an OWNER but the OWNER themselves.
+        val caller = caller(
+            Role.OWNER,
+            listOf(Permission.MANAGE_USERS, Permission.TRANSFER_OWNER),
+        )
+        assertIs<RoleChangeResult.Denied>(caller.canRemove(target("other-owner", Role.OWNER)))
+        assertIs<RoleChangeResult.Ok>(caller.canRemove(target("auditor", Role.AUDITOR)))
+    }
+
+    @Test
     fun `listedRolesFor includes target current role plus assignable roles`() {
         val caller = caller(Role.ADMIN, listOf(Permission.MANAGE_USERS))
         val target = UserRole("bob", Role.USER)

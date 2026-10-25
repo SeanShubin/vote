@@ -9,14 +9,20 @@ import org.jetbrains.compose.web.dom.*
 import org.w3c.dom.HTMLSelectElement
 
 /**
- * Admin page for listing users and changing their roles. The role <select>
- * for each row is bound to that row's [UserNameRole.allowedRoles] — the
- * backend has already narrowed those based on the caller's authority, so
- * the UI just renders what the server says is legal.
+ * Admin page for listing users, changing their roles, and deleting accounts.
+ * The role <select> for each row is bound to that row's
+ * [UserNameRole.allowedRoles] and the Delete button to its
+ * [UserNameRole.canRemove] — the backend has already decided both from the
+ * caller's authority, so the UI just renders what the server says is legal.
  *
  * Promoting another user to OWNER is an ownership transfer: the caller is
  * atomically demoted to AUDITOR. The dropdown commits on change, but if the
  * picked role is OWNER we first show a confirmation explaining the demotion.
+ *
+ * Deleting is likewise confirmed first, because the cascade reaches past the
+ * target: it destroys the elections they own, and with them every other
+ * voter's ballots on those elections. The confirmation quotes the counts the
+ * server sent so the admin sees the blast radius before committing.
  *
  * After any successful role change we reload the user list (the caller's
  * own allowedRoles may have changed — most obviously after handing off OWNER).
@@ -32,6 +38,7 @@ fun UserManagementPage(
     var successMessage by remember { mutableStateOf<String?>(null) }
     var pendingTransfer by remember { mutableStateOf<UserNameRole?>(null) }
     var pendingRoleChange by remember { mutableStateOf<Pair<String, Role>?>(null) }
+    var pendingRemoval by remember { mutableStateOf<UserNameRole?>(null) }
 
     val usersFetch = rememberCachedFetchState(
         apiClient = apiClient,
@@ -47,6 +54,7 @@ fun UserManagementPage(
         onError = { errorMessage = it },
         action = {
             errorMessage = null
+            successMessage = null
             val (userName, newRole) = pendingRoleChange ?: return@rememberAsyncAction
             apiClient.setRole(userName, newRole)
             // The caller's access token may now be stale (most obviously
@@ -64,6 +72,30 @@ fun UserManagementPage(
         pendingRoleChange = userName to newRole
         roleChangeAction.invoke()
     }
+
+    val removeAction = rememberAsyncAction(
+        apiClient = apiClient,
+        fallbackErrorMessage = "Failed to delete account",
+        onError = {
+            errorMessage = it
+            // Dismiss the dialog as well — the error banner lives on the page
+            // behind the modal backdrop, so leaving the dialog up would hide
+            // the explanation for why nothing happened.
+            pendingRemoval = null
+        },
+        action = {
+            errorMessage = null
+            successMessage = null
+            val target = pendingRemoval ?: return@rememberAsyncAction
+            apiClient.removeUser(target.userName)
+            pendingRemoval = null
+            // The cascade can take whole elections with it, so the cached
+            // election list is stale for every admin who later lands on it.
+            PageCache.invalidate("elections")
+            successMessage = "Deleted ${target.userName}."
+            usersFetch.reload()
+        },
+    )
 
     Div({ classes("container") }) {
         H1 { Text("User Management") }
@@ -87,6 +119,7 @@ fun UserManagementPage(
                             UserRow(
                                 user = user,
                                 isSelf = user.userName == currentUserName,
+                                isDeleting = removeAction.isLoading,
                                 onRoleSelected = { newRole ->
                                     if (newRole == user.role) return@UserRow
                                     if (newRole == Role.OWNER) {
@@ -95,6 +128,7 @@ fun UserManagementPage(
                                         submitRoleChange(user.userName, newRole)
                                     }
                                 },
+                                onRemoveRequested = { pendingRemoval = user },
                             )
                         }
                     }
@@ -120,13 +154,24 @@ fun UserManagementPage(
             },
         )
     }
+
+    pendingRemoval?.let { target ->
+        RemoveUserDialog(
+            target = target,
+            isDeleting = removeAction.isLoading,
+            onConfirm = { removeAction.invoke() },
+            onCancel = { pendingRemoval = null },
+        )
+    }
 }
 
 @Composable
 private fun UserRow(
     user: UserNameRole,
     isSelf: Boolean,
+    isDeleting: Boolean,
     onRoleSelected: (Role) -> Unit,
+    onRemoveRequested: () -> Unit,
 ) {
     Div({ classes("user-row") }) {
         Span({ classes("user-name") }) {
@@ -164,8 +209,76 @@ private fun UserRow(
                 }
             }
         }
+        // Third grid cell. Rendered even when there's no delete affordance so
+        // the next row's name doesn't slide up into this row's empty slot —
+        // .user-row is display:contents, so every row must contribute exactly
+        // three cells to .users-list.
+        if (user.canRemove) {
+            Button({
+                attr("data-delete-user", user.userName)
+                if (isDeleting) attr("disabled", "")
+                onClick { onRemoveRequested() }
+            }) {
+                Text("Delete")
+            }
+        } else {
+            Span({ classes("user-row-spacer") })
+        }
     }
 }
+
+/**
+ * Confirmation for deleting someone else's account. Spells out the cascade
+ * in concrete counts rather than a generic "this cannot be undone", because
+ * the destructive reach is non-obvious: deleting an election owner also
+ * deletes every ballot other voters cast in those elections.
+ */
+@Composable
+private fun RemoveUserDialog(
+    target: UserNameRole,
+    isDeleting: Boolean,
+    onConfirm: () -> Unit,
+    onCancel: () -> Unit,
+) {
+    Div({ classes("dialog-backdrop") }) {
+        Div({ classes("dialog") }) {
+            H2 { Text("Delete ${target.userName}?") }
+            P {
+                Text(
+                    "This permanently deletes their ${target.role.name} account, " +
+                        "the ${plural(target.ballotsCastCount, "ballot")} they cast, " +
+                        "and any notes they wrote.",
+                )
+            }
+            if (target.electionsOwnedCount > 0) {
+                P({ classes("dialog-warning") }) {
+                    Text(
+                        "It also deletes the ${plural(target.electionsOwnedCount, "election")} " +
+                            "they own — including every other voter's ballots and notes on them.",
+                    )
+                }
+            }
+            P { Text("This cannot be undone.") }
+            Div({ classes("button-row") }) {
+                Button({
+                    if (isDeleting) attr("disabled", "")
+                    onClick { onConfirm() }
+                }) {
+                    Text(if (isDeleting) "Deleting…" else "Delete account")
+                }
+                Button({
+                    if (isDeleting) attr("disabled", "")
+                    onClick { onCancel() }
+                }) {
+                    Text("Cancel")
+                }
+            }
+        }
+    }
+}
+
+private fun plural(count: Int, noun: String): String =
+    "$count $noun${if (count == 1) "" else "s"}"
 
 @Composable
 private fun OwnershipTransferDialog(

@@ -23,6 +23,17 @@ class InMemoryCommandModel(private val data: InMemoryData) : CommandModel {
     }
 
     override fun removeUser(authority: String, userName: String) {
+        // Cascade: delete every election this user owns, which in turn takes
+        // its candidates, tiers, managers, ballots (everyone's, not just the
+        // departing user's) and notes. Matches MySQL FK CASCADE on
+        // elections.owner_name → users(name); without this, removing an owner
+        // would leave elections pointing at a non-existent user. Snapshot the
+        // names first — deleteElection mutates data.elections.
+        data.elections.values
+            .filter { it.ownerName.equals(userName, ignoreCase = true) }
+            .map { it.electionName }
+            .toList()
+            .forEach { deleteElection(authority, it) }
         data.users.remove(userName.lowercase())
         // Cascade: drop any ballots this user cast (matches MySQL FK CASCADE on
         // ballots.voter_name → users(name)). Without this, removing a voter would

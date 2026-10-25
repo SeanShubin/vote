@@ -66,7 +66,13 @@ Write endpoints:
   than target. ADMINs may change other users' emails (e.g. correcting typos)
 - Remove user — self anytime (with state checks: OWNER must be alone +
   empty, non-OWNER must own no elections), or MANAGE_USERS + strictly
-  higher role than target
+  higher role than target. The OWNER is therefore never deletable by anyone
+  else; ownership must be transferred away first. Removal cascades: the
+  user's ballots, candidate notes and election-manager grants are dropped,
+  and every election they *own* is deleted outright — taking its candidates,
+  tiers, managers, and every other voter's ballots and notes on it. The
+  moderation UI quotes the elections-owned and ballots-cast counts before
+  confirming, because that reach is not obvious from the target alone
 - Set role — MANAGE_USERS, never on self, the role being assigned must be
   strictly less than caller's role, and the target's current role must be
   strictly less than caller's role. Promoting USER → USER is intentionally

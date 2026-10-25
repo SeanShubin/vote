@@ -62,6 +62,19 @@ interface Service {
     fun authenticateWithToken(accessToken: AccessToken): Tokens
     fun permissionsForRole(role: Role): List<Permission>
     fun setRole(accessToken: AccessToken, userName: String, role: Role)
+
+    /**
+     * Delete an account. Two callers: the user themselves (allowed to anyone,
+     * subject to the no-orphan-elections rules), or a moderator with
+     * MANAGE_USERS and a strictly greater role than the target.
+     *
+     * The deletion cascades: the user's ballots and candidate notes go, their
+     * co-manager grants on other people's elections go, and every election
+     * they *own* is deleted outright — taking its candidates, tiers, managers,
+     * and every voter's ballots and notes on it with it. A moderator deleting
+     * an election owner therefore destroys other users' ballots too, which is
+     * why the admin UI states the counts before confirming.
+     */
     fun removeUser(accessToken: AccessToken, userName: String)
     fun listUsers(accessToken: AccessToken): List<UserNameRole>
     fun listUserNames(accessToken: AccessToken): List<String>

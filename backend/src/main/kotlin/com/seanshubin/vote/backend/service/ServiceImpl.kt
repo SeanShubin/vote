@@ -209,9 +209,22 @@ class ServiceImpl(
             }
         } else {
             // Deleting another user requires MANAGE_USERS and a strictly higher role
-            // than the target (so e.g. an ADMIN can't remove the OWNER).
-            requirePermission(accessToken, Permission.MANAGE_USERS)
-            requireGreaterRole(accessToken, targetUser)
+            // than the target (so e.g. an ADMIN can't remove the OWNER). Decided by
+            // the same predicate that fills UserNameRole.canRemove, so the admin UI
+            // never offers a delete the service would then refuse.
+            val callerPermissions = UserRolePermissions(
+                userName = accessToken.userName,
+                role = accessToken.role,
+                permissions = queryModel.listPermissions(accessToken.role),
+            )
+            when (val result = callerPermissions.canRemove(UserRole(targetUser.name, targetUser.role))) {
+                is RoleChangeResult.Denied -> throw ServiceException(
+                    ServiceException.Category.UNAUTHORIZED,
+                    "${accessToken.userName} with role ${accessToken.role} may not remove " +
+                        "${targetUser.name} with role ${targetUser.role}: ${result.reason}",
+                )
+                is RoleChangeResult.Ok -> Unit
+            }
         }
 
         eventLog.appendEvent(
@@ -236,12 +249,19 @@ class ServiceImpl(
         )
         return queryModel.listUsers().map { user ->
             val target = UserRole(user.name, user.role)
+            val removable = callerPermissions.canRemove(target) is RoleChangeResult.Ok
             UserNameRole(
                 userName = user.name,
                 role = user.role,
                 allowedRoles = callerPermissions.listedRolesFor(target),
                 discordId = user.discordId,
                 discordDisplayName = user.discordDisplayName,
+                canRemove = removable,
+                // Only worth the two count queries for rows the caller could
+                // actually delete — the UI shows them in the delete
+                // confirmation and nowhere else.
+                electionsOwnedCount = if (removable) queryModel.electionsOwnedCount(user.name) else 0,
+                ballotsCastCount = if (removable) queryModel.ballotsCastCount(user.name) else 0,
             )
         }
     }

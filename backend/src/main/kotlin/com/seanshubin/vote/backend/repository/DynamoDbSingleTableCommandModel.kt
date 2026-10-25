@@ -61,6 +61,18 @@ class DynamoDbSingleTableCommandModel(
 
     override fun removeUser(authority: String, userName: String) {
         runBlocking {
+            // Cascade: delete every election this user owns, which in turn
+            // takes its candidates, tiers, managers, ballots (everyone's, not
+            // just the departing user's) and notes. Matches MySQL FK CASCADE
+            // on elections.owner_name → users(name). Done first so the
+            // per-user sweeps below have less to walk.
+            queryUserItems(
+                indexName = DynamoDbSingleTableSchema.OWNER_NAME_INDEX,
+                hashAttribute = "owner_name",
+                hashValue = userName,
+                skPrefix = DynamoDbSingleTableSchema.METADATA_SK,
+            ).mapNotNull { it["election_name"]?.asS() }
+                .forEach { deleteElectionItems(it) }
             dynamoDb.deleteItem(DeleteItemRequest {
                 tableName = DynamoDbSingleTableSchema.MAIN_TABLE
                 key = mapOf(
@@ -485,34 +497,44 @@ class DynamoDbSingleTableCommandModel(
 
     override fun deleteElection(authority: String, electionName: String) {
         runBlocking {
-            // Delete election metadata
+            deleteElectionItems(electionName)
+        }
+    }
+
+    /**
+     * Drop every item on one election's partition — metadata, candidates,
+     * tiers, managers, ballots and notes. Split out of [deleteElection] so
+     * the user-removal cascade can reuse it from inside its own coroutine
+     * scope rather than nesting another [runBlocking].
+     */
+    private suspend fun deleteElectionItems(electionName: String) {
+        // Delete election metadata
+        dynamoDb.deleteItem(DeleteItemRequest {
+            tableName = DynamoDbSingleTableSchema.MAIN_TABLE
+            key = mapOf(
+                "PK" to AttributeValue.S(DynamoDbSingleTableSchema.electionPK(electionName)),
+                "SK" to AttributeValue.S(DynamoDbSingleTableSchema.METADATA_SK)
+            )
+        })
+
+        // Delete all related items (candidates, ballots)
+        val relatedItems = dynamoDb.query(QueryRequest {
+            tableName = DynamoDbSingleTableSchema.MAIN_TABLE
+            keyConditionExpression = "PK = :pk"
+            expressionAttributeValues = mapOf(
+                ":pk" to AttributeValue.S(DynamoDbSingleTableSchema.electionPK(electionName))
+            )
+        }).items
+
+        relatedItems?.forEach { item ->
+            val sk = item["SK"]?.asS() ?: return@forEach
             dynamoDb.deleteItem(DeleteItemRequest {
                 tableName = DynamoDbSingleTableSchema.MAIN_TABLE
                 key = mapOf(
                     "PK" to AttributeValue.S(DynamoDbSingleTableSchema.electionPK(electionName)),
-                    "SK" to AttributeValue.S(DynamoDbSingleTableSchema.METADATA_SK)
+                    "SK" to AttributeValue.S(sk)
                 )
             })
-
-            // Delete all related items (candidates, ballots)
-            val relatedItems = dynamoDb.query(QueryRequest {
-                tableName = DynamoDbSingleTableSchema.MAIN_TABLE
-                keyConditionExpression = "PK = :pk"
-                expressionAttributeValues = mapOf(
-                    ":pk" to AttributeValue.S(DynamoDbSingleTableSchema.electionPK(electionName))
-                )
-            }).items
-
-            relatedItems?.forEach { item ->
-                val sk = item["SK"]?.asS() ?: return@forEach
-                dynamoDb.deleteItem(DeleteItemRequest {
-                    tableName = DynamoDbSingleTableSchema.MAIN_TABLE
-                    key = mapOf(
-                        "PK" to AttributeValue.S(DynamoDbSingleTableSchema.electionPK(electionName)),
-                        "SK" to AttributeValue.S(sk)
-                    )
-                })
-            }
         }
     }
 

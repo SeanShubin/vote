@@ -970,22 +970,17 @@ button:disabled {
 }
 
 /*
- * User management list. Three-column grid (name | role-control | optional
- * set-password button) where every row's role control aligns to the same x
- * regardless of name length — flex-per-row would let columns drift.
+ * User management list. Three-column grid (name | role-control | delete
+ * button) where every row's role control aligns to the same x regardless
+ * of name length — flex-per-row would let columns drift.
  * .user-row uses display: contents so its three children flow directly into
- * the parent grid as cells. Rows where the caller has no permission to
- * set the target's password still render a placeholder cell in column 3
- * so the grid's row-fill order doesn't bleed cells from the next user
- * into the prior row's empty slot.
- *
- * The inline AdminSetPasswordForm is a sibling div that lands in the grid
- * as another row; it spans all columns so the form input row reads as a
- * single full-width strip under the user row that opened it.
+ * the parent grid as cells. Rows the caller has no authority to delete
+ * still render a placeholder cell in column 3 so the grid's row-fill order
+ * doesn't bleed cells from the next user into the prior row's empty slot.
  */
 .users-list {
     display: grid;
-    grid-template-columns: 1fr auto;
+    grid-template-columns: 1fr auto auto;
     column-gap: 1rem;
     row-gap: 0.5rem;
     align-items: center;
@@ -994,6 +989,11 @@ button:disabled {
 
 .user-row {
     display: contents;
+}
+
+/* Match .election-item button — list-row buttons are tighter than page buttons. */
+.users-list button {
+    padding: 0.5rem 1rem;
 }
 
 .user-name {
@@ -1042,6 +1042,26 @@ button:disabled {
 
 .dialog h2 {
     margin-top: 0;
+}
+
+/*
+ * Emphasis line inside a confirmation dialog for the part of a cascade the
+ * admin is least likely to expect (deleting a user also deletes other
+ * people's ballots on the elections that user owns). Reuses the .error
+ * palette rather than introducing a second red — it is the same "stop and
+ * read this" register, just preemptive instead of reactive.
+ */
+.dialog-warning {
+    padding: 0.75rem 1rem;
+    margin: 0.75rem 0;
+    background-color: #fee;
+    border: 1px solid #fcc;
+    border-radius: 4px;
+    color: #c33;
+}
+
+.dialog p {
+    margin: 0.75rem 0;
 }
 
 .ranking-row {
